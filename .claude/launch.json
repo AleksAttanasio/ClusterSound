@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "clustersound-dev",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["tools/devserver.py", "--port", "8765"],
+      "port": 8765
+    }
+  ]
+}

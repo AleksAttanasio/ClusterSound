@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ClusterSound</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Cluster<span>Sound</span></div>
+    <button id="btn-folder" class="btn primary">Scegli cartella…</button>
+    <div id="folder-path" class="folder-path" title="">Nessuna cartella</div>
+    <button id="btn-rescan" class="btn" disabled title="Rianalizza la cartella (i file invariati vengono letti dalla cache)">Riscansiona</button>
+    <div class="progress-wrap" id="progress-wrap" hidden>
+      <div class="progress"><div id="progress-bar"></div></div>
+      <div id="progress-text" class="progress-text"></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" role="tablist">
+      <button id="view-3d" class="seg-btn active" role="tab">3D</button>
+      <button id="view-list" class="seg-btn" role="tab">Lista</button>
+    </div>
+    <button id="btn-export" class="btn" disabled>Esporta report</button>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <input id="search" class="search" type="search" placeholder="Cerca per nome o cartella…" autocomplete="off">
+      <div class="filter-block">
+        <div class="filter-title">Tipo</div>
+        <div id="type-filters" class="chips"></div>
+      </div>
+      <div class="filter-block">
+        <div class="filter-title">Confidenza minima <span id="conf-value">0%</span></div>
+        <input id="conf" type="range" min="0" max="95" step="5" value="0">
+      </div>
+      <div class="filter-block classes-block">
+        <div class="filter-title">
+          Classi
+          <span class="links"><a href="#" id="cls-all">tutte</a> · <a href="#" id="cls-none">nessuna</a></span>
+        </div>
+        <div id="class-list"></div>
+      </div>
+      <div id="stats" class="stats"></div>
+    </aside>
+
+    <main class="main">
+      <div id="view3d" class="view3d">
+        <div id="labels" class="labels"></div>
+        <div id="tooltip" class="tooltip" hidden></div>
+        <div class="scene-tools">
+          <button id="btn-rotate" class="icon-btn" title="Rotazione automatica">⟳</button>
+          <button id="btn-reset" class="icon-btn" title="Reimposta vista">⌂</button>
+          <button id="btn-labels" class="icon-btn active" title="Etichette delle classi">Aa</button>
+        </div>
+        <div id="layout-badge" class="layout-badge" hidden></div>
+        <div id="empty" class="empty">
+          <div class="empty-title">Scegli una cartella di sample</div>
+          <div class="empty-sub">ClusterSound analizza ricorsivamente tutti i file audio (wav, aif, flac, ogg, mp3),
+            li classifica (kick, snare, hat…) e li dispone in 3D per somiglianza.
+            I file originali non vengono mai modificati.</div>
+        </div>
+      </div>
+      <div id="viewlist" class="viewlist" hidden>
+        <div class="list-head" id="list-head"></div>
+        <div class="list-body" id="list-body"><div id="list-spacer"></div></div>
+      </div>
+
+      <aside id="panel" class="panel" aria-hidden="true">
+        <button id="panel-close" class="panel-close" title="Chiudi (Esc)">×</button>
+        <div id="panel-content"></div>
+      </aside>
+    </main>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

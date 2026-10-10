@@ -1,0 +1,26 @@
+[project]
+name = "clustersound"
+version = "0.1.0"
+description = "Classifica e raggruppa in 3D una libreria di sample audio (kick, snare, hat, …)."
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "soundfile>=0.12",
+    "soxr>=0.3",
+    "pywebview>=5.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pyinstaller>=6.0", "h5py"]
+
+[project.scripts]
+clustersound = "clustersound.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["clustersound*"]
+
+[tool.setuptools.package-data]
+clustersound = ["models/*", "ui/*", "ui/vendor/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
