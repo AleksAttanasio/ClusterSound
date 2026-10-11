@@ -48,9 +48,9 @@
      "rounded": 8,
      "border": 1,
      "bgcolor": [
-      0.16,
-      0.16,
-      0.16,
+      0.12,
+      0.12,
+      0.12,
       1.0
      ],
      "bordercolor": [
@@ -58,7 +58,15 @@
       0.3,
       0.3,
       1.0
-     ]
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_lcd_bg"
+      },
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_frame"
+      }
+     }
     }
    },
    {
@@ -85,9 +93,9 @@
      "rounded": 8,
      "border": 1,
      "bgcolor": [
-      0.16,
-      0.16,
-      0.16,
+      0.12,
+      0.12,
+      0.12,
       1.0
      ],
      "bordercolor": [
@@ -95,7 +103,15 @@
       0.3,
       0.3,
       1.0
-     ]
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_lcd_bg"
+      },
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_frame"
+      }
+     }
     }
    },
    {
@@ -119,12 +135,12 @@
      ],
      "background": 1,
      "ignoreclick": 1,
-     "rounded": 8,
+     "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.16,
-      0.16,
-      0.16,
+      0.12,
+      0.12,
+      0.12,
       1.0
      ],
      "bordercolor": [
@@ -132,7 +148,15 @@
       0.3,
       0.3,
       1.0
-     ]
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_lcd_bg"
+      },
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_frame"
+      }
+     }
     }
    },
    {
@@ -294,7 +318,48 @@
       20
      ],
      "items": [],
-     "parameter_enable": 0
+     "parameter_enable": 0,
+     "rounded": 6,
+     "arrow": 1,
+     "bgcolor": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgfillcolor_color": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "color": {
+       "expression": "themecolor.live_control_fg_off"
+      }
+     },
+     "bgfillcolor_type": "color",
+     "bgfillcolor_color": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "textcolor": [
+      0.85,
+      0.85,
+      0.85,
+      1.0
+     ],
+     "color": [
+      0.6,
+      0.6,
+      0.6,
+      1.0
+     ]
     }
    },
    {
@@ -322,7 +387,48 @@
       20
      ],
      "items": [],
-     "parameter_enable": 0
+     "parameter_enable": 0,
+     "rounded": 6,
+     "arrow": 1,
+     "bgcolor": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgfillcolor_color": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "color": {
+       "expression": "themecolor.live_control_fg_off"
+      }
+     },
+     "bgfillcolor_type": "color",
+     "bgfillcolor_color": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "textcolor": [
+      0.85,
+      0.85,
+      0.85,
+      1.0
+     ],
+     "color": [
+      0.6,
+      0.6,
+      0.6,
+      1.0
+     ]
     }
    },
    {
@@ -386,7 +492,73 @@
       20
      ],
      "text": "Aggiorna",
-     "mode": 0
+     "mode": 0,
+     "rounded": 6,
+     "bgcolor": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgovercolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgoncolor": {
+       "expression": "themecolor.live_control_selection"
+      },
+      "bgoveroncolor": {
+       "expression": "themecolor.live_control_selection"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_frame"
+      }
+     },
+     "bgovercolor": [
+      0.24,
+      0.24,
+      0.24,
+      1.0
+     ],
+     "bgoncolor": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ],
+     "bgoveroncolor": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ],
+     "textcolor": [
+      0.85,
+      0.85,
+      0.85,
+      1.0
+     ],
+     "textovercolor": [
+      0.95,
+      0.95,
+      0.95,
+      1.0
+     ],
+     "bordercolor": [
+      0.3,
+      0.3,
+      0.3,
+      1.0
+     ]
     }
    },
    {
@@ -450,7 +622,51 @@
       22
      ],
      "text": "Importa",
-     "mode": 0
+     "mode": 0,
+     "rounded": 6,
+     "bgcolor": [
+      0.122,
+      0.435,
+      0.984,
+      1.0
+     ],
+     "saved_attribute_attributes": {},
+     "bgovercolor": [
+      0.184,
+      0.553,
+      0.992,
+      1.0
+     ],
+     "bgoncolor": [
+      0.071,
+      0.2,
+      0.4,
+      1.0
+     ],
+     "bgoveroncolor": [
+      0.071,
+      0.2,
+      0.4,
+      1.0
+     ],
+     "textcolor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "textovercolor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "bordercolor": [
+      0.184,
+      0.553,
+      0.992,
+      1.0
+     ]
     }
    },
    {
@@ -511,7 +727,36 @@
       14,
       14
      ],
-     "parameter_enable": 0
+     "parameter_enable": 0,
+     "bgcolor": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "checkedcolor": {
+       "expression": "themecolor.live_control_selection"
+      },
+      "uncheckedcolor": {
+       "expression": "themecolor.live_control_fg_off"
+      }
+     },
+     "checkedcolor": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ],
+     "uncheckedcolor": [
+      0.5,
+      0.5,
+      0.5,
+      1.0
+     ]
     }
    },
    {
@@ -594,7 +839,36 @@
       14,
       14
      ],
-     "parameter_enable": 0
+     "parameter_enable": 0,
+     "bgcolor": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "checkedcolor": {
+       "expression": "themecolor.live_control_selection"
+      },
+      "uncheckedcolor": {
+       "expression": "themecolor.live_control_fg_off"
+      }
+     },
+     "checkedcolor": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ],
+     "uncheckedcolor": [
+      0.5,
+      0.5,
+      0.5,
+      1.0
+     ]
     }
    },
    {
@@ -659,7 +933,36 @@
       14,
       14
      ],
-     "parameter_enable": 0
+     "parameter_enable": 0,
+     "bgcolor": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "checkedcolor": {
+       "expression": "themecolor.live_control_selection"
+      },
+      "uncheckedcolor": {
+       "expression": "themecolor.live_control_fg_off"
+      }
+     },
+     "checkedcolor": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ],
+     "uncheckedcolor": [
+      0.5,
+      0.5,
+      0.5,
+      1.0
+     ]
     }
    },
    {
@@ -791,7 +1094,48 @@
       20
      ],
      "items": [],
-     "parameter_enable": 0
+     "parameter_enable": 0,
+     "rounded": 6,
+     "arrow": 1,
+     "bgcolor": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgfillcolor_color": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "color": {
+       "expression": "themecolor.live_control_fg_off"
+      }
+     },
+     "bgfillcolor_type": "color",
+     "bgfillcolor_color": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "textcolor": [
+      0.85,
+      0.85,
+      0.85,
+      1.0
+     ],
+     "color": [
+      0.6,
+      0.6,
+      0.6,
+      1.0
+     ]
     }
    },
    {
@@ -859,7 +1203,48 @@
       20
      ],
      "items": [],
-     "parameter_enable": 0
+     "parameter_enable": 0,
+     "rounded": 6,
+     "arrow": 1,
+     "bgcolor": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgfillcolor_color": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "color": {
+       "expression": "themecolor.live_control_fg_off"
+      }
+     },
+     "bgfillcolor_type": "color",
+     "bgfillcolor_color": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "textcolor": [
+      0.85,
+      0.85,
+      0.85,
+      1.0
+     ],
+     "color": [
+      0.6,
+      0.6,
+      0.6,
+      1.0
+     ]
     }
    },
    {
@@ -928,7 +1313,48 @@
      ],
      "items": [],
      "parameter_enable": 0,
-     "hint": "Scegli uno strumento: si carica e la clip suona in loop."
+     "hint": "Scegli uno strumento: si carica e la clip suona in loop.",
+     "rounded": 6,
+     "arrow": 1,
+     "bgcolor": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgfillcolor_color": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "color": {
+       "expression": "themecolor.live_control_fg_off"
+      }
+     },
+     "bgfillcolor_type": "color",
+     "bgfillcolor_color": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "textcolor": [
+      0.85,
+      0.85,
+      0.85,
+      1.0
+     ],
+     "color": [
+      0.6,
+      0.6,
+      0.6,
+      1.0
+     ]
     }
    },
    {
@@ -975,7 +1401,73 @@
      ],
      "text": "◀",
      "mode": 0,
-     "hint": "Strumento precedente / successivo"
+     "hint": "Strumento precedente / successivo",
+     "rounded": 6,
+     "bgcolor": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgovercolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgoncolor": {
+       "expression": "themecolor.live_control_selection"
+      },
+      "bgoveroncolor": {
+       "expression": "themecolor.live_control_selection"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_frame"
+      }
+     },
+     "bgovercolor": [
+      0.24,
+      0.24,
+      0.24,
+      1.0
+     ],
+     "bgoncolor": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ],
+     "bgoveroncolor": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ],
+     "textcolor": [
+      0.85,
+      0.85,
+      0.85,
+      1.0
+     ],
+     "textovercolor": [
+      0.95,
+      0.95,
+      0.95,
+      1.0
+     ],
+     "bordercolor": [
+      0.3,
+      0.3,
+      0.3,
+      1.0
+     ]
     }
    },
    {
@@ -1040,7 +1532,73 @@
      ],
      "text": "Prova ▶",
      "mode": 0,
-     "hint": "Carica lo strumento scelto e suona la clip in loop. Doppio clic: vai alla traccia."
+     "hint": "Carica lo strumento scelto e suona la clip in loop. Doppio clic: vai alla traccia.",
+     "rounded": 6,
+     "bgcolor": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgovercolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgoncolor": {
+       "expression": "themecolor.live_control_selection"
+      },
+      "bgoveroncolor": {
+       "expression": "themecolor.live_control_selection"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_frame"
+      }
+     },
+     "bgovercolor": [
+      0.24,
+      0.24,
+      0.24,
+      1.0
+     ],
+     "bgoncolor": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ],
+     "bgoveroncolor": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ],
+     "textcolor": [
+      0.85,
+      0.85,
+      0.85,
+      1.0
+     ],
+     "textovercolor": [
+      0.95,
+      0.95,
+      0.95,
+      1.0
+     ],
+     "bordercolor": [
+      0.3,
+      0.3,
+      0.3,
+      1.0
+     ]
     }
    },
    {
@@ -1105,7 +1663,73 @@
      ],
      "text": "▶",
      "mode": 0,
-     "hint": "Strumento precedente / successivo"
+     "hint": "Strumento precedente / successivo",
+     "rounded": 6,
+     "bgcolor": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgovercolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgoncolor": {
+       "expression": "themecolor.live_control_selection"
+      },
+      "bgoveroncolor": {
+       "expression": "themecolor.live_control_selection"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_frame"
+      }
+     },
+     "bgovercolor": [
+      0.24,
+      0.24,
+      0.24,
+      1.0
+     ],
+     "bgoncolor": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ],
+     "bgoveroncolor": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ],
+     "textcolor": [
+      0.85,
+      0.85,
+      0.85,
+      1.0
+     ],
+     "textovercolor": [
+      0.95,
+      0.95,
+      0.95,
+      1.0
+     ],
+     "bordercolor": [
+      0.3,
+      0.3,
+      0.3,
+      1.0
+     ]
     }
    },
    {
@@ -1169,7 +1793,73 @@
       22
      ],
      "text": "Stop",
-     "mode": 0
+     "mode": 0,
+     "rounded": 6,
+     "bgcolor": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgovercolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgoncolor": {
+       "expression": "themecolor.live_control_selection"
+      },
+      "bgoveroncolor": {
+       "expression": "themecolor.live_control_selection"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_frame"
+      }
+     },
+     "bgovercolor": [
+      0.24,
+      0.24,
+      0.24,
+      1.0
+     ],
+     "bgoncolor": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ],
+     "bgoveroncolor": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ],
+     "textcolor": [
+      0.85,
+      0.85,
+      0.85,
+      1.0
+     ],
+     "textovercolor": [
+      0.95,
+      0.95,
+      0.95,
+      1.0
+     ],
+     "bordercolor": [
+      0.3,
+      0.3,
+      0.3,
+      1.0
+     ]
     }
    },
    {
@@ -1273,7 +1963,73 @@
       22
      ],
      "text": "Clip → Melodia",
-     "mode": 0
+     "mode": 0,
+     "rounded": 6,
+     "bgcolor": [
+      0.2,
+      0.2,
+      0.2,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgovercolor": {
+       "expression": "themecolor.live_control_bg"
+      },
+      "bgoncolor": {
+       "expression": "themecolor.live_control_selection"
+      },
+      "bgoveroncolor": {
+       "expression": "themecolor.live_control_selection"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_control_fg"
+      },
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_frame"
+      }
+     },
+     "bgovercolor": [
+      0.24,
+      0.24,
+      0.24,
+      1.0
+     ],
+     "bgoncolor": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ],
+     "bgoveroncolor": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ],
+     "textcolor": [
+      0.85,
+      0.85,
+      0.85,
+      1.0
+     ],
+     "textovercolor": [
+      0.95,
+      0.95,
+      0.95,
+      1.0
+     ],
+     "bordercolor": [
+      0.3,
+      0.3,
+      0.3,
+      1.0
+     ]
     }
    },
    {
