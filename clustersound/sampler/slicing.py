@@ -6,6 +6,7 @@ from .session import DEFAULT_MAX_SAMPLE_SECONDS, SamplerSession
 
 CHUNK_S = 30.0     # onset detection runs on chunks: a 20-minute STFT would not fit in memory
 OVERLAP_S = 1.0
+LEAD_IN_S = 0.05    # silence added before the source for onset detection
 PRE_ROLL_S = 0.005  # detected onsets sit a few ms after the real attack
 MIN_REGION_S = 0.03
 TAIL_DB = -50.0     # a slice ends where its level stays below this (relative to its peak)
@@ -19,14 +20,19 @@ def rise_db(sensitivity: float) -> float:
 def onset_times(x: np.ndarray, sr: int, sensitivity: float = 0.5) -> np.ndarray:
     # each chunk owns [a + ov/2, a + hop + ov/2): the start of a chunk (where a decaying tail can look
     # like an onset) is owned by the previous chunk, which sees it with context
-    hop, ov = int(CHUNK_S * sr), int(OVERLAP_S * sr)
+    # the first chunk gets a little silence in front, so a hit right at 0 still shows an energy rise
+    hop, ov, pad = int(CHUNK_S * sr), int(OVERLAP_S * sr), int(LEAD_IN_S * sr)
     out: list[float] = []
     for a in range(0, max(1, x.size), hop):
         seg = x[a:a + hop + ov]
         if seg.size < sr * 0.05:
             break
+        lead = 0 if a else pad
+        if lead:
+            seg = np.concatenate([np.zeros(lead, dtype=seg.dtype), seg])
         lo = (a + ov / 2) / sr if a else 0.0
-        for t in features.onsets(seg, sr, rise_db(sensitivity), fallback=False) + a / sr:
+        for t in features.onsets(seg, sr, rise_db(sensitivity), fallback=False) + (a - lead) / sr:
+            t = max(0.0, t)
             if lo <= t < (a + hop + ov / 2) / sr and (not out or t - out[-1] > 0.03):
                 out.append(float(t))
     return np.array(out)

@@ -234,3 +234,9 @@ def test_capture_grab_uses_ring(monkeypatch):
 def test_capture_grab_empty():
     with pytest.raises(capture.CaptureError):
         capture.SystemCapture().grab()
+
+
+def test_hit_at_time_zero_is_found():
+    x, starts = _hits()
+    x = x[int(starts[0] * SR):]  # the first hit starts at sample 0
+    assert len(slicing.auto_slices(S.from_array(x, SR))) == len(starts)
