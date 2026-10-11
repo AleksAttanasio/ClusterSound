@@ -187,15 +187,24 @@ def _seq(lib):
 def test_clip_variations(tmp_path):
     lib = _pack(tmp_path)
     seq, pool = _seq(lib)
-    kinds = ["voicing", "color", "substitute", "performance"]
+    kinds = [k for k, _ in variations.CLIP_KINDS]  # playing style lives in the Modalità: see test_mode_variations
     a = variations.vary_clip(seq, "c16", kinds, 4, pool, C_MAJ, lib.bigrams("major"))
     assert a == variations.vary_clip(seq, "c16", kinds, 4, pool, C_MAJ, lib.bigrams("major"))
-    assert {v["kind"] for v in a} >= {"voicing", "substitute", "performance"}
+    assert {"voicing", "substitute"} <= {v["kind"] for v in a} <= set(kinds)
     ids = {c["id"] for c in pool}
     for v in a:
         assert v["clip"]["start"] == 16 and v["clip"]["len"] == 16
         if v["kind"] == "substitute":
             assert v["clip"]["chordId"] in ids and v["clip"]["root"] != 9
+
+
+def test_mode_variations():
+    base = perform.mode_of({"mode": perform.DEFAULT_MODE})
+    kinds = [k for k, _ in variations.MODE_KINDS]
+    a = variations.vary_mode(base, kinds, 0.5, 3)
+    assert a == variations.vary_mode(base, kinds, 0.5, 3)
+    assert 0 < len(a) <= 4 and all(v["kind"] in kinds for v in a)
+    assert all(v["mode"] != base for v in a) and len({repr(v["mode"]) for v in a}) == len(a)
 
 
 def test_progression_variations(tmp_path):
