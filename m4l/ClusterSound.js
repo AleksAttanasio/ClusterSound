@@ -36,6 +36,9 @@ var poll = new Task(tick, this);
 var pings = 0;
 var imported = [], sndIdx = 0;  // entries of the last import: {name, role, pad, trackId, clipId, restore, cat, options, total, pick, hasSound}
 var cats = null, catDefaults = {};  // instrument types of Live's library, and the starting one per role
+var pending = null;   // entry to play as soon as the current loading ends (the last click wins)
+var lastProva = 0;    // a second click on Prova within DOUBLE_CLICK ms selects the track
+var DOUBLE_CLICK = 400;
 
 // ------------------------------------------------------------------ inlet messages
 function bang() {  // live.thisdevice: the Live API is usable from now on
@@ -132,6 +135,12 @@ function http(path, cb) {
 http.local = 1;
 
 // ------------------------------------------------------------------ Remote Script (OSC)
+function dlog(text) {  // to the Max console and, through the Remote Script, to Live's Log.txt
+    post("ClusterSound: " + text + "\n");
+    if (bridgeOk) outlet(OUT_UDP, "/clustersound", JSON.stringify({ cmd: "log", id: 0, text: String(text) }));
+}
+dlog.local = 1;
+
 function sendOsc(obj) {
     obj.id = ++msgId;
     outlet(OUT_UDP, "/clustersound", JSON.stringify(obj));
@@ -233,6 +242,7 @@ function importPayload(p) {
     steps.push(function () {
         busy = false;
         imported = entriesOf(refs);
+        dlog("imported " + imported.length + " entries: " + imported.map(function (e) { return e.name; }).join(", "));
         sndIdx = 0;
         for (var k = 0; k < imported.length; k++) if (!imported[k].hasSound) { sndIdx = k; break; }
         fillSoundTracks();
@@ -265,7 +275,16 @@ wait.local = 1;
 function runSteps() {
     while (steps.length && !waiting) {
         var s = steps.shift();
-        try { s(); } catch (e) { status("Errore: " + e); }
+        try { s(); } catch (e) { status("Errore: " + e); dlog("step error: " + e); }
+    }
+    if (steps.length || waiting) return;
+    // idle: the menus show the current state, then the click that came in while loading is played
+    fillSoundTypes();
+    fillSoundItems();
+    if (pending) {
+        var r = pending;
+        pending = null;
+        play(r);
     }
 }
 runSteps.local = 1;
@@ -365,6 +384,7 @@ function fillSoundItems() {
     outlet(OUT_SND_ITEMS, "clear");
     if (!r) return;
     var list = choices(r);
+    dlog("menu " + r.name + ": type " + r.cat + ", " + list.length + " entries, pick " + r.pick);
     for (var i = 0; i < list.length; i++) outlet(OUT_SND_ITEMS, "append", list[i].label);
     if (list.length) outlet(OUT_SND_ITEMS, "set", Math.min(r.pick, list.length - 1));
 }
@@ -452,13 +472,6 @@ function fire(r) {
 }
 fire.local = 1;
 
-function loading() {
-    if (!waiting && !steps.length) return false;
-    status("Sto caricando, un attimo…");
-    return true;
-}
-loading.local = 1;
-
 function play(r) {  // load the picked entry and play; "… altri" fetches the next page and plays its first preset
     var c = choices(r)[r.pick];
     if (c && c.more) listType(r, r.options.length, function () { fillSoundItems(); loadOption(r, true); });
@@ -498,29 +511,49 @@ function sndtype(i) {
     runSteps();
 }
 
+function playOrQueue(r) {  // never drop a click: while something loads, the last choice waits its turn
+    if (waiting || steps.length) {
+        pending = r;
+        var c = choices(r)[r.pick];
+        return status("Dopo il caricamento: «" + (c ? c.label : "") + "»");
+    }
+    play(r);
+}
+playOrQueue.local = 1;
+
 function sndpick(i) {  // choosing an instrument plays it on the clip right away
     var r = current();
-    if (!r || loading()) return;
+    if (!r) return;
     r.pick = i;
-    play(r);
+    playOrQueue(r);
 }
 
 function prova() {
     var r = current();
     if (!r) return status("Importa prima qualcosa: gli strumenti si provano sulle tracce importate");
-    if (loading()) return;
+    var now = Date.now();
+    if (now - lastProva < DOUBLE_CLICK) {  // double click: also go to the track
+        lastProva = 0;
+        return selectTrack(r);
+    }
+    lastProva = now;
     if (!r.cat) return sndtrack(sndIdx);
-    play(r);
+    playOrQueue(r);
 }
+
+function selectTrack(r) {
+    if (alive(r.trackId)) new LiveAPI("live_set view").set("selected_track", "id", r.trackId);
+}
+selectTrack.local = 1;
 
 function step_(delta) {
     var r = current();
-    if (!r || loading()) return;
+    if (!r) return;
     var n = choices(r).length;
     if (!n) return;
     r.pick = (r.pick + delta + n) % n;
     outlet(OUT_SND_ITEMS, "set", r.pick);
-    play(r);
+    playOrQueue(r);
 }
 step_.local = 1;
 

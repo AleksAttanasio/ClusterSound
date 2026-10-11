@@ -4,6 +4,7 @@ from __future__ import absolute_import
 
 import socket
 import traceback
+from contextlib import contextmanager
 
 import Live
 from _Framework.ControlSurface import ControlSurface
@@ -73,6 +74,9 @@ class ClusterSoundBridge(ControlSurface):
 
     def _handle(self, msg):
         cmd = msg.get("cmd")
+        if cmd == "log":  # a line from the device, for debugging: no reply
+            self._log("device: %s" % msg.get("text", ""))
+            return
         if cmd != "ping":
             self._log("<- %r" % (msg,))
         if cmd == "ping":
@@ -110,8 +114,8 @@ class ClusterSoundBridge(ControlSurface):
         track = tracks[idx]
         if not self._midi(track, msg):
             return
-        song.view.selected_track = track
-        browser.load_item(item)
+        with self._selected(track, msg):
+            browser.load_item(item)
         self._reply(msg, True, track=tracks.index(track))
 
     def _track(self, msg):
@@ -159,14 +163,32 @@ class ClusterSoundBridge(ControlSurface):
         if not self._midi(track, msg):
             return
         browser = Live.Application.get_application().browser
-        song = self.song()
-        song.view.selected_track = track
-        if msg.get("pad") is not None:
-            if not self._load_on_pad(track, int(msg["pad"]), item, browser, msg):
-                return
-        else:
-            browser.load_item(item)
+        with self._selected(track, msg):
+            if msg.get("pad") is not None:
+                if not self._load_on_pad(track, int(msg["pad"]), item, browser, msg):
+                    return
+            else:
+                browser.load_item(item)
         self._reply(msg, True, name=protocol.display_name(item.name))
+
+    @contextmanager
+    def _selected(self, track, msg):
+        """The browser loads onto the selected track: select it for the load, then give the selection back
+        (unless msg["select"]), so auditioning never moves the user away from the track they are on."""
+        view = self.song().view
+        before = view.selected_track
+        view.selected_track = track
+        try:
+            yield
+        finally:
+            if not msg.get("select") and before is not None and before != track:
+                self.schedule_message(1, lambda: self._restore_selection(before))  # after Live took the load
+
+    def _restore_selection(self, track):
+        try:
+            self.song().view.selected_track = track
+        except Exception as e:  # e.g. the track was deleted meanwhile
+            self._log("cannot restore selected track: %s" % e)
 
     def _load_on_pad(self, track, note, item, browser, msg):
         """Replace what a Drum Rack pad plays (a sample or a Simpler preset) through the browser's hotswap."""

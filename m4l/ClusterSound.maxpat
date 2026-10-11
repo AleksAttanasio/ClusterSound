@@ -1113,7 +1113,7 @@
       34
      ],
      "linecount": 2,
-     "text": "Scegli uno strumento o usa ◀ ▶: si carica sulla traccia e la clip suona in loop."
+     "text": "Scegli uno strumento o usa ◀ ▶: si carica e la clip suona in loop. Doppio clic su Prova: vai alla traccia."
     }
    },
    {
