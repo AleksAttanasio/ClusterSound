@@ -146,3 +146,40 @@ def test_bridge_push_queue_and_routes(bridge):
     assert _get(bridge, "/live/next") == (200, {"kind": "compose", "name": "x"})
     assert _get(bridge, "/live/next")[0] == 204
     assert _get(bridge, "/api/init")[0] == 404
+
+
+# ---------------------------------------------------------------- Remote Script protocol
+def _protocol():
+    import importlib.util
+    path = os.path.join(os.path.dirname(__file__), "..", "remote_script", "ClusterSoundBridge", "protocol.py")
+    spec = importlib.util.spec_from_file_location("cs_protocol", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_osc_roundtrip_and_padding():
+    proto = _protocol()
+    msg = {"id": 3, "cmd": "load", "track": 2, "place": "ClusterSound Patterns/_Live/rack/Kit – è/Kit Drum Rack.adg"}
+    data = proto.osc_encode(msg)
+    assert len(data) % 4 == 0 and data.startswith(b"/clustersound\0\0\0,s\0\0")
+    assert proto.parse(data) == msg
+    assert proto.parse(proto.osc_encode({"x": 1})) is None        # no cmd
+    assert proto.parse(proto.osc_encode({"cmd": "ping"}, "/other")) is None
+    assert proto.parse(b"garbage") is None
+
+
+def test_find_item_in_places():
+    proto = _protocol()
+
+    class Item:
+        def __init__(self, name, *children):
+            self.name, self.children = name, list(children)
+
+    adg = Item("Kit Drum Rack.adg")
+    places = [Item("Samples"), Item("ClusterSound Patterns", Item("_Live", Item("rack", Item("Kit", Item("Samples"), adg))))]
+    assert proto.find_item(places, "ClusterSound Patterns/_Live/rack/Kit/Kit Drum Rack.adg") is adg
+    adg.name = "Kit Drum Rack"  # the browser may hide the extension
+    assert proto.find_item(places, "ClusterSound Patterns/_Live/rack/Kit/Kit Drum Rack.adg") is adg
+    assert proto.find_item(places, "ClusterSound Patterns/_Live/rack/Other/x.adg") is None
+    assert proto.find_item(places, "") is None
