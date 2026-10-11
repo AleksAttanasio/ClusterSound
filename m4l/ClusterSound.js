@@ -190,7 +190,8 @@ function importPayload(p) {
         (function (t, first) {
             // tracks and clips are kept by Live id: indices change as soon as tracks are added or moved
             var ref = { name: t.name, role: t.role || "chords", trackId: 0, clipId: 0, options: [], pick: 0,
-                        seed: Math.floor(Math.random() * 1000000), hasSound: false };
+                        seed: Math.floor(Math.random() * 1000000), hasSound: false, pad: null,
+                        restore: t.adg_path ? { root: t.adg_root, path: t.adg_path } : null, buses: t.buses || [] };
             refs.push(ref);
             steps.push(function () {
                 var index;
@@ -226,16 +227,16 @@ function importPayload(p) {
     }
     steps.push(function () {
         busy = false;
-        imported = refs;
+        imported = entriesOf(refs);
         sndIdx = 0;
-        for (var k = 0; k < refs.length; k++) if (!refs[k].hasSound) { sndIdx = k; break; }
+        for (var k = 0; k < imported.length; k++) if (!imported[k].hasSound) { sndIdx = k; break; }
         fillSoundTracks();
         status("Importato «" + p.name + "»" + (notes.length ? " · " + notes.join(" · ") : ""));
         // a track without an instrument gets the first proposal from Live's library, so the import plays
         for (var j = 0; j < refs.length; j++) {
             (function (r) {
                 if (r.hasSound || !bridgeOk) return;
-                suggest(r, function () { loadOption(r, false); });
+                suggest(r, function () { loadOption(r, false, r.restore ? 1 : 0); });
             })(refs[j]);
         }
     });
@@ -301,12 +302,42 @@ function fillSoundTracks() {
 }
 fillSoundTracks.local = 1;
 
+// Entries of the "Traccia" menu: every imported track and, for a Drums track, every drum bus of the pattern or
+// sequence (its proposals are single hits loaded on that bus' pad of the Drum Rack).
+function entriesOf(refs) {
+    var out = [];
+    for (var i = 0; i < refs.length; i++) {
+        var r = refs[i];
+        if (r.buses.length) r.name = r.name + " · kit intero";
+        out.push(r);
+        for (var j = 0; j < r.buses.length; j++) {
+            var b = r.buses[j];
+            out.push({ name: r.name.split(" · ")[0] + " › " + b.label, role: "bus:" + b.id, pad: b.note,
+                       trackId: r.trackId, clipId: r.clipId, options: [], pick: 0, hasSound: r.hasSound,
+                       seed: Math.floor(Math.random() * 1000000), restore: r.restore, buses: [] });
+        }
+    }
+    return out;
+}
+entriesOf.local = 1;
+
+// What the sounds menu offers for an entry: the ClusterSound samples back (when the import had a rack), then
+// the proposals from Live's library.
+function choices(r) {
+    var out = [];
+    if (r.restore) out.push({ label: r.pad !== null ? "★ Kit ClusterSound (ripristina tutto)" : "★ Sample ClusterSound", restore: true });
+    for (var i = 0; i < r.options.length; i++) out.push({ label: r.options[i].name + " · " + r.options[i].folder, opt: r.options[i] });
+    return out;
+}
+choices.local = 1;
+
 function fillSoundItems() {
     var r = current();
     outlet(OUT_SND_ITEMS, "clear");
     if (!r) return;
-    for (var i = 0; i < r.options.length; i++) outlet(OUT_SND_ITEMS, "append", r.options[i].name + " · " + r.options[i].folder);
-    if (r.options.length) outlet(OUT_SND_ITEMS, "set", r.pick);
+    var list = choices(r);
+    for (var i = 0; i < list.length; i++) outlet(OUT_SND_ITEMS, "append", list[i].label);
+    if (list.length) outlet(OUT_SND_ITEMS, "set", Math.min(r.pick, list.length - 1));
 }
 fillSoundItems.local = 1;
 
@@ -317,7 +348,7 @@ function suggest(r, then) {
         wait(id, function (msg) {
             if (!msg.ok) return status(r.name + ": " + msg.error);
             r.options = msg.items;
-            r.pick = 0;
+            r.pick = r.restore ? 1 : 0;  // the first proposal, not the ClusterSound samples
             if (r === current()) fillSoundItems();
             if (then) then();
         });
@@ -325,17 +356,21 @@ function suggest(r, then) {
 }
 suggest.local = 1;
 
-function loadOption(r, play) {
+function loadOption(r, play, which) {
     steps.push(function () {
-        var opt = r.options[r.pick];
-        if (!opt) return;
+        var c = choices(r)[which !== undefined ? which : r.pick];
+        if (!c) return;
         var index = trackIndex(r.trackId);
         if (index < 0) return status(r.name + ": la traccia non c'è più");
-        var id = sendOsc({ cmd: "load_item", track: index, item: opt.id });
+        var cmd = c.restore ? { cmd: "load", track: index, root: r.restore.root, path: r.restore.path }
+                            : { cmd: "load_item", track: index, item: c.opt.id };
+        if (!c.restore && r.pad !== null) cmd.pad = r.pad;
+        status(r.name + ": carico «" + c.label + "»…");
+        var id = sendOsc(cmd);
         wait(id, function (msg) {
             if (!msg.ok) return status(r.name + ": " + msg.error);
             r.hasSound = true;
-            status(r.name + ": " + opt.name + (play ? " ▶" : ""));
+            status(r.name + ": " + c.label + (play ? " ▶" : ""));
             if (play) fire(r);
         });
     });
@@ -363,7 +398,8 @@ function sndpick(i) {
 function prova() {
     var r = current();
     if (!r) return status("Importa prima qualcosa: le proposte sono per le tracce importate");
-    if (!r.options.length) suggest(r, function () { loadOption(r, true); });
+    if (waiting || steps.length) return status("Sto caricando, un attimo…");
+    if (!r.options.length && !(r.restore && r.pick === 0)) suggest(r, function () { loadOption(r, true); });
     else loadOption(r, true);
     runSteps();
 }
@@ -371,6 +407,7 @@ function prova() {
 function altri() {
     var r = current();
     if (!r) return;
+    if (waiting || steps.length) return status("Sto caricando, un attimo…");
     r.seed++;
     suggest(r);
     runSteps();
