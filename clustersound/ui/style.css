@@ -157,6 +157,14 @@ select.cls-select { width: 100%; background: var(--bg); color: var(--text); bord
 .icon-btn.attention { color: #ffb74d; border-color: #6b5326; }
 
 /* ---------- online screen ---------- */
+.filter-group { border-top: 1px solid var(--line); }
+.fg-head { display: flex; align-items: center; gap: 8px; padding: 9px 2px; cursor: pointer; font-size: 12px; color: var(--text-2); user-select: none; }
+.fg-head:hover { color: var(--text); }
+.fg-head .caret::before { content: '▾'; }
+.filter-group.collapsed .fg-head .caret::before { content: '▸'; }
+.fg-count { margin-left: auto; background: #1e2a40; color: var(--text); border-radius: 999px; padding: 0 7px; font-size: 11px; }
+.fg-body { display: flex; flex-direction: column; gap: 14px; padding: 4px 0 8px; }
+.filter-group.collapsed .fg-body { display: none; }
 .online-layout { grid-template-columns: 290px 1fr; }
 .online-main { position: relative; display: flex; flex-direction: column; overflow: hidden; }
 .online-presets { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
