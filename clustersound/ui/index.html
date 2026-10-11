@@ -9,22 +9,35 @@
 <body>
   <header class="topbar">
     <div class="brand">Cluster<span>Sound</span></div>
-    <button id="btn-folder" class="btn primary">Scegli cartella…</button>
-    <div id="folder-path" class="folder-path" title="">Nessuna cartella</div>
-    <button id="btn-rescan" class="btn" disabled title="Rianalizza la cartella (i file invariati vengono letti dalla cache)">Riscansiona</button>
-    <div class="progress-wrap" id="progress-wrap" hidden>
+    <div class="seg main-tabs" role="tablist">
+      <button id="tab-library" class="seg-btn active" role="tab">Libreria</button>
+      <button id="tab-online" class="seg-btn" role="tab">Online</button>
+    </div>
+    <button id="btn-folder" class="btn primary lib-only">Scegli cartella…</button>
+    <div id="folder-path" class="folder-path lib-only" title="">Nessuna cartella</div>
+    <button id="btn-rescan" class="btn lib-only" disabled title="Rianalizza la cartella (i file invariati vengono letti dalla cache)">Riscansiona</button>
+    <div class="online-only online-search" hidden>
+      <input id="online-q" class="search" type="search" placeholder="Cerca sample gratuiti (es. dusty, 909, vinyl)…" autocomplete="off">
+      <button id="online-go" class="btn primary">Cerca</button>
+    </div>
+    <div class="progress-wrap lib-only" id="progress-wrap" hidden>
       <div class="progress"><div id="progress-bar"></div></div>
       <div id="progress-text" class="progress-text"></div>
     </div>
     <div class="spacer"></div>
-    <div class="seg" role="tablist">
+    <div class="seg lib-only" role="tablist">
       <button id="view-3d" class="seg-btn active" role="tab">3D</button>
       <button id="view-list" class="seg-btn" role="tab">Lista</button>
     </div>
-    <button id="btn-export" class="btn" disabled>Esporta report</button>
+    <button id="btn-export" class="btn lib-only" disabled>Esporta report</button>
+    <div class="seg online-only" id="online-group" hidden title="Raggruppa i risultati">
+      <button class="seg-btn active" data-group="source">Per fonte</button>
+      <button class="seg-btn" data-group="instrument">Per strumento</button>
+    </div>
+    <button id="btn-settings" class="icon-btn online-only" hidden title="Impostazioni: API key Freesound, cartella download">⚙</button>
   </header>
 
-  <div class="layout">
+  <div class="layout" id="library">
     <aside class="sidebar">
       <input id="search" class="search" type="search" placeholder="Cerca per nome o cartella…" autocomplete="off">
       <div class="filter-block">
@@ -72,6 +85,35 @@
         <div id="panel-content"></div>
       </aside>
     </main>
+  </div>
+
+  <div class="layout online-layout" id="online" hidden>
+    <aside class="sidebar" id="online-sidebar"></aside>
+    <main class="online-main">
+      <div class="online-presets"><span class="hint">Rapidi:</span> <span class="chips" id="online-presets"></span></div>
+      <div id="online-results" class="online-results"></div>
+      <div id="downloads" class="downloads" hidden>
+        <div class="dl-head"><button id="dl-toggle" class="link-btn">Download <span id="dl-count"></span></button>
+          <button id="dl-open" class="link-btn">Apri cartella</button></div>
+        <div id="downloads-list" class="downloads-list"></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="settings" class="modal" hidden>
+    <div class="modal-box">
+      <h3>Impostazioni online</h3>
+      <label class="field">API key Freesound
+        <input id="set-key" type="password" autocomplete="off">
+        <span class="hint">Gratuita: crea un account e <a href="#" id="set-getkey">richiedi una chiave</a>, poi incolla il valore "Client secret/Api key".
+          Resta salvata solo su questo Mac. <a href="#" id="set-clear">Rimuovi chiave</a></span>
+      </label>
+      <label class="field">Cartella dei download
+        <span class="o-range"><input id="set-dir" type="text"><button class="btn" id="set-pick">Scegli…</button></span>
+        <span class="hint">Ogni file viene salvato in una sottocartella per fonte, con accanto un file .license.txt.</span>
+      </label>
+      <div class="modal-actions"><button class="btn" id="set-cancel">Annulla</button><button class="btn primary" id="set-save">Salva</button></div>
+    </div>
   </div>
 
   <script type="module" src="app.js"></script>

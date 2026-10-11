@@ -179,7 +179,8 @@ class Library:
             self.items = items
             self.errors = errors
             self.emb = np.array(embs, np.float32).reshape(-1, 1024)
-            self.prof = np.array(profs, np.float32).reshape(len(items), -1)
+            self.prof = (np.array(profs, np.float32).reshape(len(items), -1) if items
+                         else np.zeros((0, 144), np.float32))
             self.X = self._head_features()
             self.probs = None
         return True

@@ -8,6 +8,10 @@ def headless(folder: str, out: str | None) -> int:
     from . import export
     from .library import Library
 
+    import os
+    if not os.path.isdir(folder):
+        print(f"cartella non trovata: {folder}", file=sys.stderr)
+        return 2
     lib = Library()
     lib.scan(folder)
     counts = Counter(it["cls"] for it in lib.items)

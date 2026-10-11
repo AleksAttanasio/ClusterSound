@@ -43,6 +43,34 @@ Ogni sample ha anche un **Tipo** (One-shot / Loop / Long-Texture) e un **sottocl
 la sua classe (k-means sugli embedding, k scelto con silhouette).
 Colori, keyword e mappatura AudioSet stanno in `clustersound/taxonomy.py`.
 
+## Scheda Online: sample gratuiti
+
+Il tab **Online** in alto (alternato a **Libreria**) cerca sample gratuiti su quattro fonti e li
+mostra raggruppati **per fonte** oppure **per strumento**:
+
+| Fonte | Cosa offre | Accesso |
+|---|---|---|
+| Freesound | ~600k suoni CC (one-shot, loop, field recording) con BPM, tonalità, waveform | API key gratuita (⚙ → "richiedi una chiave") |
+| Openverse | Aggregatore CC (Freesound, Wikimedia Commons) | anonimo, limiti di frequenza bassi |
+| Internet Archive | Sample pack interi, sfogliabili file per file anche dentro gli ZIP | anonimo |
+| ccMixter | Stem, a cappella e loop CC | anonimo |
+
+- **Filtro per strumento**: le stesse 34 classi e gli stessi colori della libreria. Ogni fonte
+  riceve la query nel proprio formato (tag Freesound, ricerca Openverse, subject/title su IA, tag
+  ccMixter), poi ogni risultato viene etichettato da titolo/tag/cartelle con lo stesso parser dei
+  nomi della libreria. I falsi positivi non musicali ("soccer kick", "waves crashing") vengono scartati.
+- **Altri filtri**: fonte, licenza (CC0/PD, BY, BY-SA, NC, ND, non dichiarata), *solo uso
+  commerciale*, tipo (one-shot/loop/long), durata, BPM, tonalità, solo lossless, file singoli o
+  pack, ordinamento. Accanto a ogni filtro un'etichetta (FS·OV·IA·CC) indica quali fonti lo applicano
+  lato server; sulle altre viene applicato localmente.
+- **Anteprima**: ▶ riproduce subito (l'audio passa da Python, con cache in `~/Library/Caches/ClusterSound`).
+- **Download** (⬇): in `~/Music/ClusterSound Downloads/<Fonte>/` (configurabile), con accanto un
+  `.license.txt` che riporta autore, licenza, link e testo di attribuzione. Da Freesound senza
+  login OAuth si scarica l'anteprima HQ mp3; l'originale si scarica dalla pagina (↗).
+- I pack di Internet Archive che sembrano librerie commerciali ricaricate con una licenza libera
+  (Big Fish Audio, Sound Ideas, Loopmasters, GarageBand…) sono marcati ⚠ e nascosti per default;
+  quelli senza licenza dichiarata compaiono solo se scegli "Non dichiarata".
+
 ## Come classifica
 
 Quattro segnali fusi in log-probabilità (`clustersound/classifier.py`):
@@ -91,4 +119,5 @@ e rumore delle etichette (es. "snare roll" dentro un fill di batteria).
 - `tools/train_base_head.py` — riaddestra la head base su una o più librerie.
 - `tools/evaluate.py` — accuratezza a nomi nascosti (`--oneshots`, `--all-hidden`, `--no-base`).
 - `tools/devserver.py` — UI in un browser normale con l'API Python via HTTP.
-- `pytest` — test su segnali sintetici (kick, 808, hat, clap, pad, riser, loop) e pipeline end-to-end.
+- `pytest` — test su segnali sintetici e pipeline end-to-end; per le fonti online usa risposte registrate
+  in `tests/fixtures/online` (`CLUSTERSOUND_NETWORK_TESTS=1 pytest` interroga anche i servizi reali).

@@ -1,6 +1,7 @@
 import { Scene3D } from './scene3d.js';
 import { Panel } from './panel.js';
 import { Player } from './player.js';
+import { Online } from './online.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -11,7 +12,7 @@ const state = {
   data: null, version: -1,
   classOn: new Set(), typeOn: new Set(), minConf: 0, search: '',
   mask: null, selected: -1, scanning: false,
-  view: '3d', sort: { key: 'cls', dir: 1 }, rows: [],
+  view: '3d', sort: { key: 'cls', dir: 1 }, rows: [], tab: 'library',
 };
 
 const player = new Player({ onState: onPlayState });
@@ -25,7 +26,7 @@ function whenApiReady() {
   });
 }
 
-let scene, panel;
+let scene, panel, online;
 
 async function main() {
   state.api = await whenApiReady();
@@ -44,6 +45,7 @@ async function main() {
     onPlayToggle: togglePlay, onSeek: seek, onClose: closePanel,
   });
 
+  online = new Online({ api: state.api, player, classes: state.classes, groups: state.groups, types: state.types });
   buildSidebar();
   bindUi();
   if (init.last_folder) setFolder(init.last_folder, false);
@@ -304,7 +306,8 @@ function seek(t) {
   if (state.selected >= 0) playItem(state.selected, Math.max(0, t));
 }
 
-function onPlayState(playing) {
+function onPlayState(playing, id) {
+  if (id !== state.selected) { panel.setPlaying(false); return; } // an online preview
   panel.setPlaying(playing);
   if (playing) requestAnimationFrame(playheadLoop);
   else panel.drawPlayhead(null);
@@ -403,7 +406,21 @@ function setView(v) {
   if (v === 'list') { renderHead(); renderList(true); } else scene.resize();
 }
 
+function setTab(tab) {
+  state.tab = tab;
+  player.stop();
+  $('#tab-library').classList.toggle('active', tab === 'library');
+  $('#tab-online').classList.toggle('active', tab === 'online');
+  $('#library').hidden = tab !== 'library';
+  $('#online').hidden = tab !== 'online';
+  document.querySelectorAll('.lib-only').forEach((el) => el.classList.toggle('tab-hidden', tab !== 'library'));
+  document.querySelectorAll('.online-only').forEach((el) => { el.hidden = tab !== 'online'; });
+  if (tab === 'online') { online.show(); $('#online-q').focus(); } else scene.resize();
+}
+
 function bindUi() {
+  $('#tab-library').onclick = () => setTab('library');
+  $('#tab-online').onclick = () => setTab('online');
   $('#btn-folder').onclick = async () => {
     const p = await state.api.pick_folder();
     if (p) setFolder(p);
@@ -441,7 +458,9 @@ function bindUi() {
     buildRows();
   };
   window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('#settings').hidden) { $('#settings').hidden = true; return; }
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (state.tab !== 'library') return;
     if (e.key === 'Escape') closePanel();
     if (e.key === ' ' && state.selected >= 0) { e.preventDefault(); togglePlay(); }
     if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && state.view === 'list' && state.rows.length) {
