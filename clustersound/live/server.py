@@ -4,13 +4,15 @@
     GET /live/catalog                  -> saved user patterns, sequences, racks and progressions
     GET /live/payload?kind=…&id=…      -> payload.py output for a saved item (kind: pattern|sequence|rack|compose)
     GET /live/next                     -> the oldest item pushed from the app ("Invia a Live"), or 204
-    POST /live/clip {name, length, notes: [[pitch, start, dur, vel]] in beats}
-                                       -> keeps the clip selected in Live for Compose (melody import)
+    GET /live/clip?data=<json>         -> keeps the clip selected in Live for Compose (melody import);
+    POST /live/clip <json>                data = {name, length, notes: [[pitch, start, dur, vel]] in beats}.
+                                          Max's XMLHttpRequest is reliable with GET, so the device uses that.
 
 Only these routes exist (no generic RPC) and the server binds to 127.0.0.1.
 """
 import json
 import os
+import sys
 import threading
 import time
 import urllib.parse
@@ -142,7 +144,8 @@ class Bridge:
         with self._lock:
             self.clip = {"name": str(data.get("name") or "Clip")[:120], "length": float(data.get("length") or 0),
                          "notes": notes, "at": time.time()}
-            return {"ok": True, "notes": len(notes)}
+        print(f"[live] clip «{self.clip['name']}» ricevuta: {len(notes)} note", file=sys.stderr, flush=True)
+        return {"ok": True, "notes": len(notes)}
 
     def last_clip(self) -> dict | None:
         with self._lock:
@@ -188,6 +191,11 @@ def _handler(bridge: Bridge):
             url = urllib.parse.urlparse(self.path)
             q = {k: v[0] for k, v in urllib.parse.parse_qs(url.query).items()}
             try:
+                if url.path == "/live/clip":
+                    try:
+                        return self._json(bridge.receive_clip(json.loads(q.get("data") or "{}")))
+                    except (ValueError, TypeError, IndexError) as e:
+                        return self._json({"error": str(e)}, 400)
                 if url.path == "/live/ping":
                     return self._json({"app": "ClusterSound", "version": VERSION, "pending": bridge.pending()})
                 if url.path == "/live/catalog":

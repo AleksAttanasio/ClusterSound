@@ -346,3 +346,12 @@ def test_bridge_receives_a_clip(bridge):
     assert clip["name"] == "Lead" and clip["notes"] == [[72, 0.0, 1.0, 100], [74, 1.0, 0.5, 90]]
     assert _post(bridge, "/live/clip", {"notes": []})[0] == 400
     assert _post(bridge, "/live/nope", {})[0] == 404
+
+
+def test_bridge_receives_a_clip_by_get(bridge):
+    import json
+    import urllib.parse
+    data = urllib.parse.quote(json.dumps({"name": "Lead", "length": 4, "notes": [[72, 0, 1, 100]]}))
+    assert _get(bridge, f"/live/clip?data={data}") == (200, {"ok": True, "notes": 1})
+    assert bridge.last_clip()["notes"] == [[72, 0.0, 1.0, 100]]
+    assert _get(bridge, "/live/clip?data=%7B%7D")[0] == 400

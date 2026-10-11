@@ -93,8 +93,11 @@ function inviaclip() {
     var notes = clipNotes(clip, len);
     if (!notes.length) return status("La clip selezionata non ha note");
     var name = String(clip.get("name")[0] || "Clip");
-    httpPost("/live/clip", { name: name, length: len, notes: notes }, function (err) {
+    var body = JSON.stringify({ name: name, length: len, notes: notes });
+    dlog("clip «" + name + "»: " + notes.length + " note → ClusterSound");
+    http("/live/clip?data=" + encodeURIComponent(body), function (err, data) {
         if (err) return status(err);
+        if (!data || !data.ok) return status("ClusterSound non ha confermato la clip: aggiorna l'app");
         status("«" + name + "» inviata: in ClusterSound → Compose → Melodia → Importa → Clip da Ableton");
     });
 }
@@ -168,20 +171,6 @@ function http(path, cb) {
     req.send();
 }
 http.local = 1;
-
-function httpPost(path, body, cb) {
-    var req = new XMLHttpRequest();
-    req.open("POST", "http://127.0.0.1:" + port + path);
-    req.setRequestHeader("Content-Type", "application/json");
-    req.onreadystatechange = function () {
-        if (this.readyState !== 4) return;
-        if (!this.status) return cb("ClusterSound non raggiungibile (porta " + port + "): apri l'app");
-        if (this.status !== 200) return cb("ClusterSound: errore " + this.status);
-        cb(null);
-    };
-    req.send(JSON.stringify(body));
-}
-httpPost.local = 1;
 
 // ------------------------------------------------------------------ Remote Script (OSC)
 function dlog(text) {  // to the Max console and, through the Remote Script, to Live's Log.txt
