@@ -12,6 +12,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "pyinstaller>=6.0", "h5py"]
+midi = ["python-rtmidi>=1.5"]  # Compose: record a melody from a MIDI keyboard
 
 [project.scripts]
 clustersound = "clustersound.__main__:main"

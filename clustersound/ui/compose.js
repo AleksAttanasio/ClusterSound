@@ -977,6 +977,7 @@ export class ComposeEditor {
   }
 
   stop() {
+    if (this._rec) { this.stopRecording(); return; }
     this.transport.stop();
     this.synth.stopAll();
     this._stopPattern();
@@ -1096,7 +1097,8 @@ export class ComposeEditor {
     set('#cp-mode', s.key.mode);
     set('#cp-synth', this.ui.synth);
     $('#cp-keymode').querySelectorAll('[data-km]').forEach((b) => b.classList.toggle('active', b.dataset.km === s.keyMode));
-    $('#cp-play').textContent = this.transport.playing ? '■' : '▶';
+    $('#cp-play').textContent = this.transport.playing || this._rec ? '■' : '▶';
+    $('#cp-play').classList.toggle('rec', !!this._rec);
     $('#cp-view').querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === this.ui.view));
     $('#cp-melmute').classList.toggle('active', !this.ui.melMute && this.melNotes.length > 0);
     $('#cp-melmute').title = this.ui.melMute ? 'Melodia muta: clic per sentirla' : 'Melodia: clic per silenziarla';
@@ -2068,7 +2070,22 @@ export class ComposeEditor {
       <div class="cp-sec-title"><span>Importa melodia</span></div>
       <button class="btn" data-file>File MIDI…</button>
       <button class="btn" data-live title="In Live: seleziona una clip MIDI e premi «Clip → Melodia» nel device ClusterSound">Clip da Ableton</button>
+      <div class="cp-sec-title"><span>Tastiera MIDI</span></div>
+      <div data-rec><span class="hint">Cerco le tastiere…</span></div>
       <div class="hint">Sostituisce la melodia della versione ${this.project.active} (⌘Z per tornare indietro). Da una parte con accordi viene presa la nota più alta.</div>`);
+    this.api.compose_midi_inputs().then((r) => {
+      const box = pop.querySelector('[data-rec]');
+      if (!box) return;
+      if (!r?.available || !r.ports.length) { box.innerHTML = `<span class="hint">${esc(r?.hint || 'Nessuna tastiera MIDI collegata')}</span>`; return; }
+      box.innerHTML = `<div class="cp-mform"><select class="cp-select" data-port>${r.ports.map((p, i) => `<option value="${i}" ${i === this.ui.midiPort ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
+        <button class="btn small primary" data-record title="4 click di attacco, poi suona sopra gli accordi · Spazio o ■ per fermare">● Registra</button></div>`;
+      box.querySelector('[data-record]').onclick = () => {
+        this.ui.midiPort = +box.querySelector('[data-port]').value;
+        this._persist();
+        pop.close();
+        this.startRecording(this.ui.midiPort);
+      };
+    });
     pop.querySelector('[data-file]').onclick = async () => {
       pop.close();
       this._applyImport(await this.api.compose_melody_import(1));
@@ -2078,6 +2095,46 @@ export class ComposeEditor {
       this._applyImport(await this.api.compose_melody_from_live(1));
     };
     return pop;
+  }
+
+  // ---------------------------------------------------------------- recording from a MIDI keyboard (python-rtmidi)
+  async startRecording(port) {
+    this.stop();
+    const bpm = this.project.bpm;
+    const beat = 60 / bpm;
+    const tA = performance.now();
+    const r = await this.api.compose_record_start(port);
+    const tB = performance.now();
+    if (r?.error) { toast(r.error); return; }
+    const ctx = this.synth.ctx;
+    if (ctx.state !== 'running') await ctx.resume();
+    this.synth.setVolume(this.ui.chordVol);
+    this.synth.setVolume(this.ui.melVol, 'melody');
+    const t0 = ctx.currentTime + 0.1;
+    for (let i = 0; i < 4; i++) this.synth.note(i ? 84 : 96, 110, t0 + i * beat, t0 + i * beat + 0.05, 'pluck', 'melody');
+    const at = t0 + 4 * beat;
+    // seconds from the recorder start (midway through the call) to the first beat of the progression
+    const offset = (performance.now() + (at - ctx.currentTime) * 1000 - (tA + tB) / 2) / 1000;
+    this._rec = { offset, loop: this.ui.loop };
+    this.transport.play({ events: this.rendered.events, bpm, from: 0, to: this.seq.bars * 16 * STEP_TICKS, loop: this.ui.loop, at,
+      onEnd: () => this.stopRecording() });
+    this.renderToolbar();
+    this._animate();
+    toast('● Registrazione: 4 click di attacco, poi suona · Spazio o ■ per fermare');
+  }
+
+  async stopRecording() {
+    const rec = this._rec;
+    if (!rec) return;
+    this._rec = null;
+    this.transport.stop();
+    this.synth.stopAll();
+    this.renderToolbar();
+    const res = await this.api.compose_record_stop(rec.offset, this.project.bpm, this.seq.bars, 1, rec.loop);
+    if (res?.error) { toast(res.error); return; }
+    if (!res?.notes?.length) { toast('Nessuna nota registrata'); return; }
+    this.edit(() => { this.seq.melody = { notes: res.notes }; this.melSel.clear(); this._fitMelodyBars(); });
+    toast(`Registrate ${res.notes.length} note (⌘Z per tornare alla melodia di prima)`);
   }
 
   _applyImport(res) {

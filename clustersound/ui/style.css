@@ -641,3 +641,4 @@ select.cls-select { width: 100%; background: var(--bg); color: var(--text); bord
 .cp-mform { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .cp-mpanel .cp-vlist { max-height: none; min-height: 0; }
 .cp-minimel { height: 26px; width: 100%; background: var(--bg-2); border-radius: 4px; fill: #ffb84d; }
+.cp-play.rec { background: #e5484d; border-color: #e5484d; }

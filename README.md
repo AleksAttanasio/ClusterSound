@@ -187,6 +187,29 @@ Il pack non viene mai modificato: i file vengono letti e indicizzati in memoria.
 
 Scorciatoie: `Spazio` play/stop, `←` `→` accordo precedente/successivo, `Canc` elimina, `⌘D` duplica, `V` variazioni.
 
+### Vista Melodia
+
+In alto a sinistra **Armonia | Melodia** cambia vista. Ogni versione (A, B, C…) ha la sua melodia, che suona
+insieme agli accordi in entrambe le viste (♫ nella barra la silenzia).
+
+- **Piano roll** sotto la corsia degli accordi: le righe della scala sono più chiare e sotto ogni accordo sono
+  evidenziate le sue note. Clic su uno spazio vuoto: nuova nota (trascina per allungarla); trascina una nota per
+  spostarla, il bordo destro per allungarla, `Alt`+trascina per la velocity; doppio clic la elimina.
+  `↑` `↓` traspongono (`⇧` di un'ottava), `←` `→` spostano, `⌘D` duplica, `⌘A` seleziona tutto.
+- **Importa ▾**: da un *File MIDI* (la nota più alta di ogni accordo, quantizzata), da una *Clip di Ableton*
+  (nel device premi *Clip → Melodia* con una clip MIDI selezionata) o dalla *Tastiera MIDI*: 4 click di attacco,
+  poi suoni sopra la progressione. La registrazione richiede `pip install python-rtmidi` (la WebView di macOS
+  non ha Web MIDI). Se la versione non ha accordi, la tonalità viene rilevata dalla melodia.
+- **Melodia dagli accordi**: densità, contorno (arco, sale, scende, onda) ed estensione; note dell'accordo sui
+  tempi forti, note della scala in mezzo, frasi di 2–4 battute con una risposta. *Solo sugli accordi
+  selezionati* rigenera solo quelle battute. ▶ ascolta, *Usa* sostituisce la melodia.
+- **Accordi dalla melodia**: un accordo per battuta, due, o quanti ne servono alla melodia, scelto tra quelli
+  del pack che contengono le sue note e concatenato con gli stessi criteri dei suggerimenti. La tonalità può
+  essere quella della versione o rilevata dalla melodia. *Nuova versione* aggiunge una versione con accordi e
+  melodia, *Sostituisci* cambia gli accordi della versione corrente.
+- **Esporta MIDI**: con una melodia scegli *Accordi + melodia* (un `.mid` tipo 1 con due tracce), *Solo accordi*
+  o *Solo melodia*. *Invia a Live* crea anche una traccia *Melodia* accanto agli *Accordi*.
+
 ## Max for Live: importare in Ableton Live
 
 Il device **ClusterSound** (effetto MIDI, Live 10.1 Suite o successivo) importa direttamente nel set i pattern,
@@ -220,7 +243,10 @@ Uso, con l'app ClusterSound aperta:
   - Un pattern crea le tracce *Drums* e *Bass*, ognuna con il proprio rack e la clip.
   - Una sequenza fa lo stesso, con una clip lunga quanto tutta la sequenza.
   - Un drum rack crea una traccia con il rack.
-  - Una progressione crea una traccia *Accordi* con una clip per versione, suonate con la Modalità attiva.
+  - Una progressione crea una traccia *Accordi* con una clip per versione, suonate con la Modalità attiva, e
+    una traccia *Melodia* se c'è una melodia.
+- **Clip → Melodia**: manda all'app le note della clip MIDI selezionata in Live; in Compose → Melodia →
+  *Importa ▾ → Clip da Ableton* diventa la melodia della versione corrente.
 - **Dall'app**: *Invia a Live* nel Sequencer, nella barra della sequenza (*Live*), nel Drum Rack e nel menu
   *Esporta* di Compose. Con *Ricevi* attivo, il device importa subito quello che arriva, anche se non è salvato.
 - *Nuove tracce* (attivo di default) crea le tracce dopo quella selezionata; se lo spegni, la prima traccia

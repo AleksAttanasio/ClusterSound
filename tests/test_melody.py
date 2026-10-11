@@ -123,3 +123,22 @@ def test_live_payload_melody_track():
     assert mel[0]["notes"] == [[72, 0.0, 1.0, 100]] and mel[1]["notes"] == []
     out = payload.compose({"name": "P", "bpm": 90, "order": ["B"], "versions": {"B": b}})
     assert len(out["tracks"]) == 1
+
+
+def test_recorder_feed_and_ticks():
+    from clustersound.chords import midi_in
+    r = midi_in.Recorder()
+    r.feed([0x90, 72, 100], 1.0)
+    r.feed([0x90, 76, 90], 1.5)
+    r.feed([0x80, 72, 0], 1.5)
+    r.feed([0x90, 76, 0], 2.0)
+    r.feed([0x90, 79, 80], 2.9)  # held when stopped
+    notes = r.stop()
+    assert notes[:2] == [(1.0, 1.5, 72, 100), (1.5, 2.0, 76, 90)] and notes[2][2] == 79
+    # 120 bpm: one beat = .5 s; the transport started 1 s after the recorder
+    ticks = midi_in.to_ticks(notes[:2], 1.0, 120, 480)
+    assert ticks == [(0, 480, 72, 100), (480, 960, 76, 90)]
+    out = melody.from_spans(ticks + [(1920 * 2, 1920 * 2 + 480, 74, 80)], 480, keep=True)
+    assert [(n["start"], n["len"], n["pitch"]) for n in out] == [(0, 4, 72), (4, 4, 76), (32, 4, 74)]
+    looped = midi_in.to_ticks([(1.0 + 2.0, 1.5 + 2.0, 72, 100)], 1.0, 120, 480, length_ticks=1920)
+    assert looped == [(0, 480, 72, 100)]

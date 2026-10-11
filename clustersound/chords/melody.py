@@ -49,9 +49,10 @@ def render(seq: dict) -> list[tuple[int, int, int, int]]:
 
 
 # ------------------------------------------------------------------ import
-def from_spans(spans: list[tuple[int, int, int, int]], ppq: int, grid: int = 1) -> list[dict]:
+def from_spans(spans: list[tuple[int, int, int, int]], ppq: int, grid: int = 1, keep: bool = False) -> list[dict]:
     """Imported notes (start, end, pitch, vel in ticks at ppq) -> melody notes: quantised to `grid`
-    sixteenths, one voice (the top line wins a chord), moved so the first note keeps its place in the bar."""
+    sixteenths, one voice (the top line wins a chord), moved so the first note keeps its place in the bar
+    (keep: not moved, a take recorded against the progression)."""
     if not spans:
         return []
     six = ppq / 4
@@ -63,7 +64,7 @@ def from_spans(spans: list[tuple[int, int, int, int]], ppq: int, grid: int = 1) 
         if st not in by_start or p > by_start[st][1]:
             by_start[st] = (ln, p, v)
     starts = sorted(by_start)
-    shift = (starts[0] // 16) * 16
+    shift = 0 if keep else (starts[0] // 16) * 16
     out = []
     for i, st in enumerate(starts):
         ln, p, v = by_start[st]
