@@ -98,8 +98,12 @@ class Handler(SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8765)
-    port = ap.parse_args().port
+    ap.add_argument("--live-port", type=int, default=0,
+                    help="Live bridge port (default: off, so the running app keeps 8770 for the Max for Live device)")
+    args = ap.parse_args()
+    port = args.port
     print(f"http://localhost:{port}")
-    live = api.live_start()
-    print(f"Live bridge: http://127.0.0.1:{live['port']}/live/ping" if live["running"] else f"Live bridge: {live['error']}")
+    if args.live_port:
+        api._live.start(args.live_port)
+        print(f"Live bridge: http://127.0.0.1:{args.live_port}/live/ping" if api._live.server else f"Live bridge: {api._live.error}")
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
