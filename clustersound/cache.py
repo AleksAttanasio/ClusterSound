@@ -16,7 +16,7 @@ def _pack(arrays: dict, meta: dict) -> bytes:
     return buf.getvalue()
 
 
-def _unpack(blob: bytes) -> tuple[dict, dict]:
+def unpack(blob: bytes) -> tuple[dict, dict]:
     with np.load(io.BytesIO(blob), allow_pickle=False) as z:
         meta = json.loads(z["__meta__"].tobytes().decode())
         arrays = {k: z[k] for k in z.files if k != "__meta__"}
@@ -25,6 +25,7 @@ def _unpack(blob: bytes) -> tuple[dict, dict]:
 
 class Cache:
     def __init__(self, path: Path):
+        self.path = Path(path)
         self._lock = threading.Lock()
         self._db = sqlite3.connect(str(path), check_same_thread=False)
         self._db.execute("PRAGMA journal_mode=WAL")
@@ -41,7 +42,16 @@ class Cache:
             row = self._db.execute(
                 "SELECT blob FROM files WHERE path=? AND mtime=? AND size=? AND version=?",
                 (path, mtime, size, ANALYSIS_VERSION)).fetchone()
-        return _unpack(row[0]) if row else None
+        return unpack(row[0]) if row else None
+
+    def get_many(self, root: str) -> dict[str, tuple[float, int, bytes]]:
+        """Raw cached rows under a folder, in one query: path -> (mtime, size, blob)."""
+        prefix = root.rstrip("/") + "/"
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT path, mtime, size, blob FROM files WHERE path >= ? AND path < ? AND version=?",
+                (prefix, prefix[:-1] + "0", ANALYSIS_VERSION)).fetchall()
+        return {p: (m, s, b) for p, m, s, b in rows}
 
     def put(self, path: str, mtime: float, size: int, arrays: dict, meta: dict) -> None:
         blob = _pack(arrays, meta)
@@ -68,7 +78,7 @@ class Cache:
     def get_projection(self, key: str):
         with self._lock:
             row = self._db.execute("SELECT blob FROM projections WHERE key=?", (key,)).fetchone()
-        return _unpack(row[0])[0]["xyz"] if row else None
+        return unpack(row[0])[0]["xyz"] if row else None
 
     def put_projection(self, key: str, xyz: np.ndarray) -> None:
         with self._lock:

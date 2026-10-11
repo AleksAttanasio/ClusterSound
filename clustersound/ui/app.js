@@ -56,7 +56,10 @@ async function main() {
   online.onSend = (ref, x, y) => sendRef(ref, x, y);
   buildSidebar();
   bindUi();
-  if (init.last_folder) setFolder(init.last_folder, false);
+  if (init.last_folder) {
+    setFolder(init.last_folder, false);
+    state.api.restore(init.last_folder);
+  }
   poll();
 }
 
@@ -154,12 +157,12 @@ async function poll() {
 function showProgress(p) {
   const busy = ['scanning', 'analysing', 'classifying', 'layout'].includes(p.phase);
   state.scanning = busy;
-  $('#progress-wrap').hidden = !busy && p.phase !== 'error';
+  $('#progress-wrap').hidden = !busy && p.phase !== 'error' && p.phase !== 'stale';
   const wrap = $('#progress-wrap');
   const pct = p.total ? (100 * p.done) / p.total : 0;
   wrap.classList.toggle('indeterminate', busy && !p.total);
   $('#progress-bar').style.width = `${pct}%`;
-  const label = { scanning: 'Ricerca file', analysing: 'Analisi', classifying: 'Classificazione', layout: 'Layout 3D', error: 'Errore' }[p.phase] || '';
+  const label = { scanning: 'Ricerca file', analysing: 'Analisi', classifying: 'Classificazione', layout: 'Layout 3D', error: 'Errore', stale: 'Snapshot' }[p.phase] || '';
   $('#progress-text').textContent = p.phase === 'analysing'
     ? `${label} ${p.done}/${p.total} · ${p.message}` : `${label} ${p.message && p.phase !== 'analysing' ? '· ' + p.message : ''}`;
   if (p.phase === 'error') $('#progress-text').classList.add('error');

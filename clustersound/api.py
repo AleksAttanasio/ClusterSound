@@ -91,6 +91,13 @@ class Api:
         self._lib.start_scan(path)
         return True
 
+    def restore(self, path: str) -> bool:
+        """At startup: show the last folder from its snapshot, without re-analysing it."""
+        if not path or not os.path.isdir(path):
+            return False
+        self._lib.start_scan(path, snapshot_only=True)
+        return True
+
     def progress(self) -> dict:
         return {**self._lib.progress, "version": self._lib.version,
                 "layout": self._lib.layout_kind}
