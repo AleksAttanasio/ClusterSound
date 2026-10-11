@@ -19,7 +19,7 @@ class ClusterSoundBridge(ControlSurface):
     def __init__(self, c_instance):
         ControlSurface.__init__(self, c_instance)
         self._sock = None
-        self._pools = {}   # role -> [(BrowserItem, folder)] collected once per session
+        self._pools = {}   # type key -> [(BrowserItem, folder)] collected once per session
         self._items = {}   # id -> BrowserItem offered to the device
         self._next_id = 0
         try:
@@ -63,7 +63,8 @@ class ClusterSoundBridge(ControlSurface):
 
     def _reply(self, msg, ok, **kw):
         if msg.get("cmd") != "ping":
-            self._log("-> %s %s %s" % (msg.get("cmd"), "ok" if ok else "ERR", kw))
+            brief = dict((k, ("%d items" % len(v)) if k == "items" else v) for k, v in kw.items())
+            self._log("-> %s %s %s" % (msg.get("cmd"), "ok" if ok else "ERR", brief))
         out = dict(kw, id=msg.get("id"), cmd=msg.get("cmd"), ok=ok)
         try:
             self._sock.sendto(protocol.osc_encode(out), ("127.0.0.1", protocol.OUT_PORT))
@@ -78,8 +79,10 @@ class ClusterSoundBridge(ControlSurface):
             self._reply(msg, True, version=1)
         elif cmd == "load":
             self._load(msg, 0)
-        elif cmd == "suggest":
-            self._suggest(msg)
+        elif cmd == "categories":
+            self._categories(msg)
+        elif cmd == "list":
+            self._list(msg)
         elif cmd == "load_item":
             self._load_item(msg)
         else:
@@ -123,29 +126,29 @@ class ClusterSoundBridge(ControlSurface):
         self._reply(msg, False, error="«%s» non è una traccia MIDI" % track.name)
         return False
 
-    def _suggest(self, msg):
-        """A few presets from Live's library for the role of a track: {items: [{id, name, folder}]}."""
-        role = msg.get("role") or "chords"
-        if role not in self._pools or msg.get("rescan"):
-            browser = Live.Application.get_application().browser
-            bus = protocol.bus_of(role)
-            if bus:
-                roots, fallback = list(browser.drums.children), False
-                self._pools[role] = protocol.collect_bus(roots, protocol.BUS_WORDS[bus])
-            else:
-                roots, fallback = protocol.role_roots(browser, role)
-                self._pools[role] = protocol.collect(roots)
-            self._log("%d presets for %s%s" % (len(self._pools[role]), role, " (fallback)" if fallback else ""))
-        chosen = protocol.pick(self._pools[role], int(msg.get("count", 6)), msg.get("seed", 0))
+    def _categories(self, msg):
+        """Types of instruments in Live's library, and the one to start from for each track role."""
+        cats = protocol.categories(Live.Application.get_application().browser)
+        keys = [k for k, _ in cats]
+        self._reply(msg, True, items=[{"key": k, "name": n} for k, n in cats], defaults=protocol.defaults(keys))
+
+    def _list(self, msg):
+        """One page of the presets of a type: {key, total, offset, items: [{id, name, folder}]}."""
+        key = msg.get("key") or ""
+        if key not in self._pools or msg.get("rescan"):
+            self._pools[key] = protocol.category_pool(Live.Application.get_application().browser, key)
+            self._log("%d presets in %s" % (len(self._pools[key]), key))
+        pool = self._pools[key]
+        offset = max(0, int(msg.get("offset", 0)))
         out = []
-        for item, folder in chosen:
+        for item, folder in pool[offset:offset + int(msg.get("limit", protocol.PAGE))]:
             self._next_id += 1
             self._items[self._next_id] = item
             out.append({"id": self._next_id, "name": protocol.display_name(item.name), "folder": folder})
-        if not out:
-            self._reply(msg, False, error="nessuno strumento trovato nella libreria di Live")
+        if not pool:
+            self._reply(msg, False, error="nessuno strumento in questa categoria")
             return
-        self._reply(msg, True, items=out)
+        self._reply(msg, True, key=key, total=len(pool), offset=offset, items=out)
 
     def _load_item(self, msg):
         track = self._track(msg)

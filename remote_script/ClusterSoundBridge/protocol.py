@@ -87,22 +87,27 @@ def find_item(roots, place):
     return level[0] if level else None
 
 
-# ------------------------------------------------------------------ instrument suggestions
-# Browser categories to draw from for each role of an imported track (folder names in Live's "Sounds",
-# matched case-insensitively by prefix); the presets of installed Packs show up in these categories too.
-ROLE_SOURCES = {
-    "bass": [("sounds", ["bass"])],
-    "chords": [("sounds", ["piano", "pad", "synth keys", "strings", "mallets", "keys"])],
-    "drums": [("drums", None)],
-}
-FALLBACK_SOURCES = [("instruments", None)]
+# ------------------------------------------------------------------ instrument browser
+# The device shows Live's library as types (the folders of "Sounds" with the presets of installed Packs, the
+# drum kits, the presets of each instrument) and, for the chosen type, all its presets, page by page.
+DRUM_KITS = "drums:kits"
 AUDIO_EXT = (".wav", ".aif", ".aiff", ".mp3", ".flac", ".ogg", ".m4a")
-MAX_VISITS = 2500   # browser children are fetched lazily by Live: keep the walk short
-MAX_ITEMS = 400
+MAX_VISITS = 10000  # browser children are fetched lazily by Live: keep every walk bounded
+MAX_ITEMS = 1500
+PAGE = 60           # presets per reply (one UDP packet)
+ROLE_DEFAULTS = {
+    "chords": ["sounds:Piano & Keys", "sounds:Synth Keys", "sounds:Pad"],
+    "bass": ["sounds:Bass"],
+    "drums": [DRUM_KITS],
+}
 
 
 def _ok_name(name):
     return not name.lower().endswith(AUDIO_EXT)
+
+
+def _children(item):
+    return list(item.children) if item is not None else []
 
 
 def collect(roots, limit=MAX_ITEMS, max_visits=MAX_VISITS):
@@ -117,6 +122,24 @@ def collect(roots, limit=MAX_ITEMS, max_visits=MAX_VISITS):
             out.append((item, folder))
         if getattr(item, "is_folder", False) or getattr(item, "is_device", False):
             queue.extend((c, item.name) for c in item.children)
+    return out
+
+
+def categories(browser):
+    """[(key, label)]: the Sounds folders, the drum kits and every instrument's presets."""
+    out = [("sounds:" + c.name, c.name) for c in _children(getattr(browser, "sounds", None))
+           if getattr(c, "is_folder", False)]
+    out.append((DRUM_KITS, "Kit di batteria"))
+    out += [("instruments:" + d.name, "Preset di " + d.name) for d in _children(getattr(browser, "instruments", None))
+            if getattr(d, "is_folder", False) or getattr(d, "is_device", False)]
+    return out
+
+
+def defaults(keys):
+    """Type to start from for each role of an imported track."""
+    out = {}
+    for role, wanted in ROLE_DEFAULTS.items():
+        out[role] = next((k for k in wanted if k in keys), keys[0] if keys else None)
     return out
 
 
@@ -163,29 +186,19 @@ def bus_of(role):
     return role[4:] if role and role.startswith("bus:") and role[4:] in BUS_WORDS else None
 
 
-def role_roots(browser, role):
-    """Browser items to search for a role, and whether they are the generic fallback."""
-    for sources, fallback in ((ROLE_SOURCES.get(role, []), False), (FALLBACK_SOURCES, True)):
-        roots = []
-        for attr, prefixes in sources:
-            cat = getattr(browser, attr, None)
-            if cat is None:
-                continue
-            if prefixes is None:
-                roots.extend(cat.children)
-            else:
-                roots.extend(c for c in cat.children if any(c.name.lower().startswith(p) for p in prefixes))
-        if roots:
-            return roots, fallback
-    return [], True
-
-
-def pick(pool, count, seed):
-    """`count` distinct entries of pool, reproducible for a seed."""
-    import random
-    if len(pool) <= count:
-        return list(pool)
-    return random.Random(seed).sample(pool, count)
+def category_pool(browser, key):
+    """All presets of a type, sorted by name: [(item, folder name)]."""
+    bus = bus_of(key)
+    kind, _, name = key.partition(":")
+    if bus:
+        pool = collect_bus(_children(browser.drums), BUS_WORDS[bus])
+    elif key == DRUM_KITS:
+        pool = [(i, f) for i, f in collect(_children(browser.drums)) if i.name.lower().endswith(".adg")]
+    elif kind in ("sounds", "instruments"):
+        pool = collect([c for c in _children(getattr(browser, kind, None)) if c.name == name])
+    else:
+        pool = []
+    return sorted(pool, key=lambda e: _stem(e[0].name).lower())
 
 
 def display_name(name):

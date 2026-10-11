@@ -270,7 +270,7 @@ def test_build_amxd(tmp_path):
     assert (tmp_path / "ClusterSound.js").is_file()
 
 
-def test_suggestions_by_role():
+def test_instrument_types_and_pools():
     proto = _protocol()
 
     class Item:
@@ -278,28 +278,29 @@ def test_suggestions_by_role():
             self.name, self.children = name, list(children)
             self.is_folder, self.is_device, self.is_loadable = folder, device, loadable and not folder
 
-    bass = Item("Bass", *[Item(f"Bass {i}.adg") for i in range(10)], folder=True)
+    bass = Item("Bass", *[Item(f"Bass {i:02d}.adg") for i in range(150)], folder=True)
     keys = Item("Piano & Keys", Item("Grand.adv"), Item("Sub", Item("Rhodes.adg"), folder=True), folder=True)
     pad = Item("Pad", Item("Warm Pad.adg"), Item("pad.wav"), folder=True)
 
     class Browser:
-        sounds = Item("Sounds", bass, keys, pad, Item("Voices", Item("Choir.adg"), folder=True), folder=True)
-        drums = Item("Drums", Item("Kit-Core 909.adg"), Item("Drum Hits", Item("kick.wav"), folder=True), folder=True)
-        instruments = Item("Instruments", Item("Operator", Item("Init.adv"), device=True), folder=True)
+        sounds = Item("Sounds", bass, keys, pad, folder=True)
+        drums = Item("Drums", Item("Kit-Core 909.adg"), Item("Kick Punchy.adv"),
+                     Item("Drum Hits", Item("kick.wav"), folder=True), folder=True)
+        instruments = Item("Instruments", Item("Operator", Item("Init.adv"), Item("Bell.adv"), device=True), folder=True)
 
     b = Browser()
-    roots, fallback = proto.role_roots(b, "chords")
-    names = sorted(i.name for i, _ in proto.collect(roots))
-    assert not fallback and names == ["Grand.adv", "Rhodes.adg", "Warm Pad.adg"]  # no Voices, no audio
-    assert [i.name for i, _ in proto.collect(proto.role_roots(b, "drums")[0])] == ["Kit-Core 909.adg"]
-    pool = proto.collect(proto.role_roots(b, "bass")[0])
-    assert proto.pick(pool, 6, 1) == proto.pick(pool, 6, 1) and len(proto.pick(pool, 6, 1)) == 6
-    assert proto.pick(pool, 6, 1) != proto.pick(pool, 6, 2)
-    assert len(proto.collect(proto.role_roots(b, "bass")[0], limit=3)) == 3
-
-    b.sounds = Item("Sounds", folder=True)  # nothing for the role: instruments' presets instead
-    roots, fallback = proto.role_roots(b, "bass")
-    assert fallback and [i.name for i, _ in proto.collect(roots)] == ["Operator", "Init.adv"]
+    cats = proto.categories(b)
+    assert cats == [("sounds:Bass", "Bass"), ("sounds:Piano & Keys", "Piano & Keys"), ("sounds:Pad", "Pad"),
+                    (proto.DRUM_KITS, "Kit di batteria"), ("instruments:Operator", "Preset di Operator")]
+    d = proto.defaults([k for k, _ in cats])
+    assert d == {"chords": "sounds:Piano & Keys", "bass": "sounds:Bass", "drums": proto.DRUM_KITS}
+    assert proto.defaults(["sounds:Pad"])["chords"] == "sounds:Pad" and proto.defaults([])["bass"] is None
+    assert len(proto.category_pool(b, "sounds:Bass")) == 150                       # every preset of the type
+    assert [i.name for i, _ in proto.category_pool(b, "sounds:Piano & Keys")] == ["Grand.adv", "Rhodes.adg"]
+    assert [i.name for i, _ in proto.category_pool(b, "sounds:Pad")] == ["Warm Pad.adg"]   # no audio
+    assert [i.name for i, _ in proto.category_pool(b, proto.DRUM_KITS)] == ["Kit-Core 909.adg"]
+    assert [i.name for i, _ in proto.category_pool(b, "instruments:Operator")] == ["Bell.adv", "Init.adv", "Operator"]
+    assert proto.category_pool(b, "sounds:Nope") == [] and proto.category_pool(b, "bogus") == []
     assert proto.display_name("Warm Pad.adg") == "Warm Pad"
 
 
