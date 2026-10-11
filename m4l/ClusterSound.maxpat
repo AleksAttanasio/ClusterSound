@@ -26,42 +26,6 @@
   "boxes": [
    {
     "box": {
-     "id": "lcd_sounds",
-     "maxclass": "panel",
-     "numinlets": 1,
-     "numoutlets": 0,
-     "patching_rect": [
-      20,
-      480,
-      60,
-      30
-     ],
-     "presentation": 1,
-     "presentation_rect": [
-      280,
-      4,
-      276,
-      126
-     ],
-     "background": 1,
-     "ignoreclick": 1,
-     "rounded": 6,
-     "border": 0,
-     "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      1.0
-     ],
-     "saved_attribute_attributes": {
-      "bgcolor": {
-       "expression": "themecolor.live_lcd_bg"
-      }
-     }
-    }
-   },
-   {
-    "box": {
      "id": "lcd_status",
      "maxclass": "panel",
      "numinlets": 1,
@@ -1082,15 +1046,9 @@
       1.0,
       0.709,
       0.196,
-      1.0
+      0.35
      ],
      "saved_attribute_attributes": {
-      "bgoncolor": {
-       "expression": "themecolor.live_lcd_control_fg"
-      },
-      "bgoveroncolor": {
-       "expression": "themecolor.live_lcd_control_fg"
-      },
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
       },
@@ -1104,17 +1062,17 @@
        "expression": "themecolor.live_lcd_control_fg"
       },
       "textoncolor": {
-       "expression": "themecolor.live_lcd_bg"
+       "expression": "themecolor.live_lcd_control_fg"
       },
       "textoveroncolor": {
-       "expression": "themecolor.live_lcd_bg"
+       "expression": "themecolor.live_lcd_control_fg"
       }
      },
      "bgoveroncolor": [
       1.0,
       0.709,
       0.196,
-      1.0
+      0.35
      ],
      "bordercolor": [
       1.0,
@@ -1141,17 +1099,18 @@
       1.0
      ],
      "textoncolor": [
-      0.0,
-      0.0,
-      0.0,
+      1.0,
+      0.709,
+      0.196,
       1.0
      ],
      "textoveroncolor": [
-      0.0,
-      0.0,
-      0.0,
+      1.0,
+      0.709,
+      0.196,
       1.0
-     ]
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -1235,15 +1194,9 @@
       1.0,
       0.709,
       0.196,
-      1.0
+      0.35
      ],
      "saved_attribute_attributes": {
-      "bgoncolor": {
-       "expression": "themecolor.live_lcd_control_fg"
-      },
-      "bgoveroncolor": {
-       "expression": "themecolor.live_lcd_control_fg"
-      },
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
       },
@@ -1257,17 +1210,17 @@
        "expression": "themecolor.live_lcd_control_fg"
       },
       "textoncolor": {
-       "expression": "themecolor.live_lcd_bg"
+       "expression": "themecolor.live_lcd_control_fg"
       },
       "textoveroncolor": {
-       "expression": "themecolor.live_lcd_bg"
+       "expression": "themecolor.live_lcd_control_fg"
       }
      },
      "bgoveroncolor": [
       1.0,
       0.709,
       0.196,
-      1.0
+      0.35
      ],
      "bordercolor": [
       1.0,
@@ -1294,17 +1247,18 @@
       1.0
      ],
      "textoncolor": [
-      0.0,
-      0.0,
-      0.0,
+      1.0,
+      0.709,
+      0.196,
       1.0
      ],
      "textoveroncolor": [
-      0.0,
-      0.0,
-      0.0,
+      1.0,
+      0.709,
+      0.196,
       1.0
-     ]
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -1458,7 +1412,8 @@
       0.0,
       0.0,
       1.0
-     ]
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -1641,7 +1596,8 @@
       0.0,
       0.0,
       1.0
-     ]
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -1806,7 +1762,8 @@
       0.0,
       0.0,
       1.0
-     ]
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -1904,7 +1861,7 @@
      ],
      "saved_attribute_attributes": {
       "textcolor": {
-       "expression": "themecolor.live_lcd_title"
+       "expression": "themecolor.live_control_fg"
       }
      }
     }
@@ -1939,7 +1896,7 @@
      ],
      "saved_attribute_attributes": {
       "textcolor": {
-       "expression": "themecolor.live_lcd_title"
+       "expression": "themecolor.live_control_fg"
       }
      }
     }
@@ -2057,7 +2014,7 @@
      ],
      "saved_attribute_attributes": {
       "textcolor": {
-       "expression": "themecolor.live_lcd_title"
+       "expression": "themecolor.live_control_fg"
       }
      }
     }
@@ -2175,7 +2132,7 @@
      ],
      "saved_attribute_attributes": {
       "textcolor": {
-       "expression": "themecolor.live_lcd_title"
+       "expression": "themecolor.live_control_fg"
       }
      }
     }
@@ -2310,15 +2267,9 @@
       1.0,
       0.709,
       0.196,
-      1.0
+      0.35
      ],
      "saved_attribute_attributes": {
-      "bgoncolor": {
-       "expression": "themecolor.live_lcd_control_fg"
-      },
-      "bgoveroncolor": {
-       "expression": "themecolor.live_lcd_control_fg"
-      },
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
       },
@@ -2332,17 +2283,17 @@
        "expression": "themecolor.live_lcd_control_fg"
       },
       "textoncolor": {
-       "expression": "themecolor.live_lcd_bg"
+       "expression": "themecolor.live_lcd_control_fg"
       },
       "textoveroncolor": {
-       "expression": "themecolor.live_lcd_bg"
+       "expression": "themecolor.live_lcd_control_fg"
       }
      },
      "bgoveroncolor": [
       1.0,
       0.709,
       0.196,
-      1.0
+      0.35
      ],
      "bordercolor": [
       1.0,
@@ -2369,17 +2320,18 @@
       1.0
      ],
      "textoncolor": [
-      0.0,
-      0.0,
-      0.0,
+      1.0,
+      0.709,
+      0.196,
       1.0
      ],
      "textoveroncolor": [
-      0.0,
-      0.0,
-      0.0,
+      1.0,
+      0.709,
+      0.196,
       1.0
-     ]
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -2464,15 +2416,9 @@
       1.0,
       0.709,
       0.196,
-      1.0
+      0.35
      ],
      "saved_attribute_attributes": {
-      "bgoncolor": {
-       "expression": "themecolor.live_lcd_control_fg"
-      },
-      "bgoveroncolor": {
-       "expression": "themecolor.live_lcd_control_fg"
-      },
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
       },
@@ -2486,17 +2432,17 @@
        "expression": "themecolor.live_lcd_control_fg"
       },
       "textoncolor": {
-       "expression": "themecolor.live_lcd_bg"
+       "expression": "themecolor.live_lcd_control_fg"
       },
       "textoveroncolor": {
-       "expression": "themecolor.live_lcd_bg"
+       "expression": "themecolor.live_lcd_control_fg"
       }
      },
      "bgoveroncolor": [
       1.0,
       0.709,
       0.196,
-      1.0
+      0.35
      ],
      "bordercolor": [
       1.0,
@@ -2523,17 +2469,18 @@
       1.0
      ],
      "textoncolor": [
-      0.0,
-      0.0,
-      0.0,
+      1.0,
+      0.709,
+      0.196,
       1.0
      ],
      "textoveroncolor": [
-      0.0,
-      0.0,
-      0.0,
+      1.0,
+      0.709,
+      0.196,
       1.0
-     ]
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -2618,15 +2565,9 @@
       1.0,
       0.709,
       0.196,
-      1.0
+      0.35
      ],
      "saved_attribute_attributes": {
-      "bgoncolor": {
-       "expression": "themecolor.live_lcd_control_fg"
-      },
-      "bgoveroncolor": {
-       "expression": "themecolor.live_lcd_control_fg"
-      },
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
       },
@@ -2640,17 +2581,17 @@
        "expression": "themecolor.live_lcd_control_fg"
       },
       "textoncolor": {
-       "expression": "themecolor.live_lcd_bg"
+       "expression": "themecolor.live_lcd_control_fg"
       },
       "textoveroncolor": {
-       "expression": "themecolor.live_lcd_bg"
+       "expression": "themecolor.live_lcd_control_fg"
       }
      },
      "bgoveroncolor": [
       1.0,
       0.709,
       0.196,
-      1.0
+      0.35
      ],
      "bordercolor": [
       1.0,
@@ -2677,17 +2618,18 @@
       1.0
      ],
      "textoncolor": [
-      0.0,
-      0.0,
-      0.0,
+      1.0,
+      0.709,
+      0.196,
       1.0
      ],
      "textoveroncolor": [
-      0.0,
-      0.0,
-      0.0,
+      1.0,
+      0.709,
+      0.196,
       1.0
-     ]
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -2771,15 +2713,9 @@
       1.0,
       0.709,
       0.196,
-      1.0
+      0.35
      ],
      "saved_attribute_attributes": {
-      "bgoncolor": {
-       "expression": "themecolor.live_lcd_control_fg"
-      },
-      "bgoveroncolor": {
-       "expression": "themecolor.live_lcd_control_fg"
-      },
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
       },
@@ -2793,17 +2729,17 @@
        "expression": "themecolor.live_lcd_control_fg"
       },
       "textoncolor": {
-       "expression": "themecolor.live_lcd_bg"
+       "expression": "themecolor.live_lcd_control_fg"
       },
       "textoveroncolor": {
-       "expression": "themecolor.live_lcd_bg"
+       "expression": "themecolor.live_lcd_control_fg"
       }
      },
      "bgoveroncolor": [
       1.0,
       0.709,
       0.196,
-      1.0
+      0.35
      ],
      "bordercolor": [
       1.0,
@@ -2830,17 +2766,18 @@
       1.0
      ],
      "textoncolor": [
-      0.0,
-      0.0,
-      0.0,
+      1.0,
+      0.709,
+      0.196,
       1.0
      ],
      "textoveroncolor": [
-      0.0,
-      0.0,
-      0.0,
+      1.0,
+      0.709,
+      0.196,
       1.0
-     ]
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -2990,15 +2927,9 @@
       1.0,
       0.709,
       0.196,
-      1.0
+      0.35
      ],
      "saved_attribute_attributes": {
-      "bgoncolor": {
-       "expression": "themecolor.live_lcd_control_fg"
-      },
-      "bgoveroncolor": {
-       "expression": "themecolor.live_lcd_control_fg"
-      },
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
       },
@@ -3012,17 +2943,17 @@
        "expression": "themecolor.live_lcd_control_fg"
       },
       "textoncolor": {
-       "expression": "themecolor.live_lcd_bg"
+       "expression": "themecolor.live_lcd_control_fg"
       },
       "textoveroncolor": {
-       "expression": "themecolor.live_lcd_bg"
+       "expression": "themecolor.live_lcd_control_fg"
       }
      },
      "bgoveroncolor": [
       1.0,
       0.709,
       0.196,
-      1.0
+      0.35
      ],
      "bordercolor": [
       1.0,
@@ -3049,17 +2980,18 @@
       1.0
      ],
      "textoncolor": [
-      0.0,
-      0.0,
-      0.0,
+      1.0,
+      0.709,
+      0.196,
       1.0
      ],
      "textoveroncolor": [
-      0.0,
-      0.0,
-      0.0,
+      1.0,
+      0.709,
+      0.196,
       1.0
-     ]
+     ],
+     "usebgoncolor": 1
     }
    },
    {
