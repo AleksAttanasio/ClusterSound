@@ -35,16 +35,17 @@ def _stft_mag(x: np.ndarray, n_fft: int = 2048, hop: int = 512) -> np.ndarray:
     return np.abs(np.fft.rfft(x[idx] * win, axis=1)).astype(np.float32)
 
 
-def onsets(x: np.ndarray, sr: int, rise_db: float = 9.0) -> np.ndarray:
+def onsets(x: np.ndarray, sr: int, rise_db: float = 9.0, fallback: bool = True) -> np.ndarray:
     """Onset times (s): fast energy rises (dB) in log-spaced bands.
 
     Sustained sounds with beating or vibrato don't rise by several dB within ~16 ms, so they
-    don't produce spurious onsets; every drum hit does.
+    don't produce spurious onsets; every drum hit does. With fallback, a sound without any onset
+    still gets one at its loudest frame.
     """
     hop = 256
     mag = _stft_mag(x, 1024, hop)
     if mag.shape[0] < 3:
-        return np.array([0.0])
+        return np.array([0.0]) if fallback else np.array([])
     power = mag ** 2
     edges = np.unique(np.geomspace(2, power.shape[1] - 1, 9).astype(int))
     bands = np.add.reduceat(power, edges[:-1], axis=1)
@@ -65,7 +66,7 @@ def onsets(x: np.ndarray, sr: int, rise_db: float = 9.0) -> np.ndarray:
         if nov[i] >= rise_db and nov[i] >= nov[i - 1] and nov[i] >= nov[i + 1] and i - last >= min_gap:
             peaks.append(i)
             last = i
-    if not peaks:
+    if not peaks and fallback:
         peaks = [int(np.argmax(total_db))]
     return np.array(peaks) * hop / sr
 

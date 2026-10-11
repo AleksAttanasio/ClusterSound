@@ -26,7 +26,7 @@ def onset_times(x: np.ndarray, sr: int, sensitivity: float = 0.5) -> np.ndarray:
         if seg.size < sr * 0.05:
             break
         lo = (a + ov / 2) / sr if a else 0.0
-        for t in features.onsets(seg, sr, rise_db(sensitivity)) + a / sr:
+        for t in features.onsets(seg, sr, rise_db(sensitivity), fallback=False) + a / sr:
             if lo <= t < (a + hop + ov / 2) / sr and (not out or t - out[-1] > 0.03):
                 out.append(float(t))
     return np.array(out)
