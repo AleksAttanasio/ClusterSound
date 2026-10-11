@@ -14,6 +14,7 @@
       <button id="tab-online" class="seg-btn" role="tab">Online</button>
       <button id="tab-pattern" class="seg-btn" role="tab">Sequencer</button>
       <button id="tab-rack" class="seg-btn" role="tab">Drum Rack</button>
+      <button id="tab-compose" class="seg-btn" role="tab">Compose</button>
     </div>
     <button id="btn-folder" class="btn primary lib-only">Scegli cartella…</button>
     <div id="folder-path" class="folder-path lib-only" title="">Nessuna cartella</div>
@@ -120,6 +121,8 @@
 
   <div class="layout rack-layout" id="rack" hidden></div>
 
+  <div class="layout compose-layout" id="compose" hidden></div>
+
   <div id="settings" class="modal" hidden>
     <div class="modal-box">
       <h3>Impostazioni online</h3>
@@ -136,6 +139,10 @@
         <span class="o-range"><input id="set-cache" type="number" min="50" max="10000" step="50"><span class="hint">MB</span>
           <button class="btn" id="set-cache-clear">Svuota cache</button></span>
         <span class="hint" id="set-cache-used"></span>
+      </label>
+      <label class="field">Bridge per Ableton Live (device Max for Live ClusterSound)
+        <span class="o-range"><input id="set-live-port" type="number" min="1024" max="65535" step="1"><span class="hint">porta</span></span>
+        <span class="hint" id="set-live-status"></span>
       </label>
       <div class="modal-actions"><button class="btn" id="set-cancel">Annulla</button><button class="btn primary" id="set-save">Salva</button></div>
     </div>

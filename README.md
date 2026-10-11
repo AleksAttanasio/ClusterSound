@@ -146,6 +146,116 @@ La quarta scheda costruisce un Drum Rack 8×8 pensato per un controller come il 
   - per ogni bus, come alternare i sample. Il default è *casuale*, tranne per kick, FX e basso, dove suona solo il primo sample e gli altri entrano muti.
 - **Esporta per Ableton**: una cartella con `Samples/<gruppo>/<nota> - <nome>.wav`, `… Drum Rack.adg` (un pad per tasto, con la nota del Launchpad e i choke group), i `.license.txt` dei sample online e `LEGGIMI.txt` con la mappa 8×8 dei pad.
 
+## Scheda Compose: progressioni di accordi
+
+La quinta scheda costruisce progressioni con le clip MIDI di un chord pack organizzato come l'**Unison MIDI
+Chord Pack** (default `~/Documents/Unison MIDI Chord Pack`; *Cambia…* in alto a sinistra per un'altra cartella).
+Il pack non viene mai modificato: i file vengono letti e indicizzati in memoria.
+
+- **Browser**: gli accordi della tonalità scelta, raggruppati per grado (I, ii, bVII…) e colorati per funzione
+  (verde tonica, blu sottodominante, arancio dominante, viola colore/prestito modale). Filtri per *Triadi*,
+  *Estesi*, *Prestito & modali*, *Progressioni* e ricerca per nome o grado. Clic: ascolta; doppio clic, **+** o
+  trascinamento sulla timeline: aggiunge. Le progressioni del pack entrano come un blocco per accordo. Le
+  tonalità (o le categorie) che mancano nel pack vengono trasposte dalla tonalità più vicina.
+- **Tonalità**: *🔒 bloccata* mostra solo gli accordi di quella tonalità e cambiarla traspone l'intera
+  progressione; *Libera* permette di prendere accordi da qualsiasi tonalità e di trasporre ogni accordo
+  (±12 semitoni). In entrambi i casi la tonalità in alto è il riferimento per gradi e suggerimenti.
+- **Timeline**: lunghezza in battute e griglia (1 battuta … 1/16) a scelta. Trascina un blocco per spostarlo e
+  il bordo destro per cambiarne la durata; gli accordi successivi scorrono in avanti invece di sovrapporsi.
+  *⇔ Distribuisci* dà a tutti la stessa durata sull'intera lunghezza. Ogni blocco mostra le note che suonano
+  davvero (dopo strum, arpeggi e ritmo).
+- **Prossimo accordo**: suggerimenti per l'accordo selezionato (o l'ultimo), con punteggio e motivi: funzione
+  armonica, cadenze (V → I, ii → V, d'inganno, plagale, bVI → bVII…), moto del basso, note comuni, voice
+  leading e frequenza della mossa nelle progressioni del pack. Se dopo il blocco selezionato c'è già un
+  accordo, conta anche quanto bene il suggerimento ci conduce. Sotto ogni proposta ci sono le varianti di
+  colore dello stesso grado.
+- **Esecuzione** (per accordo, o come default della sequenza): *Block*, *Strum* (↑, ↓ o alternato, 5–80 ms),
+  *Arpeggio* (su, giù, su-giù, casuale; 1/4…1/16 e terzine; 1–2 ottave), *Ritmo* (semiminime, ottavi, offbeat,
+  charleston, tresillo, sincopato house, minime, pulse 1/16) suonato a block o a strum, durata delle note,
+  curva di dinamica, **humanize** (timing e velocity, 🎲 per rigenerarlo) e **Alterna** stili a ogni colpo o a
+  ogni battuta. Anteprima ed export usano gli stessi eventi, calcolati in Python.
+- **Variazioni di un accordo** (*✦ Varia…* o `V`): voicing (rivolti, drop-2, open/close, basso raddoppiato,
+  voice leading minimo dal precedente), colore (stesso grado con estensioni diverse), sostituzioni scelte nel
+  contesto e modi di esecuzione. ▶ ascolta la proposta dalla battuta prima.
+- **Variazioni della progressione** (*✦ Genera variazioni…*): riarmonizzazione (primo e ultimo accordo restano),
+  ritmo armonico (anticipi, lungo-corto, accordi divisi), voice leading, più ricca / più scarna, esecuzione e
+  finale (IV → V, bVI → bVII, IV → iv, ii → V…), con uno slider *Quanto variare*. *Tieni* la salva come nuova
+  **versione** (A, B, C… nelle schede sopra la timeline), *Accoda* la aggiunge in fondo (A A' …).
+- **Esporta MIDI**: un `.mid` (tipo 0, 480 PPQ, con il tempo) per la versione corrente, oppure uno per versione
+  in una cartella; *solo accordi* esporta i voicing a block senza stile. In Ableton basta trascinarlo su una
+  traccia MIDI. *Salva* / *Apri…* tengono le progressioni con tutte le versioni; ⌘Z / ⇧⌘Z annullano e ripetono.
+
+Scorciatoie: `Spazio` play/stop, `←` `→` accordo precedente/successivo, `Canc` elimina, `⌘D` duplica, `V` variazioni.
+
+## Max for Live: importare in Ableton Live
+
+Il device **ClusterSound** (effetto MIDI, Live 10.1 Suite o successivo) importa direttamente nel set i pattern,
+i drum rack e le progressioni di Compose, senza trascinare file. È fatto di tre pezzi:
+
+- **l'app**, che all'avvio apre un piccolo server solo locale (`127.0.0.1:8770`, porta modificabile nelle
+  Impostazioni) con il catalogo e i contenuti pronti per Live;
+- **il device** `m4l/ClusterSound.maxpat` + `ClusterSound.js`, che crea tracce MIDI e clip con le note via
+  Live API;
+- **la Remote Script** `remote_script/ClusterSoundBridge` (Python 2.7 in Live 10), che carica i preset `.adg`
+  dei rack e gli strumenti della libreria di Live: la Live API di Max non può farlo.
+
+I rack per Live vengono scritti in `User Library/ClusterSound`, che il browser di Live indicizza sempre: non
+serve aggiungere cartelle ai Places. Se la User Library è altrove, impostala nelle Impostazioni dell'app
+(`live_library`). Senza User Library l'app usa `~/Music/ClusterSound Patterns/Live Import`, da aggiungere ai
+Places.
+
+Installazione (una volta):
+
+1. `tools/install_live.sh`: costruisce `ClusterSound.amxd` e lo copia con la Remote Script nella User Library
+   (`~/Music/Ableton/User Library`, oppure passa il percorso come argomento).
+2. Riavvia Live. In *Preferenze → Link/MIDI* scegli **ClusterSoundBridge** come Control Surface, con Input e
+   Output su *Nessuno*.
+3. Trascina il device *ClusterSound* (in *Max MIDI Effect*) su una traccia MIDI qualsiasi. Per avere un unico
+   file autonomo, aprilo in Max e usa *Freeze Device*, poi salva.
+
+Uso, con l'app ClusterSound aperta:
+
+- **Dal device**: scegli il tipo (pattern salvati, sequenze, drum rack, progressioni) e l'elemento, poi
+  *Importa*. *Aggiorna* rilegge il catalogo.
+  - Un pattern crea le tracce *Drums* e *Bass*, ognuna con il proprio rack e la clip.
+  - Una sequenza fa lo stesso, con una clip lunga quanto tutta la sequenza.
+  - Un drum rack crea una traccia con il rack.
+  - Una progressione crea una traccia *Accordi* con una clip per versione, suonate con la Modalità attiva.
+- **Dall'app**: *Invia a Live* nel Sequencer, nella barra della sequenza (*Live*), nel Drum Rack e nel menu
+  *Esporta* di Compose. Con *Ricevi* attivo, il device importa subito quello che arriva, anche se non è salvato.
+- *Nuove tracce* (attivo di default) crea le tracce dopo quella selezionata; se lo spegni, la prima traccia
+  importata va su quella selezionata. *Tempo* imposta il BPM del set.
+- Le clip partono dalla scena selezionata e vanno sempre in uno slot vuoto: non sovrascrivono mai le clip
+  esistenti.
+- Senza la Remote Script le clip vengono create comunque, e il device indica il rack da trascinare dal browser.
+
+**Strumenti di Live da provare** (colonna destra del device):
+
+- **Traccia**: le tracce dell'ultimo import. Per la traccia *Drums* di un pattern o di una sequenza c'è anche
+  una voce per ogni bus che suona (*Drums › Kick*, *› Snare*…), e quello che scegli va solo sul pad di quel bus.
+- **Tipo**: tutte le categorie di Sounds della libreria di Live, compresi i preset dei pack installati (Bass,
+  Brass, Guitar & Plucked, Mallets, Pad, Piano & Keys, Strings, Synth Keys, Synth Lead, Voices, Winds…). Poi i
+  *Kit di batteria*, i *Preset di* ogni strumento (Operator, Wavetable, Analog, Sampler…) e, per i bus, i *Colpi*
+  di quel bus.
+- **Strumento**: tutti i preset del tipo, in ordine alfabetico, 60 alla volta (*… altri N* carica i
+  successivi).
+- Scegliere uno strumento, o passare al precedente o al successivo con **◀ ▶**, lo carica sulla traccia e fa
+  partire la clip importata in loop. **Prova ▶** ricarica quello selezionato, **Stop** ferma la traccia.
+- **★ Sample ClusterSound** (o *Kit ClusterSound* per i bus) rimette i sample dell'app.
+- Le tracce che arrivano senza strumento ricevono subito il primo preset del loro tipo: *Piano & Keys* per gli
+  accordi, *Bass* per il basso, un kit per la batteria. Così ogni import suona già.
+
+Se un rack o uno strumento non si carica, il motivo è nello stato del device e in `Log.txt` di Live
+(`~/Library/Preferences/Ableton/Live 10.x/Log.txt`, righe `ClusterSoundBridge`), dove la Remote Script registra
+ogni comando.
+
+Quando salvi una sequenza, con lei si salva anche il kit aperto nel Sequencer (sample, layer e mix), e il device
+la importa con quello. Le sequenze salvate prima di questa versione non hanno il kit. Il device usa allora il
+pattern utente da cui viene il primo blocco. Se il blocco viene da un preset di genere, importa solo il MIDI e
+lo segnala con *(solo MIDI)*: per avere anche il kit, apri la sequenza e salvala di nuovo.
+
+In mancanza di questi, il device usa il kit aperto ora nel Sequencer e lo segnala con *(kit attuale)*.
+
 ## Come classifica
 
 Quattro segnali fusi in log-probabilità (`clustersound/classifier.py`):

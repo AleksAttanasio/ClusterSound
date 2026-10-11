@@ -2,6 +2,7 @@
 import { Sequencer, refKey } from './sequencer.js';
 import { suggestBus, toast, showPopover } from './sendmenu.js';
 import { Arranger } from './arranger.js';
+import { sendToLive } from './live.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -13,6 +14,23 @@ const ALT_MODES = [['off', 'insieme'], ['cycle', 'a giro'], ['random', 'casuale'
 export const NO_ALT = new Set(['kick', 'fx', 'bass']);
 export const newSeed = () => Math.floor(Math.random() * 2 ** 32) >>> 0;
 const LS_RANDOM = 'clustersound.randomKit';
+const DYN_TIP = "Somiglianza dell'inviluppo (attacco, decay, coda) con i sample degli altri bus";
+
+// "similar dynamics" controls for the random kit popovers (Pattern and Drum Rack)
+export const dynControls = (o, what = 'bus') => `
+      <label class="pop-check" title="Attacco, decay e coda simili, relativi allo strumento: un kit tutto secco o tutto ambientale"><input type="checkbox" data-o="dyn" ${o.dyn ? 'checked' : ''}> dinamica simile tra i ${what}</label>
+      <label class="pop-field" data-dyn-margin ${o.dyn ? '' : 'hidden'}><span class="pop-row"><span>Margine di similarità</span><span data-dyn-v>${Math.round((o.margin ?? 0.3) * 100)}%</span></span>
+        <input type="range" min="0.05" max="1" step="0.05" value="${o.margin ?? 0.3}" data-o="margin">
+        <span class="pop-scale"><span>stretto</span><span>largo</span></span></label>`;
+export function wireDynControls(pop) {
+  const box = pop.querySelector('[data-o=dyn]'), field = pop.querySelector('[data-dyn-margin]');
+  box.onchange = () => {
+    field.hidden = !box.checked;
+    pop.style.top = `${Math.max(8, Math.min(parseFloat(pop.style.top), window.innerHeight - pop.offsetHeight - 8))}px`;
+  };
+  pop.querySelector('[data-o=margin]').oninput = (e) => { pop.querySelector('[data-dyn-v]').textContent = `${Math.round(e.target.value * 100)}%`; };
+}
+export const readDynControls = (pop) => ({ dyn: pop.querySelector('[data-o=dyn]').checked, margin: +pop.querySelector('[data-o=margin]').value });
 
 export class PatternEditor {
   constructor({ api, player, classes, onLoadFromRack }) {
@@ -69,6 +87,8 @@ export class PatternEditor {
     if (this.playMode !== 'sequence') this.seq.setPattern(this.p);
     if (Object.values(this.p.buses).some((b) => b.layers.length)) this.noAutofill = false;
     try { localStorage.setItem(LS_KEY, JSON.stringify({ ...this.p, _source: this.source, _noAutofill: this.noAutofill })); } catch (e) { /* private mode */ }
+    clearTimeout(this._kitT);  // the kit for Live imports of sequences saved without one
+    this._kitT = setTimeout(() => this.api.live_set_kit(this.p), 1500);
     const refs = [];
     for (const b of Object.values(this.p.buses)) for (const l of b.layers) if (l.ref?.kind === 'online') refs.push(l.ref);
     this.api.protect_samples(refs);
@@ -186,7 +206,18 @@ export class PatternEditor {
   }
 
   _randomOpts() {
-    try { return { variants: 1, folder: '', oneshot: true, ...JSON.parse(localStorage.getItem(LS_RANDOM) || '{}') }; } catch { return { variants: 1, folder: '', oneshot: true }; }
+    const def = { variants: 1, folder: '', oneshot: true, dyn: false, margin: 0.3 };
+    try { return { ...def, ...JSON.parse(localStorage.getItem(LS_RANDOM) || '{}') }; } catch { return def; }
+  }
+
+  // library ids of the audible layers on every bus but `skip` (the reference for matching dynamics)
+  _dynRefIds(skip) {
+    const ids = [];
+    for (const [id, b] of Object.entries(this.p.buses)) {
+      if (id === skip) continue;
+      for (const l of b.layers) if (!l.mute && l.ref?.kind === 'library' && l.ref.id != null) ids.push(l.ref.id);
+    }
+    return ids;
   }
 
   openRandomKit(anchor) {
@@ -198,12 +229,15 @@ export class PatternEditor {
         <select data-o="variants">${[1, 2, 4].map((n) => `<option value="${n}" ${o.variants === n ? 'selected' : ''}>${n}${n > 1 ? ' (alternati a caso)' : ''}</option>`).join('')}</select></label>
       <label class="pop-field">Solo dalla cartella / pack (facoltativo)<input type="text" data-o="folder" value="${esc(o.folder)}" placeholder="es. Cymatics"></label>
       <label class="pop-check"><input type="checkbox" data-o="oneshot" ${o.oneshot ? 'checked' : ''}> solo one-shot (niente loop)</label>
+      ${dynControls(o)}
       <div class="pop-actions"><button class="btn primary" data-go>Genera</button></div>`);
+    wireDynControls(pop);
     pop.querySelector('[data-go]').onclick = async () => {
       const opts = {
         variants: +pop.querySelector('[data-o=variants]').value,
         folder: pop.querySelector('[data-o=folder]').value.trim(),
         oneshot: pop.querySelector('[data-o=oneshot]').checked,
+        ...readDynControls(pop),
       };
       try { localStorage.setItem(LS_RANDOM, JSON.stringify(opts)); } catch { /* private mode */ }
       pop.close();
@@ -211,26 +245,37 @@ export class PatternEditor {
     };
   }
 
-  async randomKit({ variants = 1, folder = '', oneshot = true } = {}) {
+  async randomKit({ variants = 1, folder = '', oneshot = true, dyn = false, margin = 0.3 } = {}) {
     await this.ensure();
     const used = [];
     let done = 0, locked = 0;
+    const plays = (bdef) => {
+      const bus = this.p.buses[bdef.id];
+      return bdef.melodic ? bus.notes.length : bus.steps.some((v) => v) || bus.layers.some((l) => l.steps?.some((v) => v));
+    };
+    const regen = new Set(this.buses.filter((b) => plays(b) && !this.p.buses[b.id].lock).map((b) => b.id));
+    // dynamics reference: what stays (locked or silent buses), then every bus generated so far
+    const dynRef = dyn ? Object.entries(this.p.buses).filter(([id]) => !regen.has(id))
+      .flatMap(([, b]) => b.layers.filter((l) => !l.mute && l.ref?.kind === 'library').map((l) => l.ref.id)) : [];
     for (const bdef of this.buses) {
       const bus = this.p.buses[bdef.id];
-      const plays = bdef.melodic ? bus.notes.length : bus.steps.some((v) => v) || bus.layers.some((l) => l.steps?.some((v) => v));
-      if (!plays) continue;
+      if (!plays(bdef)) continue;
       if (bus.lock) { locked++; continue; }
       const n = bdef.melodic ? 1 : variants;
-      const refs = await this.api.random_refs(bdef.classes, n, { oneshot: bdef.melodic ? false : oneshot, folder, exclude: used });
+      const o = { oneshot: bdef.melodic ? false : oneshot, folder, exclude: used };
+      if (dyn) Object.assign(o, { dyn_ref: dynRef, dyn_margin: margin });
+      const refs = await this.api.random_refs(bdef.classes, n, o);
       if (!refs.length) continue;
       used.push(...refs.map((r) => r.id));
+      if (dyn) dynRef.push(...refs.map((r) => r.id));
       await this._setLayers(bdef.id, refs, NO_ALT.has(bdef.id) || refs.length < 2 ? 'off' : 'random');
       done++;
     }
     this._persist();
     await this.seq.preload(this.p);
     this.renderAll();
-    toast(done ? `Kit casuale: ${done} bus${locked ? ` · ${locked} bloccati` : ''}` : 'Nessun sample adatto (controlla il filtro cartella)');
+    toast(done ? `Kit casuale: ${done} bus${locked ? ` · ${locked} bloccati` : ''}${dyn ? ` · dinamica ±${Math.round(margin * 100)}%` : ''}`
+      : 'Nessun sample adatto (controlla il filtro cartella)');
   }
 
   clearSamples() {
@@ -330,6 +375,7 @@ export class PatternEditor {
         <button id="pt-midi" class="btn">Esporta MIDI</button>
         <button id="pt-wav" class="btn">Esporta WAV</button>
         <button id="pt-abl" class="btn primary" title="Cartella con Drum Rack .adg, sample, MIDI e loop pronta per Ableton Live">Esporta per Ableton</button>
+        <button id="pt-live" class="btn" title="Crea in Live le tracce Drums e Bass con rack e clip (serve il device ClusterSound nel set)">Invia a Live</button>
       </div>
       <div class="pt-bar pt-tools">
         <button id="pt-random" class="btn" title="Sceglie a caso un gruppo di sample simili per ogni bus non bloccato (🔒) e ne prende sample a caso">🎲 Kit casuale</button>
@@ -381,6 +427,7 @@ export class PatternEditor {
       const r = await this.api.export_ableton(this._exportable());
       if (r.error) alert(r.error); else if (r.folder) toast(`Pacchetto creato: ${r.folder.split('/').pop()}`);
     };
+    $('#pt-live').onclick = () => sendToLive(this.api, 'pattern', this._exportable());
     $('#pt-grid').addEventListener('click', (e) => this._onGridClick(e));
     $('#pt-grid').addEventListener('contextmenu', (e) => this._onGridContext(e));
     $('#pt-grid').addEventListener('input', (e) => this._onGridInput(e));
@@ -802,6 +849,7 @@ export class PatternEditor {
       <div id="ch-list" class="ch-list"></div>
       <div class="modal-actions"><button class="btn" id="ch-close">Chiudi</button></div></div>`;
     const list = $('#ch-list', modal);
+    const refIds = this._dynRefIds(busId);
     const show = async (tab) => {
       modal.querySelectorAll('.ch-tabs .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
       $('#ch-q', modal).hidden = tab !== 'lib';
@@ -811,13 +859,21 @@ export class PatternEditor {
         else show('lib');
         return;
       }
-      const refs = tab === 'lib' ? await this.api.pattern_candidates(busId, $('#ch-q', modal).value, 300) : this.onlineRefs;
-      list.innerHTML = refs.length ? refs.map((r, i) => `<div class="ch-row" data-i="${i}">
+      const q = $('#ch-q', modal).value;
+      const [sugg, cands] = tab === 'lib' ? await Promise.all([
+        q.trim() || !refIds.length ? [] : this.api.dynamic_suggestions(busId, refIds, 8),
+        this.api.pattern_candidates(busId, q, 300, false, refIds),
+      ]) : [[], this.onlineRefs];
+      const refs = sugg.concat(cands);
+      const row = (r, i) => `<div class="ch-row" data-i="${i}">
           <button class="pt-ib" data-ch="play">▶</button>
           <span class="dot" style="background:${this.classColor[r.cls] || 'transparent'}"></span>
           <span class="ch-name" title="${esc(r.path || r.url || '')}">${esc(r.name)}</span>
-          <span class="ch-meta">${r.kind === 'online' ? esc(r.source_label || '') + ' · ' + esc(r.license_label || '') : r.conf !== undefined ? Math.round(r.conf * 100) + '%' : ''}</span>
-          <button class="btn small primary" data-ch="use">Usa</button></div>`).join('')
+          <span class="ch-meta">${r.dyn !== undefined ? `<span class="ch-dyn" title="${DYN_TIP}">≈ ${Math.round(r.dyn * 100)}%</span> · ` : ''}${r.kind === 'online' ? esc(r.source_label || '') + ' · ' + esc(r.license_label || '') : r.conf !== undefined ? Math.round(r.conf * 100) + '%' : ''}</span>
+          <button class="btn small primary" data-ch="use">Usa</button></div>`;
+      list.innerHTML = refs.length
+        ? (sugg.length ? `<div class="ch-section" title="${DYN_TIP}">✦ Dinamica simile al kit</div>${sugg.map(row).join('')}<div class="ch-section">Tutti i sample del bus</div>` : '')
+          + cands.map((r, i) => row(r, i + sugg.length)).join('')
         : `<div class="hint">${tab === 'lib' ? 'Nessun sample: analizza una cartella nella scheda Libreria.' : 'Nessun sample online usato in questa sessione: usa "→ bus" nella scheda Online.'}</div>`;
       list.onclick = async (e) => {
         const b = e.target.closest('[data-ch]');

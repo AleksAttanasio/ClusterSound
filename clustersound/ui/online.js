@@ -85,12 +85,16 @@ export class Online {
     }
     const keyOpts = ['<option value="">Qualsiasi</option>']
       .concat(NOTES.flatMap((n) => [`<option>${n} major</option>`, `<option>${n} minor</option>`])).join('');
+    const grp = (id, title) => `<div class="filter-group collapsed" data-group="${id}">
+        <div class="fg-head"><span class="caret"></span><span>${title}</span><span class="fg-count" data-fg-count="${id}"></span></div>
+        <div class="fg-body">`;
     sb.innerHTML = `
       <div class="filter-block">
         <div class="filter-title">Strumento <span>${'<span data-srv="instrument"></span>'} <a href="#" id="o-ins-clear">tutti</a></span></div>
         <div id="o-ins-summary" class="hint"></div>
         <div id="o-ins-list" class="o-ins-list">${cls.join('')}</div>
       </div>
+      ${grp('src', 'Fonti e licenza')}
       <div class="filter-block">
         <div class="filter-title">Fonti</div>
         <div id="o-sources">${this.meta.sources.map((s) => `
@@ -102,7 +106,8 @@ export class Online {
         <div class="filter-title">Licenza <span data-srv="license"></span></div>
         <div class="chips" id="o-lic">${LICENSE_FILTERS.map(([k, l]) => `<button class="chip" data-lic="${k}">${l}</button>`).join('')}</div>
         <label class="o-check"><input type="checkbox" id="o-commercial"> Solo uso commerciale (no NC/ND) <span data-srv="commercial"></span></label>
-      </div>
+      </div></div></div>
+      ${grp('char', 'Tipo e caratteristiche')}
       <div class="filter-block">
         <div class="filter-title">Tipo <span data-srv="type"></span></div>
         <div class="chips" id="o-types">${this.types.map((t) => `<button class="chip" data-type="${esc(t)}">${esc(t)}</button>`).join('')}</div>
@@ -118,7 +123,8 @@ export class Online {
       <div class="filter-block">
         <div class="filter-title">Tonalità <span data-srv="key"></span></div>
         <select id="o-key" class="cls-select">${keyOpts}</select>
-      </div>
+      </div></div></div>
+      ${grp('fmt', 'Formato, pack e ordine')}
       <div class="filter-block">
         <div class="filter-title">Formato e pack <span data-srv="lossless"></span></div>
         <label class="o-check"><input type="checkbox" id="o-lossless"> Solo lossless (wav / aiff / flac)</label>
@@ -130,12 +136,32 @@ export class Online {
       <div class="filter-block">
         <div class="filter-title">Ordina <span data-srv="sort"></span></div>
         <select id="o-sort" class="cls-select">${SORTS.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
-      </div>`;
+      </div></div></div>`;
+    sb.onclick = (e) => {
+      const h = e.target.closest('.fg-head'); if (!h) return;
+      h.parentElement.classList.toggle('collapsed');
+    };
     this._refreshSrvHints();
+  }
+
+  _refreshGroupCounts() {
+    const p = this.p;
+    const b = (v) => (v ? 1 : 0);
+    const set = (v) => (v !== null && v !== '' ? 1 : 0);
+    const counts = {
+      src: b(p.sources.size !== this.meta.sources.length) + p.licenses.size + b(p.commercial),
+      char: p.types.size + set(p.dur_min) + set(p.dur_max) + set(p.bpm_min) + set(p.bpm_max) + b(p.key),
+      fmt: b(p.lossless) + b(p.packs !== 'all') + b(p.include_suspect) + b(p.sort !== 'relevance'),
+    };
+    for (const [id, n] of Object.entries(counts)) {
+      const el = document.querySelector(`[data-fg-count="${id}"]`);
+      if (el) { el.textContent = n || ''; el.style.display = n ? '' : 'none'; }
+    }
   }
 
   _refreshSrvHints() {
     document.querySelectorAll('#online-sidebar [data-srv]').forEach((el) => { el.innerHTML = this._srvHint(el.dataset.srv); });
+    this._refreshGroupCounts();
     const n = this.p.instruments.size;
     $('#o-ins-summary').textContent = n ? `${n} selezionat${n === 1 ? 'o' : 'i'}` : 'Tutti gli strumenti';
     document.querySelectorAll('.o-cls').forEach((r) => r.classList.toggle('on', this.p.instruments.has(r.dataset.cls)));
@@ -470,6 +496,13 @@ export class Online {
       this.meta.settings = await this.api.clear_cache();
       $('#set-cache-used').textContent = `In uso: ${this.meta.settings.cache_used_mb} MB`;
     };
+    $('#set-live-port').value = s.live_port;
+    $('#set-live-status').textContent = '';
+    this.api.live_status().then((st) => {
+      $('#set-live-status').textContent = st.running
+        ? `Attivo su 127.0.0.1:${st.port}. Preset per Live in ${st.stage}${st.stage_root === 'places' ? ' (aggiungi la cartella ai Places di Live)' : ''}`
+        : `Non attivo: ${st.error || 'riavvia l\'app'}`;
+    });
     $('#set-cancel').onclick = () => { m.hidden = true; };
     $('#set-getkey').onclick = (e) => { e.preventDefault(); this.api.open_url('https://freesound.org/apiv2/apply'); };
     $('#set-pick').onclick = async () => { const p = await this.api.pick_folder(); if (p) $('#set-dir').value = p; };
@@ -479,6 +512,7 @@ export class Online {
       if (key) this.meta.settings = await this.api.set_setting('freesound_key', key);
       this.meta.settings = await this.api.set_setting('download_dir', $('#set-dir').value.trim());
       this.meta.settings = await this.api.set_setting('cache_mb', $('#set-cache').value);
+      this.meta.settings = await this.api.set_setting('live_port', $('#set-live-port').value);
       m.hidden = true;
       this._renderKeyHint();
       if (key) this.search();

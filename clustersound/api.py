@@ -13,12 +13,21 @@ import numpy as np
 import soundfile as sf
 
 from . import classifier, dynamics, export, taxonomy
+from .chords import export as chord_export
+from .chords import harmony as chord_harmony
+from .chords import perform as chord_perform
+from .chords import variations as chord_variations
+from .chords.library import CATEGORIES as CHORD_CATEGORIES
+from .chords.library import DEFAULT_DIR as CHORD_DIR
+from .chords.library import ChordLibrary
 from .features import TYPES
 from .library import Library
+from .live import payload as live_payload
+from .live import server as live_server
 from .online import cache as online_cache
 from .online import search as online
 from .online.base import LICENSES, OnlineResult
-from .online.downloads import DEFAULT_DIR, Downloader
+from .online.downloads import DEFAULT_DIR, Downloader, safe_name
 from .patterns import ableton as pat_ableton
 from .patterns import arrange as pat_arrange
 from .patterns import genres as pat_genres
@@ -28,6 +37,7 @@ from .patterns import render as pat_render
 from .patterns import store as pat_store
 from .paths import data_dir
 from .racks import ableton as rack_ableton
+from .racks import dynamics_match
 from .racks import layouts as rack_layouts
 from .racks import select as rack_select
 from .racks import store as rack_store
@@ -62,6 +72,9 @@ class Api:
         self._downloader = Downloader()
         self._protected: dict[str, list[str]] = {}  # owner (pattern, rack) -> cached online files in use
         self._rack_cache: dict = {}
+        self._rack_lock = threading.Lock()  # js_api calls run on several threads
+        self._chords: ChordLibrary | None = None
+        self._live = live_server.Bridge(self._live_stage(), self._resolve, self._describe, self._title)
         threading.Thread(target=online_cache.prune, args=(self._cache_mb(),), daemon=True).start()
 
     # pywebview exposes public attributes too, so keep internals underscored
@@ -210,10 +223,21 @@ class Api:
         return {"freesound_key_set": bool(key), "cache_mb": self._cache_mb(),
                 "cache_used_mb": round(online_cache.size() / (1 << 20), 1),
                 "freesound_key_hint": (key[:4] + "…" + key[-3:]) if len(key) > 8 else "",
-                "download_dir": s.get("download_dir") or DEFAULT_DIR}
+                "download_dir": s.get("download_dir") or DEFAULT_DIR, "live_port": self._live_port(),
+                "live_library": s.get("live_library") or live_payload.USER_LIBRARY}
 
     def set_setting(self, key: str, value) -> dict:
-        if key not in ("freesound_key", "download_dir", "cache_mb"):
+        if key not in ("freesound_key", "download_dir", "cache_mb", "live_port", "live_library"):
+            return self.get_settings()
+        if key == "live_port":
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                return self.get_settings()
+            if 1024 <= value <= 65535 and value != self._live_port():
+                self._save_settings(live_port=value)
+                self._live.stop()
+                self.live_start()
             return self.get_settings()
         if key == "cache_mb":
             try:
@@ -224,9 +248,11 @@ class Api:
             online_cache.prune(value)
             return self.get_settings()
         value = (value or "").strip() or None
-        if key == "download_dir" and value:
+        if key in ("download_dir", "live_library") and value:
             value = os.path.expanduser(value)
         self._save_settings(**{key: value})
+        if key == "live_library":
+            self._live.stage = self._live_stage()
         return self.get_settings()
 
     def online_search(self, params: dict) -> dict:
@@ -304,9 +330,7 @@ class Api:
     def pattern_build(self, genre_id: str, variant: int) -> dict:
         return pat_genres.build(genre_id, int(variant))
 
-    def pattern_candidates(self, bus_id: str, query: str = "", limit: int = 200, strict: bool = False) -> list[dict]:
-        """Library samples for a bus: its classes first (by confidence), then the rest if searching.
-        strict (auto-fill): never a loop, and drum buses only take one-shots."""
+    def _bus_selection(self, bus_id: str, query: str = "", strict: bool = False) -> tuple[list[dict], list[str]]:
         classes = pat_model.BUS_BY_ID[bus_id][2] if bus_id in pat_model.BUS_BY_ID else []
         q = (query or "").lower().strip()
         rank = {c: i for i, c in enumerate(classes)}
@@ -314,7 +338,38 @@ class Api:
         if strict:
             ok = {"One-shot"} if bus_id != "bass" else {"One-shot", "Long/Texture"}
             sel = [it for it in sel if it["feats"].get("type") in ok and not classifier.name_scores(it["rel"])[1]]
-        return [self._library_ref_of(it) for it in self._ranked(sel, classes)[: int(limit)]]
+        return sel, classes
+
+    def _dyn_scores(self, ref_ids) -> np.ndarray | None:
+        """Envelope similarity of every library item to the mean of ref_ids (None without a reference)."""
+        if not ref_ids or not self._lib.items:
+            return None
+        D = self._rack_arrays()["dyn"]
+        ref = dynamics_match.reference(D, ref_ids)
+        return None if ref is None else dynamics_match.scores(D, ref)
+
+    def pattern_candidates(self, bus_id: str, query: str = "", limit: int = 200, strict: bool = False,
+                           ref_ids: list | None = None) -> list[dict]:
+        """Library samples for a bus: its classes first (by confidence), then the rest if searching.
+        strict (auto-fill): never a loop, and drum buses only take one-shots. With ref_ids (samples on the
+        other buses) every ref also gets "dyn": how close its envelope is to theirs."""
+        sel, classes = self._bus_selection(bus_id, query, strict)
+        sc = self._dyn_scores(ref_ids)
+        out = [self._library_ref_of(it) for it in self._ranked(sel, classes)[: int(limit)]]
+        if sc is not None:
+            for r in out:
+                r["dyn"] = round(float(sc[r["id"]]), 3)
+        return out
+
+    def dynamic_suggestions(self, bus_id: str, ref_ids: list, k: int = 8) -> list[dict]:
+        """The bus's samples whose envelope best matches the samples on the other buses."""
+        sc = self._dyn_scores(ref_ids)
+        if sc is None:
+            return []
+        exclude = {int(i) for i in ref_ids}
+        sel = [it for it in self._bus_selection(bus_id, "", True)[0] if it["id"] not in exclude]
+        sel.sort(key=lambda it: -sc[it["id"]])
+        return [self._library_ref_of(it) | {"dyn": round(float(sc[it["id"]]), 3)} for it in sel[: int(k)]]
 
     @staticmethod
     def _ranked(sel: list[dict], classes: list[str]) -> list[dict]:
@@ -462,12 +517,132 @@ class Api:
         return {"folder": folder}
 
 
+    # ================================================================== compose (chord progressions)
+    def _chord_lib(self) -> ChordLibrary:
+        root = self._settings().get("chord_pack_dir") or CHORD_DIR
+        if self._chords is None or self._chords.root != root:
+            self._chords = ChordLibrary(root)
+        return self._chords
+
+    def compose_init(self) -> dict:
+        lib = self._chord_lib()
+        return {"dir": lib.root, "exists": lib.exists(), "keys": lib.available_keys() if lib.exists() else [],
+                "categories": CHORD_CATEGORIES, "styles": chord_perform.meta(),
+                "clipKinds": chord_variations.CLIP_KINDS, "progKinds": chord_variations.PROG_KINDS, "modeKinds": chord_variations.MODE_KINDS,
+                "saved": pat_store.list_progressions()}
+
+    def compose_pick_folder(self, path: str | None = None) -> dict:
+        if path is None:
+            path = self.pick_folder()
+        if path:
+            self._save_settings(chord_pack_dir=os.path.expanduser(path))
+        return self.compose_init()
+
+    def compose_rescan(self) -> dict:
+        self._chord_lib().scan(force=True)
+        return self.compose_init()
+
+    def compose_chords(self, tonic: int, mode: str) -> dict:
+        return self._chord_lib().chords_for_key(int(tonic), mode)
+
+    @staticmethod
+    def _seq_key(seq: dict) -> dict:
+        k = seq.get("key") or {}
+        return {"tonic": int(k.get("tonic", 0)) % 12, "mode": "minor" if k.get("mode") == "minor" else "major"}
+
+    def _pool(self, seq: dict, related: bool = False) -> list[dict]:
+        key = self._seq_key(seq)
+        lib = self._chord_lib()
+        pool = list(lib.chords_for_key(key["tonic"], key["mode"])["chords"])
+        if related or seq.get("keyMode") == "free":
+            seen = {(c["root"], tuple(p for p, _ in c["notes"])) for c in pool}
+            for k in chord_harmony.related_keys(key):
+                for c in lib.chords_for_key(k["tonic"], k["mode"])["chords"]:
+                    sig = (c["root"], tuple(p for p, _ in c["notes"]))
+                    if sig not in seen:
+                        seen.add(sig)
+                        pool.append(c)
+        return pool
+
+    def compose_suggest(self, seq: dict, after_id: str | None = None, limit: int = 8) -> dict:
+        """Next chord after clip after_id (default: the last one), leading into the clip that follows it."""
+        key = self._seq_key(seq)
+        clips = sorted(seq.get("clips", []), key=lambda c: c["start"])
+        i = next((j for j, c in enumerate(clips) if c["id"] == after_id), len(clips) - 1)
+        prev = clips[max(0, i - 1):i + 1] if i >= 0 else []
+        nxt = clips[i + 1] if 0 <= i + 1 < len(clips) and after_id else None
+        out = chord_harmony.suggest(prev, self._pool(seq), key, self._chord_lib().bigrams(key["mode"]), nxt=nxt, limit=limit)
+        return {"after": clips[i]["id"] if i >= 0 and clips else None, "items": out}
+
+    def compose_render(self, seq: dict) -> dict:
+        key = self._seq_key(seq)
+        clips = seq.get("clips", [])
+        labels = []
+        for c in clips:
+            d = chord_harmony.describe(c)
+            labels.append({"id": c["id"], **chord_harmony.label(d, key)} if d["notes"] else {"id": c["id"]})
+        return {"ppq": chord_perform.PPQ, "events": chord_perform.render(seq), "labels": labels}
+
+    def compose_vary_clip(self, seq: dict, clip_id: str, kinds: list, seed: int = 1) -> list[dict]:
+        key = self._seq_key(seq)
+        pool = self._pool(seq)
+        return chord_variations.vary_clip(seq, clip_id, kinds, int(seed), pool, key, self._chord_lib().bigrams(key["mode"]))
+
+    def compose_vary_progression(self, seq: dict, kinds: list, amount: float = .5, seed: int = 1) -> list[dict]:
+        key = self._seq_key(seq)
+        pool = self._pool(seq)
+        return chord_variations.vary_progression(seq, kinds, amount, int(seed), pool, key, self._chord_lib().bigrams(key["mode"]))
+
+    def compose_vary_mode(self, mode: dict, kinds: list, amount: float = .5, seed: int = 1) -> list[dict]:
+        return chord_variations.vary_mode(mode, kinds, amount, int(seed))
+
+    @staticmethod
+    def _prog_title(seq: dict) -> str:
+        return f"{seq.get('name') or 'Accordi'} {int(round(seq.get('bpm', 120)))}bpm - {seq.get('bars', 4)} battute"
+
+    def compose_export_midi(self, seq: dict, pure: bool = False) -> str | None:
+        path = self._save_dialog(safe_name(self._prog_title(seq)) + ".mid", ("MIDI (*.mid)",))
+        if path:
+            chord_export.write(path, seq, pure)
+        return path
+
+    def compose_export_versions(self, seqs: list, pure: bool = False) -> dict:
+        import webview
+        os.makedirs(EXPORT_DIR, exist_ok=True)
+        res = self._window.create_file_dialog(webview.FileDialog.FOLDER, directory=EXPORT_DIR)
+        if not res:
+            return {"cancelled": True}
+        return self._write_versions(res[0] if isinstance(res, (list, tuple)) else res, seqs, pure)
+
+    def _write_versions(self, folder: str, seqs: list, pure: bool) -> dict:
+        files = []
+        for seq in seqs:
+            name = safe_name(f"{self._prog_title(seq)} - {seq.get('version', '')}".rstrip(" -"))
+            path = os.path.join(folder, name + ".mid")
+            chord_export.write(path, seq, pure)
+            files.append(path)
+        subprocess.run(["open", folder], check=False)
+        return {"folder": folder, "files": files}
+
+    def list_progressions(self) -> list[dict]:
+        return pat_store.list_progressions()
+
+    def save_progression(self, proj: dict) -> dict:
+        return pat_store.save_progression(proj)
+
+    def delete_progression(self, pid: str) -> bool:
+        return pat_store.delete_progression(pid)
+
     # ================================================================== 64-pad racks
     def racks_init(self) -> dict:
         return {**rack_layouts.ui_layouts(), "saved": rack_store.list_racks()}
 
     def _rack_arrays(self) -> dict:
         """Normalised embeddings and per-item class / type arrays, rebuilt when the library changes."""
+        with self._rack_lock:
+            return self._rack_arrays_locked()
+
+    def _rack_arrays_locked(self) -> dict:
         lib = self._lib
         c = self._rack_cache
         if c.get("emb") is not lib.emb:
@@ -479,6 +654,7 @@ class Api:
             c["cls"] = np.array([it["cls"] for it in lib.items], dtype=object)
             c["oneshot"] = np.array([it["feats"].get("type") == "One-shot" for it in lib.items], bool)
             c["group"] = np.array([f'{it["cls"]}:{it.get("sub", 0)}' for it in lib.items], dtype=object)
+            c["dyn"] = dynamics_match.dyn_matrix([it["feats"] for it in lib.items], c["cls"])
         return c
 
     def _rack_mask(self, seed: int | None, opts: dict) -> np.ndarray | None:
@@ -580,11 +756,16 @@ class Api:
         if folder:
             mask &= np.array([folder in it["rel"].lower() for it in self._lib.items], bool)
         mask[[int(i) for i in opts.get("exclude") or [] if 0 <= int(i) < len(mask)]] = False
+        margin = opts.get("dyn_margin")
+        if margin is not None and float(margin) < 1:
+            ref = dynamics_match.reference(a["dyn"], opts.get("dyn_ref"))
+            mask = dynamics_match.margin_mask(a["dyn"], ref, mask, float(margin))
         return mask
 
     def random_refs(self, classes: list[str], count: int, opts: dict | None = None) -> list[dict]:
         """Random samples of the given classes: a random sample group (class + sub-cluster), a random
-        seed in it and similar companions. opts: oneshot, folder (path substring), exclude, variation."""
+        seed in it and similar companions. opts: oneshot, folder (path substring), exclude, variation, and
+        dyn_ref + dyn_margin (keep only the dyn_margin fraction whose envelope is closest to dyn_ref's)."""
         opts = opts or {}
         if not self._lib.items:
             return []
@@ -594,7 +775,8 @@ class Api:
         return self._rack_refs(picks)
 
     def rack_randomize(self, rack: dict, only_empty: bool = False, opts: dict | None = None) -> dict:
-        """Every unlocked (or every empty) group: random samples from a random group of its family."""
+        """Every unlocked (or every empty) group: random samples from a random group of its family.
+        With opts["dyn_margin"] each group's envelopes stay close to the groups kept or generated before it."""
         opts = dict(opts or {})
         rack = rack_layouts.validate(rack)
         settings = rack_layouts.group_settings(rack)
@@ -605,7 +787,7 @@ class Api:
             if settings[g]["lock"] or (only_empty and any(rack["pads"][p] for p in pads)):
                 continue
             refs = self.random_refs(rack_layouts.family_classes(settings[g]["family"]), len(pads),
-                                    {**opts, "exclude": list(used)})
+                                    {**opts, "exclude": list(used), "dyn_ref": list(used)})
             for p, ref in zip(pads, refs + [None] * len(pads)):
                 rack["pads"][p] = ref
             used |= {r["id"] for r in refs}
@@ -633,6 +815,40 @@ class Api:
             return {"error": f"{type(e).__name__}: {e}"}
         subprocess.run(["open", folder], check=False)
         return {"folder": folder}
+
+    # ================================================================== Ableton Live (Max for Live bridge)
+    def _live_stage(self) -> live_payload.Stage:
+        """Presets for Live go to the User Library (always indexed by Live's browser), else to Places."""
+        return live_payload.Stage.default(EXPORT_DIR, self._settings().get("live_library"))
+
+    def _live_port(self) -> int:
+        return int(self._settings().get("live_port") or live_server.DEFAULT_PORT)
+
+    def live_start(self) -> dict:
+        """Start the localhost bridge for the Max for Live device (app start, or after a port change)."""
+        if not self._live.server:
+            self._live.error = None
+            self._live.start(self._live_port())
+        return self.live_status()
+
+    def live_status(self) -> dict:
+        return {"running": self._live.server is not None, "port": self._live.port or self._live_port(),
+                "error": self._live.error, "pending": self._live.pending(),
+                "stage": os.path.join(self._live.stage.base, self._live.stage.sub), "stage_root": self._live.stage.root}
+
+    def live_set_kit(self, p: dict) -> None:
+        """The Sequencer reports its kit, used for saved sequences that do not carry one."""
+        live_server.save_current_kit(p)
+
+    def live_send(self, kind: str, data: dict, opts: dict | None = None) -> dict:
+        """Build the payload of what is open in the UI and queue it for the device in Live ("Invia a Live")."""
+        try:
+            item = self._live.build(kind, data, **(opts or {}))
+        except Exception as e:
+            return {"error": f"{type(e).__name__}: {e}"}
+        return {"queued": self._live.push(item), "name": item["name"],
+                "tracks": [t["name"] for t in item["tracks"]], **self.live_status()}
+
 
 def _media_data_url(path: str) -> str | None:
     out = _wav_data_url(path)

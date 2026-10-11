@@ -2,7 +2,8 @@
 // sample plus similar ones; exported as an Ableton Drum Rack.
 import { refKey } from './sequencer.js';
 import { toast, suggestBus, showPopover } from './sendmenu.js';
-import { NO_ALT } from './pattern.js';
+import { sendToLive } from './live.js';
+import { NO_ALT, dynControls, wireDynControls, readDynControls } from './pattern.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -125,6 +126,7 @@ export class DrumRackEditor {
           <button class="btn" id="rk-clear" title="Svuota tutti i pad">Svuota</button>
           <button class="btn" id="rk-toseq" title="Carica i sample del kit nei bus del Sequencer">→ Sequencer</button>
           <button class="btn primary" id="rk-export">Esporta per Ableton</button>
+          <button class="btn" id="rk-live" title="Crea in Live una traccia con questo Drum Rack (serve il device ClusterSound nel set)">Invia a Live</button>
         </div>
         <div class="rk-stage">
           <div id="rk-grid" class="rk-grid"></div>
@@ -159,6 +161,7 @@ export class DrumRackEditor {
     $('#rk-del').onclick = () => this.deleteSaved();
     $('#rk-saved').onchange = (e) => this.loadSaved(e.target.value);
     $('#rk-export').onclick = () => this.exportRack();
+    $('#rk-live').onclick = () => this.sendRackToLive();
 
     // browser
     let qTimer = 0;
@@ -575,7 +578,7 @@ export class DrumRackEditor {
   }
 
   openRandomize(anchor) {
-    let o = { scope: 'all', folder: '', oneshot: true };
+    let o = { scope: 'all', folder: '', oneshot: true, dyn: false, margin: 0.3 };
     try { o = { ...o, ...JSON.parse(localStorage.getItem(LS_RANDOM) || '{}') }; } catch { /* private mode */ }
     const pop = showPopover(anchor, `
       <div class="pop-title">🎲 Kit casuale</div>
@@ -586,18 +589,21 @@ export class DrumRackEditor {
           <option value="empty" ${o.scope === 'empty' ? 'selected' : ''}>solo quelli vuoti</option></select></label>
       <label class="pop-field">Solo dalla cartella / pack (facoltativo)<input type="text" data-o="folder" value="${esc(o.folder)}" placeholder="es. Cymatics"></label>
       <label class="pop-check"><input type="checkbox" data-o="oneshot" ${o.oneshot ? 'checked' : ''}> solo one-shot (niente loop)</label>
+      ${dynControls(o, 'gruppi')}
       <div class="pop-actions"><button class="btn primary" data-go>Genera</button></div>`);
+    wireDynControls(pop);
     pop.querySelector('[data-go]').onclick = async () => {
       o = { scope: pop.querySelector('[data-o=scope]').value, folder: pop.querySelector('[data-o=folder]').value.trim(),
-        oneshot: pop.querySelector('[data-o=oneshot]').checked };
+        oneshot: pop.querySelector('[data-o=oneshot]').checked, ...readDynControls(pop) };
       try { localStorage.setItem(LS_RANDOM, JSON.stringify(o)); } catch { /* private mode */ }
       pop.close();
-      const out = await this.api.rack_randomize(this.rack, o.scope === 'empty', { folder: o.folder, oneshot: o.oneshot });
+      const out = await this.api.rack_randomize(this.rack, o.scope === 'empty',
+        { folder: o.folder, oneshot: o.oneshot, ...(o.dyn ? { dyn_margin: o.margin } : {}) });
       this.rack.pads = out.pads;
       this._persist();
       this.renderAll();
       const n = this.rack.pads.filter(Boolean).length;
-      toast(n ? `Kit casuale: ${n} pad pieni` : 'Nessun sample adatto (controlla il filtro cartella)');
+      toast(n ? `Kit casuale: ${n} pad pieni${o.dyn ? ` · dinamica ±${Math.round(o.margin * 100)}%` : ''}` : 'Nessun sample adatto (controlla il filtro cartella)');
     };
   }
 
@@ -708,6 +714,11 @@ export class DrumRackEditor {
     this.meta.saved = await this.api.list_racks();
     this._persist();
     this.renderSaved();
+  }
+
+  async sendRackToLive() {
+    if (!this.rack.pads.some(Boolean)) { toast('Il kit è vuoto'); return; }
+    await sendToLive(this.api, 'rack', this.rack);
   }
 
   async exportRack() {
