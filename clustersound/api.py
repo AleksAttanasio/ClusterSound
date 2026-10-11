@@ -836,6 +836,10 @@ class Api:
                 "error": self._live.error, "pending": self._live.pending(),
                 "stage": os.path.join(self._live.stage.base, self._live.stage.sub), "stage_root": self._live.stage.root}
 
+    def live_set_kit(self, p: dict) -> None:
+        """The Sequencer reports its kit, used for saved sequences that do not carry one."""
+        live_server.save_current_kit(p)
+
     def live_send(self, kind: str, data: dict, opts: dict | None = None) -> dict:
         """Build the payload of what is open in the UI and queue it for the device in Live ("Invia a Live")."""
         try:

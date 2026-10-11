@@ -87,6 +87,8 @@ export class PatternEditor {
     if (this.playMode !== 'sequence') this.seq.setPattern(this.p);
     if (Object.values(this.p.buses).some((b) => b.layers.length)) this.noAutofill = false;
     try { localStorage.setItem(LS_KEY, JSON.stringify({ ...this.p, _source: this.source, _noAutofill: this.noAutofill })); } catch (e) { /* private mode */ }
+    clearTimeout(this._kitT);  // the kit for Live imports of sequences saved without one
+    this._kitT = setTimeout(() => this.api.live_set_kit(this.p), 1500);
     const refs = [];
     for (const b of Object.values(this.p.buses)) for (const l of b.layers) if (l.ref?.kind === 'online') refs.push(l.ref);
     this.api.protect_samples(refs);

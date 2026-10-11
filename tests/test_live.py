@@ -122,6 +122,7 @@ def bridge(tmp_path, stage, monkeypatch):
     monkeypatch.setattr(pat_store, "data_dir", lambda: tmp_path)
     monkeypatch.setattr(rack_store, "data_dir", lambda: tmp_path)
     from clustersound.live import server
+    monkeypatch.setattr(server, "data_dir", lambda: tmp_path)
     b = server.Bridge(stage, _resolve, lambda r: None)
     assert b.start(0)
     yield b
@@ -188,6 +189,12 @@ def test_bridge_sequences(bridge, samples):
     assert status == 200 and out["tracks"][0]["adg"] is None and out["tracks"][0]["clips"][0]["notes"]
     status, out = _get(bridge, f"/live/payload?kind=sequence&id={orphan['id']}")
     assert status == 500 and "senza kit" in out["error"]
+
+    from clustersound.live import server
+    server.save_current_kit(kit)  # the Sequencer's kit fills in for sequences saved without one
+    names = {s["id"]: s["name"] for s in _get(bridge, "/live/catalog")[1]["sequence"]}
+    assert names[midi_only["id"]] == "G (kit attuale)" and names[orphan["id"]] == "X (kit attuale)"
+    assert _get(bridge, f"/live/payload?kind=sequence&id={orphan['id']}")[1]["tracks"][0]["adg"]
 
 
 def test_bridge_push_queue_and_routes(bridge):

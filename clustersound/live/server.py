@@ -8,11 +8,13 @@
 Only these routes exist (no generic RPC) and the server binds to 127.0.0.1.
 """
 import json
+import os
 import threading
 import urllib.parse
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from ..paths import data_dir
 from ..patterns import arrange as pat_arrange
 from ..patterns import genres as pat_genres
 from ..patterns import store as pat_store
@@ -21,6 +23,27 @@ from . import payload
 
 DEFAULT_PORT = 8770
 VERSION = 1
+KIT_FILE = "live_kit.json"
+
+
+def save_current_kit(p: dict) -> None:
+    """The pattern open in the Sequencer (its samples, layers and mix): the kit for sequences saved without one."""
+    path = data_dir() / KIT_FILE
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(p))
+    os.replace(tmp, path)
+
+
+def current_kit() -> dict | None:
+    try:
+        p = json.loads((data_dir() / KIT_FILE).read_text())
+    except (OSError, ValueError):
+        return None
+    return p if isinstance(p, dict) and p.get("buses") else None
+
+
+def _has_samples(p: dict) -> bool:
+    return any(ly.get("ref") for bus in (p.get("buses") or {}).values() for ly in bus.get("layers") or [])
 
 
 class Bridge:
@@ -45,20 +68,24 @@ class Bridge:
         raise ValueError(f"tipo sconosciuto: {kind}")
 
     @staticmethod
-    def sequence_kit(seq: dict) -> tuple[dict | None, bool]:
-        """(kit pattern, has samples) of a saved sequence: the kit saved with it, else the user pattern its
-        first block comes from, else that block's genre preset (no samples: MIDI only)."""
+    def sequence_kit(seq: dict) -> tuple[dict | None, str]:
+        """(kit pattern, note for the catalogue) of a saved sequence: the kit saved with it, else the user
+        pattern its first block comes from, else the kit open in the Sequencer now, else that block's genre
+        preset (no samples: MIDI only)."""
         if seq.get("kit"):
-            return seq["kit"], True
+            return seq["kit"], ""
         src = next((b.get("source") or {} for b in seq.get("blocks", []) if b.get("groove")), {})
         if src.get("user"):
             user = next((p for p in pat_store.list_user() if p.get("id") == src["user"]), None)
             if user:
-                return user, True
+                return user, ""
+        kit = current_kit()
+        if kit and _has_samples(kit):
+            return kit, " (kit attuale)"
         if src.get("genre") in pat_genres.GENRE_BY_ID:
             n = len(pat_genres.variants(src["genre"]))
-            return pat_genres.build(src["genre"], min(int(src.get("variant") or 0), n - 1)), False
-        return None, False
+            return pat_genres.build(src["genre"], min(int(src.get("variant") or 0), n - 1)), " (solo MIDI)"
+        return None, ""
 
     @classmethod
     def find(cls, kind: str, item_id: str) -> dict | None:
@@ -80,7 +107,7 @@ class Bridge:
     def catalog(cls) -> dict:
         return {
             "pattern": [{"id": p["id"], "name": p.get("name") or "Pattern"} for p in pat_store.list_user()],
-            "sequence": [{"id": s["id"], "name": (s.get("name") or "Sequenza") + ("" if cls.sequence_kit(s)[1] else " (solo MIDI)")}
+            "sequence": [{"id": s["id"], "name": (s.get("name") or "Sequenza") + cls.sequence_kit(s)[1]}
                          for s in pat_store.list_sequences()],
             "rack": [{"id": r["id"], "name": r.get("name") or "Rack"} for r in rack_store.list_racks()],
             "compose": [{"id": p["id"], "name": p.get("name") or "Progressione"} for p in pat_store.list_progressions()],
