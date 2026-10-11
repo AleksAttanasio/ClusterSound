@@ -70,6 +70,19 @@ def test_infer_instrument(title, tags, path, expected):
     assert inst.infer(title, tags, path) == expected
 
 
+def test_infer_is_deterministic():
+    """Ties between classes must not depend on PYTHONHASHSEED (it changed results between runs)."""
+    import subprocess
+    import sys
+    code = ("from clustersound.online import instruments as inst;"
+            "print(inst.infer('Express Yourself', ['arp', 'bass', 'beat', 'clap', 'cymbals', 'dance']),"
+            " inst.infer('SDR-204.wav', ['16bit', 'pcm', 'drumkit', 'drums', 'hertz', 'kick']))")
+    root = Path(__file__).parent.parent
+    outs = {subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=root,
+                           env={**os.environ, "PYTHONHASHSEED": str(seed)}).stdout for seed in (1, 2, 3)}
+    assert len(outs) == 1 and outs.pop().split() == ["synth", "kick"]
+
+
 def test_name_metadata():
     assert inst.bpm_from_text("Drum Loop 128bpm") == 128
     assert inst.bpm_from_text("BPM 90 groove") == 90

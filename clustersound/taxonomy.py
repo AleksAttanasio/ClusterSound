@@ -210,7 +210,8 @@ def keyword_scores(tokens: list[str]) -> dict[str, float]:
     scores: dict[str, float] = {}
     toks = set(tokens)
     has_hat = bool(toks & HAT_TOKENS) or any(t.endswith("hat") or t.startswith("hihat") for t in toks)
-    for t in toks:
+    # token order, not set order: ties (max() keeps the first) must not depend on hash randomisation
+    for t in dict.fromkeys(tokens):
         for cid, w in _KEYWORD_MAP.get(t, []):
             scores[cid] = max(scores.get(cid, 0.0), w)
     if has_hat:
