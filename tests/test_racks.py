@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from clustersound.racks import ableton, layouts, select, store
+from clustersound.racks import ableton, dynamics_match, layouts, select, store
 
 from . import synth
 
@@ -113,6 +113,59 @@ def test_random_group(emb):
     seeds = {keys[select.random_group(emb, keys, ok, 1, rng_seed=s)[0][0]] for s in range(20)}
     assert seeds == {"a:1", "a:2"}  # both groups get picked
     assert select.random_group(emb, keys, np.zeros(41, bool), 4) == []
+
+
+# ---------------------------------------------------------------- dynamics matching
+def _env(decay, k=0, attack=0.002):
+    """Envelope features of a sound decaying in `decay` s; k: its rank in its class (sets tail and slope)."""
+    return {"attack": attack, "decay20": decay, "t60": 3 * decay, "tail_ratio": 0.1 + 0.08 * k, "env_slope": -40 + 3 * k}
+
+
+@pytest.fixture()
+def dyn():
+    """Kicks with decays 0.05..0.5 s (0..9), hats 10x shorter (10..19): same spread within each class."""
+    decays = np.geomspace(0.05, 0.5, 10)
+    feats = [_env(d, k) for k, d in enumerate(decays)] + [_env(d / 10, k) for k, d in enumerate(decays)]
+    cls = np.array(["kick"] * 10 + ["hat"] * 10, dtype=object)
+    return dynamics_match.dyn_matrix(feats, cls)
+
+
+def test_dynamics_are_relative_to_the_class(dyn):
+    long_kick = dynamics_match.reference(dyn, [9])
+    d = dynamics_match.distances(dyn, long_kick)
+    assert d[19] < 0.2 < d[0]       # the long hat matches the long kick, a short kick does not
+    assert np.argmin(d[10:]) == 9   # the closest hat is the longest one
+
+
+def test_scores_follow_distance(dyn):
+    ref = dynamics_match.reference(dyn, [0, 1])
+    sc = dynamics_match.scores(dyn, ref)
+    assert np.all((sc >= 0) & (sc <= 1))
+    order = np.argsort(dynamics_match.distances(dyn, ref))
+    assert np.all(np.diff(sc[order]) <= 1e-6)
+    assert np.all(dynamics_match.scores(dyn, None) == 1)
+    assert dynamics_match.reference(dyn, []) is None
+
+
+def test_margin_mask(dyn):
+    ok = np.zeros(20, bool)
+    ok[10:] = True
+    ref = dynamics_match.reference(dyn, [0])  # the shortest kick
+    m = dynamics_match.margin_mask(dyn, ref, ok, 0.3, min_keep=2)
+    assert set(np.flatnonzero(m)) == {10, 11, 12}  # the 3 shortest hats
+    assert dynamics_match.margin_mask(dyn, ref, ok, 0.1, min_keep=4).sum() == 4
+    assert dynamics_match.margin_mask(dyn, ref, ok, 1.0) is ok
+    assert dynamics_match.margin_mask(dyn, None, ok, 0.1) is ok
+
+
+def test_random_group_with_dynamics_mask(emb):
+    keys = np.array(["a:1"] * 20 + ["b:1"] * 21, dtype=object)
+    feats = [_env(d, k % 10) for k, d in enumerate(np.geomspace(0.05, 0.5, 41))]
+    D = dynamics_match.dyn_matrix(feats, keys)
+    ok = dynamics_match.margin_mask(D, dynamics_match.reference(D, [0]), np.ones(41, bool), 0.2)
+    out = select.random_group(emb, keys, ok, 3, rng_seed=2)
+    assert out and all(ok[i] for i, _ in out)
+    assert out == select.random_group(emb, keys, ok, 3, rng_seed=2)
 
 
 # ---------------------------------------------------------------- export

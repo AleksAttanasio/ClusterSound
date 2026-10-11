@@ -337,6 +337,8 @@ select.cls-select { width: 100%; background: var(--bg); color: var(--text); bord
 .ch-row:hover { background: var(--bg-3); }
 .ch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ch-meta { color: var(--text-3); font-size: 11px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch-dyn { color: var(--accent-2); font-variant-numeric: tabular-nums; }
+.ch-section { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); padding: 6px 4px 2px; }
 
 /* send menu + toast */
 .send-menu { position: fixed; z-index: 80; width: 400px; background: var(--bg-2); border: 1px solid #3a4152; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,.5); padding: 6px; max-height: 70vh; overflow-y: auto; }
@@ -398,6 +400,8 @@ select.cls-select { width: 100%; background: var(--bg); color: var(--text); bord
 .pop-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-2); }
 .pop-field select, .pop-field input { background: var(--bg); border: 1px solid var(--line); border-radius: 5px; color: var(--text); padding: 5px 6px; font: inherit; }
 .pop-check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); cursor: pointer; }
+.pop-row { display: flex; justify-content: space-between; }
+.pop-scale { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-3); }
 .pop-actions { display: flex; justify-content: flex-end; }
 .pt-lock { opacity: .45; background: transparent; border-color: transparent; }
 .pt-lock:hover, .pt-lock.on { opacity: 1; }
