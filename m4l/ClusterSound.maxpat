@@ -17,13 +17,724 @@
   ],
   "openinpresentation": 1,
   "default_fontsize": 10.0,
-  "default_fontname": "Arial Bold",
+  "default_fontname": "Ableton Sans Medium",
   "gridsize": [
    8.0,
    8.0
   ],
   "description": "ClusterSound: importa pattern, drum rack e progressioni Compose nel set.",
   "boxes": [
+   {
+    "box": {
+     "id": "lcd_status",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      90,
+      480,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      4,
+      134,
+      552,
+      30
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 0,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgcolor": {
+       "expression": "themecolor.live_lcd_bg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_kinds",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      20,
+      480,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      8,
+      26,
+      264,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.12,
+      0.12,
+      0.12,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_items",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      90,
+      480,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      8,
+      50,
+      264,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.12,
+      0.12,
+      0.12,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_m_sndtrack",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      160,
+      480,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      348,
+      30,
+      200,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.12,
+      0.12,
+      0.12,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_m_sndtype",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      230,
+      480,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      348,
+      54,
+      200,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.12,
+      0.12,
+      0.12,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_m_sndpick",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      300,
+      480,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      348,
+      78,
+      200,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.12,
+      0.12,
+      0.12,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_bref",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      20,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      208,
+      5,
+      64,
+      18
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.12,
+      0.12,
+      0.12,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_bimp",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      90,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      8,
+      76,
+      130,
+      22
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.12,
+      0.12,
+      0.12,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_tg_newtracks",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      160,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      8,
+      104,
+      92,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.12,
+      0.12,
+      0.12,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_tg_tempo",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      230,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      104,
+      104,
+      80,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.12,
+      0.12,
+      0.12,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_tg_receive",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      300,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      188,
+      104,
+      84,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.12,
+      0.12,
+      0.12,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_bprev",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      370,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      288,
+      104,
+      32,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.12,
+      0.12,
+      0.12,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_bprova",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      440,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      324,
+      104,
+      120,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.12,
+      0.12,
+      0.12,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_bnext",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      510,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      448,
+      104,
+      32,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.12,
+      0.12,
+      0.12,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_bferma",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      20,
+      560,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      484,
+      104,
+      64,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.12,
+      0.12,
+      0.12,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_bclip",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      90,
+      560,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      142,
+      76,
+      130,
+      22
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.12,
+      0.12,
+      0.12,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
+      }
+     }
+    }
+   },
    {
     "box": {
      "id": "thisdevice",
@@ -149,13 +860,24 @@
      "presentation": 1,
      "presentation_rect": [
       8,
-      4,
-      120,
-      20
+      6,
+      180,
+      16
      ],
-     "text": "ClusterSound",
-     "fontface": 1,
-     "fontsize": 12.0
+     "text": "Da ClusterSound",
+     "fontsize": 11.0,
+     "fontname": "Ableton Sans Bold",
+     "textcolor": [
+      0.92,
+      0.92,
+      0.92,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      }
+     }
     }
    },
    {
@@ -179,11 +901,48 @@
      "presentation_rect": [
       8,
       26,
-      130,
-      22
+      264,
+      20
      ],
      "items": [],
-     "parameter_enable": 0
+     "parameter_enable": 0,
+     "rounded": 6,
+     "arrow": 1,
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bgfillcolor_type": "color",
+     "bgfillcolor_color": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "textcolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "color": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     },
+     "color": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ]
     }
    },
    {
@@ -206,12 +965,49 @@
      "presentation": 1,
      "presentation_rect": [
       8,
-      52,
-      260,
-      22
+      50,
+      264,
+      20
      ],
      "items": [],
-     "parameter_enable": 0
+     "parameter_enable": 0,
+     "rounded": 6,
+     "arrow": 1,
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bgfillcolor_type": "color",
+     "bgfillcolor_color": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "textcolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "color": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     },
+     "color": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ]
     }
    },
    {
@@ -269,13 +1065,97 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      144,
-      26,
-      60,
-      22
+      208,
+      5,
+      64,
+      18
      ],
      "text": "Aggiorna",
-     "mode": 0
+     "mode": 0,
+     "rounded": 6,
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bgovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.15
+     ],
+     "bgoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.35
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "borderoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoveroncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     },
+     "bgoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.35
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "borderoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textcolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -334,12 +1214,96 @@
      "presentation": 1,
      "presentation_rect": [
       8,
-      80,
-      120,
-      24
+      76,
+      130,
+      22
      ],
      "text": "Importa",
-     "mode": 0
+     "mode": 0,
+     "rounded": 6,
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bgovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.15
+     ],
+     "bgoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.35
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "borderoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoveroncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     },
+     "bgoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.35
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "borderoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textcolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -381,9 +1345,9 @@
    {
     "box": {
      "id": "tg_newtracks",
-     "maxclass": "toggle",
+     "maxclass": "textbutton",
      "numinlets": 1,
-     "numoutlets": 1,
+     "numoutlets": 3,
      "patching_rect": [
       20,
       220,
@@ -391,16 +1355,110 @@
       20
      ],
      "outlettype": [
+      "",
+      "",
       "int"
      ],
      "presentation": 1,
      "presentation_rect": [
       8,
-      112,
-      18,
-      18
+      104,
+      92,
+      20
      ],
-     "parameter_enable": 0
+     "mode": 1,
+     "text": "Nuove tracce",
+     "texton": "Nuove tracce",
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "rounded": 6,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bgovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.15
+     ],
+     "bgoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgoveroncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "borderoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoncolor": {
+       "expression": "themecolor.live_lcd_bg"
+      },
+      "textoveroncolor": {
+       "expression": "themecolor.live_lcd_bg"
+      }
+     },
+     "bgoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "borderoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textcolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoncolor": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ],
+     "textoveroncolor": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -415,14 +1473,21 @@
       90,
       20
      ],
-     "presentation": 1,
-     "presentation_rect": [
-      28,
-      111,
-      80,
-      20
+     "presentation": 0,
+     "text": "Nuove tracce",
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.92,
+      0.92,
+      0.92,
+      1.0
      ],
-     "text": "Nuove tracce"
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      }
+     }
     }
    },
    {
@@ -464,9 +1529,9 @@
    {
     "box": {
      "id": "tg_tempo",
-     "maxclass": "toggle",
+     "maxclass": "textbutton",
      "numinlets": 1,
-     "numoutlets": 1,
+     "numoutlets": 3,
      "patching_rect": [
       160,
       220,
@@ -474,16 +1539,110 @@
       20
      ],
      "outlettype": [
+      "",
+      "",
       "int"
      ],
      "presentation": 1,
      "presentation_rect": [
-      110,
-      112,
-      18,
-      18
+      104,
+      104,
+      80,
+      20
      ],
-     "parameter_enable": 0
+     "mode": 1,
+     "text": "Tempo",
+     "texton": "Tempo",
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "rounded": 6,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bgovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.15
+     ],
+     "bgoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgoveroncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "borderoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoncolor": {
+       "expression": "themecolor.live_lcd_bg"
+      },
+      "textoveroncolor": {
+       "expression": "themecolor.live_lcd_bg"
+      }
+     },
+     "bgoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "borderoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textcolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoncolor": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ],
+     "textoveroncolor": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -498,14 +1657,21 @@
       90,
       20
      ],
-     "presentation": 1,
-     "presentation_rect": [
-      130,
-      111,
-      80,
-      20
+     "presentation": 0,
+     "text": "Tempo",
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.92,
+      0.92,
+      0.92,
+      1.0
      ],
-     "text": "Tempo"
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      }
+     }
     }
    },
    {
@@ -529,9 +1695,9 @@
    {
     "box": {
      "id": "tg_receive",
-     "maxclass": "toggle",
+     "maxclass": "textbutton",
      "numinlets": 1,
-     "numoutlets": 1,
+     "numoutlets": 3,
      "patching_rect": [
       300,
       220,
@@ -539,16 +1705,110 @@
       20
      ],
      "outlettype": [
+      "",
+      "",
       "int"
      ],
      "presentation": 1,
      "presentation_rect": [
-      180,
-      112,
-      18,
-      18
+      188,
+      104,
+      84,
+      20
      ],
-     "parameter_enable": 0
+     "mode": 1,
+     "text": "Ricevi",
+     "texton": "Ricevi",
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "rounded": 6,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bgovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.15
+     ],
+     "bgoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bgoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgoveroncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "borderoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoncolor": {
+       "expression": "themecolor.live_lcd_bg"
+      },
+      "textoveroncolor": {
+       "expression": "themecolor.live_lcd_bg"
+      }
+     },
+     "bgoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "borderoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textcolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoncolor": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ],
+     "textoveroncolor": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -563,14 +1823,21 @@
       90,
       20
      ],
-     "presentation": 1,
-     "presentation_rect": [
-      200,
-      111,
-      80,
-      20
+     "presentation": 0,
+     "text": "Ricevi",
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.92,
+      0.92,
+      0.92,
+      1.0
      ],
-     "text": "Ricevi"
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      }
+     }
     }
    },
    {
@@ -623,14 +1890,25 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      300,
-      4,
-      250,
-      20
+      288,
+      8,
+      260,
+      16
      ],
-     "text": "Strumenti di Live da provare",
-     "fontface": 1,
-     "fontsize": 12.0
+     "text": "Strumenti di Live",
+     "fontsize": 11.0,
+     "fontname": "Ableton Sans Bold",
+     "textcolor": [
+      0.92,
+      0.92,
+      0.92,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      }
+     }
     }
    },
    {
@@ -647,12 +1925,25 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      300,
-      28,
-      60,
-      20
+      288,
+      31,
+      56,
+      18
      ],
-     "text": "Traccia"
+     "text": "Traccia",
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.92,
+      0.92,
+      0.92,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      }
+     }
     }
    },
    {
@@ -674,13 +1965,50 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      360,
-      26,
-      190,
-      22
+      348,
+      30,
+      200,
+      20
      ],
      "items": [],
-     "parameter_enable": 0
+     "parameter_enable": 0,
+     "rounded": 6,
+     "arrow": 1,
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bgfillcolor_type": "color",
+     "bgfillcolor_color": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "textcolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "color": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     },
+     "color": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ]
     }
    },
    {
@@ -715,12 +2043,25 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      300,
-      54,
-      60,
-      20
+      288,
+      55,
+      56,
+      18
      ],
-     "text": "Tipo"
+     "text": "Tipo",
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.92,
+      0.92,
+      0.92,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      }
+     }
     }
    },
    {
@@ -742,13 +2083,50 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      360,
-      52,
-      190,
-      22
+      348,
+      54,
+      200,
+      20
      ],
      "items": [],
-     "parameter_enable": 0
+     "parameter_enable": 0,
+     "rounded": 6,
+     "arrow": 1,
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bgfillcolor_type": "color",
+     "bgfillcolor_color": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "textcolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "color": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     },
+     "color": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ]
     }
    },
    {
@@ -783,12 +2161,25 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      300,
-      80,
-      60,
-      20
+      288,
+      79,
+      56,
+      18
      ],
-     "text": "Strumento"
+     "text": "Strumento",
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.92,
+      0.92,
+      0.92,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      }
+     }
     }
    },
    {
@@ -810,13 +2201,51 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      360,
+      348,
       78,
-      190,
-      22
+      200,
+      20
      ],
      "items": [],
-     "parameter_enable": 0
+     "parameter_enable": 0,
+     "hint": "Scegli uno strumento: si carica e la clip suona in loop.",
+     "rounded": 6,
+     "arrow": 1,
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bgfillcolor_type": "color",
+     "bgfillcolor_color": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "textcolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "color": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     },
+     "color": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ]
     }
    },
    {
@@ -856,13 +2285,98 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      300,
+      288,
       104,
-      36,
-      24
+      32,
+      20
      ],
      "text": "◀",
-     "mode": 0
+     "mode": 0,
+     "hint": "Strumento precedente / successivo",
+     "rounded": 6,
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bgovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.15
+     ],
+     "bgoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.35
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "borderoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoveroncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     },
+     "bgoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.35
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "borderoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textcolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -920,13 +2434,98 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      340,
+      324,
       104,
-      100,
-      24
+      120,
+      20
      ],
      "text": "Prova ▶",
-     "mode": 0
+     "mode": 0,
+     "hint": "Carica lo strumento scelto e suona la clip in loop. Doppio clic: vai alla traccia.",
+     "rounded": 6,
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bgovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.15
+     ],
+     "bgoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.35
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "borderoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoveroncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     },
+     "bgoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.35
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "borderoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textcolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -984,13 +2583,98 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      444,
+      448,
       104,
-      36,
-      24
+      32,
+      20
      ],
      "text": "▶",
-     "mode": 0
+     "mode": 0,
+     "hint": "Strumento precedente / successivo",
+     "rounded": 6,
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bgovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.15
+     ],
+     "bgoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.35
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "borderoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoveroncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     },
+     "bgoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.35
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "borderoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textcolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -1050,11 +2734,95 @@
      "presentation_rect": [
       484,
       104,
-      66,
-      24
+      64,
+      20
      ],
      "text": "Stop",
-     "mode": 0
+     "mode": 0,
+     "rounded": 6,
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bgovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.15
+     ],
+     "bgoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.35
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "borderoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoveroncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     },
+     "bgoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.35
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "borderoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textcolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -1105,15 +2873,22 @@
       250,
       34
      ],
-     "presentation": 1,
-     "presentation_rect": [
-      300,
-      132,
-      250,
-      34
-     ],
+     "presentation": 0,
      "linecount": 2,
-     "text": "Scegli uno strumento o usa ◀ ▶: si carica e la clip suona in loop. Doppio clic su Prova: vai alla traccia."
+     "text": "Scegli uno strumento o usa ◀ ▶: si carica e la clip suona in loop. Doppio clic su Prova: vai alla traccia.",
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.92,
+      0.92,
+      0.92,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_control_fg"
+      }
+     }
     }
    },
    {
@@ -1130,13 +2905,26 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      8,
-      134,
-      280,
-      32
+      12,
+      140,
+      536,
+      18
      ],
      "text": "Avvio…",
-     "linecount": 2
+     "linecount": 1,
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.92,
+      0.92,
+      0.92,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_lcd_title"
+      }
+     }
     }
    },
    {
@@ -1158,13 +2946,97 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      134,
-      80,
-      134,
-      24
+      142,
+      76,
+      130,
+      22
      ],
      "text": "Clip → Melodia",
-     "mode": 0
+     "mode": 0,
+     "rounded": 6,
+     "fontname": "Ableton Sans Bold",
+     "fontsize": 10.0,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bgovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.15
+     ],
+     "bgoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.35
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "borderoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textovercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      },
+      "textoveroncolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     },
+     "bgoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      0.35
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "borderoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textcolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textovercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "textoveroncolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "usebgoncolor": 1
     }
    },
    {
@@ -1401,7 +3273,7 @@
     "patchline": {
      "source": [
       "tg_newtracks",
-      0
+      2
      ],
      "destination": [
       "pp_newtracks",
@@ -1437,7 +3309,7 @@
     "patchline": {
      "source": [
       "tg_tempo",
-      0
+      2
      ],
      "destination": [
       "pp_tempo",
@@ -1461,7 +3333,7 @@
     "patchline": {
      "source": [
       "tg_receive",
-      0
+      2
      ],
      "destination": [
       "pp_receive",
