@@ -36,10 +36,10 @@ coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="ClusterSo
 app = BUNDLE(
     coll,
     name="ClusterSound.app",
-    icon=None,
+    icon=str(root / "brand" / "ClusterSound.icns"),
     bundle_identifier="com.clustersound.app",
     info_plist={
-        "CFBundleShortVersionString": "0.1.0",
+        "CFBundleShortVersionString": "0.2.0",
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "12.0",
     },

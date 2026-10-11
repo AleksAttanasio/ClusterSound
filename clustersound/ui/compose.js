@@ -8,6 +8,8 @@
 import { toast, showPopover } from './sendmenu.js';
 import { sendToLive } from './live.js';
 import { velGain } from './sequencer.js';
+import { btn, openDialog as waDialog, isTypingTarget } from './kit.js';
+import { svg } from './icons.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -26,6 +28,10 @@ const FUNC_LABEL = { T: 'tonica', S: 'sottodominante', D: 'dominante', C: 'color
 const SNAPS = [[16, '1 battuta'], [8, '1/2'], [4, '1/4'], [2, '1/8'], [1, '1/16']];
 const VERSION_NAMES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const STYLE_BADGE = { block: '▤', strum: '⟋', arp: '⋰' };
+const NO_PRESET = '_'; // wa-option values cannot be empty
+const xs = (label, o = {}) => btn(label, { size: 'xs', ...o });
+const playIco = (i, title = 'Ascolta') => `<button class="cp-ib" data-play="${i}" title="${title}">${svg('play', 11)}</button>`;
+const chipBtn = (attrs, label, on) => `<wa-button size="xs" pill class="chip ${on ? 'on' : ''}" ${attrs}>${label}</wa-button>`;
 const VEL_CYCLE = [0, 100, 120, 65]; // click on a step: off → strike → accent → soft → off
 const LEN_CYCLE = [0, 1, 2, 4, 8];   // alt+click: until the next strike, 1/16, 1/8, 1/4, 1/2
 const SYNTHS = [['pad', 'Pad'], ['ep', 'Piano elettrico'], ['pluck', 'Pluck'], ['organ', 'Organo']];
@@ -414,43 +420,47 @@ export class ComposeEditor {
   // ---------------------------------------------------------------- shell
   _buildShell() {
     const root = $('#compose');
-    const tonics = (flats) => SHARPS.map((n, i) => `<option value="${i}">${flats && FLATS[i] !== n ? `${FLATS[i]}` : n}</option>`).join('');
+    const tonics = (flats) => SHARPS.map((n, i) => `<wa-option value="${i}">${flats && FLATS[i] !== n ? `${FLATS[i]}` : n}</wa-option>`).join('');
     root.innerHTML = `
       <aside class="sidebar cp-browser">
         <div class="cp-pack"><span class="cp-pack-path" id="cp-dir"></span><button class="link-btn" id="cp-dir-pick">Cambia…</button></div>
         <div class="cp-keyrow">
-          <select id="cp-b-tonic" class="cp-select">${tonics(true)}</select>
-          <div class="seg" id="cp-b-mode"><button class="seg-btn" data-mode="major">Maggiore</button><button class="seg-btn" data-mode="minor">Minore</button></div>
+          <wa-select id="cp-b-tonic" size="s" class="cp-select" value="0">${tonics(true)}</wa-select>
+          <wa-radio-group id="cp-b-mode" class="seg" orientation="horizontal" size="s" value="major" label="Modo">
+            <wa-radio appearance="button" value="major">Maggiore</wa-radio><wa-radio appearance="button" value="minor">Minore</wa-radio></wa-radio-group>
         </div>
         <div class="hint" id="cp-b-hint"></div>
-        <input id="cp-q" class="search" type="search" placeholder="Cerca (es. maj9, sus, Am, bVII)…" autocomplete="off">
+        <wa-input id="cp-q" class="search" type="search" size="s" with-clear placeholder="Cerca (es. maj9, sus, Am, bVII)…" autocomplete="off"><wa-icon slot="start" name="search"></wa-icon></wa-input>
         <div class="chips" id="cp-cats"></div>
         <div class="cp-legend">${Object.entries(FUNC_LABEL).map(([f, l]) => `<span><i style="background:${FUNC_COLOR[f]}"></i>${l}</span>`).join('')}</div>
         <div id="cp-list" class="cp-list"></div>
       </aside>
       <main class="cp-main">
         <div class="cp-toolbar">
-          <div class="seg" id="cp-view" title="Armonia: gli accordi · Melodia: la melodia sopra gli accordi">
-            <button class="seg-btn" data-view="harmony">Armonia</button><button class="seg-btn" data-view="melody">Melodia</button></div>
-          <input id="cp-name" class="cp-name" type="text" spellcheck="false" title="Nome della progressione">
-          <label class="cp-field">BPM <input id="cp-bpm" type="number" min="40" max="240" step="1"></label>
-          <label class="cp-field">Battute <input id="cp-bars" type="number" min="1" max="128" step="1"></label>
-          <label class="cp-field">Griglia <select id="cp-snap" class="cp-select">${SNAPS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
-          <div class="seg" id="cp-keymode" title="Bloccata: solo accordi della tonalità, cambiare tonalità traspone tutto. Libera: accordi da qualunque tonalità, trasponibili uno per uno.">
-            <button class="seg-btn" data-km="locked">🔒 Tonalità</button><button class="seg-btn" data-km="free">Libera</button></div>
-          <select id="cp-tonic" class="cp-select" title="Tonalità della progressione">${tonics(true)}</select>
-          <select id="cp-mode" class="cp-select"><option value="major">maggiore</option><option value="minor">minore</option></select>
+          <wa-radio-group id="cp-view" class="seg" orientation="horizontal" size="s" value="harmony" label="Vista" title="Armonia: gli accordi · Melodia: la melodia sopra gli accordi">
+            <wa-radio appearance="button" value="harmony">Armonia</wa-radio><wa-radio appearance="button" value="melody">Melodia</wa-radio></wa-radio-group>
+          <wa-input id="cp-name" class="cp-name" size="s" spellcheck="false" title="Nome della progressione"></wa-input>
+          <label class="cp-field">BPM <wa-number-input id="cp-bpm" size="s" without-steppers min="40" max="240" step="1"></wa-number-input></label>
+          <label class="cp-field">Battute <wa-number-input id="cp-bars" size="s" without-steppers min="1" max="128" step="1"></wa-number-input></label>
+          <label class="cp-field">Griglia <wa-select id="cp-snap" size="s" class="cp-select">${SNAPS.map(([v, l]) => `<wa-option value="${v}">${l}</wa-option>`).join('')}</wa-select></label>
+          <wa-radio-group id="cp-keymode" class="seg" orientation="horizontal" size="s" value="locked" label="Tonalità" title="Bloccata: solo accordi della tonalità, cambiare tonalità traspone tutto. Libera: accordi da qualunque tonalità, trasponibili uno per uno.">
+            <wa-radio appearance="button" value="locked"><wa-icon name="lock"></wa-icon>Tonalità</wa-radio><wa-radio appearance="button" value="free"><wa-icon name="lock-open"></wa-icon>Libera</wa-radio></wa-radio-group>
+          <wa-select id="cp-tonic" size="s" class="cp-select cp-key" title="Tonalità della progressione">${tonics(true)}</wa-select>
+          <wa-select id="cp-mode" size="s" class="cp-select cp-kmode"><wa-option value="major">maggiore</wa-option><wa-option value="minor">minore</wa-option></wa-select>
           <div class="spacer"></div>
-          <select id="cp-synth" class="cp-select" title="Suono dell'anteprima (non viene esportato)">${SYNTHS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
-          <button class="icon-btn" id="cp-melmute" title="Melodia: on / muta">♫</button>
-          <button class="btn primary cp-play" id="cp-play" title="Play / stop (Spazio)">▶</button>
-          <button class="icon-btn" id="cp-loop" title="Loop">⟲</button>
-          <span class="cp-pat"><button class="btn" id="cp-withpat" title="Suona insieme al pattern del Sequencer">🥁 Pattern</button><button class="btn" id="cp-patset" title="Pattern: basso, volumi, BPM">▾</button></span>
-          <button class="icon-btn" id="cp-undo" title="Annulla (⌘Z)">↶</button>
-          <button class="icon-btn" id="cp-redo" title="Ripeti (⇧⌘Z)">↷</button>
-          <button class="btn" id="cp-open">Apri…</button>
-          <button class="btn" id="cp-save">Salva</button>
-          <button class="btn primary" id="cp-export">Esporta MIDI ▾</button>
+          <wa-select id="cp-synth" size="s" class="cp-select cp-synth" title="Suono dell'anteprima (non viene esportato)">${SYNTHS.map(([v, l]) => `<wa-option value="${v}">${l}</wa-option>`).join('')}</wa-select>
+          <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-melmute" title="Melodia: on / muta"><wa-icon name="music" label="Melodia"></wa-icon></wa-button>
+          <wa-button class="cp-play" variant="brand" size="s" id="cp-play" title="Play / stop (Spazio)"><wa-icon name="play" label="Play"></wa-icon></wa-button>
+          <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-loop" title="Loop"><wa-icon name="rotate-ccw" label="Loop"></wa-icon></wa-button>
+          <wa-button-group class="cp-pat" label="Pattern">
+            ${btn('Pattern', { id: 'cp-withpat', icon: 'drum', title: 'Suona insieme al pattern del Sequencer' })}${btn('<wa-icon name="chevron-down" label="Impostazioni pattern"></wa-icon>', { id: 'cp-patset', title: 'Pattern: basso, volumi, BPM' })}
+          </wa-button-group>
+          <wa-button-group label="Cronologia">
+            <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-undo" title="Annulla (⌘Z)"><wa-icon name="undo-2" label="Annulla"></wa-icon></wa-button><wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-redo" title="Ripeti (⇧⌘Z)"><wa-icon name="redo-2" label="Ripeti"></wa-icon></wa-button>
+          </wa-button-group>
+          ${btn('Apri…', { id: 'cp-open', icon: 'folder-open' })}
+          ${btn('Salva', { id: 'cp-save', icon: 'save' })}
+          ${btn('Esporta MIDI', { id: 'cp-export', variant: 'brand', icon: 'file-down', 'with-caret': true })}
         </div>
         <div class="cp-versions" id="cp-versions"></div>
         <div class="cp-tlwrap" id="cp-tlwrap">
@@ -467,8 +477,8 @@ export class ComposeEditor {
         <div class="cp-tlbar">
           <span class="hint" id="cp-tlhint"></span>
           <div class="spacer"></div>
-          <button class="btn small" id="cp-even" title="Stessa durata per tutti gli accordi, su tutta la lunghezza">⇔ Distribuisci</button>
-          <button class="btn small" id="cp-clear">Svuota</button>
+          ${xs('Distribuisci', { id: 'cp-even', icon: 'maximize-2', title: 'Stessa durata per tutti gli accordi, su tutta la lunghezza' })}
+          ${xs('Svuota', { id: 'cp-clear', icon: 'trash-2' })}
         </div>
         <div class="cp-bottom">
           <section class="cp-suggest">
@@ -490,11 +500,11 @@ export class ComposeEditor {
       await this.loadBrowser();
     };
     $('#cp-b-tonic').onchange = (e) => { this.browse.tonic = +e.target.value; this._persist(); this.loadBrowser(); };
-    $('#cp-b-mode').onclick = (e) => {
-      const b = e.target.closest('[data-mode]'); if (!b) return;
-      this.browse.mode = b.dataset.mode; this._persist(); this.loadBrowser();
-    };
-    $('#cp-q').oninput = (e) => { this.browse.q = e.target.value; this.renderList(); };
+    $('#cp-b-mode').addEventListener('change', (e) => {
+      if (e.target.id !== 'cp-b-mode') return;
+      this.browse.mode = e.target.value; this._persist(); this.loadBrowser();
+    });
+    $('#cp-q').oninput = (e) => { this.browse.q = e.target.value || ''; this.renderList(); };
     $('#cp-cats').onclick = (e) => {
       const b = e.target.closest('[data-cat]'); if (!b) return;
       const c = b.dataset.cat;
@@ -517,26 +527,27 @@ export class ComposeEditor {
       e.dataTransfer.effectAllowed = 'copy';
     });
 
-    $('#cp-name').onchange = (e) => this.edit(() => { this.project.name = e.target.value.trim() || 'Progressione'; }, { redraw: false });
+    $('#cp-name').onchange = (e) => this.edit(() => { this.project.name = (e.target.value || '').trim() || 'Progressione'; }, { redraw: false });
     $('#cp-bpm').onchange = (e) => this.edit(() => { this.project.bpm = Math.max(40, Math.min(240, +e.target.value || 100)); });
     $('#cp-bars').onchange = (e) => this.edit(() => { this.seq.bars = Math.max(1, Math.min(128, Math.round(+e.target.value) || 4)); });
     $('#cp-snap').onchange = (e) => { this.ui.snap = +e.target.value; this._persist(); };
-    $('#cp-keymode').onclick = (e) => {
-      const b = e.target.closest('[data-km]'); if (!b || b.dataset.km === this.seq.keyMode) return;
+    $('#cp-keymode').addEventListener('change', (e) => {
+      const km = e.target.value;
+      if (e.target.id !== 'cp-keymode' || km === this.seq.keyMode) return;
       this.edit(() => {
-        this.seq.keyMode = b.dataset.km;
-        if (b.dataset.km === 'locked') {
+        this.seq.keyMode = km;
+        if (km === 'locked') {
           // locking folds the per-clip transpositions into the notes
           for (const c of this.seq.clips) this._bakeTranspose(c);
           this.browse.tonic = this.seq.key.tonic; this.browse.mode = this.seq.key.mode;
         }
       });
       this.loadBrowser();
-    };
+    });
     $('#cp-tonic').onchange = (e) => this.setKey(+e.target.value, this.seq.key.mode);
     $('#cp-mode').onchange = (e) => this.setKey(this.seq.key.tonic, e.target.value);
     $('#cp-synth').onchange = (e) => { this.ui.synth = this.synth.preset = e.target.value; this._persist(); };
-    $('#cp-view').onclick = (e) => { const b = e.target.closest('[data-view]'); if (b) this.setView(b.dataset.view); };
+    $('#cp-view').addEventListener('change', (e) => { if (e.target.id === 'cp-view') this.setView(e.target.value); });
     $('#cp-melmute').onclick = () => {
       this.ui.melMute = !this.ui.melMute;
       this._persist();
@@ -592,7 +603,7 @@ export class ComposeEditor {
       if (name) this.edit(() => { this.project.modes[t.dataset.m].name = name.trim(); });
     };
     modes.onchange = (e) => {
-      if (e.target.id === 'cp-preset' && e.target.value) {
+      if (e.target.id === 'cp-preset' && e.target.value && e.target.value !== NO_PRESET) {
         this.edit(() => { this.mode.rhythm = fixGrid(this.meta.styles.presetGrids[e.target.value]); });
       } else if (e.target.id === 'cp-rbars') {
         this.edit(() => { this.mode.rhythm = fixGrid({ ...this.mode.rhythm, bars: +e.target.value }); });
@@ -672,7 +683,7 @@ export class ComposeEditor {
     this.renderBrowserHead();
     if (!this.meta.exists) {
       $('#cp-list').innerHTML = `<div class="cp-empty">Cartella del chord pack non trovata:<br><code>${esc(this.meta.dir)}</code><br>
-        <button class="btn small" id="cp-dir-pick2">Scegli la cartella…</button></div>`;
+        ${xs('Scegli la cartella…', { id: 'cp-dir-pick2', icon: 'folder-open' })}</div>`;
       $('#cp-dir-pick2').onclick = () => $('#cp-dir-pick').click();
       return;
     }
@@ -685,9 +696,10 @@ export class ComposeEditor {
     const locked = this.seq.keyMode === 'locked';
     $('#cp-dir').textContent = this.meta.dir.replace(/^\/Users\/[^/]+/, '~');
     $('#cp-dir').title = this.meta.dir;
-    $('#cp-b-tonic').value = k.tonic;
+    $('#cp-b-tonic').value = String(k.tonic);
     $('#cp-b-tonic').disabled = locked;
-    $('#cp-b-mode').querySelectorAll('[data-mode]').forEach((b) => { b.classList.toggle('active', b.dataset.mode === k.mode); b.disabled = locked; });
+    $('#cp-b-mode').value = k.mode;
+    $('#cp-b-mode').disabled = locked;
     const tr = this.current?.transposed;
     $('#cp-b-hint').textContent = (locked ? `Tonalità bloccata su ${keyName(k)}: cambiala dalla barra in alto.` : `Sfogli ${keyName(k)} · ogni accordo resta trasponibile.`)
       + (tr ? ` Tonalità assente nel pack: trasposta di ${tr > 0 ? '+' : ''}${tr}.` : '')
@@ -697,7 +709,7 @@ export class ComposeEditor {
 
   renderCats() {
     $('#cp-cats').innerHTML = this.meta.categories.map(([id, label]) =>
-      `<button class="chip ${this.browse.cats.includes(id) ? 'on' : ''}" data-cat="${id}">${esc(label)}</button>`).join('');
+      chipBtn(`data-cat="${id}"`, esc(label), this.browse.cats.includes(id))).join('');
   }
 
   renderList() {
@@ -721,7 +733,7 @@ export class ComposeEditor {
       for (const c of items.sort((a, b) => a.notes.length - b.notes.length || a.name.localeCompare(b.name))) {
         html.push(`<div class="cp-chord" draggable="true" data-cid="${esc(c.id)}" title="${esc(c.file)}">
           <span class="cp-dot" style="background:${FUNC_COLOR[c.func]}"></span><span class="cp-cname">${esc(c.name)}</span>
-          <span class="cp-cdeg">${esc(c.degree)}</span><button class="cp-add" data-add title="Aggiungi in coda">+</button></div>`);
+          <span class="cp-cdeg">${esc(c.degree)}</span><button class="cp-add" data-add title="Aggiungi in coda">${svg('plus', 12)}</button></div>`);
       }
       html.push('</div>');
     }
@@ -733,7 +745,7 @@ export class ComposeEditor {
           html.push(`<div class="cp-prog" draggable="true" data-pid="${esc(p.id)}">
             <div class="cp-cname">${esc(p.name.replace(/\s*\(.*\)$/, ''))}</div>
             <div class="cp-prog-chords">${p.chords.map((c) => `<span style="--fc:${FUNC_COLOR[c.func]}">${esc(c.degree)}</span>`).join('')}</div>
-            <button class="cp-add" data-add title="Aggiungi in coda">+</button></div>`);
+            <button class="cp-add" data-add title="Aggiungi in coda">${svg('plus', 12)}</button></div>`);
         }
         html.push('</div>');
       }
@@ -943,7 +955,7 @@ export class ComposeEditor {
     $('#cp-sug').innerHTML = res.items.map((it, i) => `
       <div class="cp-sug-card" data-sug="${i}" style="--fc:${FUNC_COLOR[it.func]}">
         <div class="cp-sug-head"><span class="cp-deg" style="--fc:${FUNC_COLOR[it.func]}">${esc(it.degree)}</span><b>${esc(it.chord.name)}</b>
-          <button class="cp-add" data-add title="Aggiungi dopo">+</button></div>
+          <button class="cp-add" data-add title="Aggiungi dopo">${svg('plus', 12)}</button></div>
         <div class="cp-score"><i style="width:${Math.round(it.score * 100)}%"></i></div>
         <div class="cp-reasons">${esc(it.reasons.join(' · ') || FUNC_LABEL[it.func])}</div>
         ${it.alts.length ? `<div class="cp-alts">${it.alts.map((a, j) => `<span class="chip" data-alt="${j}" title="clic: ascolta · doppio clic: aggiungi">${esc(a.name)}</span>`).join('')}</div>` : ''}
@@ -1057,12 +1069,12 @@ export class ComposeEditor {
     const pop = showPopover(anchor, `
       <div class="cp-sec-title"><span>Pattern del Sequencer</span></div>
       <div>${esc(g?.name || 'Pattern')} · ${esc(p.name || '')}<br><span class="hint">${Math.round(p.bpm)} BPM · ${p.bars} ${p.bars === 1 ? 'battuta' : 'battute'} · basso in ${esc(p.key)}</span></div>
-      <label class="cp-own"><input type="checkbox" data-bass ${this.ui.bassFollow ? 'checked' : ''}> il basso segue gli accordi</label>
-      <label class="cp-field">Accordi <input type="range" min="0" max="1.2" step="0.05" value="${this.ui.chordVol}" data-cv></label>
-      <label class="cp-field">Pattern <input type="range" min="0" max="1.2" step="0.05" value="${this.ui.patVol}" data-pv></label>
-      <button class="btn small" data-usebpm>Usa il BPM del pattern (${Math.round(p.bpm)})</button>
-      <button class="btn small" data-swing>Swing del pattern (${p.swing}) nella modalità</button>
-      <button class="btn small" data-open>Apri nel Sequencer</button>`);
+      <wa-checkbox size="s" class="cp-own" data-bass ${this.ui.bassFollow ? 'checked' : ''}>il basso segue gli accordi</wa-checkbox>
+      <label class="cp-field">Accordi <wa-slider size="s" min="0" max="1.2" step="0.05" value="${this.ui.chordVol}" data-cv label="Volume accordi"></wa-slider></label>
+      <label class="cp-field">Pattern <wa-slider size="s" min="0" max="1.2" step="0.05" value="${this.ui.patVol}" data-pv label="Volume pattern"></wa-slider></label>
+      ${xs(`Usa il BPM del pattern (${Math.round(p.bpm)})`, { 'data-usebpm': true })}
+      ${xs(`Swing del pattern (${p.swing}) nella modalità`, { 'data-swing': true })}
+      ${xs('Apri nel Sequencer', { icon: 'arrow-right', 'data-open': true })}`);
     pop.querySelector('[data-bass]').onchange = (e) => {
       this.ui.bassFollow = e.target.checked;
       this._persist();
@@ -1111,14 +1123,20 @@ export class ComposeEditor {
     set('#cp-name', this.project.name);
     set('#cp-bpm', this.project.bpm);
     set('#cp-bars', s.bars);
-    set('#cp-snap', this.ui.snap);
-    set('#cp-tonic', s.key.tonic);
+    set('#cp-snap', String(this.ui.snap));
+    set('#cp-tonic', String(s.key.tonic));
     set('#cp-mode', s.key.mode);
     set('#cp-synth', this.ui.synth);
-    $('#cp-keymode').querySelectorAll('[data-km]').forEach((b) => b.classList.toggle('active', b.dataset.km === s.keyMode));
-    $('#cp-play').textContent = this.transport.playing || this._rec ? '■' : '▶';
-    $('#cp-play').classList.toggle('rec', !!this._rec);
-    $('#cp-view').querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === this.ui.view));
+    $('#cp-keymode').value = s.keyMode;
+    const play = $('#cp-play');
+    const state = this._rec ? 'rec' : this.transport.playing ? 'stop' : 'play';
+    if (play.dataset.state !== state) {
+      play.dataset.state = state;
+      play.innerHTML = `<wa-icon name="${{ rec: 'circle', stop: 'square', play: 'play' }[state]}" label="${state === 'play' ? 'Play' : 'Stop'}"></wa-icon>`;
+      play.variant = state === 'play' ? 'brand' : 'danger';
+    }
+    play.classList.toggle('rec', !!this._rec);
+    $('#cp-view').value = this.ui.view;
     $('#cp-melmute').classList.toggle('active', !this.ui.melMute && this.hasMelody);
     $('#cp-melmute').title = this.ui.melMute ? 'Melodia muta: clic per sentirla' : 'Melodia: clic per silenziarla';
     $('#cp-loop').classList.toggle('active', this.ui.loop);
@@ -1131,10 +1149,10 @@ export class ComposeEditor {
     const p = this.project;
     $('#cp-versions').innerHTML = `<span class="cp-barlabel">Armonia</span>
       ${p.order.map((v) => `<button class="cp-vtab ${v === p.active ? 'active' : ''}" data-v="${v}" title="${p.versions[v].clips.length} accordi · ${p.versions[v].bars} battute">${v}</button>`).join('')}
-      <button class="btn small" data-act="dup" title="Duplica la versione corrente">＋ Duplica</button>
-      <button class="btn small" data-act="vary" title="Variazioni degli accordi: riarmonizzazione, ritmo armonico, voicing, finali">✦ Varia armonia…</button>
-      ${this.melNotes.length && this.ui.view === 'harmony' ? '<button class="btn small" data-act="harm" title="Nuove versioni con gli accordi ricavati dalla melodia">♫ Armonizza la melodia…</button>' : ''}
-      ${p.order.length > 1 ? '<button class="btn small" data-act="del" title="Elimina la versione corrente">✕</button>' : ''}`;
+      ${xs('Duplica', { icon: 'copy', 'data-act': 'dup', title: 'Duplica la versione corrente' })}
+      ${xs('Varia armonia…', { icon: 'sparkles', 'data-act': 'vary', title: 'Variazioni degli accordi: riarmonizzazione, ritmo armonico, voicing, finali' })}
+      ${this.melNotes.length && this.ui.view === 'harmony' ? xs('Armonizza la melodia…', { icon: 'music', 'data-act': 'harm', title: 'Nuove versioni con gli accordi ricavati dalla melodia' }) : ''}
+      ${p.order.length > 1 ? xs('<wa-icon name="x" label="Elimina"></wa-icon>', { 'data-act': 'del', title: 'Elimina la versione corrente' }) : ''}`;
   }
 
   get pxStep() { return this._pxStep || 10; }
@@ -1180,17 +1198,17 @@ export class ComposeEditor {
     const presets = this.meta.styles.presets;
     $('#cp-modes').innerHTML = `<span class="cp-barlabel">Modalità</span>
       ${p.modeOrder.map((k) => `<button class="cp-vtab cp-mtab ${k === p.modeActive ? 'active' : ''}" data-m="${k}" title="Doppio clic: rinomina">${esc(p.modes[k].name || k)}</button>`).join('')}
-      <button class="btn small" data-mact="dup" title="Duplica la modalità corrente">＋ Duplica</button>
-      <button class="btn small" data-mact="vary" title="Variazioni della ritmica e del modo di suonare">✦ Varia modalità…</button>
-      ${p.modeOrder.length > 1 ? '<button class="btn small" data-mact="del" title="Elimina la modalità corrente">✕</button>' : ''}
+      ${xs('Duplica', { icon: 'copy', 'data-mact': 'dup', title: 'Duplica la modalità corrente' })}
+      ${xs('Varia modalità…', { icon: 'sparkles', 'data-mact': 'vary', title: 'Variazioni della ritmica e del modo di suonare' })}
+      ${p.modeOrder.length > 1 ? xs('<wa-icon name="x" label="Elimina"></wa-icon>', { 'data-mact': 'del', title: 'Elimina la modalità corrente' }) : ''}
       <span class="cp-sep"></span>
       <span class="cp-barlabel">Ritmica</span>
-      <select id="cp-preset" class="cp-select" title="Parti da un preset e modificalo sulla griglia">
-        <option value="">${g.preset ? 'Preset…' : '— personalizzata —'}</option>
-        ${presets.map(([k, l]) => `<option value="${k}" ${k === g.preset ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
-      <select id="cp-rbars" class="cp-select" title="Lunghezza della ritmica (si ripete)">${[1, 2, 4].map((b) => `<option value="${b}" ${b === g.bars ? 'selected' : ''}>${b} ${b === 1 ? 'battuta' : 'battute'}</option>`).join('')}</select>
-      <button class="btn small ${g.on ? '' : 'active'}" data-mact="toggle" title="Spenta: ogni accordo suona una volta e resta tenuto">${g.on ? 'Ritmica attiva' : 'Accordi tenuti'}</button>
-      <button class="btn small" data-mact="rclear">Svuota</button>`;
+      <wa-select id="cp-preset" size="xs" class="cp-select cp-preset" value="${g.preset || NO_PRESET}" title="Parti da un preset e modificalo sulla griglia">
+        <wa-option value="${NO_PRESET}">— personalizzata —</wa-option>
+        ${presets.map(([k, l]) => `<wa-option value="${k}">${esc(l)}</wa-option>`).join('')}</wa-select>
+      <wa-select id="cp-rbars" size="xs" class="cp-select cp-rbars" value="${g.bars}" title="Lunghezza della ritmica (si ripete)">${[1, 2, 4].map((b) => `<wa-option value="${b}">${b} ${b === 1 ? 'battuta' : 'battute'}</wa-option>`).join('')}</wa-select>
+      ${xs(g.on ? 'Ritmica attiva' : 'Accordi tenuti', { cls: g.on ? '' : 'active', 'data-mact': 'toggle', title: 'Spenta: ogni accordo suona una volta e resta tenuto' })}
+      ${xs('Svuota', { 'data-mact': 'rclear' })}`;
   }
 
   _autoDir(g, j) {
@@ -1397,21 +1415,21 @@ export class ComposeEditor {
           <span class="cp-step"><button data-p="transpose" data-d="-1" ${locked ? 'disabled' : ''}>−</button><span>${c.transpose > 0 ? '+' : ''}${c.transpose || 0}</span><button data-p="transpose" data-d="1" ${locked ? 'disabled' : ''}>+</button></span></div>
         <div class="cp-prop">Ottava<span class="cp-step"><button data-p="octave" data-d="-1">−</button><span>${c.octave > 0 ? '+' : ''}${c.octave || 0}</span><button data-p="octave" data-d="1">+</button></span></div>
         <div class="cp-prop">Rivolto<span class="cp-step"><button data-p="inversion" data-d="-1">−</button><span>${c.inversion || 0}</span><button data-p="inversion" data-d="1">+</button></span></div>
-        <div class="cp-prop">Velocity <input type="range" min="30" max="130" step="5" value="${c.vel || 100}" data-vel><span class="hint">${c.vel || 100}%</span></div>
+        <div class="cp-prop">Velocity <wa-slider size="xs" min="30" max="130" step="5" value="${c.vel || 100}" data-vel label="Velocity"></wa-slider><span class="hint">${c.vel || 100}%</span></div>
         <div class="cp-prop">Durata <span>${this._fmtLen(c.len)}</span></div>
       </div>
       <div class="cp-actions">
-        <button class="btn small primary" data-act="vary" title="Voicing, colore e sostituzioni dell'accordo (V)">✦ Varia armonia…</button>
-        <button class="btn small" data-act="dup" title="Duplica (⌘D)">Duplica</button>
-        <button class="btn small" data-act="del" title="Elimina (Canc)">Elimina</button>
+        ${xs('Varia armonia…', { variant: 'brand', icon: 'sparkles', 'data-act': 'vary', title: "Voicing, colore e sostituzioni dell'accordo (V)" })}
+        ${xs('Duplica', { icon: 'copy', 'data-act': 'dup', title: 'Duplica (⌘D)' })}
+        ${xs('Elimina', { icon: 'trash-2', 'data-act': 'del', title: 'Elimina (Canc)' })}
       </div>
       <div class="cp-sec-title"><span>Esecuzione</span>
-        <label class="cp-own"><input type="checkbox" data-own ${own ? 'checked' : ''}> propria${multi ? ' (tutti i selezionati)' : ''}</label></div>
-      ${own ? `<div class="cp-srow"><span>Ritmica</span><select class="cp-select" data-rsel>
-          <option value="inherit" ${rsel === 'inherit' ? 'selected' : ''}>quella della modalità</option>
-          <option value="sustain" ${rsel === 'sustain' ? 'selected' : ''}>tenuto (un colpo)</option>
-          ${this.meta.styles.presets.map(([k, l]) => `<option value="preset:${k}" ${rsel === `preset:${k}` ? 'selected' : ''}>${esc(l)}</option>`).join('')}
-          ${rsel === 'preset:' ? '<option value="preset:" selected>personalizzata</option>' : ''}</select></div>
+        <wa-checkbox size="s" class="cp-own" data-own ${own ? 'checked' : ''}>propria${multi ? ' (tutti i selezionati)' : ''}</wa-checkbox></div>
+      ${own ? `<div class="cp-srow"><span>Ritmica</span><wa-select size="xs" class="cp-select cp-rsel" data-rsel value="${esc(rsel)}">
+          <wa-option value="inherit">quella della modalità</wa-option>
+          <wa-option value="sustain">tenuto (un colpo)</wa-option>
+          ${this.meta.styles.presets.map(([k, l]) => `<wa-option value="preset:${k}">${esc(l)}</wa-option>`).join('')}
+          ${rsel === 'preset:' ? '<wa-option value="preset:">personalizzata</wa-option>' : ''}</wa-select></div>
         ${this._playEditor(st, { swing: false })}`
         : `<div class="hint">Suona come la modalità <b>${esc(mode.name)}</b>. Attiva "propria" per suonare questo accordo diversamente (altro strum, arpeggio, tenuto…).</div>`}`;
     box.querySelectorAll('[data-p]').forEach((b) => {
@@ -1455,9 +1473,10 @@ export class ComposeEditor {
   _playEditor(st, { swing }) {
     const m = this.meta.styles;
     const p = st.play;
-    const opt = (list, v) => list.map(([k, l]) => `<option value="${k}" ${String(k) === String(v) ? 'selected' : ''}>${esc(l)}</option>`).join('');
-    const seg = (name, list, v) => `<div class="seg cp-seg">${list.map(([k, l]) => `<button class="seg-btn ${String(k) === String(v) ? 'active' : ''}" data-s="${name}" data-v="${k}">${esc(l)}</button>`).join('')}</div>`;
-    const range = (name, min, max, step, v, unit = '', title = '') => `<span class="cp-range" title="${esc(title)}"><input type="range" data-r="${name}" min="${min}" max="${max}" step="${step}" value="${v}"><span>${v}${unit}</span></span>`;
+    const opt = (list) => list.map(([k, l]) => `<wa-option value="${k}">${esc(l)}</wa-option>`).join('');
+    const sel = (name, list, v, title = '') => `<wa-select size="xs" class="cp-select" data-sel="${name}" value="${esc(v)}"${title ? ` title="${esc(title)}"` : ''}>${opt(list)}</wa-select>`;
+    const seg = (name, list, v) => `<wa-radio-group class="seg cp-seg" orientation="horizontal" size="xs" data-s="${name}" value="${esc(v)}" label="${esc(name)}">${list.map(([k, l]) => `<wa-radio appearance="button" value="${k}">${esc(l)}</wa-radio>`).join('')}</wa-radio-group>`;
+    const range = (name, min, max, step, v, unit = '', title = '') => `<span class="cp-range" title="${esc(title)}"><wa-slider size="xs" data-r="${name}" min="${min}" max="${max}" step="${step}" value="${v}" label="${esc(name)}"></wa-slider><span>${v}${unit}</span></span>`;
     const row = (label, html, title = '') => `<div class="cp-srow" title="${esc(title)}"><span>${label}</span>${html}</div>`;
     const strumUsed = p.type === 'strum' || (p.alternate.every !== 'off' && p.alternate.tokens.some((t) => t.startsWith('strum')));
     const s = p.strum, h = p.humanize;
@@ -1466,18 +1485,18 @@ export class ComposeEditor {
       ${seg('play.type', m.types, p.type)}
       ${row('Durata note', range('play.gate', 25, 100, 5, Math.round(p.gate * 100), '%'), 'Quanto dura ogni colpo rispetto allo spazio fino al successivo')}
       ${swing ? row('Swing', range('swing', 50, 75, 1, st.swing, '', '50 = dritto, 66 = terzinato, 75 = shuffle pesante (sui sedicesimi in levare)')) : ''}
-      ${p.type === 'arp' ? row('Arpeggio', `<select data-sel="play.arp.mode" class="cp-select">${opt(m.arpModes, p.arp.mode)}</select>
-          <select data-sel="play.arp.rate" class="cp-select">${opt(m.rates.map((r) => [r, r]), p.arp.rate)}</select>
+      ${p.type === 'arp' ? row('Arpeggio', `${sel('play.arp.mode', m.arpModes, p.arp.mode)}
+          ${sel('play.arp.rate', m.rates.map((r) => [r, r]), p.arp.rate)}
           ${seg('play.arp.octaves', [[1, '1 ott.'], [2, '2 ott.']], p.arp.octaves)}`) : ''}
       ${strumUsed ? `<div class="cp-subtitle">Strum</div>
-        ${row('Direzione', `<select data-sel="play.strum.dir" class="cp-select">${opt(m.strumDirs, s.dir)}</select>`, 'Chitarra: pennata giù sui battere e su in levare. Frecce: ⇧+clic sugli step della ritmica')}
+        ${row('Direzione', sel('play.strum.dir', m.strumDirs, s.dir), 'Chitarra: pennata giù sui battere e su in levare. Frecce: ⇧+clic sugli step della ritmica')}
         ${row('Velocità', `${s.unit === 'ms' ? range('play.strum.spread', 3, 90, 1, s.spread, ' ms', 'Tempo tra una nota e la successiva') : ''}
-            <select data-sel="play.strum.unit" class="cp-select" title="In millisecondi o in valore musicale (segue il BPM)">${opt(m.strumUnits.map((u) => [u, u === 'ms' ? 'ms' : u]), s.unit)}</select>`)}
-        ${row('Curva', `<select data-sel="play.strum.curve" class="cp-select">${opt(m.strumCurves, s.curve)}</select>`, 'Accelera: le ultime corde arrivano più ravvicinate, come una pennata vera')}
-        ${row('Pennata su', `<select data-sel="play.strum.upNotes" class="cp-select" title="Nelle pennate dall'alto suonano solo le note più acute">${opt([[0, 'tutte le note'], [2, '2 note alte'], [3, '3 note alte'], [4, '4 note alte']], s.upNotes)}</select>
+            ${sel('play.strum.unit', m.strumUnits.map((u) => [u, u === 'ms' ? 'ms' : u]), s.unit, 'In millisecondi o in valore musicale (segue il BPM)')}`)}
+        ${row('Curva', sel('play.strum.curve', m.strumCurves, s.curve), 'Accelera: le ultime corde arrivano più ravvicinate, come una pennata vera')}
+        ${row('Pennata su', `${sel('play.strum.upNotes', [[0, 'tutte le note'], [2, '2 note alte'], [3, '3 note alte'], [4, '4 note alte']], s.upNotes, "Nelle pennate dall'alto suonano solo le note più acute")}
             ${range('play.strum.upSoft', 0, 60, 5, s.upSoft, '% più piano', 'Le pennate dall\'alto sono più deboli')}`)}
         ${row('Inclinazione', range('play.strum.velTilt', -40, 40, 5, s.velTilt, '%', 'Negativo: la prima nota più forte; positivo: l\'ultima più forte'))}` : ''}
-      <div class="cp-subtitle">Humanize <button class="icon-btn small" data-dice title="Nuova umanizzazione (stesse quantità, altro caso)">🎲</button></div>
+      <div class="cp-subtitle">Humanize <button class="cp-ib" data-dice title="Nuova umanizzazione (stesse quantità, altro caso)">${svg('dices', 12)}</button></div>
       ${row('Timing', range('play.humanize.timing', 0, 40, 1, h.timing, ' ms', 'Spostamento casuale di ogni colpo (tutte le note insieme)'))}
       ${row('Note accordo', range('play.humanize.spread', 0, 25, 1, h.spread, ' ms', 'Le note dello stesso colpo non partono esattamente insieme'))}
       ${row('Feel', range('play.humanize.feel', -25, 25, 1, h.feel, ' ms', 'Negativo: in anticipo (spinge) · positivo: in ritardo (laid back)'))}
@@ -1486,10 +1505,10 @@ export class ComposeEditor {
       ${row('Durate', range('play.humanize.len', 0, 40, 5, h.len, '%', 'Variazione casuale della lunghezza delle note'))}
       ${row('Accenti', range('play.humanize.accent', 0, 40, 5, h.accent, '%', 'Più forte sul primo e sui battere, più leggero in levare'))}
       <div class="cp-subtitle">Dinamica e alternanza</div>
-      ${row('Dinamica', `<select data-sel="play.velCurve" class="cp-select">${opt(m.velCurves, p.velCurve)}</select>`)}
-      ${row('Alterna', `<select data-sel="play.alternate.every" class="cp-select">${opt([['off', 'no'], ['hit', 'a ogni colpo'], ['bar', 'a ogni battuta']], p.alternate.every)}</select>
-        ${p.alternate.every !== 'off' ? `<span class="cp-tokens">${p.alternate.tokens.map((t, i) => `<span class="chip on" data-tokdel="${i}" title="Rimuovi">${esc(tokLabel[t] || t)} ×</span>`).join('') || '<span class="hint">aggiungi:</span>'}</span>
-          <span class="cp-tokadd">${m.tokens.filter(([t]) => p.alternate.every === 'bar' || t !== 'arp').map(([t, l]) => `<button class="chip" data-tokadd="${t}">+ ${esc(l)}</button>`).join('')}</span>` : ''}`)}
+      ${row('Dinamica', sel('play.velCurve', m.velCurves, p.velCurve))}
+      ${row('Alterna', `${sel('play.alternate.every', [['off', 'no'], ['hit', 'a ogni colpo'], ['bar', 'a ogni battuta']], p.alternate.every)}
+        ${p.alternate.every !== 'off' ? `<span class="cp-tokens">${p.alternate.tokens.map((t, i) => chipBtn(`data-tokdel="${i}" title="Rimuovi"`, `${esc(tokLabel[t] || t)}<wa-icon slot="end" name="x"></wa-icon>`, true)).join('') || '<span class="hint">aggiungi:</span>'}</span>
+          <span class="cp-tokadd">${m.tokens.filter(([t]) => p.alternate.every === 'bar' || t !== 'arp').map(([t, l]) => chipBtn(`data-tokadd="${t}"`, `<wa-icon slot="start" name="plus"></wa-icon>${esc(l)}`)).join('')}</span>` : ''}`)}
     </div>`;
   }
 
@@ -1498,8 +1517,8 @@ export class ComposeEditor {
     const ed = box.querySelector('.cp-style');
     if (!ed) return;
     const num = (v) => (v !== '' && !Number.isNaN(+v) ? +v : v);
-    ed.querySelectorAll('[data-s]').forEach((b) => {
-      b.onclick = () => { const n = clone(st); setPath(n, b.dataset.s, num(b.dataset.v)); commit(n); };
+    ed.querySelectorAll('[data-s]').forEach((g) => {
+      g.addEventListener('change', (e) => { if (e.target !== g) return; const n = clone(st); setPath(n, g.dataset.s, num(g.value)); commit(n); });
     });
     ed.querySelectorAll('[data-sel]').forEach((sel) => {
       sel.onchange = () => {
@@ -1528,30 +1547,20 @@ export class ComposeEditor {
   }
 
   // ---------------------------------------------------------------- variations
+  // title is plain text (the dialog label); closing it in any way stops the preview
   _modal(title, body) {
-    document.querySelector('.cp-modal')?.remove();
-    const m = document.createElement('div');
-    m.className = 'modal cp-modal';
-    m.innerHTML = `<div class="modal-box cp-modal-box"><div class="cp-modal-head"><h3>${title}</h3><button class="icon-btn" data-close>✕</button></div>${body}</div>`;
-    document.body.appendChild(m);
-    const close = () => { m.remove(); document.removeEventListener('keydown', onKey, true); this.stop(); };
-    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
-    document.addEventListener('keydown', onKey, true);
-    m.addEventListener('pointerdown', (e) => { if (e.target === m) close(); });
-    m.querySelector('[data-close]').onclick = close;
-    m.close = close;
-    return m;
+    return waDialog('cp-modal', { label: title, cls: 'cp-modal', width: '700px', body: `<div class="cp-modal-body">${body}</div>`, onHide: () => this.stop() });
   }
 
   async clipVariations(id) {
     const c = this.clip(id);
     if (!c) return;
     const kinds = this.meta.clipKinds;
-    const m = this._modal(`Varia armonia: ${esc(this.displayName(c))}`, `
-      <div class="cp-vtools"><div class="chips" data-kinds>${kinds.map(([k, l]) => `<button class="chip ${this.clipKinds.includes(k) ? 'on' : ''}" data-kind="${k}">${esc(l)}</button>`).join('')}</div>
-        <button class="btn small" data-gen>🎲 Altre proposte</button></div>
+    const m = this._modal(`Varia armonia: ${this.displayName(c)}`, `
+      <div class="cp-vtools"><div class="chips" data-kinds>${kinds.map(([k, l]) => chipBtn(`data-kind="${k}"`, esc(l), this.clipKinds.includes(k))).join('')}</div>
+        ${xs('Altre proposte', { icon: 'dices', 'data-gen': true })}</div>
       <div class="cp-vlist" data-list><div class="hint">Genero…</div></div>
-      <div class="hint">▶ ascolta nel contesto (dalla battuta prima) · Usa: sostituisce l'accordo (annullabile con ⌘Z)</div>`);
+      <div class="hint">Play: ascolta nel contesto (dalla battuta prima) · Usa: sostituisce l'accordo (annullabile con ⌘Z)</div>`);
     let seed = 1 + Math.floor(Math.random() * 1e6);
     const load = async () => {
       m.querySelector('[data-list]').innerHTML = '<div class="hint">Genero…</div>';
@@ -1560,8 +1569,8 @@ export class ComposeEditor {
       const groups = Object.fromEntries(kinds);
       m.querySelector('[data-list]').innerHTML = this._clipProposals.map((p, i) => `
         <div class="cp-vrow"><span class="cp-vkind">${esc(groups[p.kind] || p.kind)}</span><span class="cp-vlabel">${esc(p.label)}</span>
-          <button class="icon-btn small" data-play="${i}" title="Ascolta nel contesto">▶</button>
-          <button class="btn small primary" data-use="${i}">Usa</button></div>`).join('') || '<div class="hint">Nessuna variazione per questi tipi.</div>';
+          ${playIco(i, 'Ascolta nel contesto')}
+          ${xs('Usa', { variant: 'brand', 'data-use': i })}</div>`).join('') || '<div class="hint">Nessuna variazione per questi tipi.</div>';
     };
     m.querySelector('[data-kinds]').onclick = (e) => {
       const b = e.target.closest('[data-kind]'); if (!b) return;
@@ -1597,9 +1606,9 @@ export class ComposeEditor {
     if (!this.seq.clips.length) { toast('Aggiungi prima qualche accordo'); return; }
     const kinds = this.meta.progKinds;
     const m = this._modal(`Varia armonia: versione ${this.project.active}`, `
-      <div class="cp-vtools"><div class="chips" data-kinds>${kinds.map(([k, l]) => `<button class="chip ${this.progKinds.includes(k) ? 'on' : ''}" data-kind="${k}">${esc(l)}</button>`).join('')}</div></div>
-      <div class="cp-vtools"><label class="cp-field">Quanto variare <input type="range" min="10" max="100" step="5" value="${this.ui.amount || 50}" data-amount></label>
-        <button class="btn small primary" data-gen>🎲 Genera</button></div>
+      <div class="cp-vtools"><div class="chips" data-kinds>${kinds.map(([k, l]) => chipBtn(`data-kind="${k}"`, esc(l), this.progKinds.includes(k))).join('')}</div></div>
+      <div class="cp-vtools"><label class="cp-field">Quanto variare <wa-slider size="s" min="10" max="100" step="5" value="${this.ui.amount || 50}" data-amount label="Quanto variare"></wa-slider></label>
+        ${xs('Genera', { variant: 'brand', icon: 'dices', 'data-gen': true })}</div>
       <div class="cp-vlist" data-list></div>
       <div class="hint">Tieni: diventa una nuova versione (A, B, C…) modificabile · Accoda: la aggiunge alla fine della progressione (A A' …)</div>`);
     let seed = 1 + Math.floor(Math.random() * 1e6);
@@ -1609,9 +1618,9 @@ export class ComposeEditor {
       this._progProposals = res || [];
       m.querySelector('[data-list]').innerHTML = this._progProposals.map((p, i) => `
         <div class="cp-vrow cp-vprog"><div class="cp-vmain"><span class="cp-vlabel">${esc(p.label)}</span>${this._miniTimeline(p.seq)}</div>
-          <button class="icon-btn small" data-play="${i}" title="Ascolta">▶</button>
-          <button class="btn small primary" data-keep="${i}">Tieni</button>
-          <button class="btn small" data-append="${i}">Accoda</button></div>`).join('') || '<div class="hint">Nessuna variazione possibile con questi tipi (servono almeno 2–3 accordi).</div>';
+          ${playIco(i)}
+          ${xs('Tieni', { variant: 'brand', 'data-keep': i })}
+          ${xs('Accoda', { 'data-append': i })}</div>`).join('') || '<div class="hint">Nessuna variazione possibile con questi tipi (servono almeno 2–3 accordi).</div>';
     };
     m.querySelector('[data-kinds]').onclick = (e) => {
       const b = e.target.closest('[data-kind]'); if (!b) return;
@@ -1655,12 +1664,12 @@ export class ComposeEditor {
 
   async modeVariations() {
     const kinds = this.meta.modeKinds;
-    const m = this._modal(`Varia modalità: ${esc(this.mode.name)}`, `
-      <div class="cp-vtools"><div class="chips" data-kinds>${kinds.map(([k, l]) => `<button class="chip ${this.modeKinds.includes(k) ? 'on' : ''}" data-kind="${k}">${esc(l)}</button>`).join('')}</div></div>
-      <div class="cp-vtools"><label class="cp-field">Quanto variare <input type="range" min="10" max="100" step="5" value="${this.ui.modeAmount || 50}" data-amount></label>
-        <button class="btn small primary" data-gen>🎲 Genera</button></div>
+    const m = this._modal(`Varia modalità: ${this.mode.name}`, `
+      <div class="cp-vtools"><div class="chips" data-kinds>${kinds.map(([k, l]) => chipBtn(`data-kind="${k}"`, esc(l), this.modeKinds.includes(k))).join('')}</div></div>
+      <div class="cp-vtools"><label class="cp-field">Quanto variare <wa-slider size="s" min="10" max="100" step="5" value="${this.ui.modeAmount || 50}" data-amount label="Quanto variare"></wa-slider></label>
+        ${xs('Genera', { variant: 'brand', icon: 'dices', 'data-gen': true })}</div>
       <div class="cp-vlist" data-list></div>
-      <div class="hint">Gli accordi non cambiano. ▶ ascolta · Usa: sostituisce la modalità corrente (⌘Z per tornare indietro) · Tieni: la aggiunge come nuova modalità</div>`);
+      <div class="hint">Gli accordi non cambiano. Play: ascolta · Usa: sostituisce la modalità corrente (⌘Z per tornare indietro) · Tieni: la aggiunge come nuova modalità</div>`);
     let seed = 1 + Math.floor(Math.random() * 1e6);
     const load = async () => {
       m.querySelector('[data-list]').innerHTML = '<div class="hint">Genero…</div>';
@@ -1669,9 +1678,9 @@ export class ComposeEditor {
       const names = Object.fromEntries(kinds);
       m.querySelector('[data-list]').innerHTML = this._modeProposals.map((p, i) => `
         <div class="cp-vrow cp-vprog"><div class="cp-vmain"><span class="cp-vlabel"><span class="cp-vkind">${esc(names[p.kind] || p.kind)}</span> ${esc(p.label)}</span>${this._miniGrid(p.mode)}</div>
-          <button class="icon-btn small" data-play="${i}" title="Ascolta">▶</button>
-          <button class="btn small primary" data-use="${i}">Usa</button>
-          <button class="btn small" data-keep="${i}">Tieni</button></div>`).join('') || '<div class="hint">Nessuna variazione con questi tipi.</div>';
+          ${playIco(i)}
+          ${xs('Usa', { variant: 'brand', 'data-use': i })}
+          ${xs('Tieni', { 'data-keep': i })}</div>`).join('') || '<div class="hint">Nessuna variazione con questi tipi.</div>';
     };
     m.querySelector('[data-kinds]').onclick = (e) => {
       const b = e.target.closest('[data-kind]'); if (!b) return;
@@ -1794,15 +1803,16 @@ export class ComposeEditor {
       ${this.layers.map((l) => `<span class="cp-layer ${l === L ? 'active' : ''} ${l.mute ? 'muted' : ''}" data-layer="${l.id}" style="--lc:${ROLE_COLOR[l.role] || '#ffb84d'}">
         <button class="cp-lname" data-lsel title="${esc(this._roleMeta(l.role).label)} · ${l.notes.length} note · doppio clic: rinomina">${esc(l.name)}</button>
         <button class="cp-lbtn" data-lmute title="${l.mute ? 'Muto: clic per sentirlo' : 'Silenzia il layer'}">M</button>
-        ${this.layers.length > 1 ? '<button class="cp-lbtn" data-ldel title="Elimina il layer">✕</button>' : ''}</span>`).join('')}
-      <button class="btn small" data-mel="add" title="Un'altra linea sugli stessi accordi: basso, arpeggio, riff, pad, keys…">＋ Layer ▾</button>
+        ${this.layers.length > 1 ? `<button class="cp-lbtn" data-ldel title="Elimina il layer">${svg('x', 11)}</button>` : ''}</span>`).join('')}
+      ${xs('Layer', { icon: 'plus', 'with-caret': true, 'data-mel': 'add', title: "Un'altra linea sugli stessi accordi: basso, arpeggio, riff, pad, keys…" })}
       <span class="cp-sep"></span>
       <span class="hint">${n ? `${n} note` : 'vuoto'}${this.melSel.size ? ` · ${this.melSel.size} selezionate` : ''}</span>
-      <button class="btn small" data-mel="import" title="Da file MIDI, da una clip di Ableton o dalla tastiera MIDI">⤓ Importa ▾</button>
-      <button class="btn small" data-mel="down" title="Un'ottava sotto (selezione o tutto il layer)" ${n ? '' : 'disabled'}>−8va</button>
-      <button class="btn small" data-mel="up" title="Un'ottava sopra (selezione o tutto il layer)" ${n ? '' : 'disabled'}>+8va</button>
-      <label class="cp-field" title="Volume del layer «${esc(L.name)}»">Layer <input type="range" min="0" max="1.5" step="0.05" value="${L.vol ?? 1}" data-lvol></label>
-      <label class="cp-field" title="Volume di tutti i layer">Tutti <input type="range" min="0" max="1.2" step="0.05" value="${this.ui.melVol}" data-mvol></label>`;
+      ${xs('Importa', { icon: 'upload', 'with-caret': true, 'data-mel': 'import', title: 'Da file MIDI, da una clip di Ableton o dalla tastiera MIDI' })}
+      <wa-button-group label="Ottava">
+        ${xs('−8va', { 'data-mel': 'down', disabled: !n, title: "Un'ottava sotto (selezione o tutto il layer)" })}${xs('+8va', { 'data-mel': 'up', disabled: !n, title: "Un'ottava sopra (selezione o tutto il layer)" })}
+      </wa-button-group>
+      <label class="cp-field" title="Volume del layer «${esc(L.name)}»">Layer <wa-slider size="xs" min="0" max="1.5" step="0.05" value="${L.vol ?? 1}" data-lvol label="Volume layer"></wa-slider></label>
+      <label class="cp-field" title="Volume di tutti i layer">Tutti <wa-slider size="xs" min="0" max="1.2" step="0.05" value="${this.ui.melVol}" data-mvol label="Volume melodia"></wa-slider></label>`;
   }
 
   _melRange() {
@@ -2026,7 +2036,7 @@ export class ComposeEditor {
     gen.onchange = (e) => {
       const f = e.target.dataset.g; if (!f) return;
       if (f === 'role') { this._genRole(e.target.value); this._persist(); this.renderMelPanels(); return; }
-      this.ui.gen[f] = e.target.type === 'checkbox' ? e.target.checked : ['lo', 'hi'].includes(f) ? +e.target.value : e.target.value;
+      this.ui.gen[f] = e.target.localName === 'wa-checkbox' ? e.target.checked : ['lo', 'hi'].includes(f) ? +e.target.value : e.target.value;
       if (this.ui.gen.hi - this.ui.gen.lo < 7) this.ui.gen.hi = this.ui.gen.lo + 12;
       this._persist();
       if (['lo', 'hi'].includes(f)) this.renderMelPanels();
@@ -2046,7 +2056,7 @@ export class ComposeEditor {
     const harm = $('#cp-mharm');
     harm.onchange = (e) => {
       const f = e.target.dataset.h; if (!f) return;
-      this.ui.harm[f] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+      this.ui.harm[f] = e.target.localName === 'wa-checkbox' ? e.target.checked : e.target.value;
       this._persist();
     };
     harm.onclick = (e) => {
@@ -2070,27 +2080,28 @@ export class ComposeEditor {
     if (this.ui.view !== 'melody' || !this.meta.melody) return;
     const g = this.ui.gen, h = this.ui.harm, M = this.meta.melody;
     const R = this._roleMeta(g.role);
-    const opts = (list, v) => list.map(([k, l]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${esc(l)}</option>`).join('');
-    const pitches = (v) => Array.from({ length: 73 }, (_, i) => 24 + i).map((p) => `<option value="${p}" ${p === v ? 'selected' : ''}>${pitchName(p, keyFlats(this.seq.key))}</option>`).join('');
+    const opts = (list) => list.map(([k, l]) => `<wa-option value="${k}">${esc(l)}</wa-option>`).join('');
+    const pitches = () => Array.from({ length: 73 }, (_, i) => 24 + i).map((p) => `<wa-option value="${p}">${pitchName(p, keyFlats(this.seq.key))}</wa-option>`).join('');
+    const sel = (attr, v, html, cls = '') => `<wa-select size="xs" class="cp-select ${cls}" ${attr} value="${esc(v)}">${html}</wa-select>`;
     $('#cp-mgen').innerHTML = `
       <div class="cp-sec-title"><span>Genera dagli accordi</span><span class="hint">${GEN_HINT[g.role] || ''}</span></div>
       <div class="cp-mform">
-        <label class="cp-field">Tipo <select class="cp-select" data-g="role">${opts(M.roles.map((r) => [r.id, r.label]), g.role)}</select></label>
-        <label class="cp-field">Densità <select class="cp-select" data-g="density">${opts(M.densities, g.density)}</select></label>
-        ${R.shapes.length ? `<label class="cp-field">${esc(R.shapeLabel)} <select class="cp-select" data-g="contour">${opts(R.shapes, g.contour)}</select></label>` : ''}
-        <label class="cp-field">Da <select class="cp-select" data-g="lo">${pitches(g.lo)}</select> a <select class="cp-select" data-g="hi">${pitches(g.hi)}</select></label>
-        <label class="cp-own" title="Seleziona uno o più accordi sulla corsia: il resto della melodia resta com'è"><input type="checkbox" data-g="sel" ${g.sel ? 'checked' : ''}> solo sugli accordi selezionati</label>
-        <button class="btn small primary" data-gen>🎲 Genera</button>
+        <label class="cp-field">Tipo ${sel('data-g="role"', g.role, opts(M.roles.map((r) => [r.id, r.label])))}</label>
+        <label class="cp-field">Densità ${sel('data-g="density"', g.density, opts(M.densities))}</label>
+        ${R.shapes.length ? `<label class="cp-field">${esc(R.shapeLabel)} ${sel('data-g="contour"', g.contour, opts(R.shapes))}</label>` : ''}
+        <label class="cp-field">Da ${sel('data-g="lo"', g.lo, pitches(), 'cp-pitch')} a ${sel('data-g="hi"', g.hi, pitches(), 'cp-pitch')}</label>
+        <wa-checkbox size="s" class="cp-own" data-g="sel" ${g.sel ? 'checked' : ''} title="Seleziona uno o più accordi sulla corsia: il resto della melodia resta com'è">solo sugli accordi selezionati</wa-checkbox>
+        ${xs('Genera', { variant: 'brand', icon: 'dices', 'data-gen': true })}
       </div>
       <div class="cp-vlist" data-glist>${this._genList()}</div>`;
     const keyLabel = `Tonalità della versione (${keyName(this.seq.key)})`;
     $('#cp-mharm').innerHTML = `
       <div class="cp-sec-title"><span>Accordi dalla melodia</span><span class="hint">ogni accordo contiene le note della melodia, concatenati come i suggerimenti</span></div>
       <div class="cp-mform">
-        <label class="cp-field">Ritmo armonico <select class="cp-select" data-h="rate">${opts(M.rates, h.rate)}</select></label>
-        <label class="cp-field">Tonalità <select class="cp-select" data-h="key">${opts([['seq', keyLabel], ['auto', 'Rileva dalla melodia']], h.key)}</select></label>
-        <label class="cp-own"><input type="checkbox" data-h="related" ${h.related ? 'checked' : ''}> anche accordi in prestito (tonalità vicine)</label>
-        <button class="btn small primary" data-harm>♫ Armonizza</button>
+        <label class="cp-field">Ritmo armonico ${sel('data-h="rate"', h.rate, opts(M.rates))}</label>
+        <label class="cp-field">Tonalità ${sel('data-h="key"', h.key, opts([['seq', keyLabel], ['auto', 'Rileva dalla melodia']]))}</label>
+        <wa-checkbox size="s" class="cp-own" data-h="related" ${h.related ? 'checked' : ''}>anche accordi in prestito (tonalità vicine)</wa-checkbox>
+        ${xs('Armonizza', { variant: 'brand', icon: 'music', 'data-harm': true })}
       </div>
       <div class="cp-vlist" data-hlist>${this._harmList()}</div>`;
   }
@@ -2108,14 +2119,14 @@ export class ComposeEditor {
   _genList() {
     if (this._genBusy) return '<div class="hint">Genero…</div>';
     const L = this.layer;
-    if (!this._genItems) return `<div class="hint">${this.seq.clips.length ? `Scegli il tipo e premi «Genera»: ▶ ascolta con gli accordi e gli altri layer · Usa: sostituisce il layer «${esc(L.name)}» se è dello stesso tipo · ＋ Layer: lo aggiunge sopra gli altri (⌘Z per tornare indietro).` : 'Servono prima degli accordi (vista Armonia).'}</div>`;
+    if (!this._genItems) return `<div class="hint">${this.seq.clips.length ? `Scegli il tipo e premi «Genera»: Play ascolta con gli accordi e gli altri layer · Usa: sostituisce il layer «${esc(L.name)}» se è dello stesso tipo · + Layer: lo aggiunge sopra gli altri (⌘Z per tornare indietro).` : 'Servono prima degli accordi (vista Armonia).'}</div>`;
     return this._genItems.map((m, i) => {
       const same = m.role === L.role;
       return `
       <div class="cp-vrow cp-vprog"><div class="cp-vmain"><span class="cp-vlabel">${esc(m.label)}</span>${this._miniMelody(m.melody.notes, this.seq.bars, ROLE_COLOR[m.role])}</div>
-        <button class="icon-btn small" data-play="${i}" title="Ascolta con gli accordi e gli altri layer">▶</button>
-        ${same ? `<button class="btn small primary" data-use="${i}" title="Sostituisce le note del layer «${esc(L.name)}»">Usa</button>` : ''}
-        <button class="btn small ${same ? '' : 'primary'}" data-add="${i}" title="Aggiunge un nuovo layer con questa linea">＋ Layer</button></div>`;
+        ${playIco(i, 'Ascolta con gli accordi e gli altri layer')}
+        ${same ? xs('Usa', { variant: 'brand', 'data-use': i, title: `Sostituisce le note del layer «${L.name}»` }) : ''}
+        ${xs('Layer', { variant: same ? 'neutral' : 'brand', icon: 'plus', 'data-add': i, title: 'Aggiunge un nuovo layer con questa linea' })}</div>`;
     }).join('') || '<div class="hint">Niente da generare: servono degli accordi.</div>';
   }
 
@@ -2125,9 +2136,9 @@ export class ComposeEditor {
     const key = this._harmKey && this.ui.harm.key === 'auto' ? `<div class="hint">Tonalità rilevata: ${keyName(this._harmKey)}</div>` : '';
     return key + (this._harmItems.map((it, i) => `
       <div class="cp-vrow cp-vprog"><div class="cp-vmain"><span class="cp-vlabel">${esc(it.label)}</span>${this._miniTimeline(it.seq)}</div>
-        <button class="icon-btn small" data-play="${i}" title="Ascolta con la melodia">▶</button>
-        <button class="btn small primary" data-keep="${i}">Nuova versione</button>
-        <button class="btn small" data-replace="${i}">Sostituisci</button></div>`).join('') || '<div class="hint">Nessun accordo del pack per questa melodia.</div>');
+        ${playIco(i, 'Ascolta con la melodia')}
+        ${xs('Nuova versione', { variant: 'brand', 'data-keep': i })}
+        ${xs('Sostituisci', { 'data-replace': i })}</div>`).join('') || '<div class="hint">Nessun accordo del pack per questa melodia.</div>');
   }
 
   async generateMelody() {
@@ -2167,7 +2178,7 @@ export class ComposeEditor {
 
   addLayerMenu(anchor) {
     const pop = showPopover(anchor, `<div class="cp-sec-title"><span>Nuovo layer</span></div>
-      ${this.meta.melody.roles.map((r) => `<button class="btn" data-role="${r.id}" style="border-left:3px solid ${ROLE_COLOR[r.id]}">${esc(r.label)}</button>`).join('')}
+      ${this.meta.melody.roles.map((r) => btn(`<span slot="start" class="dot" style="background:${ROLE_COLOR[r.id]}"></span>${esc(r.label)}`, { 'data-role': r.id })).join('')}
       <div class="hint">Un layer vuoto sugli stessi accordi: scrivilo, importalo o generalo qui sotto.</div>`);
     pop.onclick = (e) => {
       const b = e.target.closest('[data-role]'); if (!b) return;
@@ -2218,8 +2229,8 @@ export class ComposeEditor {
   importMenu(anchor) {
     const pop = showPopover(anchor, `
       <div class="cp-sec-title"><span>Importa melodia</span></div>
-      <button class="btn" data-file>File MIDI…</button>
-      <button class="btn" data-live title="In Live: seleziona una clip MIDI e premi «Clip → Melodia» nel device ClusterSound">Clip da Ableton</button>
+      ${btn('File MIDI…', { icon: 'folder-open', 'data-file': true })}
+      ${btn('Clip da Ableton', { icon: 'upload', 'data-live': true, title: 'In Live: seleziona una clip MIDI e premi «Clip → Melodia» nel device ClusterSound' })}
       <div class="cp-sec-title"><span>Tastiera MIDI</span></div>
       <div data-rec><span class="hint">Cerco le tastiere…</span></div>
       <div class="hint">Sostituisce il layer «${esc(this.layer.name)}» della versione ${this.project.active} (⌘Z per tornare indietro). Da una parte con accordi viene presa la nota più alta.</div>`);
@@ -2227,8 +2238,8 @@ export class ComposeEditor {
       const box = pop.querySelector('[data-rec]');
       if (!box) return;
       if (!r?.available || !r.ports.length) { box.innerHTML = `<span class="hint">${esc(r?.hint || 'Nessuna tastiera MIDI collegata')}</span>`; return; }
-      box.innerHTML = `<div class="cp-mform"><select class="cp-select" data-port>${r.ports.map((p, i) => `<option value="${i}" ${i === this.ui.midiPort ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
-        <button class="btn small primary" data-record title="4 click di attacco, poi suona sopra gli accordi · Spazio o ■ per fermare">● Registra</button></div>`;
+      box.innerHTML = `<div class="cp-mform"><wa-select size="s" class="cp-select" data-port value="${Math.min(this.ui.midiPort || 0, r.ports.length - 1)}">${r.ports.map((p, i) => `<wa-option value="${i}">${esc(p)}</wa-option>`).join('')}</wa-select>
+        ${xs('Registra', { variant: 'danger', icon: 'circle', 'data-record': true, title: '4 click di attacco, poi suona sopra gli accordi · Spazio o Stop per fermare' })}</div>`;
       box.querySelector('[data-record]').onclick = () => {
         this.ui.midiPort = +box.querySelector('[data-port]').value;
         this._persist();
@@ -2319,8 +2330,8 @@ export class ComposeEditor {
     const pop = showPopover(anchor, `<div class="cp-sec-title"><span>Progressioni salvate</span></div>
       <div class="cp-openlist">${list.sort((a, b) => b.updated - a.updated).map((p) => `
         <div class="cp-openrow" data-id="${esc(p.id)}"><span>${esc(p.name)}</span><span class="hint">${p.order?.length || 1} vers.</span>
-          <button class="link-btn" data-del="${esc(p.id)}" title="Elimina">✕</button></div>`).join('') || '<div class="hint">Nessuna progressione salvata.</div>'}</div>
-      <button class="btn small" data-new>Nuova progressione</button>`);
+          <button class="link-btn" data-del="${esc(p.id)}" title="Elimina">${svg('x', 12)}</button></div>`).join('') || '<div class="hint">Nessuna progressione salvata.</div>'}</div>
+      ${xs('Nuova progressione', { icon: 'plus', 'data-new': true })}`);
     pop.onclick = async (e) => {
       const del = e.target.closest('[data-del]');
       if (del) {
@@ -2356,19 +2367,19 @@ export class ComposeEditor {
     const hasMel = Object.values(p.versions).some((v) => melodyOf(v.melody).layers.some((l) => l.notes.length));
     const parts = hasMel ? this.ui.parts : 'chords';
     const pop = showPopover(anchor, `
-      <button class="btn primary" data-one>Versione ${p.active} · ${esc(this.mode.name)} → .mid</button>
-      ${many ? `<button class="btn" data-all>Tutte le versioni (${p.order.join(', ')}) con ${esc(this.mode.name)} → cartella</button>` : ''}
-      ${manyModes ? `<button class="btn" data-modes>Versione ${p.active} con tutte le modalità → cartella</button>` : ''}
-      <label class="cp-own"><input type="checkbox" data-pure ${this.ui.pure ? 'checked' : ''}> solo accordi (senza ritmica, strum, arpeggi e humanize)</label>
-      ${hasMel ? `<div class="seg cp-seg" data-parts>${PARTS.map(([k, l]) => `<button class="seg-btn ${k === this.ui.parts ? 'active' : ''}" data-part="${k}">${l}</button>`).join('')}</div>
+      ${btn(`Versione ${p.active} · ${esc(this.mode.name)} → .mid`, { variant: 'brand', icon: 'file-down', 'data-one': true })}
+      ${many ? btn(`Tutte le versioni (${p.order.join(', ')}) con ${esc(this.mode.name)} → cartella`, { icon: 'folder-open', 'data-all': true }) : ''}
+      ${manyModes ? btn(`Versione ${p.active} con tutte le modalità → cartella`, { icon: 'folder-open', 'data-modes': true }) : ''}
+      <wa-checkbox size="s" class="cp-own" data-pure ${this.ui.pure ? 'checked' : ''}>solo accordi (senza ritmica, strum, arpeggi e humanize)</wa-checkbox>
+      ${hasMel ? `<wa-radio-group class="seg cp-seg" orientation="horizontal" size="xs" data-parts value="${this.ui.parts}" label="Parti">${PARTS.map(([k, l]) => `<wa-radio appearance="button" value="${k}">${l}</wa-radio>`).join('')}</wa-radio-group>
         <div class="hint">Accordi + melodia: un .mid con una traccia per gli accordi e una per ogni layer (i layer muti restano fuori).</div>` : ''}
-      <button class="btn" data-live>Versione ${p.active} → Live</button>
-      ${many ? `<button class="btn" data-live-all>Tutte le versioni → Live (una clip ciascuna)</button>` : ''}
+      ${btn(`Versione ${p.active} → Live`, { 'data-live': true })}
+      ${many ? btn('Tutte le versioni → Live (una clip ciascuna)', { 'data-live-all': true }) : ''}
       <div class="hint">In Ableton: trascina il file su una traccia MIDI. Il tempo del file è ${p.bpm} BPM. «→ Live» crea la traccia con le clip tramite il device ClusterSound.</div>`);
     pop.querySelector('[data-pure]').onchange = (e) => { this.ui.pure = e.target.checked; this._persist(); };
-    pop.querySelector('[data-parts]')?.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-part]'); if (!b) return;
-      this.ui.parts = b.dataset.part;
+    pop.querySelector('[data-parts]')?.addEventListener('change', (e) => {
+      if (!e.target.matches('[data-parts]')) return;
+      this.ui.parts = e.target.value;
       this._persist();
       pop.close();
       this.exportMenu(anchor);
@@ -2400,7 +2411,7 @@ export class ComposeEditor {
 
   // ---------------------------------------------------------------- keyboard (from app.js)
   onKey(e) {
-    if (e.target.closest?.('input, select, textarea')) return false;
+    if (isTypingTarget(e)) return false;
     const mod = e.metaKey || e.ctrlKey;
     if (e.key === ' ') { this.togglePlay(); return true; }
     if (mod && e.key.toLowerCase() === 'z') { e.shiftKey ? this.redo() : this.undo(); return true; }

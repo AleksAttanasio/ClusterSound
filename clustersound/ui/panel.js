@@ -1,8 +1,12 @@
 // Detail drawer: class, actions, dynamics (waveform + RMS envelope + ADSR), spectrogram, metrics.
 
+import { btn } from './kit.js';
+
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (v, d = 1, unit = '') => (v === null || v === undefined || Number.isNaN(v) ? '—' : `${Number(v).toFixed(d)}${unit}`);
 const fmtTime = (s) => (s === null || s === undefined ? '—' : s < 1 ? `${(s * 1000).toFixed(0)} ms` : `${s.toFixed(2)} s`);
+
+const playLabel = (playing) => playing ? '<wa-icon slot="start" name="square"></wa-icon>Stop' : '<wa-icon slot="start" name="play"></wa-icon>Play';
 
 const ADSR_COLORS = { A: '#ffb74d', D: '#ef5350', S: '#66bb6a', R: '#42a5f5' };
 
@@ -43,7 +47,7 @@ export class Panel {
     return `<div class="p-class">
       <span class="p-badge" style="background:${cls.color}26;color:${cls.color}"><span class="dot" style="background:${cls.color}"></span>${esc(cls.label)}</span>
       <span class="p-conf">${user ? '' : `${Math.round(conf * 100)}% confidenza`}</span>
-      ${user ? '<span class="p-user">✓ etichetta manuale</span>' : ''}
+      ${user ? '<span class="p-user"><wa-icon name="check"></wa-icon> etichetta manuale</span>' : ''}
     </div>`;
   }
 
@@ -55,8 +59,8 @@ export class Panel {
     const info = d.info || {};
     const byId = Object.fromEntries(this.classes.map((c) => [c.id, c]));
     const alts = (d.alts || []).filter((x) => x.cls !== d.cls).slice(0, 3);
-    const options = this.groups.map((g) => `<optgroup label="${esc(g)}">${this.classes.filter((c) => c.group === g)
-      .map((c) => `<option value="${c.id}" ${c.id === d.cls ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}</optgroup>`).join('');
+    const options = this.groups.map((g, k) => `${k ? '<wa-divider></wa-divider>' : ''}<small>${esc(g)}</small>${this.classes.filter((c) => c.group === g)
+      .map((c) => `<wa-option value="${c.id}" ${c.id === d.cls ? 'selected' : ''}><span slot="start" class="dot" style="background:${c.color}"></span>${esc(c.label)}</wa-option>`).join('')}`).join('');
     const bit = (info.subtype || '').replace('PCM_', '').replace('FLOAT', '32f').replace('DOUBLE', '64f');
 
     this.content.innerHTML = `
@@ -66,10 +70,10 @@ export class Panel {
         <div class="p-path" title="${esc(d.path)}">${esc(d.rel)}</div>
       </div>
       <div class="p-actions">
-        <button class="btn primary" data-act="play">${playing ? '■ Stop' : '▶ Play'}</button>
-        <button class="btn" data-act="reveal" title="Apre il Finder con il file selezionato">Mostra nella cartella</button>
-        <button class="btn" data-act="similar">Trova simili</button>
-        <button class="btn" data-act="send" title="Aggiungi il sample a un bus del Sequencer o al Drum Rack">Invia ▾</button>
+        ${btn(playLabel(playing), { variant: 'brand', 'data-act': 'play' })}
+        ${btn('Mostra nella cartella', { icon: 'folder-open', 'data-act': 'reveal', title: 'Apre il Finder con il file selezionato' })}
+        ${btn('Trova simili', { icon: 'sparkles', 'data-act': 'similar' })}
+        ${btn('Invia', { 'data-act': 'send', 'with-caret': true, title: 'Aggiungi il sample a un bus del Sequencer o al Drum Rack' })}
       </div>
 
       <div>
@@ -101,10 +105,10 @@ export class Panel {
 
       <div>
         <div class="section-title">Classe</div>
-        <select class="cls-select" id="cls-select">${options}</select>
+        <wa-select size="s" class="cls-select" id="cls-select" value="${esc(d.cls)}">${options}</wa-select>
         ${alts.length ? `<div class="hint" style="margin:8px 0 6px">Alternative</div><div class="alts">${alts.map((x) => {
           const c = byId[x.cls];
-          return `<button class="alt" data-cls="${c.id}"><span class="dot" style="background:${c.color}"></span>${esc(c.label)} ${Math.round(x.p * 100)}%</button>`;
+          return `<wa-button size="xs" pill appearance="outlined" class="alt" data-cls="${c.id}"><span slot="start" class="dot" style="background:${c.color}"></span>${esc(c.label)} ${Math.round(x.p * 100)}%</wa-button>`;
         }).join('')}</div>` : ''}
         ${d.user ? '<div style="margin-top:8px"><a href="#" id="clear-label">Rimuovi etichetta manuale</a></div>' : ''}
         <div class="hint" style="margin-top:8px">Le correzioni entrano nel training: le altre classificazioni si aggiornano in pochi secondi.</div>
@@ -138,7 +142,7 @@ export class Panel {
 
   setPlaying(playing) {
     const b = this.content.querySelector('[data-act=play]');
-    if (b) b.textContent = playing ? '■ Stop' : '▶ Play';
+    if (b) b.innerHTML = playLabel(playing);
   }
 
   _fit(cv) {
