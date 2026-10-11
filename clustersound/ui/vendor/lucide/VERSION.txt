@@ -1,0 +1,1 @@
+Lucide static 1.47.0 (subset). Vendored; do not edit.
