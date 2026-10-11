@@ -49,7 +49,7 @@
      "id": "js",
      "maxclass": "newobj",
      "numinlets": 1,
-     "numoutlets": 6,
+     "numoutlets": 7,
      "patching_rect": [
       20,
       330,
@@ -57,6 +57,7 @@
       22
      ],
      "outlettype": [
+      "",
       "",
       "",
       "",
@@ -624,17 +625,39 @@
      "presentation_rect": [
       300,
       4,
-      200,
+      250,
       20
      ],
-     "text": "Suoni da provare",
+     "text": "Strumenti di Live da provare",
      "fontface": 1,
      "fontsize": 12.0
     }
    },
    {
     "box": {
-     "id": "sndtracks",
+     "id": "lbl_sndtrack",
+     "maxclass": "comment",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      700,
+      120,
+      60,
+      20
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      300,
+      28,
+      60,
+      20
+     ],
+     "text": "Traccia"
+    }
+   },
+   {
+    "box": {
+     "id": "m_sndtrack",
      "maxclass": "umenu",
      "numinlets": 1,
      "numoutlets": 3,
@@ -651,9 +674,9 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      300,
+      360,
       26,
-      250,
+      190,
       22
      ],
      "items": [],
@@ -662,41 +685,13 @@
    },
    {
     "box": {
-     "id": "snditems",
-     "maxclass": "umenu",
-     "numinlets": 1,
-     "numoutlets": 3,
-     "patching_rect": [
-      480,
-      200,
-      250,
-      22
-     ],
-     "outlettype": [
-      "int",
-      "",
-      ""
-     ],
-     "presentation": 1,
-     "presentation_rect": [
-      300,
-      52,
-      250,
-      22
-     ],
-     "items": [],
-     "parameter_enable": 0
-    }
-   },
-   {
-    "box": {
-     "id": "psndt",
+     "id": "p_sndtrack",
      "maxclass": "newobj",
      "numinlets": 1,
      "numoutlets": 1,
      "patching_rect": [
       480,
-      160,
+      150,
       100,
       22
      ],
@@ -708,13 +703,131 @@
    },
    {
     "box": {
-     "id": "psndp",
+     "id": "lbl_sndtype",
+     "maxclass": "comment",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      700,
+      280,
+      60,
+      20
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      300,
+      54,
+      60,
+      20
+     ],
+     "text": "Tipo"
+    }
+   },
+   {
+    "box": {
+     "id": "m_sndtype",
+     "maxclass": "umenu",
+     "numinlets": 1,
+     "numoutlets": 3,
+     "patching_rect": [
+      480,
+      280,
+      200,
+      22
+     ],
+     "outlettype": [
+      "int",
+      "",
+      ""
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      360,
+      52,
+      190,
+      22
+     ],
+     "items": [],
+     "parameter_enable": 0
+    }
+   },
+   {
+    "box": {
+     "id": "p_sndtype",
      "maxclass": "newobj",
      "numinlets": 1,
      "numoutlets": 1,
      "patching_rect": [
       480,
-      240,
+      310,
+      100,
+      22
+     ],
+     "outlettype": [
+      ""
+     ],
+     "text": "prepend sndtype"
+    }
+   },
+   {
+    "box": {
+     "id": "lbl_sndpick",
+     "maxclass": "comment",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      700,
+      200,
+      60,
+      20
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      300,
+      80,
+      60,
+      20
+     ],
+     "text": "Strumento"
+    }
+   },
+   {
+    "box": {
+     "id": "m_sndpick",
+     "maxclass": "umenu",
+     "numinlets": 1,
+     "numoutlets": 3,
+     "patching_rect": [
+      480,
+      200,
+      200,
+      22
+     ],
+     "outlettype": [
+      "int",
+      "",
+      ""
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      360,
+      78,
+      190,
+      22
+     ],
+     "items": [],
+     "parameter_enable": 0
+    }
+   },
+   {
+    "box": {
+     "id": "p_sndpick",
+     "maxclass": "newobj",
+     "numinlets": 1,
+     "numoutlets": 1,
+     "patching_rect": [
+      480,
+      230,
       100,
       22
      ],
@@ -726,7 +839,7 @@
    },
    {
     "box": {
-     "id": "bprova",
+     "id": "bprev",
      "maxclass": "textbutton",
      "numinlets": 1,
      "numoutlets": 3,
@@ -744,8 +857,72 @@
      "presentation": 1,
      "presentation_rect": [
       300,
+      104,
+      36,
+      24
+     ],
+     "text": "◀",
+     "mode": 0
+    }
+   },
+   {
+    "box": {
+     "id": "bprevt",
+     "maxclass": "newobj",
+     "numinlets": 1,
+     "numoutlets": 1,
+     "patching_rect": [
+      760,
+      50,
+      30,
+      22
+     ],
+     "outlettype": [
+      "bang"
+     ],
+     "text": "t b"
+    }
+   },
+   {
+    "box": {
+     "id": "bprevm",
+     "maxclass": "message",
+     "numinlets": 2,
+     "numoutlets": 1,
+     "patching_rect": [
+      760,
       80,
+      60,
+      22
+     ],
+     "outlettype": [
+      ""
+     ],
+     "text": "prev"
+    }
+   },
+   {
+    "box": {
+     "id": "bprova",
+     "maxclass": "textbutton",
+     "numinlets": 1,
+     "numoutlets": 3,
+     "patching_rect": [
+      850,
+      20,
       80,
+      22
+     ],
+     "outlettype": [
+      "",
+      "",
+      "int"
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      340,
+      104,
+      100,
       24
      ],
      "text": "Prova ▶",
@@ -759,7 +936,7 @@
      "numinlets": 1,
      "numoutlets": 1,
      "patching_rect": [
-      760,
+      850,
       50,
       30,
       22
@@ -777,7 +954,7 @@
      "numinlets": 2,
      "numoutlets": 1,
      "patching_rect": [
-      760,
+      850,
       80,
       60,
       22
@@ -790,71 +967,7 @@
    },
    {
     "box": {
-     "id": "baltri",
-     "maxclass": "textbutton",
-     "numinlets": 1,
-     "numoutlets": 3,
-     "patching_rect": [
-      850,
-      20,
-      80,
-      22
-     ],
-     "outlettype": [
-      "",
-      "",
-      "int"
-     ],
-     "presentation": 1,
-     "presentation_rect": [
-      386,
-      80,
-      80,
-      24
-     ],
-     "text": "Altri",
-     "mode": 0
-    }
-   },
-   {
-    "box": {
-     "id": "baltrit",
-     "maxclass": "newobj",
-     "numinlets": 1,
-     "numoutlets": 1,
-     "patching_rect": [
-      850,
-      50,
-      30,
-      22
-     ],
-     "outlettype": [
-      "bang"
-     ],
-     "text": "t b"
-    }
-   },
-   {
-    "box": {
-     "id": "baltrim",
-     "maxclass": "message",
-     "numinlets": 2,
-     "numoutlets": 1,
-     "patching_rect": [
-      850,
-      80,
-      60,
-      22
-     ],
-     "outlettype": [
-      ""
-     ],
-     "text": "altri"
-    }
-   },
-   {
-    "box": {
-     "id": "bferma",
+     "id": "bnext",
      "maxclass": "textbutton",
      "numinlets": 1,
      "numoutlets": 3,
@@ -871,9 +984,73 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      472,
+      444,
+      104,
+      36,
+      24
+     ],
+     "text": "▶",
+     "mode": 0
+    }
+   },
+   {
+    "box": {
+     "id": "bnextt",
+     "maxclass": "newobj",
+     "numinlets": 1,
+     "numoutlets": 1,
+     "patching_rect": [
+      940,
+      50,
+      30,
+      22
+     ],
+     "outlettype": [
+      "bang"
+     ],
+     "text": "t b"
+    }
+   },
+   {
+    "box": {
+     "id": "bnextm",
+     "maxclass": "message",
+     "numinlets": 2,
+     "numoutlets": 1,
+     "patching_rect": [
+      940,
       80,
-      78,
+      60,
+      22
+     ],
+     "outlettype": [
+      ""
+     ],
+     "text": "next"
+    }
+   },
+   {
+    "box": {
+     "id": "bferma",
+     "maxclass": "textbutton",
+     "numinlets": 1,
+     "numoutlets": 3,
+     "patching_rect": [
+      1030,
+      20,
+      80,
+      22
+     ],
+     "outlettype": [
+      "",
+      "",
+      "int"
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      484,
+      104,
+      66,
       24
      ],
      "text": "Stop",
@@ -887,7 +1064,7 @@
      "numinlets": 1,
      "numoutlets": 1,
      "patching_rect": [
-      940,
+      1030,
       50,
       30,
       22
@@ -905,7 +1082,7 @@
      "numinlets": 2,
      "numoutlets": 1,
      "patching_rect": [
-      940,
+      1030,
       80,
       60,
       22
@@ -931,12 +1108,12 @@
      "presentation": 1,
      "presentation_rect": [
       300,
-      110,
+      132,
       250,
-      50
+      34
      ],
-     "linecount": 3,
-     "text": "Prova carica lo strumento sulla traccia e suona la clip in loop. Altri: nuove proposte dalla libreria di Live."
+     "linecount": 2,
+     "text": "Scegli uno strumento o usa ◀ ▶: si carica sulla traccia e la clip suona in loop."
     }
    },
    {
@@ -1259,7 +1436,7 @@
       4
      ],
      "destination": [
-      "sndtracks",
+      "m_sndtrack",
       0
      ]
     }
@@ -1267,11 +1444,11 @@
    {
     "patchline": {
      "source": [
-      "sndtracks",
+      "m_sndtrack",
       0
      ],
      "destination": [
-      "psndt",
+      "p_sndtrack",
       0
      ]
     }
@@ -1279,7 +1456,43 @@
    {
     "patchline": {
      "source": [
-      "psndt",
+      "p_sndtrack",
+      0
+     ],
+     "destination": [
+      "js",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "js",
+      6
+     ],
+     "destination": [
+      "m_sndtype",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "m_sndtype",
+      0
+     ],
+     "destination": [
+      "p_sndtype",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "p_sndtype",
       0
      ],
      "destination": [
@@ -1295,7 +1508,7 @@
       5
      ],
      "destination": [
-      "snditems",
+      "m_sndpick",
       0
      ]
     }
@@ -1303,11 +1516,11 @@
    {
     "patchline": {
      "source": [
-      "snditems",
+      "m_sndpick",
       0
      ],
      "destination": [
-      "psndp",
+      "p_sndpick",
       0
      ]
     }
@@ -1315,7 +1528,43 @@
    {
     "patchline": {
      "source": [
-      "psndp",
+      "p_sndpick",
+      0
+     ],
+     "destination": [
+      "js",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "bprev",
+      0
+     ],
+     "destination": [
+      "bprevt",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "bprevt",
+      0
+     ],
+     "destination": [
+      "bprevm",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "bprevm",
       0
      ],
      "destination": [
@@ -1363,11 +1612,11 @@
    {
     "patchline": {
      "source": [
-      "baltri",
+      "bnext",
       0
      ],
      "destination": [
-      "baltrit",
+      "bnextt",
       0
      ]
     }
@@ -1375,11 +1624,11 @@
    {
     "patchline": {
      "source": [
-      "baltrit",
+      "bnextt",
       0
      ],
      "destination": [
-      "baltrim",
+      "bnextm",
       0
      ]
     }
@@ -1387,7 +1636,7 @@
    {
     "patchline": {
      "source": [
-      "baltrim",
+      "bnextm",
       0
      ],
      "destination": [

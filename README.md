@@ -229,23 +229,21 @@ Uso, con l'app ClusterSound aperta:
   esistenti.
 - Senza la Remote Script le clip vengono create comunque, e il device indica il rack da trascinare dal browser.
 
-**Suoni da provare** (colonna destra del device):
+**Strumenti di Live da provare** (colonna destra del device):
 
-- Dopo un import, *Traccia* elenca le tracce create. Per quella scelta il device propone 6 strumenti presi dalla
-  libreria di Live e dai pack installati:
-  - per il basso, i preset *Bass* di Sounds;
-  - per gli accordi, *Piano & Keys*, *Pad*, *Synth Keys*, *Strings* e *Mallets*;
-  - per la batteria, i kit di Drums.
-- Per la traccia *Drums* di un pattern o di una sequenza c'è anche una voce per ogni bus che suona (*Drums ›
-  Kick*, *› Snare*, *› Closed Hat*…). Le sue proposte sono colpi singoli presi dai Drums di Live, cioè sample
-  e preset di Simpler. *Prova* li carica solo sul pad di quel bus nel Drum Rack, mentre la sequenza suona.
-- **Prova ▶** carica lo strumento sulla traccia e fa partire la clip importata in loop. Lo strumento che lasci
-  caricato è la tua scelta.
+- **Traccia**: le tracce dell'ultimo import. Per la traccia *Drums* di un pattern o di una sequenza c'è anche
+  una voce per ogni bus che suona (*Drums › Kick*, *› Snare*…), e quello che scegli va solo sul pad di quel bus.
+- **Tipo**: tutte le categorie di Sounds della libreria di Live, compresi i preset dei pack installati (Bass,
+  Brass, Guitar & Plucked, Mallets, Pad, Piano & Keys, Strings, Synth Keys, Synth Lead, Voices, Winds…). Poi i
+  *Kit di batteria*, i *Preset di* ogni strumento (Operator, Wavetable, Analog, Sampler…) e, per i bus, i *Colpi*
+  di quel bus.
+- **Strumento**: tutti i preset del tipo, in ordine alfabetico, 60 alla volta (*… altri N* carica i
+  successivi).
+- Scegliere uno strumento, o passare al precedente o al successivo con **◀ ▶**, lo carica sulla traccia e fa
+  partire la clip importata in loop. **Prova ▶** ricarica quello selezionato, **Stop** ferma la traccia.
 - **★ Sample ClusterSound** (o *Kit ClusterSound* per i bus) rimette i sample dell'app.
-- **Altri** propone 6 strumenti nuovi, **Stop** ferma la traccia.
-- Le tracce che arrivano senza strumento ricevono subito la prima proposta, così ogni import suona già. Sono
-  le progressioni, le sequenze senza sample e i rack che non si sono caricati.
-- Le tracce con i sample dell'app li tengono, ma puoi provare comunque altri suoni.
+- Le tracce che arrivano senza strumento ricevono subito il primo preset del loro tipo: *Piano & Keys* per gli
+  accordi, *Bass* per il basso, un kit per la batteria. Così ogni import suona già.
 
 Se un rack o uno strumento non si carica, il motivo è nello stato del device e in `Log.txt` di Live
 (`~/Library/Preferences/Ableton/Live 10.x/Log.txt`, righe `ClusterSoundBridge`), dove la Remote Script registra
