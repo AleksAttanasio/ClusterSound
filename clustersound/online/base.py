@@ -74,6 +74,7 @@ LICENSES = {
     "by-nc-sa": {"label": "CC BY-NC-SA", "commercial": False},
     "by-nc-nd": {"label": "CC BY-NC-ND", "commercial": False},
     "sampling+": {"label": "Sampling+", "commercial": False},
+    "rf": {"label": "Royalty-free", "commercial": True},  # site licence (curated packs), not CC
     "unknown": {"label": "Non dichiarata", "commercial": False},
 }
 # filter groups shown in the UI

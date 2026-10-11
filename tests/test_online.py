@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from clustersound.online import archive, ccmixter, downloads, freesound, openverse
+from clustersound.online import archive, catalog, ccmixter, downloads, freesound, openverse
 from clustersound.online import instruments as inst
 from clustersound.online import search as S
 from clustersound.online.base import OnlineResult, SourceError, normalize_license
@@ -209,6 +209,21 @@ def test_client_filters():
     assert not S.passes(r(suspect=True), {})
     assert S.passes(r(suspect=True), {"include_suspect": True})
     assert not S.passes(r(is_pack=True), {"packs": "files"})
+
+
+# ---------------------------------------------------------------- catalogue
+def test_catalog():
+    from clustersound.online.base import LICENSES
+    from clustersound.taxonomy import CLASSES
+    ids = {p["id"] for p in catalog.PROVIDERS}
+    assert {k for k, p in ((p["id"], p) for p in catalog.PROVIDERS) if p["kind"] == "api"} == set(S.SOURCES)
+    class_ids = {c.id for c in CLASSES}
+    for c in catalog.curated():
+        assert c["provider"] in ids and c["url"].startswith("https://")
+        assert LICENSES[c["license"]]["commercial"], c["id"]  # the showcase only lists royalty-free packs
+        assert set(c["instruments"]) <= class_ids, c["id"]
+    for p in catalog.providers():
+        assert p["logo"] is None or (Path(catalog.LOGO_DIR).parent.parent / p["logo"]).exists()
 
 
 # ---------------------------------------------------------------- downloads
