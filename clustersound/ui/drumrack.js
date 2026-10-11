@@ -2,6 +2,7 @@
 // sample plus similar ones; exported as an Ableton Drum Rack.
 import { refKey } from './sequencer.js';
 import { toast, suggestBus, showPopover } from './sendmenu.js';
+import { sendToLive } from './live.js';
 import { NO_ALT, dynControls, wireDynControls, readDynControls } from './pattern.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -125,6 +126,7 @@ export class DrumRackEditor {
           <button class="btn" id="rk-clear" title="Svuota tutti i pad">Svuota</button>
           <button class="btn" id="rk-toseq" title="Carica i sample del kit nei bus del Sequencer">→ Sequencer</button>
           <button class="btn primary" id="rk-export">Esporta per Ableton</button>
+          <button class="btn" id="rk-live" title="Crea in Live una traccia con questo Drum Rack (serve il device ClusterSound nel set)">Invia a Live</button>
         </div>
         <div class="rk-stage">
           <div id="rk-grid" class="rk-grid"></div>
@@ -159,6 +161,7 @@ export class DrumRackEditor {
     $('#rk-del').onclick = () => this.deleteSaved();
     $('#rk-saved').onchange = (e) => this.loadSaved(e.target.value);
     $('#rk-export').onclick = () => this.exportRack();
+    $('#rk-live').onclick = () => this.sendRackToLive();
 
     // browser
     let qTimer = 0;
@@ -711,6 +714,11 @@ export class DrumRackEditor {
     this.meta.saved = await this.api.list_racks();
     this._persist();
     this.renderSaved();
+  }
+
+  async sendRackToLive() {
+    if (!this.rack.pads.some(Boolean)) { toast('Il kit è vuoto'); return; }
+    await sendToLive(this.api, 'rack', this.rack);
   }
 
   async exportRack() {

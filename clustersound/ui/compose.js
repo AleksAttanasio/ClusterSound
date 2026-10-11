@@ -4,6 +4,7 @@
 // generate variations of either, play it together with the Sequencer pattern and export a .mid for Ableton.
 // Every note heard here comes from compose_render (Python), so preview and export are the same events.
 import { toast, showPopover } from './sendmenu.js';
+import { sendToLive } from './live.js';
 import { velGain } from './sequencer.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -1698,13 +1699,23 @@ export class ComposeEditor {
       ${many ? `<button class="btn" data-all>Tutte le versioni (${p.order.join(', ')}) con ${esc(this.mode.name)} → cartella</button>` : ''}
       ${manyModes ? `<button class="btn" data-modes>Versione ${p.active} con tutte le modalità → cartella</button>` : ''}
       <label class="cp-own"><input type="checkbox" data-pure ${this.ui.pure ? 'checked' : ''}> solo accordi (senza ritmica, strum, arpeggi e humanize)</label>
-      <div class="hint">In Ableton: trascina il file su una traccia MIDI. Il tempo del file è ${p.bpm} BPM.</div>`);
+      <button class="btn" data-live>Versione ${p.active} → Live</button>
+      ${many ? `<button class="btn" data-live-all>Tutte le versioni → Live (una clip ciascuna)</button>` : ''}
+      <div class="hint">In Ableton: trascina il file su una traccia MIDI. Il tempo del file è ${p.bpm} BPM. «→ Live» crea la traccia con le clip tramite il device ClusterSound.</div>`);
     pop.querySelector('[data-pure]').onchange = (e) => { this.ui.pure = e.target.checked; this._persist(); };
     pop.querySelector('[data-one]').onclick = async () => {
       pop.close();
       const r = await this.api.compose_export_midi({ ...this.playSeq, name: label(p.active, p.modeActive) }, this.ui.pure);
       if (r) toast(`MIDI salvato: ${r.split('/').pop()}`);
     };
+    pop.querySelector('[data-live]').onclick = () => {
+      pop.close();
+      sendToLive(this.api, 'compose', { ...this.playSeq, name: label(p.active, p.modeActive) }, { pure: this.ui.pure });
+    };
+    pop.querySelector('[data-live-all]')?.addEventListener('click', () => {
+      pop.close();
+      sendToLive(this.api, 'compose', clone(p), { pure: this.ui.pure });
+    });
     const many_ = async (seqs) => {
       pop.close();
       const r = await this.api.compose_export_versions(seqs, this.ui.pure);

@@ -1,6 +1,7 @@
 // Sequence panel of the Pattern screen: chain patterns (any genre) into a full arrangement.
 // The kit (samples, layers, mix) is the one of the pattern editor; every block stores only its groove.
 import { toast } from './sendmenu.js';
+import { sendToLive } from './live.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -67,6 +68,7 @@ export class Arranger {
         <button class="btn" data-a="exp-midi">MIDI</button>
         <button class="btn" data-a="exp-wav">WAV</button>
         <button class="btn primary" data-a="exp-abl">Ableton</button>
+        <button class="btn" data-a="exp-live" title="Crea in Live le tracce della sequenza (serve il device ClusterSound nel set)">Live</button>
       </div>
       <div class="sq-body">
         <div id="sq-track" class="sq-track"></div>
@@ -285,6 +287,8 @@ export class Arranger {
       toast('Rendering della sequenza…');
       const p = await this.api.export_wav(flat);
       if (p) toast(`WAV salvato: ${p.split('/').pop()}`);
+    } else if (kind === 'live') {
+      await sendToLive(this.api, 'sequence', flat);
     } else {
       toast('Preparazione pacchetto Ableton…');
       const r = await this.api.export_ableton(flat);
@@ -390,6 +394,7 @@ export class Arranger {
       case 'exp-midi': this._export('midi'); return;
       case 'exp-wav': this._export('wav'); return;
       case 'exp-abl': this._export('abl'); return;
+      case 'exp-live': this._export('live'); return;
       default: return;
     }
     e.stopPropagation();
