@@ -41,7 +41,7 @@ export class Player {
     src.buffer = buffer;
     src.connect(ctx.destination);
     src.onended = () => {
-      if (this.src === src) { this.src = null; this.playing = false; this._emit(false); }
+      if (this.src === src) { this.src = null; this.playing = false; this._emit(false, true); }
     };
     src.start(0, Math.min(offset, buffer.duration));
     this.src = src;
@@ -52,9 +52,9 @@ export class Player {
     this._emit(true);
   }
 
-  // listeners get (playing, id); several views share one player
+  // listeners get (playing, id, ended): ended = the sound reached its end (not stopped)
   subscribe(fn) { this.listeners.add(fn); }
-  _emit(playing) { for (const fn of this.listeners) fn(playing, this.id); }
+  _emit(playing, ended = false) { for (const fn of this.listeners) fn(playing, this.id, ended); }
 
   stop(notify = true) {
     if (this.src) {

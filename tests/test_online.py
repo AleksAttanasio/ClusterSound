@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from clustersound.online import archive, ccmixter, downloads, freesound, openverse
+from clustersound.online import archive, catalog, ccmixter, downloads, freesound, openverse
 from clustersound.online import instruments as inst
 from clustersound.online import search as S
 from clustersound.online.base import OnlineResult, SourceError, normalize_license
@@ -70,6 +70,19 @@ def test_infer_instrument(title, tags, path, expected):
     assert inst.infer(title, tags, path) == expected
 
 
+def test_infer_is_deterministic():
+    """Ties between classes must not depend on PYTHONHASHSEED (it changed results between runs)."""
+    import subprocess
+    import sys
+    code = ("from clustersound.online import instruments as inst;"
+            "print(inst.infer('Express Yourself', ['arp', 'bass', 'beat', 'clap', 'cymbals', 'dance']),"
+            " inst.infer('SDR-204.wav', ['16bit', 'pcm', 'drumkit', 'drums', 'hertz', 'kick']))")
+    root = Path(__file__).parent.parent
+    outs = {subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=root,
+                           env={**os.environ, "PYTHONHASHSEED": str(seed)}).stdout for seed in (1, 2, 3)}
+    assert len(outs) == 1 and outs.pop().split() == ["synth", "kick"]
+
+
 def test_name_metadata():
     assert inst.bpm_from_text("Drum Loop 128bpm") == 128
     assert inst.bpm_from_text("BPM 90 groove") == 90
@@ -105,6 +118,35 @@ def test_freesound_filters():
     assert "duration:[* TO 2]" in f["filter"] and "bpm:[120 TO *]" in f["filter"]
     assert 'tonality:"C minor"' in f["filter"] and "single_event:true" in f["filter"]
     assert "type:(wav OR aiff OR flac)" in f["filter"] and f["sort"] == "downloads_desc"
+
+
+def test_freesound_packs(monkeypatch):
+    calls = []
+
+    def fake_get(url, params=None, headers=None, as_json=True, ttl=None):
+        calls.append((url, params))
+        return load("freesound_packs_grouped.json")
+
+    monkeypatch.setattr(freesound, "http_get", fake_get)
+    cards, total, more = freesound.packs({"q": "kick", "commercial": True, "sort": "downloads"}, 1,
+                                         {"freesound_key": "k"})
+    assert len(calls) == 1  # names come with the search: no request per pack
+    params = calls[0][1]
+    assert params["group_by_pack"] == 1 and params["sort"] == "downloads_desc"
+    assert params["filter"].endswith(" pack:*") and "license:" in params["filter"]
+    assert [c.uid for c in cards] == ["freesound:pack:41", "freesound:pack:77"]  # the loose sound is skipped
+    c = cards[0]
+    assert c.is_pack and c.title == "808 Kicks Vol. 1" and c.author == "beatsmith"
+    assert c.license == "cc0" and c.waveform_img and c.preview_url.endswith("-hq.mp3")
+    assert c.extra["matching"] == 8
+    assert c.page_url == "https://freesound.org/people/beatsmith/packs/41/"
+    whole, _, _ = freesound.packs({}, 1, {"freesound_key": "k"})
+    assert calls[-1][1]["filter"] == "pack:*"
+    assert whole[0].extra["num_sounds"] == 8 and "matching" not in whole[0].extra  # no query: whole pack
+    sound = freesound.parse(load("freesound_packs_grouped.json"))[0]
+    assert sound.extra["pack_id"] == "41" and sound.extra["pack_title"] == "808 Kicks Vol. 1"
+    with pytest.raises(SourceError, match="API key"):
+        freesound.packs({}, 1, {})
 
 
 def test_parse_openverse():
@@ -185,6 +227,55 @@ def test_client_filters():
     assert not S.passes(r(suspect=True), {})
     assert S.passes(r(suspect=True), {"include_suspect": True})
     assert not S.passes(r(is_pack=True), {"packs": "files"})
+
+
+def test_store_pack_page_and_download(monkeypatch):
+    def fake_get(url, params=None, headers=None, as_json=True, ttl=None):
+        if url.endswith("/sounds/"):
+            return dict(load("freesound_kick.json"), next=None)
+        if "/users/" in url:
+            return {"results": [load("freesound_pack.json"), dict(load("freesound_pack.json"), id=99, name="Other")]}
+        if "/packs/" in url:
+            return dict(load("freesound_pack.json"), id=int(url.rstrip("/").rsplit("/", 1)[-1]))
+        return load("freesound_packs_grouped.json")
+
+    monkeypatch.setattr(freesound, "http_get", fake_get)
+    settings = {"freesound_key": "k"}
+    res = S.search_source("freesound", {"q": "kick"}, 1, settings, packs=True)
+    assert res["error"] is None and [r["uid"] for r in res["results"]] == ["freesound:pack:41", "freesound:pack:77"]
+    assert res["results"][0]["info"]["matching"] == 8
+    page = S.pack("freesound:pack:41", 1, settings)
+    assert page["error"] is None and page["pack"]["title"] == "808 Kicks Vol. 1"
+    assert page["pack"]["info"]["matching"] == 8 and page["pack"]["info"]["description"]
+    assert len(page["files"]) == 2 and page["files"][0]["info"]["pack_title"] == "808 Kicks Vol. 1"
+    assert [o["uid"] for o in page["others"]] == ["freesound:pack:99"]  # the open pack is left out
+    files = S.pack_files("freesound:pack:41", settings)
+    assert len(files) == 2 and S.get(files[0].uid) is files[0]
+    root = "/tmp/dl"
+    assert os.path.join("Freesound", "808 Kicks Vol. 1") in downloads.target_path(root, files[0], files[0].download_url)
+
+
+def test_featured_without_key(monkeypatch):
+    monkeypatch.setattr(archive, "search", lambda p, page, s: ([], 0, False))
+    monkeypatch.setattr(openverse, "search", lambda p, page, s: ([], 0, False))
+    home = S.featured({})
+    assert home["freesound_packs"]["needs_key"] and home["archive_packs"]["error"] is None
+    assert home["cc0_new"]["source"] == "openverse"
+
+
+# ---------------------------------------------------------------- catalogue
+def test_catalog():
+    from clustersound.online.base import LICENSES
+    from clustersound.taxonomy import CLASSES
+    ids = {p["id"] for p in catalog.PROVIDERS}
+    assert {k for k, p in ((p["id"], p) for p in catalog.PROVIDERS) if p["kind"] == "api"} == set(S.SOURCES)
+    class_ids = {c.id for c in CLASSES}
+    for c in catalog.curated():
+        assert c["provider"] in ids and c["url"].startswith("https://")
+        assert LICENSES[c["license"]]["commercial"], c["id"]  # the showcase only lists royalty-free packs
+        assert set(c["instruments"]) <= class_ids, c["id"]
+    for p in catalog.providers():
+        assert p["logo"] is None or (Path(catalog.LOGO_DIR).parent.parent / p["logo"]).exists()
 
 
 # ---------------------------------------------------------------- downloads

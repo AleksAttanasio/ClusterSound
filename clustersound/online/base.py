@@ -59,8 +59,13 @@ class OnlineResult:
         d = asdict(self)
         d["commercial_ok"] = self.commercial_ok
         d["license_label"] = LICENSES.get(self.license, LICENSES["unknown"])["label"]
-        d.pop("extra", None)
+        extra = d.pop("extra", None) or {}
+        d["info"] = {k: extra[k] for k in INFO_KEYS if extra.get(k) is not None}
         return d
+
+
+# extra fields the UI shows (store cards and pack pages)
+INFO_KEYS = ("pack_id", "pack_title", "num_sounds", "downloads", "rating", "description", "matching", "created")
 
 
 # commercial = usable in a commercial production as a sample (no NC, no ND).
@@ -74,6 +79,7 @@ LICENSES = {
     "by-nc-sa": {"label": "CC BY-NC-SA", "commercial": False},
     "by-nc-nd": {"label": "CC BY-NC-ND", "commercial": False},
     "sampling+": {"label": "Sampling+", "commercial": False},
+    "rf": {"label": "Royalty-free", "commercial": True},  # site licence (curated packs), not CC
     "unknown": {"label": "Non dichiarata", "commercial": False},
 }
 # filter groups shown in the UI
@@ -148,7 +154,9 @@ def http_get(url: str, params: dict | None = None, headers: dict | None = None,
         raise SourceError(f"errore HTTP {e.code}") from e
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         raise SourceError(f"non raggiungibile ({getattr(e, 'reason', e)})") from e
-    data = json.loads(body) if as_json else body.decode("utf-8", "replace")
+    # some sources (ccMixter) mix in latin-1 bytes: never let one bad character drop a whole page
+    text = body.decode("utf-8", "replace")
+    data = json.loads(text) if as_json else text
     with _cache_lock:
         if len(_cache) > 500:
             _cache.clear()
