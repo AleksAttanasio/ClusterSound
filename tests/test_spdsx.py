@@ -1,3 +1,6 @@
+import threading
+
+import numpy as np
 import pytest
 
 from clustersound.racks import layouts, spdsx
@@ -92,3 +95,75 @@ def test_allowed_families():
     assert "snareclap" not in toms       # 6 snares
     t1 = allowed[keys.index("t1")]
     assert "kick" in t1 and "808" in t1
+
+
+# ---------------------------------------------------------------- API
+class _FakeLib:
+    """Library stub: every class used by the SPD-SX families, two sub-clusters each, 6 one-shots per sub."""
+
+    CLASSES = ["kick", "sub808", "snare", "clap", "snap", "rimshot", "closed_hat", "open_hat", "ride", "crash",
+               "tom", "shaker", "tambourine", "perc_other", "cowbell", "hand_drum", "woodblock", "impact"]
+
+    def __init__(self):
+        rng = np.random.default_rng(0)
+        self.items, rows = [], []
+        for c, cls in enumerate(self.CLASSES):
+            for sub in (1, 2):
+                centre = rng.normal(size=16)
+                for k in range(6):
+                    i = len(self.items)
+                    self.items.append({"id": i, "path": f"/lib/{cls}{sub}_{k}.wav", "rel": f"{cls}/{cls}{sub}_{k}.wav",
+                                       "name": f"{cls}{sub}_{k}.wav", "cls": cls, "sub": sub, "conf": 0.9,
+                                       "feats": {"type": "One-shot", "decay20": 0.1 + k / 50}, "info": {"duration": 0.3}})
+                    rows.append(centre + 0.3 * rng.normal(size=16))
+        self.emb = np.array(rows, np.float32)
+        self.version = 1
+
+
+@pytest.fixture()
+def api():
+    from clustersound.api import Api
+    a = object.__new__(Api)
+    a._lib = _FakeLib()
+    a._rack_cache = {}
+    a._rack_lock = threading.Lock()
+    return a
+
+
+def _sub(ref):
+    return ref["cls"], ref["path"].rsplit("/", 1)[1][len(ref["cls"])]
+
+
+@pytest.mark.parametrize("triggers", TRIGGERS)
+def test_rack_generate(api, triggers):
+    for seed in range(10):
+        r = api.rack_generate(_rack(triggers=triggers), {"rng_seed": seed})
+        assert r["device"] == "spdsx" and r["geometry"] in spdsx.GEOMETRIES
+        assert spdsx.playability(r) == []
+        active = spdsx.active_pads(r)
+        assert all(r["pads"][p] for p in active)
+        ids = [r["pads"][p]["id"] for p in active]
+        assert len(ids) == len(set(ids))
+        if triggers["trig1"]:
+            assert r["pads"][spdsx.TRIG1]["cls"] == "kick"
+        # every pad group is seeded from its own sample group (class + sub-cluster)
+        seeds = [_sub(r["pads"][pads[0]]) for pads in layouts.groups_of(r)]
+        assert len(seeds) == len(set(seeds))
+
+
+def test_rack_generate_keeps_config_with_locked_group(api):
+    r = _rack("spd_cols", groups={"spd_cols:1": {"lock": True}})
+    out = api.rack_generate(r, {"rng_seed": 1})
+    assert out["geometry"] == "spd_cols" and not any(out["pads"][p] for p in spdsx.groups("spd_cols")[1])
+
+
+def test_rack_check(api):
+    chk = api.rack_check(_rack())
+    assert chk["warnings"] == [] and len(chk["allowed"]) == len(spdsx.groups("spd_kit"))
+    assert api.rack_check(layouts.new_rack()) == {"warnings": [], "allowed": None}
+
+
+def test_autofill_spd(api):
+    r = api.rack_autofill(_rack("spd_rows", {"trig1": True, "trig2": True}))
+    assert all(r["pads"][p] for p in range(spdsx.PADS))
+    assert r["pads"][spdsx.TRIG1]["cls"] == "kick" and r["pads"][spdsx.TRIG2]["cls"] in ("ride", "crash")
