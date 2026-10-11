@@ -28,6 +28,7 @@ from .patterns import render as pat_render
 from .patterns import store as pat_store
 from .paths import data_dir
 from .racks import ableton as rack_ableton
+from .racks import dynamics_match
 from .racks import layouts as rack_layouts
 from .racks import select as rack_select
 from .racks import store as rack_store
@@ -62,6 +63,7 @@ class Api:
         self._downloader = Downloader()
         self._protected: dict[str, list[str]] = {}  # owner (pattern, rack) -> cached online files in use
         self._rack_cache: dict = {}
+        self._rack_lock = threading.Lock()  # js_api calls run on several threads
         threading.Thread(target=online_cache.prune, args=(self._cache_mb(),), daemon=True).start()
 
     # pywebview exposes public attributes too, so keep internals underscored
@@ -304,9 +306,7 @@ class Api:
     def pattern_build(self, genre_id: str, variant: int) -> dict:
         return pat_genres.build(genre_id, int(variant))
 
-    def pattern_candidates(self, bus_id: str, query: str = "", limit: int = 200, strict: bool = False) -> list[dict]:
-        """Library samples for a bus: its classes first (by confidence), then the rest if searching.
-        strict (auto-fill): never a loop, and drum buses only take one-shots."""
+    def _bus_selection(self, bus_id: str, query: str = "", strict: bool = False) -> tuple[list[dict], list[str]]:
         classes = pat_model.BUS_BY_ID[bus_id][2] if bus_id in pat_model.BUS_BY_ID else []
         q = (query or "").lower().strip()
         rank = {c: i for i, c in enumerate(classes)}
@@ -314,7 +314,38 @@ class Api:
         if strict:
             ok = {"One-shot"} if bus_id != "bass" else {"One-shot", "Long/Texture"}
             sel = [it for it in sel if it["feats"].get("type") in ok and not classifier.name_scores(it["rel"])[1]]
-        return [self._library_ref_of(it) for it in self._ranked(sel, classes)[: int(limit)]]
+        return sel, classes
+
+    def _dyn_scores(self, ref_ids) -> np.ndarray | None:
+        """Envelope similarity of every library item to the mean of ref_ids (None without a reference)."""
+        if not ref_ids or not self._lib.items:
+            return None
+        D = self._rack_arrays()["dyn"]
+        ref = dynamics_match.reference(D, ref_ids)
+        return None if ref is None else dynamics_match.scores(D, ref)
+
+    def pattern_candidates(self, bus_id: str, query: str = "", limit: int = 200, strict: bool = False,
+                           ref_ids: list | None = None) -> list[dict]:
+        """Library samples for a bus: its classes first (by confidence), then the rest if searching.
+        strict (auto-fill): never a loop, and drum buses only take one-shots. With ref_ids (samples on the
+        other buses) every ref also gets "dyn": how close its envelope is to theirs."""
+        sel, classes = self._bus_selection(bus_id, query, strict)
+        sc = self._dyn_scores(ref_ids)
+        out = [self._library_ref_of(it) for it in self._ranked(sel, classes)[: int(limit)]]
+        if sc is not None:
+            for r in out:
+                r["dyn"] = round(float(sc[r["id"]]), 3)
+        return out
+
+    def dynamic_suggestions(self, bus_id: str, ref_ids: list, k: int = 8) -> list[dict]:
+        """The bus's samples whose envelope best matches the samples on the other buses."""
+        sc = self._dyn_scores(ref_ids)
+        if sc is None:
+            return []
+        exclude = {int(i) for i in ref_ids}
+        sel = [it for it in self._bus_selection(bus_id, "", True)[0] if it["id"] not in exclude]
+        sel.sort(key=lambda it: -sc[it["id"]])
+        return [self._library_ref_of(it) | {"dyn": round(float(sc[it["id"]]), 3)} for it in sel[: int(k)]]
 
     @staticmethod
     def _ranked(sel: list[dict], classes: list[str]) -> list[dict]:
@@ -468,6 +499,10 @@ class Api:
 
     def _rack_arrays(self) -> dict:
         """Normalised embeddings and per-item class / type arrays, rebuilt when the library changes."""
+        with self._rack_lock:
+            return self._rack_arrays_locked()
+
+    def _rack_arrays_locked(self) -> dict:
         lib = self._lib
         c = self._rack_cache
         if c.get("emb") is not lib.emb:
@@ -479,6 +514,7 @@ class Api:
             c["cls"] = np.array([it["cls"] for it in lib.items], dtype=object)
             c["oneshot"] = np.array([it["feats"].get("type") == "One-shot" for it in lib.items], bool)
             c["group"] = np.array([f'{it["cls"]}:{it.get("sub", 0)}' for it in lib.items], dtype=object)
+            c["dyn"] = dynamics_match.dyn_matrix([it["feats"] for it in lib.items], c["cls"])
         return c
 
     def _rack_mask(self, seed: int | None, opts: dict) -> np.ndarray | None:
@@ -580,11 +616,16 @@ class Api:
         if folder:
             mask &= np.array([folder in it["rel"].lower() for it in self._lib.items], bool)
         mask[[int(i) for i in opts.get("exclude") or [] if 0 <= int(i) < len(mask)]] = False
+        margin = opts.get("dyn_margin")
+        if margin is not None and float(margin) < 1:
+            ref = dynamics_match.reference(a["dyn"], opts.get("dyn_ref"))
+            mask = dynamics_match.margin_mask(a["dyn"], ref, mask, float(margin))
         return mask
 
     def random_refs(self, classes: list[str], count: int, opts: dict | None = None) -> list[dict]:
         """Random samples of the given classes: a random sample group (class + sub-cluster), a random
-        seed in it and similar companions. opts: oneshot, folder (path substring), exclude, variation."""
+        seed in it and similar companions. opts: oneshot, folder (path substring), exclude, variation, and
+        dyn_ref + dyn_margin (keep only the dyn_margin fraction whose envelope is closest to dyn_ref's)."""
         opts = opts or {}
         if not self._lib.items:
             return []
@@ -594,7 +635,8 @@ class Api:
         return self._rack_refs(picks)
 
     def rack_randomize(self, rack: dict, only_empty: bool = False, opts: dict | None = None) -> dict:
-        """Every unlocked (or every empty) group: random samples from a random group of its family."""
+        """Every unlocked (or every empty) group: random samples from a random group of its family.
+        With opts["dyn_margin"] each group's envelopes stay close to the groups kept or generated before it."""
         opts = dict(opts or {})
         rack = rack_layouts.validate(rack)
         settings = rack_layouts.group_settings(rack)
@@ -605,7 +647,7 @@ class Api:
             if settings[g]["lock"] or (only_empty and any(rack["pads"][p] for p in pads)):
                 continue
             refs = self.random_refs(rack_layouts.family_classes(settings[g]["family"]), len(pads),
-                                    {**opts, "exclude": list(used)})
+                                    {**opts, "exclude": list(used), "dyn_ref": list(used)})
             for p, ref in zip(pads, refs + [None] * len(pads)):
                 rack["pads"][p] = ref
             used |= {r["id"] for r in refs}
