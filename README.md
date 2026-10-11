@@ -119,7 +119,7 @@ La terza scheda (**Libreria | Online | Sequencer | Drum Rack**) è un sequencer 
 
   Verificato con Ableton Live 10.1: i preset si aprono con i sample al loro posto.
 
-## Scheda Drum Rack: kit a 64 pad per Launchpad Pro
+## Scheda Drum Rack: kit per Launchpad Pro (64 pad) e Roland SPD-SX
 
 La quarta scheda costruisce un Drum Rack 8×8 pensato per un controller come il Novation Launchpad Pro MK3.
 
@@ -145,6 +145,34 @@ La quarta scheda costruisce un Drum Rack 8×8 pensato per un controller come il 
   - se *sovrascrivere* i bus scelti, *aggiungere* ai layer esistenti o *svuotare anche gli altri bus*;
   - per ogni bus, come alternare i sample. Il default è *casuale*, tranne per kick, FX e basso, dove suona solo il primo sample e gli altri entrano muti.
 - **Esporta per Ableton**: una cartella con `Samples/<gruppo>/<nota> - <nome>.wav`, `… Drum Rack.adg` (un pad per tasto, con la nota del Launchpad e i choke group), i `.license.txt` dei sample online e `LEGGIMI.txt` con la mappa 8×8 dei pad.
+
+### Kit per Roland SPD-SX
+
+Il menu in alto a sinistra della barra sceglie lo strumento: **Controller 8×8 (Launchpad)** o **Roland SPD-SX**. Ogni strumento ha il suo kit, quindi passare dall'uno all'altro non tocca l'altro kit.
+
+- **Pad**: sono disegnati come sullo strumento. In alto la riga stretta dei pad 1–3, sotto i pad 4–6 e 7–9. Più sotto ci sono gli ingressi **Pedale (Trig 1)** e **Trig 2**, che si attivano e disattivano con la loro spunta.
+  - Il pedale prende un kick di default.
+  - Senza pedale, il kick passa sul pad 8 (in basso al centro).
+- **Note MIDI**: quelle di fabbrica della SPD-SX. Pad 1–9 = 60–68 (C3–G#3 in Live), Trig 1 = 69, Trig 2 = 70.
+- **Configurazioni**: dicono quali pad formano un gruppo di sample simili e di che famiglia.
+  - *Kit classico*: hat e piatti in alto, snare e clap al centro (snare sul pad 5), tom in basso;
+  - *Righe*;
+  - *Colonne*;
+  - *Croce*: snare al centro, percussioni a croce, hat agli angoli;
+  - *Percussioni*;
+  - *Libero*.
+- **Suonabilità**: al massimo 2 kick (pedale + 1 pad), 3 snare/clap e 5 tra hat e piatti.
+  - Nel menu *Famiglia* le scelte che supererebbero questi limiti sono disattivate.
+  - Se il kit li supera, per esempio in *Libero* o con sample trascinati, sotto i pad compare un avviso.
+- **🎲 Genera kit**: sceglie una configurazione suonabile a caso, con varianti di famiglia dello stesso ruolo (snare / clap, hat / hat + piatti, perc / shaker / tom…).
+  - Riempie ogni gruppo con sample simili tra loro, presi da un gruppo di suoni (classe + sotto-cluster) che nessun altro gruppo usa. Così il kick del pedale e un eventuale kick su un pad, o due righe di hat, suonano diversi.
+  - Si può mantenere la configurazione attuale; resta invariata anche se un gruppo è bloccato (🔒).
+  - Come per *🎲 Casuale*, si può limitare a una cartella o pack, tenere solo i one-shot e far combaciare le dinamiche.
+  - *Auto-riempi*, *🎲 Casuale*, *→ Sequencer* e *Invia a Live* funzionano come per l'8×8.
+- **Esporta (Live + SPD-SX)**: crea una cartella con:
+  - `… SPD-SX Drum Rack.adg` sulle note della SPD-SX, per suonare Live con la SPD-SX via USB MIDI;
+  - `SPD-SX/` con i WAV a 16 bit / 44,1 kHz, chiamati `P1 - …` … `P9 - …`, `T1 Pedale - …` e `T2 - …`, da importare con SPD-SX Wave Manager;
+  - `LEGGIMI.txt` con la mappa dei pad e i passaggi per Live e per la SPD-SX.
 
 ## Scheda Compose: progressioni di accordi
 
