@@ -59,8 +59,13 @@ class OnlineResult:
         d = asdict(self)
         d["commercial_ok"] = self.commercial_ok
         d["license_label"] = LICENSES.get(self.license, LICENSES["unknown"])["label"]
-        d.pop("extra", None)
+        extra = d.pop("extra", None) or {}
+        d["info"] = {k: extra[k] for k in INFO_KEYS if extra.get(k) is not None}
         return d
+
+
+# extra fields the UI shows (store cards and pack pages)
+INFO_KEYS = ("pack_id", "pack_title", "num_sounds", "downloads", "rating", "description", "matching", "created")
 
 
 # commercial = usable in a commercial production as a sample (no NC, no ND).

@@ -28,8 +28,9 @@ from .library import Library
 from .live import payload as live_payload
 from .live import server as live_server
 from .online import cache as online_cache
+from .online import catalog
 from .online import search as online
-from .online.base import LICENSES, OnlineResult
+from .online.base import LICENSES, OnlineResult, SourceError
 from .online.downloads import DEFAULT_DIR, Downloader, safe_name
 from .patterns import ableton as pat_ableton
 from .patterns import arrange as pat_arrange
@@ -73,7 +74,8 @@ class Api:
         self._window = None
         self._settings_path = data_dir() / "settings.json"
         self._relabel_lock = threading.Lock()
-        self._downloader = Downloader()
+        self._downloader = Downloader(on_done=self._on_download_done)
+        self._rescan_timer: threading.Timer | None = None
         self._protected: dict[str, list[str]] = {}  # owner (pattern, rack) -> cached online files in use
         self._rack_cache: dict = {}
         self._rack_lock = threading.Lock()  # js_api calls run on several threads
@@ -218,6 +220,8 @@ class Api:
     # ================================================================== online
     def online_init(self) -> dict:
         return {"sources": [{"id": k, "label": v} for k, v in online.LABELS.items()],
+                "pack_sources": online.PACK_SOURCES,
+                "providers": catalog.providers(), "curated": catalog.curated(),
                 "licenses": {k: v["label"] for k, v in LICENSES.items()},
                 "server_filters": online.server_filters(),
                 "settings": self.get_settings()}
@@ -268,6 +272,68 @@ class Api:
             return {"error": "fonte sconosciuta", "results": []}
         return online.search_source(source, params or {}, int(page), self._settings())
 
+    def online_packs(self, source: str, params: dict, page: int) -> dict:
+        if source not in online.PACK_SOURCES:
+            return {"error": "fonte senza pack", "results": []}
+        return online.search_source(source, params or {}, int(page), self._settings(), packs=True)
+
+    def online_pack(self, uid: str, page: int = 1) -> dict:
+        return online.pack(uid, int(page or 1), self._settings())
+
+    def online_featured(self) -> dict:
+        return online.featured(self._settings())
+
+    def online_download_pack(self, uid: str) -> dict:
+        """Queue every file of a pack (Freesound: HQ previews, the originals need an OAuth login)."""
+        try:
+            files = online.pack_files(uid, self._settings())
+        except SourceError as e:
+            return {"error": str(e)}
+        if not files:
+            return {"error": "nessun file scaricabile in questo pack"}
+        root = self._settings().get("download_dir") or DEFAULT_DIR
+        queued = 0
+        for f in files:
+            try:
+                self._downloader.enqueue(f, f.download_url, root)
+                queued += 1
+            except ValueError:
+                pass
+        return {"error": None, "queued": queued, "in_library": self._downloads_in_library()}
+
+    def _downloads_in_library(self) -> bool:
+        lib_root = self._lib.root
+        if not lib_root:
+            return False
+        dl = os.path.realpath(self._settings().get("download_dir") or DEFAULT_DIR)
+        lib_root = os.path.realpath(lib_root)
+        return dl == lib_root or dl.startswith(lib_root + os.sep)
+
+    def _on_download_done(self, job: dict) -> None:
+        """Downloads inside the open library folder: rescan once the burst of downloads settles."""
+        if not self._downloads_in_library():
+            return
+        if self._rescan_timer:
+            self._rescan_timer.cancel()
+        self._rescan_timer = threading.Timer(3.0, self._rescan_after_downloads)
+        self._rescan_timer.daemon = True
+        self._rescan_timer.start()
+
+    def _rescan_after_downloads(self) -> None:
+        if any(j["status"] in ("queued", "downloading") for j in self._downloader.status()):
+            self._rescan_timer = threading.Timer(3.0, self._rescan_after_downloads)
+            self._rescan_timer.daemon = True
+            self._rescan_timer.start()
+            return
+        if self._lib.root and self._lib.progress.get("phase") not in ("scanning", "analysing", "classifying", "layout"):
+            self._lib.start_scan(self._lib.root)  # unchanged files come from the feature cache
+
+    def library_add_downloads(self) -> str | None:
+        """Open the download folder as the library (when it is not already inside it)."""
+        root = self._settings().get("download_dir") or DEFAULT_DIR
+        os.makedirs(root, exist_ok=True)
+        return root if self.start_scan(root) else None
+
     def online_expand(self, uid: str, params: dict) -> dict:
         return online.expand(uid, params or {})
 
@@ -291,7 +357,8 @@ class Api:
                 return {"error": "file non appartenente al pack"}
         root = self._settings().get("download_dir") or DEFAULT_DIR
         try:
-            return self._downloader.enqueue(r, url or r.download_url, root)
+            return {**self._downloader.enqueue(r, url or r.download_url, root),
+                    "in_library": self._downloads_in_library()}
         except ValueError as e:
             return {"error": str(e)}
 

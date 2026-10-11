@@ -211,6 +211,40 @@ def test_client_filters():
     assert not S.passes(r(is_pack=True), {"packs": "files"})
 
 
+def test_store_pack_page_and_download(monkeypatch):
+    def fake_get(url, params=None, headers=None, as_json=True, ttl=None):
+        if url.endswith("/sounds/"):
+            return dict(load("freesound_kick.json"), next=None)
+        if "/users/" in url:
+            return {"results": [load("freesound_pack.json"), dict(load("freesound_pack.json"), id=99, name="Other")]}
+        if "/packs/" in url:
+            return dict(load("freesound_pack.json"), id=int(url.rstrip("/").rsplit("/", 1)[-1]))
+        return load("freesound_packs_grouped.json")
+
+    monkeypatch.setattr(freesound, "http_get", fake_get)
+    settings = {"freesound_key": "k"}
+    res = S.search_source("freesound", {"q": "kick"}, 1, settings, packs=True)
+    assert res["error"] is None and [r["uid"] for r in res["results"]] == ["freesound:pack:41", "freesound:pack:77"]
+    assert res["results"][0]["info"]["matching"] == 8
+    page = S.pack("freesound:pack:41", 1, settings)
+    assert page["error"] is None and page["pack"]["title"] == "808 Kicks Vol. 1"
+    assert page["pack"]["info"]["matching"] == 8 and page["pack"]["info"]["description"]
+    assert len(page["files"]) == 2 and page["files"][0]["info"]["pack_title"] == "808 Kicks Vol. 1"
+    assert [o["uid"] for o in page["others"]] == ["freesound:pack:99"]  # the open pack is left out
+    files = S.pack_files("freesound:pack:41", settings)
+    assert len(files) == 2 and S.get(files[0].uid) is files[0]
+    root = "/tmp/dl"
+    assert os.path.join("Freesound", "808 Kicks Vol. 1") in downloads.target_path(root, files[0], files[0].download_url)
+
+
+def test_featured_without_key(monkeypatch):
+    monkeypatch.setattr(archive, "search", lambda p, page, s: ([], 0, False))
+    monkeypatch.setattr(openverse, "search", lambda p, page, s: ([], 0, False))
+    home = S.featured({})
+    assert home["freesound_packs"]["needs_key"] and home["archive_packs"]["error"] is None
+    assert home["cc0_new"]["source"] == "openverse"
+
+
 # ---------------------------------------------------------------- catalogue
 def test_catalog():
     from clustersound.online.base import LICENSES
