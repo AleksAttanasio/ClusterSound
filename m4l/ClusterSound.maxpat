@@ -26,6 +26,117 @@
   "boxes": [
    {
     "box": {
+     "id": "card_import",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      20,
+      480,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      4,
+      4,
+      276,
+      132
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 8,
+     "border": 1,
+     "bgcolor": [
+      0.16,
+      0.16,
+      0.16,
+      1.0
+     ],
+     "bordercolor": [
+      0.3,
+      0.3,
+      0.3,
+      1.0
+     ]
+    }
+   },
+   {
+    "box": {
+     "id": "card_sounds",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      90,
+      480,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      284,
+      4,
+      272,
+      132
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 8,
+     "border": 1,
+     "bgcolor": [
+      0.16,
+      0.16,
+      0.16,
+      1.0
+     ],
+     "bordercolor": [
+      0.3,
+      0.3,
+      0.3,
+      1.0
+     ]
+    }
+   },
+   {
+    "box": {
+     "id": "card_status",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      160,
+      480,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      4,
+      142,
+      552,
+      22
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 8,
+     "border": 1,
+     "bgcolor": [
+      0.16,
+      0.16,
+      0.16,
+      1.0
+     ],
+     "bordercolor": [
+      0.3,
+      0.3,
+      0.3,
+      1.0
+     ]
+    }
+   },
+   {
+    "box": {
      "id": "thisdevice",
      "maxclass": "newobj",
      "numinlets": 1,
@@ -148,10 +259,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
+      12,
       8,
-      4,
-      120,
-      20
+      200,
+      18
      ],
      "text": "ClusterSound",
      "fontface": 1,
@@ -177,10 +288,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      8,
-      26,
-      130,
-      22
+      12,
+      30,
+      184,
+      20
      ],
      "items": [],
      "parameter_enable": 0
@@ -205,10 +316,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      8,
-      52,
+      12,
+      56,
       260,
-      22
+      20
      ],
      "items": [],
      "parameter_enable": 0
@@ -269,10 +380,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      144,
-      26,
-      60,
-      22
+      200,
+      30,
+      72,
+      20
      ],
      "text": "Aggiorna",
      "mode": 0
@@ -333,10 +444,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      8,
-      80,
-      120,
-      24
+      12,
+      82,
+      128,
+      22
      ],
      "text": "Importa",
      "mode": 0
@@ -395,10 +506,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      8,
+      12,
       112,
-      18,
-      18
+      14,
+      14
      ],
      "parameter_enable": 0
     }
@@ -418,9 +529,9 @@
      "presentation": 1,
      "presentation_rect": [
       28,
-      111,
-      80,
-      20
+      110,
+      72,
+      18
      ],
      "text": "Nuove tracce"
     }
@@ -478,10 +589,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      110,
+      104,
       112,
-      18,
-      18
+      14,
+      14
      ],
      "parameter_enable": 0
     }
@@ -500,10 +611,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      130,
-      111,
-      80,
-      20
+      120,
+      110,
+      48,
+      18
      ],
      "text": "Tempo"
     }
@@ -543,10 +654,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      180,
+      172,
       112,
-      18,
-      18
+      14,
+      14
      ],
      "parameter_enable": 0
     }
@@ -565,10 +676,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      200,
-      111,
-      80,
-      20
+      188,
+      110,
+      60,
+      18
      ],
      "text": "Ricevi"
     }
@@ -623,10 +734,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      300,
-      4,
-      250,
-      20
+      292,
+      8,
+      256,
+      18
      ],
      "text": "Strumenti di Live da provare",
      "fontface": 1,
@@ -647,10 +758,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      300,
-      28,
-      60,
-      20
+      292,
+      31,
+      56,
+      18
      ],
      "text": "Traccia"
     }
@@ -674,10 +785,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      360,
-      26,
-      190,
-      22
+      352,
+      30,
+      196,
+      20
      ],
      "items": [],
      "parameter_enable": 0
@@ -715,10 +826,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      300,
-      54,
-      60,
-      20
+      292,
+      57,
+      56,
+      18
      ],
      "text": "Tipo"
     }
@@ -742,10 +853,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      360,
-      52,
-      190,
-      22
+      352,
+      56,
+      196,
+      20
      ],
      "items": [],
      "parameter_enable": 0
@@ -783,10 +894,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      300,
-      80,
-      60,
-      20
+      292,
+      83,
+      56,
+      18
      ],
      "text": "Strumento"
     }
@@ -810,13 +921,14 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      360,
-      78,
-      190,
-      22
+      352,
+      82,
+      196,
+      20
      ],
      "items": [],
-     "parameter_enable": 0
+     "parameter_enable": 0,
+     "hint": "Scegli uno strumento: si carica e la clip suona in loop."
     }
    },
    {
@@ -856,13 +968,14 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      300,
-      104,
-      36,
-      24
+      292,
+      108,
+      32,
+      22
      ],
      "text": "◀",
-     "mode": 0
+     "mode": 0,
+     "hint": "Strumento precedente / successivo"
     }
    },
    {
@@ -920,13 +1033,14 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      340,
-      104,
-      100,
-      24
+      328,
+      108,
+      112,
+      22
      ],
      "text": "Prova ▶",
-     "mode": 0
+     "mode": 0,
+     "hint": "Carica lo strumento scelto e suona la clip in loop. Doppio clic: vai alla traccia."
     }
    },
    {
@@ -985,12 +1099,13 @@
      "presentation": 1,
      "presentation_rect": [
       444,
-      104,
-      36,
-      24
+      108,
+      32,
+      22
      ],
      "text": "▶",
-     "mode": 0
+     "mode": 0,
+     "hint": "Strumento precedente / successivo"
     }
    },
    {
@@ -1048,10 +1163,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      484,
-      104,
-      66,
-      24
+      480,
+      108,
+      68,
+      22
      ],
      "text": "Stop",
      "mode": 0
@@ -1105,13 +1220,7 @@
       250,
       34
      ],
-     "presentation": 1,
-     "presentation_rect": [
-      300,
-      132,
-      250,
-      34
-     ],
+     "presentation": 0,
      "linecount": 2,
      "text": "Scegli uno strumento o usa ◀ ▶: si carica e la clip suona in loop. Doppio clic su Prova: vai alla traccia."
     }
@@ -1130,13 +1239,13 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      8,
-      134,
-      280,
-      32
+      12,
+      144,
+      536,
+      18
      ],
      "text": "Avvio…",
-     "linecount": 2
+     "linecount": 1
     }
    },
    {
@@ -1158,10 +1267,10 @@
      ],
      "presentation": 1,
      "presentation_rect": [
-      134,
-      80,
-      134,
-      24
+      144,
+      82,
+      128,
+      22
      ],
      "text": "Clip → Melodia",
      "mode": 0
