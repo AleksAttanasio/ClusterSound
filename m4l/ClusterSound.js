@@ -167,6 +167,16 @@ function pathIndex(api, key) {  // "live_set tracks 3" -> 3
 }
 pathIndex.local = 1;
 
+function alive(id) {
+    return id && Number(new LiveAPI("id " + id).id) === id;
+}
+alive.local = 1;
+
+function trackIndex(trackId) {  // current index of a track in live_set tracks, -1 if it is gone
+    return alive(trackId) ? pathIndex(new LiveAPI("id " + trackId), "tracks") : -1;
+}
+trackIndex.local = 1;
+
 function importPayload(p) {
     var set = new LiveAPI("live_set");
     var selTrack = pathIndex(new LiveAPI("live_set view selected_track"), "tracks");
@@ -178,20 +188,26 @@ function importPayload(p) {
 
     for (var i = 0; i < p.tracks.length; i++) {
         (function (t, first) {
-            var ref = { name: t.name, role: t.role || "chords", index: -1, slot: -1, options: [], pick: 0,
+            // tracks and clips are kept by Live id: indices change as soon as tracks are added or moved
+            var ref = { name: t.name, role: t.role || "chords", trackId: 0, clipId: 0, options: [], pick: 0,
                         seed: Math.floor(Math.random() * 1000000), hasSound: false };
             refs.push(ref);
             steps.push(function () {
-                if (first && !opts.newtracks && selTrack >= 0) { ref.index = selTrack; return; }
-                set.call("create_midi_track", insertAt);
-                ref.index = insertAt >= 0 ? insertAt : set.getcount("tracks") - 1;
-                if (insertAt >= 0) insertAt++;
-                new LiveAPI("live_set tracks " + ref.index).set("name", t.name);
+                var index;
+                if (first && !opts.newtracks && selTrack >= 0) {
+                    index = selTrack;
+                } else {
+                    set.call("create_midi_track", insertAt);
+                    index = insertAt >= 0 ? insertAt : set.getcount("tracks") - 1;
+                    if (insertAt >= 0) insertAt++;
+                    new LiveAPI("live_set tracks " + index).set("name", t.name);
+                }
+                ref.trackId = Number(new LiveAPI("live_set tracks " + index).id);
             });
             if (t.adg_path) {
                 steps.push(function () {
                     if (!bridgeOk) { notes.push(t.name + ": Remote Script non attiva, trascina il rack dal browser → " + t.adg_path); return; }
-                    var id = sendOsc({ cmd: "load", track: ref.index, root: t.adg_root, path: t.adg_path });
+                    var id = sendOsc({ cmd: "load", track: trackIndex(ref.trackId), root: t.adg_root, path: t.adg_path });
                     wait(id, function (msg) {
                         if (msg.ok) ref.hasSound = true;
                         else notes.push(t.name + ": " + msg.error);
@@ -201,8 +217,8 @@ function importPayload(p) {
             for (var c = 0; c < t.clips.length; c++) {
                 (function (clip, slot) {
                     steps.push(function () {
-                        var at = writeClip(set, ref.index, slot, clip);
-                        if (ref.slot < 0) ref.slot = at;
+                        var clipId = writeClip(set, trackIndex(ref.trackId), slot, clip);
+                        if (!ref.clipId) ref.clipId = clipId;
                     });
                 })(t.clips[c], scene + c);
             }
@@ -267,7 +283,7 @@ function writeClip(set, track, slot, clip) {
         c.call("note", n[0], n[1].toFixed(6), n[2].toFixed(6), n[3], 0);
     }
     c.call("done");
-    return slot;
+    return Number(c.id);
 }
 writeClip.local = 1;
 
@@ -313,7 +329,9 @@ function loadOption(r, play) {
     steps.push(function () {
         var opt = r.options[r.pick];
         if (!opt) return;
-        var id = sendOsc({ cmd: "load_item", track: r.index, item: opt.id });
+        var index = trackIndex(r.trackId);
+        if (index < 0) return status(r.name + ": la traccia non c'è più");
+        var id = sendOsc({ cmd: "load_item", track: index, item: opt.id });
         wait(id, function (msg) {
             if (!msg.ok) return status(r.name + ": " + msg.error);
             r.hasSound = true;
@@ -325,7 +343,8 @@ function loadOption(r, play) {
 loadOption.local = 1;
 
 function fire(r) {
-    if (r.slot >= 0) new LiveAPI("live_set tracks " + r.index + " clip_slots " + r.slot).call("fire");
+    // fire the clip itself, never a slot: firing an empty slot of an armed track starts recording
+    if (r.clipId && alive(r.clipId)) new LiveAPI("id " + r.clipId).call("fire");
 }
 fire.local = 1;
 
@@ -359,5 +378,5 @@ function altri() {
 
 function ferma() {
     var r = current();
-    if (r) new LiveAPI("live_set tracks " + r.index).call("stop_all_clips");
+    if (r && alive(r.trackId)) new LiveAPI("id " + r.trackId).call("stop_all_clips");
 }

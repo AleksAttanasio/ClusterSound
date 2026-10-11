@@ -105,6 +105,8 @@ class ClusterSoundBridge(ControlSurface):
         if tries:
             self._log("found %s after %d retries" % (path, tries))
         track = tracks[idx]
+        if not self._midi(track, msg):
+            return
         song.view.selected_track = track
         browser.load_item(item)
         self._reply(msg, True, track=tracks.index(track))
@@ -113,6 +115,13 @@ class ClusterSoundBridge(ControlSurface):
         tracks = list(self.song().tracks)
         idx = int(msg.get("track", -1))
         return tracks[idx] if -len(tracks) <= idx < len(tracks) else None
+
+    def _midi(self, track, msg):
+        """Loading an instrument on an audio track makes Live create a new MIDI track: refuse instead."""
+        if track.has_midi_input:
+            return True
+        self._reply(msg, False, error="«%s» non è una traccia MIDI" % track.name)
+        return False
 
     def _suggest(self, msg):
         """A few presets from Live's library for the role of a track: {items: [{id, name, folder}]}."""
@@ -138,6 +147,8 @@ class ClusterSoundBridge(ControlSurface):
         item = self._items.get(int(msg.get("item", 0)))
         if track is None or item is None:
             self._reply(msg, False, error="traccia o strumento non validi")
+            return
+        if not self._midi(track, msg):
             return
         self.song().view.selected_track = track
         Live.Application.get_application().browser.load_item(item)
