@@ -97,3 +97,52 @@ def test_compose_payload_matches_render():
     assert sorted(n[1] for n in a["notes"]) == sorted(round(s / perform.PPQ, 6) for s, *_ in ev)
     single = payload.compose({**seq, "name": "S", "bpm": 100})
     assert single["tracks"][0]["clips"][0]["name"] == "S"
+
+
+# ---------------------------------------------------------------- HTTP bridge
+@pytest.fixture()
+def bridge(tmp_path, export_dir, monkeypatch):
+    from clustersound.patterns import store as pat_store
+    from clustersound.racks import store as rack_store
+    monkeypatch.setattr(pat_store, "data_dir", lambda: tmp_path)
+    monkeypatch.setattr(rack_store, "data_dir", lambda: tmp_path)
+    from clustersound.live import server
+    b = server.Bridge(export_dir, _resolve, lambda r: None)
+    assert b.start(0)
+    yield b
+    b.stop()
+
+
+def _get(b, path):
+    import json
+    import urllib.error
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{b.port}{path}") as r:
+            body = r.read()
+            return r.status, json.loads(body) if body else None
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read())
+
+
+def test_bridge_catalog_and_payload(bridge):
+    from clustersound.patterns import store as pat_store
+    seq = {"bars": 1, "clips": [{"id": "a", "notes": CMAJ, "start": 0, "len": 16}]}
+    prog = pat_store.save_progression({"name": "P", "bpm": 100, "order": ["A"], "versions": {"A": seq}})
+    status, cat = _get(bridge, "/live/catalog")
+    assert status == 200 and cat["compose"] == [{"id": prog["id"], "name": "P"}]
+    assert any(g["id"] == "house:0" for g in cat["genre"])
+    status, out = _get(bridge, f"/live/payload?kind=compose&id={prog['id']}")
+    assert status == 200 and out["tracks"][0]["clips"][0]["notes"]
+    status, out = _get(bridge, "/live/payload?kind=genre&id=house:0")
+    assert status == 200 and out["tracks"][0]["name"] == "Drums"
+    assert _get(bridge, "/live/payload?kind=rack&id=rack:nope")[0] == 404
+
+
+def test_bridge_push_queue_and_routes(bridge):
+    assert _get(bridge, "/live/next") == (204, None)
+    bridge.push({"kind": "compose", "name": "x"})
+    assert _get(bridge, "/live/ping")[1]["pending"] == 1
+    assert _get(bridge, "/live/next") == (200, {"kind": "compose", "name": "x"})
+    assert _get(bridge, "/live/next")[0] == 204
+    assert _get(bridge, "/api/init")[0] == 404
