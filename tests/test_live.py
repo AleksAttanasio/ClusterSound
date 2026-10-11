@@ -265,3 +265,36 @@ def test_build_amxd(tmp_path):
     ids = {b["box"]["id"] for b in patcher["boxes"]}
     assert all(ln["patchline"]["source"][0] in ids and ln["patchline"]["destination"][0] in ids for ln in patcher["lines"])
     assert (tmp_path / "ClusterSound.js").is_file()
+
+
+def test_suggestions_by_role():
+    proto = _protocol()
+
+    class Item:
+        def __init__(self, name, *children, folder=False, device=False, loadable=True):
+            self.name, self.children = name, list(children)
+            self.is_folder, self.is_device, self.is_loadable = folder, device, loadable and not folder
+
+    bass = Item("Bass", *[Item(f"Bass {i}.adg") for i in range(10)], folder=True)
+    keys = Item("Piano & Keys", Item("Grand.adv"), Item("Sub", Item("Rhodes.adg"), folder=True), folder=True)
+    pad = Item("Pad", Item("Warm Pad.adg"), Item("pad.wav"), folder=True)
+
+    class Browser:
+        sounds = Item("Sounds", bass, keys, pad, Item("Voices", Item("Choir.adg"), folder=True), folder=True)
+        drums = Item("Drums", Item("Kit-Core 909.adg"), Item("Drum Hits", Item("kick.wav"), folder=True), folder=True)
+        instruments = Item("Instruments", Item("Operator", Item("Init.adv"), device=True), folder=True)
+
+    b = Browser()
+    roots, fallback = proto.role_roots(b, "chords")
+    names = sorted(i.name for i, _ in proto.collect(roots))
+    assert not fallback and names == ["Grand.adv", "Rhodes.adg", "Warm Pad.adg"]  # no Voices, no audio
+    assert [i.name for i, _ in proto.collect(proto.role_roots(b, "drums")[0])] == ["Kit-Core 909.adg"]
+    pool = proto.collect(proto.role_roots(b, "bass")[0])
+    assert proto.pick(pool, 6, 1) == proto.pick(pool, 6, 1) and len(proto.pick(pool, 6, 1)) == 6
+    assert proto.pick(pool, 6, 1) != proto.pick(pool, 6, 2)
+    assert len(proto.collect(proto.role_roots(b, "bass")[0], limit=3)) == 3
+
+    b.sounds = Item("Sounds", folder=True)  # nothing for the role: instruments' presets instead
+    roots, fallback = proto.role_roots(b, "bass")
+    assert fallback and [i.name for i, _ in proto.collect(roots)] == ["Operator", "Init.adv"]
+    assert proto.display_name("Warm Pad.adg") == "Warm Pad"

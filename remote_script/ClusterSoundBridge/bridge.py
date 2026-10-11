@@ -19,6 +19,9 @@ class ClusterSoundBridge(ControlSurface):
     def __init__(self, c_instance):
         ControlSurface.__init__(self, c_instance)
         self._sock = None
+        self._pools = {}   # role -> [(BrowserItem, folder)] collected once per session
+        self._items = {}   # id -> BrowserItem offered to the device
+        self._next_id = 0
         try:
             self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self._sock.bind(("127.0.0.1", protocol.IN_PORT))
@@ -75,6 +78,10 @@ class ClusterSoundBridge(ControlSurface):
             self._reply(msg, True, version=1)
         elif cmd == "load":
             self._load(msg, 0)
+        elif cmd == "suggest":
+            self._suggest(msg)
+        elif cmd == "load_item":
+            self._load_item(msg)
         else:
             self._reply(msg, False, error="comando sconosciuto: %s" % cmd)
 
@@ -101,6 +108,40 @@ class ClusterSoundBridge(ControlSurface):
         song.view.selected_track = track
         browser.load_item(item)
         self._reply(msg, True, track=tracks.index(track))
+
+    def _track(self, msg):
+        tracks = list(self.song().tracks)
+        idx = int(msg.get("track", -1))
+        return tracks[idx] if -len(tracks) <= idx < len(tracks) else None
+
+    def _suggest(self, msg):
+        """A few presets from Live's library for the role of a track: {items: [{id, name, folder}]}."""
+        role = msg.get("role") or "chords"
+        if role not in self._pools or msg.get("rescan"):
+            browser = Live.Application.get_application().browser
+            roots, fallback = protocol.role_roots(browser, role)
+            self._pools[role] = protocol.collect(roots)
+            self._log("%d presets for %s%s" % (len(self._pools[role]), role, " (fallback)" if fallback else ""))
+        chosen = protocol.pick(self._pools[role], int(msg.get("count", 6)), msg.get("seed", 0))
+        out = []
+        for item, folder in chosen:
+            self._next_id += 1
+            self._items[self._next_id] = item
+            out.append({"id": self._next_id, "name": protocol.display_name(item.name), "folder": folder})
+        if not out:
+            self._reply(msg, False, error="nessuno strumento trovato nella libreria di Live")
+            return
+        self._reply(msg, True, items=out)
+
+    def _load_item(self, msg):
+        track = self._track(msg)
+        item = self._items.get(int(msg.get("item", 0)))
+        if track is None or item is None:
+            self._reply(msg, False, error="traccia o strumento non validi")
+            return
+        self.song().view.selected_track = track
+        Live.Application.get_application().browser.load_item(item)
+        self._reply(msg, True, name=protocol.display_name(item.name))
 
     @staticmethod
     def _roots(browser, root):

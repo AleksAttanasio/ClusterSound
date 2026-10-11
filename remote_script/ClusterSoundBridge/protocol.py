@@ -85,3 +85,65 @@ def find_item(roots, place):
         if not level:
             return None
     return level[0] if level else None
+
+
+# ------------------------------------------------------------------ instrument suggestions
+# Browser categories to draw from for each role of an imported track (folder names in Live's "Sounds",
+# matched case-insensitively by prefix); the presets of installed Packs show up in these categories too.
+ROLE_SOURCES = {
+    "bass": [("sounds", ["bass"])],
+    "chords": [("sounds", ["piano", "pad", "synth keys", "strings", "mallets", "keys"])],
+    "drums": [("drums", None)],
+}
+FALLBACK_SOURCES = [("instruments", None)]
+AUDIO_EXT = (".wav", ".aif", ".aiff", ".mp3", ".flac", ".ogg", ".m4a")
+MAX_VISITS = 2500   # browser children are fetched lazily by Live: keep the walk short
+MAX_ITEMS = 400
+
+
+def _ok_name(name):
+    return not name.lower().endswith(AUDIO_EXT)
+
+
+def collect(roots, limit=MAX_ITEMS, max_visits=MAX_VISITS):
+    """[(item, folder name)] of loadable presets under the given browser items, breadth first.
+
+    Folders and devices (e.g. "Operator", whose children are its presets) are opened; audio files skipped."""
+    out, queue, visits = [], [(r, getattr(r, "name", "")) for r in roots], 0
+    while queue and len(out) < limit and visits < max_visits:
+        item, folder = queue.pop(0)
+        visits += 1
+        if getattr(item, "is_loadable", False) and not getattr(item, "is_folder", False) and _ok_name(item.name):
+            out.append((item, folder))
+        if getattr(item, "is_folder", False) or getattr(item, "is_device", False):
+            queue.extend((c, item.name) for c in item.children)
+    return out
+
+
+def role_roots(browser, role):
+    """Browser items to search for a role, and whether they are the generic fallback."""
+    for sources, fallback in ((ROLE_SOURCES.get(role, []), False), (FALLBACK_SOURCES, True)):
+        roots = []
+        for attr, prefixes in sources:
+            cat = getattr(browser, attr, None)
+            if cat is None:
+                continue
+            if prefixes is None:
+                roots.extend(cat.children)
+            else:
+                roots.extend(c for c in cat.children if any(c.name.lower().startswith(p) for p in prefixes))
+        if roots:
+            return roots, fallback
+    return [], True
+
+
+def pick(pool, count, seed):
+    """`count` distinct entries of pool, reproducible for a seed."""
+    import random
+    if len(pool) <= count:
+        return list(pool)
+    return random.Random(seed).sample(pool, count)
+
+
+def display_name(name):
+    return _stem(name)
