@@ -187,6 +187,47 @@ Il pack non viene mai modificato: i file vengono letti e indicizzati in memoria.
 
 Scorciatoie: `Spazio` play/stop, `←` `→` accordo precedente/successivo, `Canc` elimina, `⌘D` duplica, `V` variazioni.
 
+## Max for Live: importare in Ableton Live
+
+Il device **ClusterSound** (effetto MIDI, Live 10.1 Suite o successivo) importa direttamente nel set i pattern,
+i drum rack e le progressioni di Compose, senza trascinare file. È fatto di tre pezzi:
+
+- **l'app**, che all'avvio apre un piccolo server solo locale (`127.0.0.1:8770`, porta modificabile nelle
+  Impostazioni) con il catalogo e i contenuti pronti per Live;
+- **il device** `m4l/ClusterSound.maxpat` + `ClusterSound.js`, che crea tracce MIDI e clip con le note via
+  Live API;
+- **la Remote Script** `remote_script/ClusterSoundBridge` (Python 2.7 in Live 10), che carica i preset `.adg`
+  dei rack: la Live API di Max non può farlo.
+
+Installazione (una volta):
+
+1. `tools/install_live.sh`: costruisce `ClusterSound.amxd` e lo copia con la Remote Script nella User Library
+   (`~/Music/Ableton/User Library`, oppure passa il percorso come argomento).
+2. Riavvia Live. In *Preferenze → Link/MIDI* scegli **ClusterSoundBridge** come Control Surface, con Input e
+   Output su *Nessuno*.
+3. Nel browser di Live aggiungi `~/Music/ClusterSound Patterns` ai **Places** (*Add Folder…*): è lì che l'app
+   scrive i rack (sottocartella `_Live`) e la Remote Script li cerca.
+4. Trascina il device *ClusterSound* (in *Max MIDI Effect*) su una traccia MIDI qualsiasi. Per avere un unico
+   file autonomo, aprilo in Max e usa *Freeze Device*, poi salva.
+
+Uso, con l'app ClusterSound aperta:
+
+- **Dal device**: scegli il tipo (pattern salvati, generi, drum rack, progressioni) e l'elemento, poi
+  *Importa*. *Aggiorna* rilegge il catalogo.
+  - Un pattern crea le tracce *Drums* e *Bass*, ognuna con il proprio rack e la clip.
+  - Un drum rack crea una traccia con il rack.
+  - Una progressione crea una traccia *Accordi* con una clip per versione, suonate con la Modalità attiva.
+- **Dall'app**: *Invia a Live* nel Sequencer, nella barra della sequenza (*Live*), nel Drum Rack e nel menu
+  *Esporta* di Compose. Con *Ricevi* attivo, il device importa subito quello che arriva, anche se non è salvato.
+- *Nuove tracce* (attivo di default) crea le tracce dopo quella selezionata; se lo spegni, la prima traccia
+  importata va su quella selezionata. *Tempo* imposta il BPM del set.
+- Le clip partono dalla scena selezionata e vanno sempre in uno slot vuoto: non sovrascrivono mai le clip
+  esistenti.
+- Senza la Remote Script le clip vengono create comunque, e il device indica il rack da trascinare dai Places.
+
+Le sequenze salvate non contengono il kit, quindi si mandano a Live dall'app, con *Live* nella barra della
+sequenza. I generi del catalogo non hanno sample: creano solo la clip MIDI.
+
 ## Come classifica
 
 Quattro segnali fusi in log-probabilità (`clustersound/classifier.py`):
