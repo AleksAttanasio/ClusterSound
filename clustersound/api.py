@@ -533,7 +533,8 @@ class Api:
         return {"dir": lib.root, "exists": lib.exists(), "keys": lib.available_keys() if lib.exists() else [],
                 "categories": CHORD_CATEGORIES, "styles": chord_perform.meta(),
                 "clipKinds": chord_variations.CLIP_KINDS, "progKinds": chord_variations.PROG_KINDS, "modeKinds": chord_variations.MODE_KINDS,
-                "melody": {"densities": chord_melody.DENSITIES, "contours": chord_melody.CONTOURS, "rates": chord_melody.RATES},
+                "melody": {"densities": chord_melody.DENSITIES, "contours": chord_melody.CONTOURS, "rates": chord_melody.RATES,
+                           "roles": chord_melody.roles_meta()},
                 "saved": pat_store.list_progressions()}
 
     def compose_pick_folder(self, path: str | None = None) -> dict:
@@ -587,7 +588,7 @@ class Api:
             d = chord_harmony.describe(c)
             labels.append({"id": c["id"], **chord_harmony.label(d, key)} if d["notes"] else {"id": c["id"]})
         return {"ppq": chord_perform.PPQ, "events": chord_perform.render(seq), "labels": labels,
-                "melody": chord_melody.render(seq)}
+                "layers": chord_melody.render_layers(seq)}
 
     # ---------------------------------------------------------------- melody
     def compose_melody_generate(self, seq: dict, opts: dict | None = None, seed: int = 1) -> list[dict]:
