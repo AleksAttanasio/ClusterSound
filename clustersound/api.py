@@ -13,12 +13,19 @@ import numpy as np
 import soundfile as sf
 
 from . import classifier, dynamics, export, taxonomy
+from .chords import export as chord_export
+from .chords import harmony as chord_harmony
+from .chords import perform as chord_perform
+from .chords import variations as chord_variations
+from .chords.library import CATEGORIES as CHORD_CATEGORIES
+from .chords.library import DEFAULT_DIR as CHORD_DIR
+from .chords.library import ChordLibrary
 from .features import TYPES
 from .library import Library
 from .online import cache as online_cache
 from .online import search as online
 from .online.base import LICENSES, OnlineResult
-from .online.downloads import DEFAULT_DIR, Downloader
+from .online.downloads import DEFAULT_DIR, Downloader, safe_name
 from .patterns import ableton as pat_ableton
 from .patterns import arrange as pat_arrange
 from .patterns import genres as pat_genres
@@ -64,6 +71,7 @@ class Api:
         self._protected: dict[str, list[str]] = {}  # owner (pattern, rack) -> cached online files in use
         self._rack_cache: dict = {}
         self._rack_lock = threading.Lock()  # js_api calls run on several threads
+        self._chords: ChordLibrary | None = None
         threading.Thread(target=online_cache.prune, args=(self._cache_mb(),), daemon=True).start()
 
     # pywebview exposes public attributes too, so keep internals underscored
@@ -492,6 +500,119 @@ class Api:
         subprocess.run(["open", folder], check=False)
         return {"folder": folder}
 
+
+    # ================================================================== compose (chord progressions)
+    def _chord_lib(self) -> ChordLibrary:
+        root = self._settings().get("chord_pack_dir") or CHORD_DIR
+        if self._chords is None or self._chords.root != root:
+            self._chords = ChordLibrary(root)
+        return self._chords
+
+    def compose_init(self) -> dict:
+        lib = self._chord_lib()
+        return {"dir": lib.root, "exists": lib.exists(), "keys": lib.available_keys() if lib.exists() else [],
+                "categories": CHORD_CATEGORIES, "styles": chord_perform.meta(),
+                "clipKinds": chord_variations.CLIP_KINDS, "progKinds": chord_variations.PROG_KINDS,
+                "saved": pat_store.list_progressions()}
+
+    def compose_pick_folder(self, path: str | None = None) -> dict:
+        if path is None:
+            path = self.pick_folder()
+        if path:
+            self._save_settings(chord_pack_dir=os.path.expanduser(path))
+        return self.compose_init()
+
+    def compose_rescan(self) -> dict:
+        self._chord_lib().scan(force=True)
+        return self.compose_init()
+
+    def compose_chords(self, tonic: int, mode: str) -> dict:
+        return self._chord_lib().chords_for_key(int(tonic), mode)
+
+    @staticmethod
+    def _seq_key(seq: dict) -> dict:
+        k = seq.get("key") or {}
+        return {"tonic": int(k.get("tonic", 0)) % 12, "mode": "minor" if k.get("mode") == "minor" else "major"}
+
+    def _pool(self, seq: dict, related: bool = False) -> list[dict]:
+        key = self._seq_key(seq)
+        lib = self._chord_lib()
+        pool = list(lib.chords_for_key(key["tonic"], key["mode"])["chords"])
+        if related or seq.get("keyMode") == "free":
+            seen = {(c["root"], tuple(p for p, _ in c["notes"])) for c in pool}
+            for k in chord_harmony.related_keys(key):
+                for c in lib.chords_for_key(k["tonic"], k["mode"])["chords"]:
+                    sig = (c["root"], tuple(p for p, _ in c["notes"]))
+                    if sig not in seen:
+                        seen.add(sig)
+                        pool.append(c)
+        return pool
+
+    def compose_suggest(self, seq: dict, after_id: str | None = None, limit: int = 8) -> dict:
+        """Next chord after clip after_id (default: the last one), leading into the clip that follows it."""
+        key = self._seq_key(seq)
+        clips = sorted(seq.get("clips", []), key=lambda c: c["start"])
+        i = next((j for j, c in enumerate(clips) if c["id"] == after_id), len(clips) - 1)
+        prev = clips[max(0, i - 1):i + 1] if i >= 0 else []
+        nxt = clips[i + 1] if 0 <= i + 1 < len(clips) and after_id else None
+        out = chord_harmony.suggest(prev, self._pool(seq), key, self._chord_lib().bigrams(key["mode"]), nxt=nxt, limit=limit)
+        return {"after": clips[i]["id"] if i >= 0 and clips else None, "items": out}
+
+    def compose_render(self, seq: dict) -> dict:
+        key = self._seq_key(seq)
+        clips = seq.get("clips", [])
+        labels = []
+        for c in clips:
+            d = chord_harmony.describe(c)
+            labels.append({"id": c["id"], **chord_harmony.label(d, key)} if d["notes"] else {"id": c["id"]})
+        return {"ppq": chord_perform.PPQ, "events": chord_perform.render(seq), "labels": labels}
+
+    def compose_vary_clip(self, seq: dict, clip_id: str, kinds: list, seed: int = 1) -> list[dict]:
+        key = self._seq_key(seq)
+        pool = self._pool(seq)
+        return chord_variations.vary_clip(seq, clip_id, kinds, int(seed), pool, key, self._chord_lib().bigrams(key["mode"]))
+
+    def compose_vary_progression(self, seq: dict, kinds: list, amount: float = .5, seed: int = 1) -> list[dict]:
+        key = self._seq_key(seq)
+        pool = self._pool(seq)
+        return chord_variations.vary_progression(seq, kinds, amount, int(seed), pool, key, self._chord_lib().bigrams(key["mode"]))
+
+    @staticmethod
+    def _prog_title(seq: dict) -> str:
+        return f"{seq.get('name') or 'Accordi'} {int(round(seq.get('bpm', 120)))}bpm - {seq.get('bars', 4)} battute"
+
+    def compose_export_midi(self, seq: dict, pure: bool = False) -> str | None:
+        path = self._save_dialog(safe_name(self._prog_title(seq)) + ".mid", ("MIDI (*.mid)",))
+        if path:
+            chord_export.write(path, seq, pure)
+        return path
+
+    def compose_export_versions(self, seqs: list, pure: bool = False) -> dict:
+        import webview
+        os.makedirs(EXPORT_DIR, exist_ok=True)
+        res = self._window.create_file_dialog(webview.FileDialog.FOLDER, directory=EXPORT_DIR)
+        if not res:
+            return {"cancelled": True}
+        return self._write_versions(res[0] if isinstance(res, (list, tuple)) else res, seqs, pure)
+
+    def _write_versions(self, folder: str, seqs: list, pure: bool) -> dict:
+        files = []
+        for seq in seqs:
+            name = safe_name(f"{self._prog_title(seq)} - {seq.get('version', '')}".rstrip(" -"))
+            path = os.path.join(folder, name + ".mid")
+            chord_export.write(path, seq, pure)
+            files.append(path)
+        subprocess.run(["open", folder], check=False)
+        return {"folder": folder, "files": files}
+
+    def list_progressions(self) -> list[dict]:
+        return pat_store.list_progressions()
+
+    def save_progression(self, proj: dict) -> dict:
+        return pat_store.save_progression(proj)
+
+    def delete_progression(self, pid: str) -> bool:
+        return pat_store.delete_progression(pid)
 
     # ================================================================== 64-pad racks
     def racks_init(self) -> dict:

@@ -117,15 +117,16 @@ def write(path: str, p: dict, parts: str = "both", mapping: str = "drumrack", in
         f.write(header + b"".join(tracks))
 
 
-def read_notes(path: str) -> list[tuple[int, int, int, int]]:
-    """Minimal reader (tests/debug): (track, tick, note, velocity) of every note-on."""
+def iter_events(path: str) -> tuple[int, list[tuple[int, int, int, int, int]]]:
+    """Minimal SMF reader: (PPQ, [(track, tick, status, data1, data2)]) for every channel voice event."""
     data = open(path, "rb").read()
     assert data[:4] == b"MThd"
-    ntracks = struct.unpack(">H", data[10:12])[0]
-    pos = 14
+    ntracks, ppq = struct.unpack(">HH", data[10:14])
+    pos = 8 + struct.unpack(">I", data[4:8])[0]
     out = []
     for t in range(ntracks):
-        assert data[pos:pos + 4] == b"MTrk"
+        if data[pos:pos + 4] != b"MTrk":
+            break
         size = struct.unpack(">I", data[pos + 4:pos + 8])[0]
         i, end, tick, status = pos + 8, pos + 8 + size, 0, 0
         while i < end:
@@ -138,9 +139,9 @@ def read_notes(path: str) -> list[tuple[int, int, int, int]]:
                     break
             tick += delta
             b = data[i]
-            if b == 0xFF:
+            if b in (0xFF, 0xF0, 0xF7):  # meta / sysex: skip the payload
+                j = i + 2 if b == 0xFF else i + 1
                 ln = 0
-                j = i + 2
                 while True:
                     c = data[j]
                     j += 1
@@ -154,11 +155,36 @@ def read_notes(path: str) -> list[tuple[int, int, int, int]]:
                 i += 1
             kind = status & 0xF0
             if kind in (0x80, 0x90, 0xA0, 0xB0, 0xE0):
-                a, v = data[i], data[i + 1]
+                out.append((t, tick, status, data[i], data[i + 1]))
                 i += 2
-                if kind == 0x90 and v > 0:
-                    out.append((t, tick, a, v))
             else:
+                out.append((t, tick, status, data[i], 0))
                 i += 1
         pos = end
-    return out
+    return ppq, out
+
+
+def read_notes(path: str) -> list[tuple[int, int, int, int]]:
+    """Minimal reader (tests/debug): (track, tick, note, velocity) of every note-on."""
+    return [(t, tick, a, v) for t, tick, st, a, v in iter_events(path)[1] if st & 0xF0 == 0x90 and v > 0]
+
+
+def read_note_spans(path: str) -> tuple[int, list[tuple[int, int, int, int]]]:
+    """(PPQ, [(start, end, note, velocity)]) over all tracks; unterminated notes end at the last event."""
+    ppq, events = iter_events(path)
+    last = max((e[1] for e in events), default=0)
+    open_, spans = {}, []
+    for t, tick, st, a, v in events:
+        kind = st & 0xF0
+        key = (t, st & 0x0F, a)
+        if kind == 0x90 and v > 0:
+            if key in open_:  # retrigger without note-off
+                s, vel = open_.pop(key)
+                spans.append((s, tick, a, vel))
+            open_[key] = (tick, v)
+        elif kind == 0x80 or (kind == 0x90 and v == 0):
+            if key in open_:
+                s, vel = open_.pop(key)
+                spans.append((s, tick, a, vel))
+    spans += [(s, last, k[2], vel) for k, (s, vel) in open_.items()]
+    return ppq, sorted(spans)
