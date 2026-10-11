@@ -212,9 +212,10 @@ Installazione (una volta):
 
 Uso, con l'app ClusterSound aperta:
 
-- **Dal device**: scegli il tipo (pattern salvati, generi, drum rack, progressioni) e l'elemento, poi
+- **Dal device**: scegli il tipo (pattern salvati, sequenze, drum rack, progressioni) e l'elemento, poi
   *Importa*. *Aggiorna* rilegge il catalogo.
   - Un pattern crea le tracce *Drums* e *Bass*, ognuna con il proprio rack e la clip.
+  - Una sequenza fa lo stesso, con una clip lunga quanto tutta la sequenza.
   - Un drum rack crea una traccia con il rack.
   - Una progressione crea una traccia *Accordi* con una clip per versione, suonate con la Modalità attiva.
 - **Dall'app**: *Invia a Live* nel Sequencer, nella barra della sequenza (*Live*), nel Drum Rack e nel menu
@@ -225,8 +226,10 @@ Uso, con l'app ClusterSound aperta:
   esistenti.
 - Senza la Remote Script le clip vengono create comunque, e il device indica il rack da trascinare dai Places.
 
-Le sequenze salvate non contengono il kit, quindi si mandano a Live dall'app, con *Live* nella barra della
-sequenza. I generi del catalogo non hanno sample: creano solo la clip MIDI.
+Quando salvi una sequenza, con lei si salva anche il kit aperto nel Sequencer (sample, layer e mix), e il device
+la importa con quello. Le sequenze salvate prima di questa versione non hanno il kit. Il device usa allora il
+pattern utente da cui viene il primo blocco. Se il blocco viene da un preset di genere, importa solo il MIDI e
+lo segnala con *(solo MIDI)*: per avere anche il kit, apri la sequenza e salvala di nuovo.
 
 ## Come classifica
 
