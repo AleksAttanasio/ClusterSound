@@ -7,6 +7,7 @@ exact same app.js runs. Native dialogs are replaced by prompt().
 """
 import argparse
 import json
+import os
 import sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -26,6 +27,7 @@ SHIM = """<script>
   const names = %s;
   const api = Object.fromEntries(names.map((n) => [n, call(n)]));
   api.pick_folder = async () => prompt('Percorso della cartella da analizzare');
+  api.compose_pick_folder = async () => { const p = prompt('Cartella del chord pack'); return p ? call('compose_pick_folder')(p) : call('compose_init')(); };
   api.export_report = async () => { const p = prompt('Salva report in (…/report.csv)'); return p ? call('_dev_export')(p) : null; };
   window.pywebview = { api };
   setTimeout(() => window.dispatchEvent(new Event('pywebviewready')), 0);
@@ -38,6 +40,16 @@ class DevApi(Api):
         from clustersound import export
         export.write(self._lib.items, path)
         return path
+
+    def _save_dialog(self, filename, types):  # no native dialog: save straight into the export folder
+        from clustersound.api import EXPORT_DIR
+        os.makedirs(EXPORT_DIR, exist_ok=True)
+        return os.path.join(EXPORT_DIR, filename)
+
+    def compose_export_versions(self, seqs, pure=False):
+        from clustersound.api import EXPORT_DIR
+        os.makedirs(EXPORT_DIR, exist_ok=True)
+        return self._write_versions(EXPORT_DIR, seqs, pure)
 
 
 api = DevApi()

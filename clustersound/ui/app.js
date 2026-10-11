@@ -4,6 +4,7 @@ import { Player } from './player.js';
 import { Online } from './online.js';
 import { PatternEditor } from './pattern.js';
 import { DrumRackEditor } from './drumrack.js';
+import { ComposeEditor } from './compose.js';
 import { showSendMenu } from './sendmenu.js';
 
 const $ = (s) => document.querySelector(s);
@@ -22,7 +23,7 @@ const state = {
 };
 
 const player = new Player({ onState: onPlayState });
-window.__cs = { state, player, get pattern() { return pattern; }, get rack() { return rack; }, get scene() { return scene; } }; // handy from the web inspector (--debug)
+window.__cs = { state, player, get pattern() { return pattern; }, get rack() { return rack; }, get compose() { return compose; }, get scene() { return scene; } }; // handy from the web inspector (--debug)
 
 // ------------------------------------------------------------------ boot
 function whenApiReady() {
@@ -32,7 +33,7 @@ function whenApiReady() {
   });
 }
 
-let scene, panel, online, pattern, rack;
+let scene, panel, online, pattern, rack, compose;
 
 async function main() {
   state.api = await whenApiReady();
@@ -60,6 +61,7 @@ async function main() {
   pattern = new PatternEditor({ api: state.api, player, classes: state.classes, onLoadFromRack: () => rack.openLoadDialog() });
   rack = new DrumRackEditor({ api: state.api, player, classes: state.classes, getTrail,
     getSequencer: () => pattern, onOpenSequencer: () => setTab('pattern') });
+  compose = new ComposeEditor({ api: state.api, player, getPattern: () => pattern, onOpenSequencer: () => setTab('pattern') });
   online.onSend = (ref, x, y) => sendRef(ref, x, y);
   buildSidebar();
   bindUi();
@@ -574,18 +576,21 @@ function setTab(tab) {
   player.stop();
   if (tab !== 'pattern' && pattern) pattern.hide();
   if (tab !== 'rack' && rack) rack.hide();
+  if (tab !== 'compose' && compose) compose.hide();
   $('#tab-library').classList.toggle('active', tab === 'library');
   $('#tab-online').classList.toggle('active', tab === 'online');
   $('#tab-pattern').classList.toggle('active', tab === 'pattern');
   $('#tab-rack').classList.toggle('active', tab === 'rack');
+  $('#tab-compose').classList.toggle('active', tab === 'compose');
   $('#library').hidden = tab !== 'library';
   $('#online').hidden = tab !== 'online';
   $('#pattern').hidden = tab !== 'pattern';
   $('#rack').hidden = tab !== 'rack';
+  $('#compose').hidden = tab !== 'compose';
   document.querySelectorAll('.lib-only').forEach((el) => el.classList.toggle('tab-hidden', tab !== 'library'));
   document.querySelectorAll('.online-only').forEach((el) => { el.hidden = tab !== 'online'; });
   if (tab === 'online') { online.show(); $('#online-q').focus(); } else if (tab === 'pattern') pattern.show();
-  else if (tab === 'rack') rack.show(); else scene.resize();
+  else if (tab === 'rack') rack.show(); else if (tab === 'compose') compose.show(); else scene.resize();
 }
 
 function bindUi() {
@@ -593,6 +598,7 @@ function bindUi() {
   $('#tab-online').onclick = () => setTab('online');
   $('#tab-pattern').onclick = () => setTab('pattern');
   $('#tab-rack').onclick = () => setTab('rack');
+  $('#tab-compose').onclick = () => setTab('compose');
   $('#list-body').addEventListener('contextmenu', (e) => {
     const r = e.target.closest('.list-row');
     if (!r) return;
@@ -656,6 +662,7 @@ function bindUi() {
     if (e.key === 'Escape' && !$('#settings').hidden) { $('#settings').hidden = true; return; }
     if ((e.target.tagName === 'INPUT' && e.target.type !== 'range') || e.target.tagName === 'SELECT') return;
     if (state.tab === 'pattern' && e.key === ' ') { e.preventDefault(); pattern.togglePlay(); return; }
+    if (state.tab === 'compose') { if (!document.querySelector('.cp-modal, .popover') && compose.onKey(e)) e.preventDefault(); return; }
     if (state.tab !== 'library') return;
     if (e.key === 'Escape') { if (state.focus) exitFocus(); else closePanel(); }
     if (e.key === ' ' && state.selected >= 0) { e.preventDefault(); togglePlay(); }

@@ -6,6 +6,12 @@
       "runtimeExecutable": ".venv/bin/python",
       "runtimeArgs": ["tools/devserver.py", "--port", "8765"],
       "port": 8765
+    },
+    {
+      "name": "clustersound-compose",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["tools/devserver.py", "--port", "8766"],
+      "port": 8766
     }
   ]
 }

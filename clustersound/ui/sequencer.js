@@ -153,7 +153,8 @@ export class Sequencer {
   // ---------------------------------------------------------------- transport
   setPattern(p) { this.p = p; this.updateMix(); }
 
-  start(fromStep = 0) {
+  // at: AudioContext time of the first step (to start in sync with another transport)
+  start(fromStep = 0, at = null) {
     if (this.playing || !this.p) return;
     this.ctx.resume();
     this._graph();
@@ -161,7 +162,7 @@ export class Sequencer {
     this.playing = true;
     this.step = fromStep % (this.p.bars * 16);
     this.loop = 0; // loops played since start ('random_pass' alternation re-draws on every loop)
-    this.nextTime = this.ctx.currentTime + 0.06;
+    this.nextTime = at ?? this.ctx.currentTime + 0.06;
     this.timer = setInterval(() => this._tick(), TICK_MS);
     this._tick();
   }
@@ -268,6 +269,8 @@ export class Sequencer {
   _scheduleBass(bus, i, t, dest) {
     const notes = [...bus.notes].sort((a, b) => a.step - b.step);
     const sd = this.stepDur();
+    // bassShift (optional, e.g. the Compose tab): semitones for an absolute step, so the bass follows chords
+    const shift = this.bassShift ? this.bassShift(this.loop * this.p.bars * 16 + i) : 0;
     const swingAt = (s) => (s % 2 === 1 ? (this.swingOf(s) / 100 * 2 - 1) * sd : 0);
     notes.forEach((nt, idx) => {
       if (nt.step !== i) return;
@@ -286,11 +289,11 @@ export class Sequencer {
         const buf = this.buffers.get(refKey(layer.ref));
         if (!buf) continue;
         const src = this._voice(buf, dest, t + (layer.offset_ms || 0) / 1000,
-          velGain(nt.vel || 100) * layer.volume, Math.pow(2, this.bassSemis(layer, nt.semi) / 12), end);
-        let rate = Math.pow(2, this.bassSemis(layer, nt.semi) / 12);
+          velGain(nt.vel || 100) * layer.volume, Math.pow(2, this.bassSemis(layer, nt.semi + shift) / 12), end);
+        let rate = Math.pow(2, this.bassSemis(layer, nt.semi + shift) / 12);
         for (const nx of chain.slice(1)) {
           const at = t + (nx.step - nt.step) * sd + swingAt(nx.step) - swingAt(nt.step);
-          const next = Math.pow(2, this.bassSemis(layer, nx.semi) / 12);
+          const next = Math.pow(2, this.bassSemis(layer, nx.semi + shift) / 12);
           src.playbackRate.setValueAtTime(rate, Math.max(t, at - 0.06));
           src.playbackRate.exponentialRampToValueAtTime(next, at);
           rate = next;

@@ -25,7 +25,8 @@ def _read() -> dict:
 def _write(data: dict) -> None:
     tmp = _path().with_suffix(".tmp")
     tmp.write_text(json.dumps({"version": 1, "patterns": data.get("patterns", []),
-                               "sequences": data.get("sequences", [])}))
+                               "sequences": data.get("sequences", []),
+                               "progressions": data.get("progressions", [])}))
     tmp.replace(_path())
 
 
@@ -94,4 +95,33 @@ def delete_sequence(sid: str) -> bool:
         if len(kept) == len(items):
             return False
         _save(kept, "sequences")
+    return True
+
+
+# ------------------------------------------------------------------ chord progressions (Compose)
+def list_progressions() -> list[dict]:
+    with _lock:
+        return _load("progressions")
+
+
+def save_progression(proj: dict) -> dict:
+    proj = dict(proj)
+    with _lock:
+        items = _load("progressions")
+        if not str(proj.get("id", "")).startswith("prog:"):
+            proj["id"] = "prog:" + uuid.uuid4().hex[:10]
+            proj["created"] = time.time()
+        proj["updated"] = time.time()
+        items = [x for x in items if x.get("id") != proj["id"]] + [proj]
+        _save(items, "progressions")
+    return proj
+
+
+def delete_progression(pid: str) -> bool:
+    with _lock:
+        items = _load("progressions")
+        kept = [x for x in items if x.get("id") != pid]
+        if len(kept) == len(items):
+            return False
+        _save(kept, "progressions")
     return True
