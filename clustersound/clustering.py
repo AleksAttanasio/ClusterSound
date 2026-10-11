@@ -72,8 +72,11 @@ def subclusters(X: np.ndarray, max_k: int = 8, seed: int = 0) -> np.ndarray:
     return remap[lab]
 
 
-def knn(X: np.ndarray, i: int, k: int = 10) -> list[int]:
+def knn(X: np.ndarray, i: int, k: int = 10, return_sims: bool = False):
     Xn = l2norm(X)
     sims = Xn @ Xn[i]
     sims[i] = -np.inf
-    return np.argsort(-sims)[:k].tolist()
+    ids = np.argsort(-sims)[:k]
+    if return_sims:
+        return ids.tolist(), sims[ids].tolist()
+    return ids.tolist()

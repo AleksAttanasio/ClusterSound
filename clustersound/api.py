@@ -154,7 +154,7 @@ class Api:
         subprocess.run(["open", "-R", path], check=False)
         return True
 
-    def similar(self, item_id: int, k: int = 12) -> list[int]:
+    def similar(self, item_id: int, k: int = 12) -> list[dict]:
         return self._lib.similar(int(item_id), int(k))
 
     def relabel(self, item_id: int, cls: str | None) -> dict:

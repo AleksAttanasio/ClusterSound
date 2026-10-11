@@ -71,6 +71,26 @@ input[type=range] { width: 100%; accent-color: var(--accent-2); }
 .view3d canvas { display: block; outline: none; }
 .labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .labels .lbl { position: absolute; transform: translate(-50%, -50%); font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: rgba(15,17,21,.72); white-space: nowrap; text-shadow: 0 1px 2px #000; }
+.labels .flbl { position: absolute; transform: translate(10px, -50%); font-size: 11px; padding: 1px 6px; border-radius: 4px; background: rgba(15,17,21,.78); white-space: nowrap; color: var(--text-2); opacity: 0; transition: opacity .3s; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.labels .flbl.in { opacity: 1; }
+.labels .flbl b { color: var(--accent); font-weight: 600; }
+.labels .flbl.center { color: var(--text); font-weight: 600; border: 1px solid #34507f; }
+.labels .flbl.sel { color: #fff; border: 1px solid #fff; }
+.labels .flbl.compact .nm { display: none; }
+.labels .flbl.stop { transform: translate(calc(-100% - 6px), -50%); color: #1a1408; background: #ffb84d; font-weight: 700; padding: 0 5px; border-radius: 8px; }
+.focus-bar { position: absolute; left: calc((100% - var(--inset, 0px)) / 2); transition: left .25s ease; top: 12px; transform: translateX(-50%); background: rgba(21,24,32,.92); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; z-index: 4; max-width: calc(100% - var(--inset, 0px) - 24px); animation: fb-in .25s ease-out; }
+@keyframes fb-in { from { opacity: 0; transform: translate(-50%, -6px); } }
+.fb-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.fb-title { font-size: 12px; color: var(--text-2); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-title b { color: var(--text); }
+.fb-k { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); }
+.fb-k input { width: 130px; }
+.fb-k span { min-width: 22px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+.fb-crumbs { display: flex; gap: 4px; flex-wrap: wrap; max-width: 640px; }
+.fb-crumbs button { font-size: 11px; padding: 2px 7px; border-radius: 10px; border: 1px solid #5c4720; background: rgba(255,184,77,.08); color: #ffcf85; cursor: pointer; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-crumbs button.cur { background: #ffb84d; color: #1a1408; border-color: #ffb84d; }
+.fb-crumbs .sep { color: var(--text-3); font-size: 11px; align-self: center; }
+.fb-hint { font-size: 11px; color: var(--text-3); }
 .tooltip { position: absolute; pointer-events: none; background: rgba(20,23,30,.95); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; font-size: 12px; max-width: 360px; z-index: 5; }
 .tooltip .t-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tooltip .t-sub { color: var(--text-2); display: flex; align-items: center; gap: 6px; }

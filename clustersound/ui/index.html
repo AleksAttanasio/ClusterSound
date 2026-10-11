@@ -62,6 +62,19 @@
     <main class="main">
       <div id="view3d" class="view3d">
         <div id="labels" class="labels"></div>
+        <div id="focus-labels" class="labels"></div>
+        <div id="focus-bar" class="focus-bar" hidden>
+          <div class="fb-row">
+            <span class="fb-title">Simili a <b id="fb-name"></b></span>
+            <label class="fb-k" title="Quanti sample simili mostrare">
+              <input type="range" id="fb-k" min="5" max="60" step="1"><span id="fb-k-val"></span>
+            </label>
+            <button id="fb-trail" class="btn small" title="Inquadra tutto il percorso">⤢ Percorso</button>
+            <button id="fb-exit" class="btn small" title="Torna alla mappa (Esc)">✕ Esci</button>
+          </div>
+          <div id="fb-crumbs" class="fb-crumbs" hidden></div>
+          <div class="fb-hint">Clic: ascolta · doppio clic: ricentra sul sample</div>
+        </div>
         <div id="tooltip" class="tooltip" hidden></div>
         <div class="scene-tools">
           <button id="btn-rotate" class="icon-btn" title="Rotazione automatica">⟳</button>

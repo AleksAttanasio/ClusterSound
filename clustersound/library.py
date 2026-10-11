@@ -335,8 +335,12 @@ class Library:
             })
         return out
 
-    def similar(self, item_id: int, k: int = 12) -> list[int]:
-        return clustering.knn(self.emb, item_id, k) if len(self.emb) > 1 else []
+    def similar(self, item_id: int, k: int = 12) -> list[dict]:
+        """The k nearest items in embedding space, most similar first, with cosine similarity."""
+        if len(self.emb) <= 1:
+            return []
+        ids, sims = clustering.knn(self.emb, item_id, k, return_sims=True)
+        return [{"id": int(i), "sim": float(s)} for i, s in zip(ids, sims)]
 
 
 __all__ = ["Library", "scan_files", "analyse_file", "Path"]

@@ -15,10 +15,12 @@ const state = {
   classOn: new Set(), typeOn: new Set(), minConf: 0, search: '',
   mask: null, selected: -1, scanning: false,
   view: '3d', sort: { key: 'cls', dir: 1 }, rows: [], tab: 'library',
+  focus: null, // {center, items: [{id, sim}], trail: [id…]} while the similar-samples view is open
+  simK: (() => { try { return Math.min(60, Math.max(5, +localStorage.getItem('cs.simK') || 12)); } catch { return 12; } })(),
 };
 
 const player = new Player({ onState: onPlayState });
-window.__cs = { state, player, get pattern() { return pattern; } }; // handy from the web inspector (--debug)
+window.__cs = { state, player, get pattern() { return pattern; }, get scene() { return scene; } }; // handy from the web inspector (--debug)
 
 // ------------------------------------------------------------------ boot
 function whenApiReady() {
@@ -41,6 +43,7 @@ async function main() {
 
   scene = new Scene3D($('#view3d'), {
     onHover, onClick: (i) => { if (i >= 0) select(i, true); },
+    onDoubleClick: (i) => showSimilar(i),
     onContext: (i, x, y) => sendLibraryItem(i, x, y),
   });
   scene.onFrame = drawLabels;
@@ -176,6 +179,7 @@ async function loadResults() {
   const d = await state.api.results();
   state.version = d.version;
   if (!d.cls.length) return;
+  if (state.focus && d.cls.length !== state.data?.cls.length) exitFocus(false);
   state.data = d;
   $('#empty').hidden = true;
   $('#btn-export').disabled = false;
@@ -225,7 +229,9 @@ function computeCentroids() {
 
 let labelsOn = true;
 function drawLabels() {
-  if (!labelsOn || !centroids.length || state.view !== '3d') return;
+  if (state.view !== '3d') return;
+  if (state.focus) { drawFocusLabels(); return; }
+  if (!labelsOn || !centroids.length) return;
   const els = $('#labels').children;
   for (let k = 0; k < centroids.length; k++) {
     const c = centroids[k];
@@ -244,8 +250,10 @@ function onHover(i, x, y) {
   if (i < 0 || !state.data) { tip.hidden = true; document.body.style.cursor = ''; return; }
   const d = state.data;
   const c = state.classes[d.cls[i]];
+  const sim = state.focus?.items.find((it) => it.id === i);
   tip.innerHTML = `<div class="t-name">${esc(d.name[i])}</div>
-    <div class="t-sub"><span class="dot" style="background:${c.color}"></span>${esc(c.label)} · ${d.user[i] ? 'manuale' : Math.round(d.conf[i] * 100) + '%'} · gruppo ${d.sub[i]}</div>`;
+    <div class="t-sub"><span class="dot" style="background:${c.color}"></span>${esc(c.label)} · ${d.user[i] ? 'manuale' : Math.round(d.conf[i] * 100) + '%'} · gruppo ${d.sub[i]}</div>
+    ${sim ? `<div class="t-sub">Somiglianza ${Math.round(sim.sim * 100)}%</div>` : ''}`;
   tip.hidden = false;
   const W = $('#view3d').clientWidth;
   tip.style.left = `${Math.min(x + 14, W - tip.offsetWidth - 8)}px`;
@@ -256,13 +264,15 @@ function onHover(i, x, y) {
 async function select(i, play) {
   const d = state.data;
   if (!d || i < 0) return;
+  if (state.focus && !inFocus(i)) exitFocus();
   state.selected = i;
   scene.setSelected(i);
-  scene.setSimilar([]);
   highlightRow();
+  if (state.focus) syncFocusLabels();
   const item = { name: d.name[i], rel: d.rel[i], conf: d.conf[i], user: d.user[i] };
   panel.loading(item, state.classes[d.cls[i]]);
   if (play) playItem(i);
+  if (state.focus) syncInset();
   const det = await state.api.details(i);
   if (state.selected !== i) return; // user moved on
   panel.render(det, player.playing && player.id === i);
@@ -273,14 +283,132 @@ function closePanel() {
   panel.close();
   state.selected = -1;
   scene.setSelected(-1);
-  scene.setSimilar([]);
+  exitFocus();
   highlightRow();
 }
 
-async function showSimilar(id) {
-  const ids = await state.api.similar(id, 12);
-  scene.setSimilar(ids);
-  if (state.view === '3d') scene.focus(id);
+// ------------------------------------------------------------------ similar-samples focus
+const inFocus = (i) => !!state.focus && (i === state.focus.center || state.focus.trail.includes(i)
+  || state.focus.items.some((it) => it.id === i));
+
+let focusTok = 0;
+// Open the close-up of `id` and its neighbours, or re-centre it on `id`. Every centre visited is
+// appended to the trail (revisits too); `backTo` = index of a breadcrumb to go back to, cutting the trail there.
+async function showSimilar(id, backTo = -1) {
+  if (!state.data || id < 0) return;
+  if (state.view !== '3d') setView('3d');
+  const prev = state.focus?.trail || [];
+  const trail = backTo >= 0 ? prev.slice(0, backTo + 1) : prev[prev.length - 1] === id ? prev : [...prev, id];
+  await loadFocus(id, trail);
+}
+
+async function loadFocus(center, trail) {
+  const tok = ++focusTok;
+  const items = await state.api.similar(center, state.simK);
+  if (tok !== focusTok) return; // a newer request (slider, re-centre) won
+  const entering = !state.focus;
+  state.focus = { center, items, trail };
+  renderFocusBar();
+  syncInset();
+  scene.setFocus(center, items, trail);
+  if (entering) $('#labels').hidden = true;
+  syncFocusLabels();
+}
+
+function exitFocus(restoreView = true) {
+  if (!state.focus) return;
+  focusTok++;
+  state.focus = null;
+  scene.clearFocus(restoreView);
+  $('#focus-bar').hidden = true;
+  $('#labels').hidden = !labelsOn;
+  syncInset();
+  syncFocusLabels();
+}
+
+// keep the close-up out from under the detail panel
+function syncInset() {
+  const px = state.focus && panel.isOpen() ? $('#panel').offsetWidth : 0;
+  const bar = $('#focus-bar');
+  scene.setInset(px, state.focus && !bar.hidden ? bar.offsetTop + bar.offsetHeight : 0);
+  $('#view3d').style.setProperty('--inset', `${px}px`);
+}
+
+function renderFocusBar() {
+  const f = state.focus, d = state.data;
+  $('#focus-bar').hidden = false;
+  $('#fb-name').textContent = d.name[f.center];
+  $('#fb-name').title = d.rel[f.center];
+  $('#fb-k').value = state.simK;
+  $('#fb-k-val').textContent = state.simK;
+  $('#fb-trail').hidden = f.trail.length < 2;
+  const crumbs = $('#fb-crumbs');
+  crumbs.hidden = f.trail.length < 2;
+  crumbs.innerHTML = f.trail.map((id, k) => `${k ? '<span class="sep">›</span>' : ''}<button data-k="${k}"
+    class="${k === f.trail.length - 1 ? 'cur' : ''}" title="Torna qui · ${esc(d.rel[id])}">${k + 1} · ${esc(d.name[id])}</button>`).join('');
+}
+
+// one HTML label per neighbour (name + similarity) and a numbered badge per trail stop
+let focusLabels = new Map(); // key -> element
+function syncFocusLabels() {
+  const box = $('#focus-labels');
+  const f = state.focus, d = state.data;
+  const want = new Map();
+  if (f) {
+    want.set(`c${f.center}`, { id: f.center, cls: 'center', html: `<span class="nm">${esc(d.name[f.center])}</span>` });
+    f.items.forEach((it, k) => want.set(`n${it.id}`, { id: it.id, cls: '', rank: k + 1,
+      html: `<span class="nm">${esc(d.name[it.id])} </span><b>${Math.round(it.sim * 100)}%</b>` }));
+    const steps = new Map(); // a sample visited more than once shows all its step numbers
+    f.trail.forEach((id, k) => steps.set(id, [...(steps.get(id) || []), k + 1]));
+    for (const [id, ks] of steps) want.set(`t${id}`, { id, cls: 'stop', html: ks.join('·') });
+  }
+  for (const [key, el] of focusLabels) {
+    if (want.has(key)) continue;
+    el.classList.remove('in');
+    setTimeout(() => el.remove(), 300);
+    focusLabels.delete(key);
+  }
+  for (const [key, w] of want) {
+    let el = focusLabels.get(key);
+    if (!el) {
+      el = document.createElement('div');
+      box.appendChild(el);
+      focusLabels.set(key, el);
+      requestAnimationFrame(() => el.classList.add('in'));
+    }
+    const sel = w.cls !== 'stop' && w.id === state.selected;
+    el.dataset.id = w.id;
+    // drawing order for collisions: centre and selection first, then the most similar
+    el.dataset.prio = w.cls === 'stop' ? -1 : w.cls === 'center' ? 0 : sel ? 0.5 : w.rank;
+    el.className = `flbl ${w.cls} ${sel ? 'sel' : ''} ${el.classList.contains('in') ? 'in' : ''}`;
+    el.innerHTML = w.html;
+    el._w = null; // re-measure
+  }
+  focusOrder = [...focusLabels.values()].sort((a, b) => a.dataset.prio - b.dataset.prio);
+}
+
+// Names whose box would overlap a label already placed collapse to just the percentage.
+let focusOrder = [];
+function drawFocusLabels() {
+  const placed = [];
+  const hit = (r) => placed.some((o) => r[0] < o[2] && r[2] > o[0] && r[1] < o[3] && r[3] > o[1]);
+  for (const el of focusOrder) {
+    const p = scene.pos(+el.dataset.id);
+    const s = p && scene.project(...p);
+    if (!s) { el.style.display = 'none'; continue; }
+    el.style.display = '';
+    el.style.left = `${s[0]}px`;
+    el.style.top = `${s[1]}px`;
+    if (el.classList.contains('stop')) { placed.push([s[0] - 18, s[1] - 9, s[0] - 4, s[1] + 9]); continue; }
+    if (!el._w) { // full and compact widths, measured once
+      el.classList.remove('compact'); const full = el.offsetWidth;
+      el.classList.add('compact'); el._w = [full, el.offsetWidth];
+    }
+    const box = (w) => [s[0] + 10, s[1] - 9, s[0] + 10 + w, s[1] + 9];
+    const compact = hit(box(el._w[0])) && el.dataset.prio > 0;
+    el.classList.toggle('compact', compact);
+    placed.push(box(el._w[compact ? 1 : 0]));
+  }
 }
 
 async function relabel(id, cls) {
@@ -473,10 +601,26 @@ function bindUi() {
   };
   $('#panel-close').onclick = closePanel;
   $('#btn-rotate').onclick = (e) => { const on = e.currentTarget.classList.toggle('active'); scene.setAutoRotate(on); };
-  $('#btn-reset').onclick = () => scene.resetView();
+  $('#btn-reset').onclick = () => { exitFocus(false); scene.resetView(); };
+  $('#fb-exit').onclick = () => exitFocus();
+  $('#fb-trail').onclick = () => scene.frameTrail();
+  let kTimer = 0;
+  $('#fb-k').oninput = (e) => {
+    state.simK = +e.target.value;
+    $('#fb-k-val').textContent = state.simK;
+    try { localStorage.setItem('cs.simK', state.simK); } catch { /* private mode */ }
+    clearTimeout(kTimer);
+    kTimer = setTimeout(() => { if (state.focus) loadFocus(state.focus.center, state.focus.trail); }, 120);
+  };
+  $('#fb-crumbs').onclick = (e) => {
+    const b = e.target.closest('button[data-k]');
+    if (!b || !state.focus) return;
+    const k = +b.dataset.k, id = state.focus.trail[k];
+    showSimilar(id, k).then(() => select(id, true));
+  };
   $('#btn-labels').onclick = (e) => {
     labelsOn = e.currentTarget.classList.toggle('active');
-    $('#labels').hidden = !labelsOn;
+    $('#labels').hidden = !labelsOn || !!state.focus;
   };
   $('#list-body').addEventListener('scroll', () => renderList());
   $('#list-body').onclick = (e) => {
@@ -492,10 +636,10 @@ function bindUi() {
   };
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !$('#settings').hidden) { $('#settings').hidden = true; return; }
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if ((e.target.tagName === 'INPUT' && e.target.type !== 'range') || e.target.tagName === 'SELECT') return;
     if (state.tab === 'pattern' && e.key === ' ') { e.preventDefault(); pattern.togglePlay(); return; }
     if (state.tab !== 'library') return;
-    if (e.key === 'Escape') closePanel();
+    if (e.key === 'Escape') { if (state.focus) exitFocus(); else closePanel(); }
     if (e.key === ' ' && state.selected >= 0) { e.preventDefault(); togglePlay(); }
     if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && state.view === 'list' && state.rows.length) {
       e.preventDefault();
