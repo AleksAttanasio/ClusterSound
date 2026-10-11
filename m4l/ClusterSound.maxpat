@@ -17,7 +17,7 @@
   ],
   "openinpresentation": 1,
   "default_fontsize": 10.0,
-  "default_fontname": "Arial Bold",
+  "default_fontname": "Ableton Sans Medium",
   "gridsize": [
    8.0,
    8.0
@@ -289,8 +289,19 @@
       18
      ],
      "text": "ClusterSound",
-     "fontface": 1,
-     "fontsize": 12.0
+     "fontsize": 11.0,
+     "fontname": "Ableton Sans Bold",
+     "textcolor": [
+      0.95,
+      0.95,
+      0.95,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_lcd_title"
+      }
+     }
     }
    },
    {
@@ -359,7 +370,9 @@
       0.6,
       0.6,
       1.0
-     ]
+     ],
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0
     }
    },
    {
@@ -428,7 +441,9 @@
       0.6,
       0.6,
       1.0
-     ]
+     ],
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0
     }
    },
    {
@@ -558,7 +573,9 @@
       0.3,
       0.3,
       1.0
-     ]
+     ],
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0
     }
    },
    {
@@ -666,7 +683,9 @@
       0.553,
       0.992,
       1.0
-     ]
+     ],
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0
     }
    },
    {
@@ -778,7 +797,20 @@
       72,
       18
      ],
-     "text": "Nuove tracce"
+     "text": "Nuove tracce",
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.8,
+      0.8,
+      0.8,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     }
     }
    },
    {
@@ -890,7 +922,20 @@
       48,
       18
      ],
-     "text": "Tempo"
+     "text": "Tempo",
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.8,
+      0.8,
+      0.8,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     }
     }
    },
    {
@@ -984,7 +1029,20 @@
       60,
       18
      ],
-     "text": "Ricevi"
+     "text": "Ricevi",
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.8,
+      0.8,
+      0.8,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     }
     }
    },
    {
@@ -1042,9 +1100,20 @@
       256,
       18
      ],
-     "text": "Strumenti di Live da provare",
-     "fontface": 1,
-     "fontsize": 12.0
+     "text": "Strumenti di Live",
+     "fontsize": 11.0,
+     "fontname": "Ableton Sans Bold",
+     "textcolor": [
+      0.95,
+      0.95,
+      0.95,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_lcd_title"
+      }
+     }
     }
    },
    {
@@ -1066,7 +1135,21 @@
       56,
       18
      ],
-     "text": "Traccia"
+     "text": "Traccia",
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.8,
+      0.8,
+      0.8,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     },
+     "textjustification": 2
     }
    },
    {
@@ -1135,7 +1218,9 @@
       0.6,
       0.6,
       1.0
-     ]
+     ],
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0
     }
    },
    {
@@ -1175,7 +1260,21 @@
       56,
       18
      ],
-     "text": "Tipo"
+     "text": "Tipo",
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.8,
+      0.8,
+      0.8,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     },
+     "textjustification": 2
     }
    },
    {
@@ -1244,7 +1343,9 @@
       0.6,
       0.6,
       1.0
-     ]
+     ],
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0
     }
    },
    {
@@ -1284,7 +1385,21 @@
       56,
       18
      ],
-     "text": "Strumento"
+     "text": "Strumento",
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.8,
+      0.8,
+      0.8,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     },
+     "textjustification": 2
     }
    },
    {
@@ -1354,7 +1469,9 @@
       0.6,
       0.6,
       1.0
-     ]
+     ],
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0
     }
    },
    {
@@ -1467,7 +1584,9 @@
       0.3,
       0.3,
       1.0
-     ]
+     ],
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0
     }
    },
    {
@@ -1598,7 +1717,9 @@
       0.3,
       0.3,
       1.0
-     ]
+     ],
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0
     }
    },
    {
@@ -1729,7 +1850,9 @@
       0.3,
       0.3,
       1.0
-     ]
+     ],
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0
     }
    },
    {
@@ -1859,7 +1982,9 @@
       0.3,
       0.3,
       1.0
-     ]
+     ],
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0
     }
    },
    {
@@ -1912,7 +2037,20 @@
      ],
      "presentation": 0,
      "linecount": 2,
-     "text": "Scegli uno strumento o usa ◀ ▶: si carica e la clip suona in loop. Doppio clic su Prova: vai alla traccia."
+     "text": "Scegli uno strumento o usa ◀ ▶: si carica e la clip suona in loop. Doppio clic su Prova: vai alla traccia.",
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.6,
+      0.6,
+      0.6,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_control_fg_off"
+      }
+     }
     }
    },
    {
@@ -1935,7 +2073,20 @@
       18
      ],
      "text": "Avvio…",
-     "linecount": 1
+     "linecount": 1,
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0,
+     "textcolor": [
+      0.6,
+      0.6,
+      0.6,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "textcolor": {
+       "expression": "themecolor.live_control_fg_off"
+      }
+     }
     }
    },
    {
@@ -2029,7 +2180,9 @@
       0.3,
       0.3,
       1.0
-     ]
+     ],
+     "fontname": "Ableton Sans Medium",
+     "fontsize": 10.0
     }
    },
    {
