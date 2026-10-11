@@ -39,7 +39,7 @@ app = BUNDLE(
     icon=str(root / "brand" / "ClusterSound.icns"),
     bundle_identifier="com.clustersound.app",
     info_plist={
-        "CFBundleShortVersionString": "0.2.1",
+        "CFBundleShortVersionString": "0.3.0",
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "12.0",
     },
