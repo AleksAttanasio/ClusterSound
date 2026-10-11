@@ -442,15 +442,18 @@ wa-select.pop-field, wa-input.pop-field { display: block; }
 .pt-alt { width: 104px; }
 .rk-frame.lock { border-style: dashed; }
 .rk-frame.lock span { display: block; }
-.rk-load { width: 600px; }
+.rk-load { display: flex; flex-direction: column; gap: 12px; }
 .rk-load-rows { display: flex; flex-direction: column; gap: 4px; max-height: 50vh; overflow-y: auto; }
-.rk-load-row { display: grid; grid-template-columns: 170px 1fr 200px; align-items: center; gap: 10px; padding: 5px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
-.rk-load-opts { display: flex; flex-direction: column; gap: 6px; }
+.rk-load-row { display: grid; grid-template-columns: 170px 1fr 210px; align-items: center; gap: 10px; padding: 5px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+.rk-load-opts { display: flex; flex-direction: column; gap: 10px; }
 .rk-menu { width: 280px; }
 .rk-menu .send-row { display: block; cursor: pointer; }
 .rack-layout .rk-browser { gap: 8px; }
-.rk-select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; color: var(--text); padding: 5px 6px; font: inherit; max-width: 100%; }
-.rk-browser .links label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-2); }
+wa-select.rk-select { max-width: 100%; }
+.rk-bar wa-select.rk-select { width: auto; min-width: 150px; }
+.rk-bar #rk-map { width: 290px; }
+.rk-bar #rk-device { width: 215px; }
+.rk-browser .links wa-checkbox { color: var(--text-2); }
 .rk-blist { flex: 1; min-height: 120px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
 .rk-brow { display: flex; align-items: center; gap: 7px; padding: 4px 8px; cursor: pointer; border-bottom: 1px solid #1a1e27; -webkit-user-select: none; user-select: none; }
 .rk-brow:hover { background: var(--bg-3); }
@@ -462,7 +465,8 @@ wa-select.pop-field, wa-input.pop-field { display: block; }
 .rk-trail button { background: var(--bg-3); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; font-size: 11px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rk-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 10px 14px; gap: 10px; }
 .rk-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.rk-name { width: 170px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; color: var(--text); padding: 6px 8px; font: inherit; font-weight: 600; }
+.rk-name { width: 170px; }
+.rk-name::part(input) { font-weight: 600; }
 .rk-stage { flex: 1; min-height: 0; display: flex; gap: 14px; align-items: flex-start; }
 .rk-grid { --g: 5px; display: grid; grid-template-columns: repeat(4, 1fr) 6px repeat(4, 1fr); grid-template-rows: repeat(4, 1fr) 6px repeat(4, 1fr);
   gap: var(--g); aspect-ratio: 1; height: min(100%, calc(100vw - 270px - 28px - 330px)); max-height: 100%; flex: none; padding: 8px; background: #0b0d11; border: 1px solid var(--line); border-radius: 12px; }
@@ -477,25 +481,26 @@ wa-select.pop-field, wa-input.pop-field { display: block; }
 .rk-pname { font-size: 10px; line-height: 1.15; max-height: 2.3em; overflow: hidden; word-break: break-all; color: var(--text); }
 .rk-frame { pointer-events: none; border: 1.5px solid color-mix(in srgb, var(--gc) 45%, transparent); border-radius: 8px; margin: -3px; z-index: 2; position: relative; }
 .rk-frame.sel { border: 2px solid var(--gc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gc) 25%, transparent); }
-.rk-frame span { position: absolute; top: -8px; left: 6px; font-size: 9px; padding: 0 4px; background: #0b0d11; color: var(--gc); border-radius: 3px; white-space: nowrap; opacity: .85; }
+.rk-frame span { position: absolute; top: -8px; left: 6px; font-size: 9px; padding: 0 4px; background: #0b0d11; color: var(--gc); border-radius: 3px; white-space: nowrap; opacity: .85; display: inline-flex; align-items: center; gap: 3px; }
 .rk-frame:not(.sel) span { display: none; }
 .rk-insp { width: 316px; flex: none; max-height: 100%; overflow-y: auto; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 9px; }
 .rk-ihead { display: flex; align-items: center; gap: 8px; }
 .rk-ihead .hint { margin-left: auto; }
 .rk-field { display: flex; flex-direction: column; gap: 4px; color: var(--text-2); font-size: 12px; }
-.rk-field input[type=range] { width: 100%; }
-.rk-check { display: flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 12px; cursor: pointer; }
+.rk-check { color: var(--text-2); }
 .rk-sep { border-top: 1px solid var(--line); }
 .rk-seed { display: flex; align-items: center; gap: 7px; min-height: 26px; }
 .rk-seed-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.rk-modes .seg-btn { flex: 1; padding: 6px 4px; font-size: 12px; }
+.rk-modes wa-radio { flex: 1; --wa-form-control-padding-inline: 6px; }
+.rk-modes::part(form-control-input) { width: 100%; }
 .rk-cands { max-height: 260px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
-.rk-cand { display: flex; align-items: center; gap: 6px; padding: 3px 6px; font-size: 12px; cursor: pointer; }
+.rk-cand { display: flex; align-items: center; gap: 6px; padding: 3px 6px; font-size: 12px; }
 .rk-cand:hover { background: var(--bg-3); }
 .rk-cname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-warn > div { display: flex; align-items: center; gap: 6px; }
 .rk-cand b { color: var(--text-2); font-weight: 600; font-size: 11px; }
 .rk-actions { display: flex; gap: 8px; }
-.rk-actions .btn.primary { flex: 1; }
+.rk-actions wa-button[variant="brand"] { flex: 1; }
 
 /* sequencer tab: section labels, sample toolbar, danger button */
 .pt-row-label { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--text-3); min-width: 62px; }
@@ -687,7 +692,7 @@ wa-select.pop-field, wa-input.pop-field { display: block; }
 
 /* ---------------------------------------------------------------- Drum Rack: Roland SPD-SX */
 .rk-device { font-weight: 600; }
-.rk-warn { background: #2a1f12; border: 1px solid #5c4320; color: #f3c27a; border-radius: 8px; padding: 6px 10px; font-size: 12px; display: flex; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box; }
+.rk-warn { background: var(--wa-color-warning-fill-quiet); border: 1px solid var(--wa-color-warning-border-normal); color: var(--wa-color-warning-on-quiet); border-radius: 8px; padding: 6px 10px; font-size: 12px; display: flex; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box; }
 .rk-spd { display: flex; flex-direction: column; align-items: center; gap: 14px; max-height: 100%; overflow-y: auto; width: min(520px, calc(100vw - 270px - 28px - 330px)); flex: none; }
 .spd-body { width: 100%; background: linear-gradient(#22252c, #16181d); border: 1px solid #333844; border-radius: 22px 22px 14px 14px; padding: 14px 16px 18px;
   box-shadow: inset 0 1px 0 #3a3f4b, 0 6px 18px #0008; }
@@ -705,7 +710,7 @@ wa-select.pop-field, wa-input.pop-field { display: block; }
 .spd-pad .rk-note { font-size: 11px; color: var(--text-2); }
 .spd-pad .rk-note i { font-style: normal; color: var(--text-3); margin-left: 3px; }
 .spd-pad .rk-pname { font-size: 11px; }
-.spd-fam { position: absolute; top: 4px; right: 6px; font-size: 9px; padding: 0 4px; border-radius: 3px; background: #0b0d11cc; color: var(--gc); white-space: nowrap; max-width: 70%; overflow: hidden; text-overflow: ellipsis; }
+.spd-fam { position: absolute; top: 4px; right: 6px; font-size: 9px; padding: 0 4px; border-radius: 3px; background: #0b0d11cc; color: var(--gc); white-space: nowrap; max-width: 70%; overflow: hidden; text-overflow: ellipsis; display: inline-flex; align-items: center; gap: 3px; }
 .spd-pad .rk-badge { top: auto; bottom: 4px; }
 .spd-trigs { display: flex; gap: 18px; justify-content: center; width: 100%; }
 .spd-trig { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 42%; }

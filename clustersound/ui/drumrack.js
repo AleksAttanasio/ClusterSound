@@ -4,6 +4,8 @@ import { refKey } from './sequencer.js';
 import { toast, suggestBus, showPopover } from './sendmenu.js';
 import { sendToLive } from './live.js';
 import { NO_ALT, dynControls, wireDynControls, readDynControls } from './pattern.js';
+import { btn, openDialog } from './kit.js';
+import { svg } from './icons.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -160,9 +162,9 @@ export class DrumRackEditor {
     const root = $('#rack');
     root.innerHTML = `
       <aside class="sidebar rk-browser">
-        <div class="filter-title">Sample <span class="links"><label title="Il browser segue la famiglia del gruppo selezionato"><input type="checkbox" id="rk-follow"> segui gruppo</label></span></div>
-        <select id="rk-bfam" class="rk-select"></select>
-        <input id="rk-q" class="search" type="search" placeholder="Cerca per nome o cartella…" autocomplete="off">
+        <div class="filter-title">Sample <span class="links"><wa-checkbox size="xs" id="rk-follow" title="Il browser segue la famiglia del gruppo selezionato">segui gruppo</wa-checkbox></span></div>
+        <wa-select id="rk-bfam" size="s" class="rk-select"></wa-select>
+        <wa-input id="rk-q" class="search" type="search" size="s" with-clear placeholder="Cerca per nome o cartella…" autocomplete="off"><wa-icon slot="start" name="search"></wa-icon></wa-input>
         <div class="hint">Clic: ascolta e usa come seed · doppio clic: riempi il gruppo · trascina su un pad</div>
         <div id="rk-blist" class="rk-blist"></div>
         <div class="rk-trail-box">
@@ -172,24 +174,24 @@ export class DrumRackEditor {
       </aside>
       <main class="rk-main">
         <div class="rk-bar">
-          <select id="rk-device" class="rk-select rk-device" title="Per quale strumento è il kit">${DEVICES.map(([id, l]) => `<option value="${id}">${l}</option>`).join('')}</select>
-          <input id="rk-name" class="rk-name" type="text" maxlength="80" title="Nome del kit (anche del file .adg)">
-          <div class="seg" id="rk-geo"></div>
-          <select id="rk-map" class="rk-select" title="Note MIDI dei pad">
-            <option value="launchpad">Note: Launchpad / Live (quadranti 4×4)</option>
-            <option value="rows">Note: righe sequenziali (36 + riga×8)</option>
-          </select>
+          <wa-select id="rk-device" size="s" class="rk-select rk-device" title="Per quale strumento è il kit">${DEVICES.map(([id, l]) => `<wa-option value="${id}">${l}</wa-option>`).join('')}</wa-select>
+          <wa-input id="rk-name" size="s" class="rk-name" maxlength="80" title="Nome del kit (anche del file .adg)"></wa-input>
+          <wa-radio-group id="rk-geo" class="seg" orientation="horizontal" size="s" label="Geometria"></wa-radio-group>
+          <wa-select id="rk-map" size="s" class="rk-select" title="Note MIDI dei pad">
+            <wa-option value="launchpad">Note: Launchpad / Live (quadranti 4×4)</wa-option>
+            <wa-option value="rows">Note: righe sequenziali (36 + riga×8)</wa-option>
+          </wa-select>
           <div class="spacer"></div>
-          <button class="btn" id="rk-auto" title="Riempie i gruppi vuoti in base alla famiglia (Alt+clic: rigenera tutti i gruppi non bloccati)">Auto-riempi</button>
-          <button class="btn" id="rk-random" title="Per ogni gruppo non bloccato (🔒): un gruppo di sample simili a caso della sua famiglia, con sample a caso">🎲 Casuale</button>
-          <button class="btn" id="rk-gen" title="Kit SPD-SX casuale e suonabile: configurazione a caso, ogni gruppo da un gruppo di sample simili diverso" hidden>🎲 Genera kit</button>
-          <select id="rk-saved" class="rk-select" title="Kit salvati"></select>
-          <button class="btn" id="rk-save" title="Salva il kit">Salva</button>
-          <button class="btn" id="rk-del" title="Elimina il kit salvato" hidden>Elimina</button>
-          <button class="btn" id="rk-clear" title="Svuota tutti i pad">Svuota</button>
-          <button class="btn" id="rk-toseq" title="Carica i sample del kit nei bus del Sequencer">→ Sequencer</button>
-          <button class="btn primary" id="rk-export">Esporta per Ableton</button>
-          <button class="btn" id="rk-live" title="Crea in Live una traccia con questo Drum Rack (serve il device ClusterSound nel set)">Invia a Live</button>
+          ${btn('Auto-riempi', { id: 'rk-auto', icon: 'sparkles', title: 'Riempie i gruppi vuoti in base alla famiglia (Alt+clic: rigenera tutti i gruppi non bloccati)' })}
+          ${btn('Casuale', { id: 'rk-random', icon: 'dices', title: 'Per ogni gruppo non bloccato: un gruppo di sample simili a caso della sua famiglia, con sample a caso' })}
+          ${btn('Genera kit', { id: 'rk-gen', icon: 'dices', hidden: true, title: 'Kit SPD-SX casuale e suonabile: configurazione a caso, ogni gruppo da un gruppo di sample simili diverso' })}
+          <wa-select id="rk-saved" size="s" class="rk-select" title="Kit salvati"></wa-select>
+          ${btn('Salva', { id: 'rk-save', icon: 'save', title: 'Salva il kit' })}
+          ${btn('Elimina', { id: 'rk-del', icon: 'trash-2', hidden: true, title: 'Elimina il kit salvato' })}
+          ${btn('Svuota', { id: 'rk-clear', title: 'Svuota tutti i pad' })}
+          ${btn('Sequencer', { id: 'rk-toseq', icon: 'arrow-right', title: 'Carica i sample del kit nei bus del Sequencer' })}
+          ${btn('Esporta per Ableton', { id: 'rk-export', variant: 'brand', icon: 'file-down' })}
+          ${btn('Invia a Live', { id: 'rk-live', title: 'Crea in Live una traccia con questo Drum Rack (serve il device ClusterSound nel set)' })}
         </div>
         <div class="rk-stage">
           <div id="rk-grid" class="rk-grid"></div>
@@ -198,18 +200,17 @@ export class DrumRackEditor {
       </main>`;
 
     this._buildBar();
-    $('#rk-bfam').innerHTML = this.meta.families.map((f) => `<option value="${f.id}">${esc(f.label)}</option>`).join('');
+    $('#rk-bfam').innerHTML = this.meta.families.map((f) => `<wa-option value="${f.id}"><span slot="start" class="dot" style="background:${f.color}"></span>${esc(f.label)}</wa-option>`).join('');
     $('#rk-follow').checked = this.browse.follow;
 
-    $('#rk-geo').onclick = (e) => {
-      const b = e.target.closest('[data-geo]');
-      if (!b) return;
-      this.rack.geometry = b.dataset.geo;
+    $('#rk-geo').addEventListener('change', (e) => {
+      if (e.target.id !== 'rk-geo' || e.target.value === this.rack.geometry) return;
+      this.rack.geometry = e.target.value;
       this._fixPad();
       this._persist();
       this.renderAll();
       this._followGroup();
-    };
+    });
     $('#rk-device').onchange = (e) => this.setDevice(e.target.value);
     $('#rk-gen').onclick = (e) => this.openGenerate(e.currentTarget);
     $('#rk-map').onchange = (e) => { this.rack.mapping = e.target.value; this._persist(); this.renderGrid(); };
@@ -236,7 +237,7 @@ export class DrumRackEditor {
 
     // browser
     let qTimer = 0;
-    $('#rk-q').oninput = (e) => { this.browse.q = e.target.value; clearTimeout(qTimer); qTimer = setTimeout(() => this.loadBrowser(), 150); };
+    $('#rk-q').oninput = (e) => { this.browse.q = e.target.value || ''; clearTimeout(qTimer); qTimer = setTimeout(() => this.loadBrowser(), 150); };
     $('#rk-bfam').onchange = (e) => { this.browse.family = e.target.value; this.loadBrowser(); };
     $('#rk-follow').onchange = (e) => { this.browse.follow = e.target.checked; this._followGroup(); };
     const list = $('#rk-blist');
@@ -313,8 +314,7 @@ export class DrumRackEditor {
       const t = e.target.closest('[data-act]');
       if (!t) return;
       const act = t.dataset.act;
-      if (act === 'mode') { this.opts.mode = t.dataset.mode; this._persist(); this.renderInspector(); }
-      else if (act === 'fill') this.fillGroup();
+      if (act === 'fill') this.fillGroup();
       else if (act === 'clear-group') this.clearGroup();
       else if (act === 'play-seed' && this.seed) this.audition(this.seed);
       else if (act === 'play') this.audition(this.manual.cands[+t.dataset.k]);
@@ -323,11 +323,12 @@ export class DrumRackEditor {
     insp.onchange = (e) => {
       const t = e.target;
       const g = this.groupOf(this.pad);
-      if (t.dataset.set === 'family') { this.setSetting(g, 'family', t.value); this.renderAll(); this._followGroup(); }
+      if (t.dataset.set === 'mode') { this.opts.mode = t.value; this._persist(); this.renderInspector(); }
+      else if (t.dataset.set === 'family') { this.setSetting(g, 'family', t.value); this.renderAll(); this._followGroup(); }
       else if (t.dataset.set === 'choke') { this.setSetting(g, 'choke', +t.value); }
       else if (t.dataset.set === 'lock') { this.setSetting(g, 'lock', t.checked); this.renderGrid(); }
       else if (t.dataset.opt) {
-        this.opts[t.dataset.opt] = t.type === 'checkbox' ? t.checked : t.type === 'range' ? +t.value : t.value;
+        this.opts[t.dataset.opt] = t.localName === 'wa-checkbox' ? t.checked : t.localName === 'wa-slider' ? +t.value : t.value;
         this._persist();
         if (t.dataset.opt !== 'variation' && t.dataset.opt !== 'avoid') { this.manual.seedKey = ''; this.renderInspector(); }
       } else if (t.dataset.pick != null) {
@@ -349,11 +350,11 @@ export class DrumRackEditor {
   _buildBar() {
     const list = this.isSpd ? this.meta.spdsx.configs : this.meta.geometries;
     $('#rk-device').value = this.device;
-    $('#rk-geo').innerHTML = list.map((g) => `<button class="seg-btn" data-geo="${g.id}">${esc(g.label)}</button>`).join('');
+    $('#rk-geo').innerHTML = list.map((g) => `<wa-radio appearance="button" value="${g.id}">${esc(g.label)}</wa-radio>`).join('');
     $('#rk-geo').title = this.isSpd ? 'Configurazione dei pad: quali gruppi e quali famiglie' : '';
     $('#rk-map').hidden = this.isSpd;
     $('#rk-gen').hidden = !this.isSpd;
-    $('#rk-export').textContent = this._exportLabel();
+    $('#rk-export').innerHTML = `<wa-icon slot="start" name="file-down"></wa-icon>${this._exportLabel()}`;
     $('#rk-export').title = this.isSpd ? 'Drum Rack per Live sulle note della SPD-SX + WAV 16 bit per SPD-SX Wave Manager' : '';
   }
 
@@ -371,7 +372,7 @@ export class DrumRackEditor {
   renderAll() {
     $('#rk-name').value = this.rack.name;
     $('#rk-map').value = this.rack.mapping;
-    document.querySelectorAll('#rk-geo .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.geo === this.rack.geometry));
+    $('#rk-geo').value = this.rack.geometry;
     this.renderSaved();
     this.renderGrid();
     this.renderInspector();
@@ -408,7 +409,7 @@ export class DrumRackEditor {
       const lock = this.settings(g).lock;
       if (this.rack.geometry === 'free' && g !== sel && !lock) return;
       html.push(`<div class="rk-frame ${g === sel ? 'sel' : ''} ${lock ? 'lock' : ''}" style="grid-row:${rowStart}/${rowEnd};grid-column:${colStart}/${colEnd};--gc:${fam.color}">
-        ${this.rack.geometry !== 'free' || lock ? `<span>${lock ? '🔒 ' : ''}${this.rack.geometry !== 'free' ? esc(fam.label) : ''}</span>` : ''}</div>`);
+        ${this.rack.geometry !== 'free' || lock ? `<span>${lock ? svg('lock', 9) : ''}${this.rack.geometry !== 'free' ? esc(fam.label) : ''}</span>` : ''}</div>`);
     });
     const grid = $('#rk-grid');
     grid.className = 'rk-grid';
@@ -431,7 +432,7 @@ export class DrumRackEditor {
       const color = ref ? this.classColor[ref.cls] || '#8a8f98' : '';
       const badge = ref ? KIND_BADGE[ref.kind] : '';
       const tag = firstOf[p] != null && this.rack.geometry !== 'spd_free'
-        ? `<span class="spd-fam">${s.lock ? '🔒 ' : ''}${esc(fam.label)}</span>` : (s.lock ? '<span class="spd-fam">🔒</span>' : '');
+        ? `<span class="spd-fam">${s.lock ? svg('lock', 9) : ''}${esc(fam.label)}</span>` : (s.lock ? `<span class="spd-fam">${svg('lock', 9)}</span>` : '');
       return `<div class="rk-pad spd-pad ${extra} ${ref ? 'full' : ''} ${p === this.pad ? 'sel' : ''} ${g === sel ? 'gsel' : ''}" data-p="${p}"
         draggable="${ref ? 'true' : 'false'}" style="--gc:${fam.color};${ref ? `--pc:${color}` : ''}"
         title="${esc(spd.labels[p])} · ${noteName(spd.notes[p])}${ref ? ` · ${esc(ref.name)}` : ' · vuoto'}">
@@ -440,7 +441,7 @@ export class DrumRackEditor {
     };
     const trig = (p, key, label, icon) => `<div class="spd-trig ${t[key] ? '' : 'off'}">
         ${t[key] ? cell(p, 'spd-tpad') : `<div class="spd-tpad spd-empty">${icon}<span>non collegato</span></div>`}
-        <label class="rk-check" data-trig-wrap><input type="checkbox" data-trig="${key}" ${t[key] ? 'checked' : ''}> ${label}</label>
+        <wa-checkbox size="s" class="rk-check" data-trig="${key}" ${t[key] ? 'checked' : ''}>${label}</wa-checkbox>
       </div>`;
     const grid = $('#rk-grid');
     grid.className = 'rk-spd';
@@ -451,7 +452,7 @@ export class DrumRackEditor {
       </div>
       <div class="spd-trigs">
         ${trig(spd.trig1, 'trig1', 'Pedale (Trig 1)', PEDAL_ICON)}
-        ${trig(spd.trig2, 'trig2', 'Trig 2', '◎')}
+        ${trig(spd.trig2, 'trig2', 'Trig 2', svg('circle', 20))}
       </div>
       <div id="rk-warn" class="rk-warn" hidden></div>`;
     this._renderWarnings();
@@ -471,34 +472,31 @@ export class DrumRackEditor {
     const allowed = this.isSpd && this.rack.geometry !== 'spd_free' ? this.check?.allowed?.[g] : null;
     const famOpt = (f) => {
       const off = allowed && !allowed.includes(f.id);
-      return `<option value="${f.id}" ${f.id === s.family ? 'selected' : ''} ${off ? 'disabled' : ''}>${esc(f.label)}${off ? ' — troppi pad di questo tipo' : ''}</option>`;
+      return `<wa-option value="${f.id}" ${off ? 'disabled' : ''}><span slot="start" class="dot" style="background:${f.color}"></span>${esc(f.label)}${off ? ' — troppi pad di questo tipo' : ''}</wa-option>`;
     };
     const html = [`
       <div class="rk-ihead"><span class="dot" style="background:${fam.color}"></span>
         <b>Gruppo ${g + 1}</b><span class="hint">${pads.length} pad · ${filled} pieni · ${esc(where)}</span></div>
-      <label class="rk-field">Famiglia
-        <select data-set="family" class="rk-select">${this.meta.families.map(famOpt).join('')}</select></label>
-      <label class="rk-field" title="I pad con lo stesso choke group si zittiscono a vicenda (es. hat aperto/chiuso)">Choke group
-        <select data-set="choke" class="rk-select"><option value="0">nessuno</option>${Array.from({ length: 16 }, (_, i) => `<option value="${i + 1}" ${s.choke === i + 1 ? 'selected' : ''}>${i + 1}</option>`).join('')}</select></label>
-      <label class="rk-check" title="Casuale e Auto-riempi (Alt) non cambiano i gruppi bloccati"><input type="checkbox" data-set="lock" ${s.lock ? 'checked' : ''}> 🔒 blocca gruppo</label>
+      <wa-select size="s" class="rk-field" label="Famiglia" data-set="family" value="${s.family}">${this.meta.families.map(famOpt).join('')}</wa-select>
+      <wa-select size="s" class="rk-field" label="Choke group" data-set="choke" value="${s.choke || 0}" title="I pad con lo stesso choke group si zittiscono a vicenda (es. hat aperto/chiuso)"><wa-option value="0">nessuno</wa-option>${Array.from({ length: 16 }, (_, i) => `<wa-option value="${i + 1}">${i + 1}</wa-option>`).join('')}</wa-select>
+      <wa-checkbox size="s" class="rk-check" data-set="lock" ${s.lock ? 'checked' : ''} title="Casuale e Auto-riempi (Alt) non cambiano i gruppi bloccati">blocca gruppo</wa-checkbox>
       <div class="rk-sep"></div>
       <div class="rk-seed">${seed
-        ? `<button class="pt-ib" data-act="play-seed" title="Ascolta">▶</button><span class="dot" style="background:${this.classColor[seed.cls] || '#8a8f98'}"></span>
+        ? `<button class="pt-ib" data-act="play-seed" title="Ascolta">${svg('play', 11)}</button><span class="dot" style="background:${this.classColor[seed.cls] || '#8a8f98'}"></span>
            <span class="rk-seed-name" title="${esc(seed.path || seed.name)}">${esc(seed.name)}</span>`
         : '<span class="hint">Seed: clicca un sample nel browser, su un pad o “Drum Rack” dal menu Invia della Libreria.</span>'}</div>
-      <div class="seg rk-modes">${MODES.map(([m, l]) => `<button class="seg-btn ${o.mode === m ? 'active' : ''}" data-act="mode" data-mode="${m}">${l}</button>`).join('')}</div>`];
+      <wa-radio-group class="seg rk-modes" orientation="horizontal" size="s" data-set="mode" value="${o.mode}" label="Modo di riempimento">${MODES.map(([m, l]) => `<wa-radio appearance="button" value="${m}">${l}</wa-radio>`).join('')}</wa-radio-group>`];
     if (o.mode === 'random') {
-      html.push(`<label class="rk-field" title="Quanto lontano dal seed può pescare: 0% = i più simili">Variazione <span id="rk-var-v">${Math.round(o.variation * 100)}%</span>
-        <input type="range" min="0" max="1" step="0.05" value="${o.variation}" data-opt="variation"></label>`);
+      html.push(`<div class="rk-field" title="Quanto lontano dal seed può pescare: 0% = i più simili"><span class="pop-row"><span>Variazione</span><span id="rk-var-v">${Math.round(o.variation * 100)}%</span></span>
+        <wa-slider size="s" min="0" max="1" step="0.05" value="${o.variation}" data-opt="variation" label="Variazione"></wa-slider></div>`);
     }
-    html.push(`<label class="rk-field">Simili tra
-      <select data-opt="filter" class="rk-select">
-        <option value="class" ${o.filter === 'class' ? 'selected' : ''}>stessa classe del seed</option>
-        <option value="family" ${o.filter === 'family' ? 'selected' : ''}>famiglia del gruppo (${esc(fam.label)})</option>
-        <option value="none" ${o.filter === 'none' ? 'selected' : ''}>tutta la libreria</option>
-      </select></label>
-      <label class="rk-check"><input type="checkbox" data-opt="oneshot" ${o.oneshot ? 'checked' : ''}> solo one-shot</label>
-      <label class="rk-check"><input type="checkbox" data-opt="avoid" ${o.avoid ? 'checked' : ''}> evita sample già nel kit</label>`);
+    html.push(`<wa-select size="s" class="rk-field" label="Simili tra" data-opt="filter" value="${o.filter}">
+        <wa-option value="class">stessa classe del seed</wa-option>
+        <wa-option value="family">famiglia del gruppo (${esc(fam.label)})</wa-option>
+        <wa-option value="none">tutta la libreria</wa-option>
+      </wa-select>
+      <wa-checkbox size="s" class="rk-check" data-opt="oneshot" ${o.oneshot ? 'checked' : ''}>solo one-shot</wa-checkbox>
+      <wa-checkbox size="s" class="rk-check" data-opt="avoid" ${o.avoid ? 'checked' : ''}>evita sample già nel kit</wa-checkbox>`);
     if (o.mode === 'manual') {
       html.push(`<div class="filter-title">Scegli i simili <span id="rk-pick-count">${this.manual.picked.length}/${pads.length - 1}</span></div>
         <div id="rk-cands" class="rk-cands">${similarOk ? '<div class="hint">Carico…</div>' : '<div class="hint">Serve un seed della Libreria.</div>'}</div>`);
@@ -511,8 +509,8 @@ export class DrumRackEditor {
     }
     const canFill = o.mode === 'trail' ? this.getTrail().length > 0 : !!seed && (similarOk || pads.length === 1);
     html.push(`<div class="rk-actions">
-      <button class="btn primary" data-act="fill" ${canFill ? '' : 'disabled'}>${o.mode === 'random' && filled ? '↻ Rigenera gruppo' : 'Riempi gruppo'}</button>
-      <button class="btn" data-act="clear-group" ${filled ? '' : 'disabled'}>Svuota gruppo</button></div>
+      ${btn(o.mode === 'random' && filled ? 'Rigenera gruppo' : 'Riempi gruppo', { variant: 'brand', icon: o.mode === 'random' && filled ? 'refresh-cw' : 'layout-grid', 'data-act': 'fill', disabled: !canFill })}
+      ${btn('Svuota gruppo', { 'data-act': 'clear-group', disabled: !filled })}</div>
       ${seed && !similarOk && pads.length > 1 ? '<div class="hint">Sample online/file: niente simili, trascinalo su un pad.</div>' : ''}`);
     $('#rk-insp').innerHTML = html.join('');
     if (o.mode === 'manual' && similarOk) this._loadCandidates();
@@ -535,7 +533,7 @@ export class DrumRackEditor {
     const w = this.check?.warnings || [];
     if (!box) return;
     box.hidden = !w.length;
-    box.innerHTML = w.map((x) => `<div>⚠︎ ${esc(x)}</div>`).join('');
+    box.innerHTML = w.map((x) => `<div>${svg('triangle-alert', 12)} ${esc(x)}</div>`).join('');
   }
 
   async _loadCandidates() {
@@ -551,11 +549,9 @@ export class DrumRackEditor {
     if (!box) return;
     const size = this.groups[this.groupOf(this.pad)].length - 1;
     $('#rk-pick-count').textContent = `${this.manual.picked.length}/${size}`;
-    box.innerHTML = this.manual.cands.length ? this.manual.cands.map((c, k) => `<label class="rk-cand">
-      <input type="checkbox" data-pick="${k}" ${this.manual.picked.includes(k) ? 'checked' : ''}>
-      <button class="pt-ib" data-act="play" data-k="${k}" title="Ascolta">▶</button>
-      <span class="dot" style="background:${this.classColor[c.cls] || '#8a8f98'}"></span>
-      <span class="rk-cname" title="${esc(c.path)}">${esc(c.name)}</span><b>${Math.round(c.sim * 100)}%</b></label>`).join('')
+    box.innerHTML = this.manual.cands.length ? this.manual.cands.map((c, k) => `<div class="rk-cand">
+      <button class="pt-ib" data-act="play" data-k="${k}" title="Ascolta">${svg('play', 11)}</button>
+      <wa-checkbox size="xs" class="rk-cname" data-pick="${k}" ${this.manual.picked.includes(k) ? 'checked' : ''} title="${esc(c.path)}"><span class="dot" style="background:${this.classColor[c.cls] || '#8a8f98'}"></span> ${esc(c.name)}</wa-checkbox><b>${Math.round(c.sim * 100)}%</b></div>`).join('')
       : '<div class="hint">Nessun sample simile con questi filtri.</div>';
   }
 
@@ -569,8 +565,11 @@ export class DrumRackEditor {
 
   renderSaved() {
     const saved = (this.meta.saved || []).filter((r) => (r.device || 'grid64') === this.device);
-    $('#rk-saved').innerHTML = `<option value="">${saved.length ? 'Carica kit…' : 'Nessun kit salvato'}</option>`
-      + saved.map((r) => `<option value="${esc(r.id)}" ${r.id === this.rack.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('');
+    const sel = $('#rk-saved');
+    sel.placeholder = saved.length ? 'Carica kit…' : 'Nessun kit salvato';
+    sel.disabled = !saved.length;
+    sel.innerHTML = saved.map((r) => `<wa-option value="${esc(r.id)}">${esc(r.name)}</wa-option>`).join('');
+    sel.value = saved.some((r) => r.id === this.rack.id) ? this.rack.id : '';
     $('#rk-del').hidden = !this.rack.id;
   }
 
@@ -757,19 +756,18 @@ export class DrumRackEditor {
     let o = { scope: 'all', folder: '', oneshot: true, dyn: false, margin: 0.3 };
     try { o = { ...o, ...JSON.parse(localStorage.getItem(LS_RANDOM) || '{}') }; } catch { /* private mode */ }
     const pop = showPopover(anchor, `
-      <div class="pop-title">🎲 Kit casuale</div>
+      <div class="pop-title">${svg('dices')} Kit casuale</div>
       <div class="hint">Ogni gruppo prende un gruppo di sample simili scelto a caso tra quelli della sua famiglia, e sample a caso da lì.
-        I gruppi bloccati (🔒) restano com'erano.</div>
-      <label class="pop-field">Gruppi
-        <select data-o="scope"><option value="all" ${o.scope === 'all' ? 'selected' : ''}>tutti (non bloccati)</option>
-          <option value="empty" ${o.scope === 'empty' ? 'selected' : ''}>solo quelli vuoti</option></select></label>
-      <label class="pop-field">Solo dalla cartella / pack (facoltativo)<input type="text" data-o="folder" value="${esc(o.folder)}" placeholder="es. Cymatics"></label>
-      <label class="pop-check"><input type="checkbox" data-o="oneshot" ${o.oneshot ? 'checked' : ''}> solo one-shot (niente loop)</label>
+        I gruppi bloccati restano com'erano.</div>
+      <wa-select size="s" class="pop-field" label="Gruppi" data-o="scope" value="${o.scope}"><wa-option value="all">tutti (non bloccati)</wa-option>
+          <wa-option value="empty">solo quelli vuoti</wa-option></wa-select>
+      <wa-input size="s" class="pop-field" label="Solo dalla cartella / pack (facoltativo)" data-o="folder" value="${esc(o.folder)}" placeholder="es. Cymatics"></wa-input>
+      <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>solo one-shot (niente loop)</wa-checkbox>
       ${dynControls(o, 'gruppi')}
-      <div class="pop-actions"><button class="btn primary" data-go>Genera</button></div>`);
+      <div class="pop-actions">${btn('Genera', { variant: 'brand', icon: 'dices', 'data-go': true })}</div>`);
     wireDynControls(pop);
     pop.querySelector('[data-go]').onclick = async () => {
-      o = { scope: pop.querySelector('[data-o=scope]').value, folder: pop.querySelector('[data-o=folder]').value.trim(),
+      o = { scope: pop.querySelector('[data-o=scope]').value, folder: (pop.querySelector('[data-o=folder]').value || '').trim(),
         oneshot: pop.querySelector('[data-o=oneshot]').checked, ...readDynControls(pop) };
       try { localStorage.setItem(LS_RANDOM, JSON.stringify(o)); } catch { /* private mode */ }
       pop.close();
@@ -788,18 +786,18 @@ export class DrumRackEditor {
     let o = { keep: false, folder: '', oneshot: true, dyn: false, margin: 0.3 };
     try { o = { ...o, ...JSON.parse(localStorage.getItem(LS_RANDOM + '.spdsx') || '{}') }; } catch { /* private mode */ }
     const pop = showPopover(anchor, `
-      <div class="pop-title">🎲 Genera kit SPD-SX</div>
+      <div class="pop-title">${svg('dices')} Genera kit SPD-SX</div>
       <div class="hint">Sceglie una configurazione suonabile a caso (al massimo pedale + 1 pad di kick, 3 di snare/clap)
         e riempie ogni gruppo con sample simili tra loro, ognuno da un gruppo di suoni diverso. Il pedale prende un kick.
-        Con un gruppo bloccato (🔒) la configurazione resta quella attuale.</div>
-      <label class="pop-check"><input type="checkbox" data-o="keep" ${o.keep ? 'checked' : ''}> mantieni la configurazione attuale</label>
-      <label class="pop-field">Solo dalla cartella / pack (facoltativo)<input type="text" data-o="folder" value="${esc(o.folder)}" placeholder="es. Cymatics"></label>
-      <label class="pop-check"><input type="checkbox" data-o="oneshot" ${o.oneshot ? 'checked' : ''}> solo one-shot (niente loop)</label>
+        Con un gruppo bloccato la configurazione resta quella attuale.</div>
+      <wa-checkbox size="s" class="pop-check" data-o="keep" ${o.keep ? 'checked' : ''}>mantieni la configurazione attuale</wa-checkbox>
+      <wa-input size="s" class="pop-field" label="Solo dalla cartella / pack (facoltativo)" data-o="folder" value="${esc(o.folder)}" placeholder="es. Cymatics"></wa-input>
+      <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>solo one-shot (niente loop)</wa-checkbox>
       ${dynControls(o, 'gruppi')}
-      <div class="pop-actions"><button class="btn primary" data-go>Genera</button></div>`);
+      <div class="pop-actions">${btn('Genera', { variant: 'brand', icon: 'dices', 'data-go': true })}</div>`);
     wireDynControls(pop);
     pop.querySelector('[data-go]').onclick = async () => {
-      o = { keep: pop.querySelector('[data-o=keep]').checked, folder: pop.querySelector('[data-o=folder]').value.trim(),
+      o = { keep: pop.querySelector('[data-o=keep]').checked, folder: (pop.querySelector('[data-o=folder]').value || '').trim(),
         oneshot: pop.querySelector('[data-o=oneshot]').checked, ...readDynControls(pop) };
       try { localStorage.setItem(LS_RANDOM + '.spdsx', JSON.stringify(o)); } catch { /* private mode */ }
       pop.close();
@@ -844,16 +842,10 @@ export class DrumRackEditor {
     const ids = buses.map((b) => b.id).filter((id) => kit[id]);
     if (!ids.length) { toast('Il Drum Rack è vuoto'); return; }
     const counts = seq.layerCounts();
-    let modal = $('#rk-load');
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'rk-load';
-      modal.className = 'modal';
-      document.body.appendChild(modal);
-    }
-    modal.hidden = false;
-    modal.innerHTML = `<div class="modal-box rk-load">
-      <h3>Carica il Drum Rack nel Sequencer</h3>
+    const modal = openDialog('rk-load', {
+      label: 'Carica il Drum Rack nel Sequencer',
+      width: '640px',
+      body: `<div class="rk-load">
       <div class="hint">Ogni sample va nel bus della sua classe (max ${MAX_PER_BUS} per bus). Scegli quali bus caricare
         e, quando un bus riceve più sample, se suonano insieme o si alternano a ogni colpo.</div>
       <div class="rk-load-rows">${ids.map((id) => {
@@ -861,25 +853,26 @@ export class DrumRackEditor {
         const n = kit[id].length;
         const def = NO_ALT.has(id) || n < 2 ? 'off' : 'random';
         return `<div class="rk-load-row" data-bus="${id}">
-          <label class="rk-check"><input type="checkbox" data-use checked><span class="dot" style="background:${b.color}"></span><b>${esc(b.label)}</b></label>
+          <wa-checkbox size="s" data-use checked><span class="dot" style="background:${b.color}"></span> <b>${esc(b.label)}</b></wa-checkbox>
           <span class="hint">${n} dal kit · ora ${counts[id] || 0} layer</span>
           ${b.melodic || n < 2 ? '<span class="hint">—</span>'
-            : `<select class="rk-select" data-alt title="Come suonano i sample del bus">${ALT_LABELS.map(([m, l]) => `<option value="${m}" ${m === def ? 'selected' : ''}>${l}</option>`).join('')}</select>`}
+            : `<wa-select size="xs" data-alt value="${def}" title="Come suonano i sample del bus">${ALT_LABELS.map(([m, l]) => `<wa-option value="${m}">${l}</wa-option>`).join('')}</wa-select>`}
         </div>`;
       }).join('')}</div>
       <div class="rk-load-opts">
-        <label class="rk-check"><input type="radio" name="rk-mode" value="replace" checked> Sovrascrivi i bus selezionati</label>
-        <label class="rk-check"><input type="radio" name="rk-mode" value="add"> Aggiungi ai layer esistenti</label>
-        <label class="rk-check"><input type="checkbox" data-clear> Svuota anche gli altri bus (sovrascrivi tutto)</label>
-      </div>
-      <div class="modal-actions"><button class="btn" data-cancel>Annulla</button><button class="btn primary" data-ok>Carica e apri il Sequencer</button></div>
-    </div>`;
-    const close = () => { modal.hidden = true; };
+        <wa-radio-group size="s" data-mode value="replace" label="Come caricare">
+          <wa-radio value="replace">Sovrascrivi i bus selezionati</wa-radio>
+          <wa-radio value="add">Aggiungi ai layer esistenti</wa-radio>
+        </wa-radio-group>
+        <wa-checkbox size="s" data-clear>Svuota anche gli altri bus (sovrascrivi tutto)</wa-checkbox>
+      </div></div>`,
+      footer: btn('Annulla', { 'data-cancel': true }) + btn('Carica e apri il Sequencer', { variant: 'brand', icon: 'arrow-right', 'data-ok': true }),
+    });
+    const close = () => modal.close();
     modal.querySelector('[data-cancel]').onclick = close;
-    modal.onclick = (e) => { if (e.target === modal) close(); };
-    modal.querySelector('[data-clear]').onchange = (e) => {
-      if (e.target.checked) modal.querySelector('input[value=replace]').checked = true;
-    };
+    modal.querySelector('[data-clear]').addEventListener('change', (e) => {
+      if (e.target.checked) modal.querySelector('[data-mode]').value = 'replace';
+    });
     modal.querySelector('[data-ok]').onclick = async () => {
       const assign = {};
       for (const row of modal.querySelectorAll('.rk-load-row')) {
@@ -887,7 +880,7 @@ export class DrumRackEditor {
         assign[row.dataset.bus] = { refs: kit[row.dataset.bus], alt: row.querySelector('[data-alt]')?.value || 'off' };
       }
       const clearOthers = modal.querySelector('[data-clear]').checked;
-      const replace = clearOthers || modal.querySelector('input[name=rk-mode]:checked').value === 'replace';
+      const replace = clearOthers || modal.querySelector('[data-mode]').value === 'replace';
       close();
       await seq.loadKit(assign, { replace, clearOthers });
       toast(`Sequencer: ${Object.keys(assign).length} bus caricati dal Drum Rack`);
@@ -935,15 +928,13 @@ export class DrumRackEditor {
   async exportRack() {
     if (!this.rack.pads.some(Boolean)) { toast('Il kit è vuoto'); return; }
     const btn = $('#rk-export');
-    btn.disabled = true;
-    btn.textContent = 'Esporto…';
+    btn.loading = true;
     try {
       const res = await this.api.export_rack(this.rack);
       if (res.error) toast(`Errore: ${res.error}`);
       else if (res.folder) toast(`Esportato in ${res.folder}`);
     } finally {
-      btn.disabled = false;
-      btn.textContent = this._exportLabel();
+      btn.loading = false;
     }
   }
 }
