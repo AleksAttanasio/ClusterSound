@@ -46,6 +46,11 @@ from .racks import layouts as rack_layouts
 from .racks import select as rack_select
 from .racks import spdsx as rack_spdsx
 from .racks import store as rack_store
+from .sampler import capture as sampler_capture
+from .sampler import export as sampler_export
+from .sampler import links as sampler_links
+from .sampler import session as sampler_session
+from .sampler import slicing
 
 PREVIEW_MAX_SECONDS = 60
 EXPORT_DIR = os.path.expanduser("~/Music/ClusterSound Patterns")
@@ -61,6 +66,10 @@ def _wav_data_url(src) -> str | None:
             sr = f.samplerate
     except Exception:
         return None
+    return _array_data_url(data, sr)
+
+
+def _array_data_url(data: np.ndarray, sr: int) -> str:
     if data.shape[1] > 2:
         data = data[:, :2]
     buf = io.BytesIO()
@@ -82,6 +91,8 @@ class Api:
         self._chords: ChordLibrary | None = None
         self._recorder = chord_midi_in.Recorder()
         self._live = live_server.Bridge(self._live_stage(), self._resolve, self._describe, self._title)
+        self._sampler: sampler_session.SamplerSession | None = None
+        self._capture = sampler_capture.SystemCapture(self._capture_seconds())
         threading.Thread(target=online_cache.prune, args=(self._cache_mb(),), daemon=True).start()
 
     # pywebview exposes public attributes too, so keep internals underscored
@@ -233,10 +244,29 @@ class Api:
                 "cache_used_mb": round(online_cache.size() / (1 << 20), 1),
                 "freesound_key_hint": (key[:4] + "…" + key[-3:]) if len(key) > 8 else "",
                 "download_dir": s.get("download_dir") or DEFAULT_DIR, "live_port": self._live_port(),
-                "live_library": s.get("live_library") or live_payload.USER_LIBRARY}
+                "live_library": s.get("live_library") or live_payload.USER_LIBRARY,
+                "sampler_dir": s.get("sampler_dir") or sampler_export.DEFAULT_DIR,
+                "sampler_max_seconds": self._sampler_max(), "capture_buffer_seconds": self._capture_seconds()}
+
+    def _sampler_max(self) -> float:
+        return float(self._settings().get("sampler_max_seconds") or sampler_session.DEFAULT_MAX_SAMPLE_SECONDS)
+
+    def _capture_seconds(self) -> float:
+        return float(self._settings().get("capture_buffer_seconds") or sampler_capture.DEFAULT_BUFFER_SECONDS)
 
     def set_setting(self, key: str, value) -> dict:
-        if key not in ("freesound_key", "download_dir", "cache_mb", "live_port", "live_library"):
+        if key not in ("freesound_key", "download_dir", "cache_mb", "live_port", "live_library", "sampler_dir",
+                       "sampler_max_seconds", "capture_buffer_seconds"):
+            return self.get_settings()
+        if key in ("sampler_max_seconds", "capture_buffer_seconds"):
+            lo, hi = (1, sampler_session.DEFAULT_MAX_SAMPLE_SECONDS) if key == "sampler_max_seconds" else (10, 300)
+            try:
+                value = max(lo, min(hi, float(value)))
+            except (TypeError, ValueError):
+                return self.get_settings()
+            self._save_settings(**{key: value})
+            if key == "capture_buffer_seconds" and not self._capture.running:
+                self._capture.seconds = value
             return self.get_settings()
         if key == "live_port":
             try:
@@ -257,7 +287,7 @@ class Api:
             online_cache.prune(value)
             return self.get_settings()
         value = (value or "").strip() or None
-        if key in ("download_dir", "live_library") and value:
+        if key in ("download_dir", "live_library", "sampler_dir") and value:
             value = os.path.expanduser(value)
         self._save_settings(**{key: value})
         if key == "live_library":
@@ -301,18 +331,22 @@ class Api:
                 pass
         return {"error": None, "queued": queued, "in_library": self._downloads_in_library()}
 
-    def _downloads_in_library(self) -> bool:
+    def _inside_library(self, folder: str) -> bool:
         lib_root = self._lib.root
         if not lib_root:
             return False
-        dl = os.path.realpath(self._settings().get("download_dir") or DEFAULT_DIR)
-        lib_root = os.path.realpath(lib_root)
-        return dl == lib_root or dl.startswith(lib_root + os.sep)
+        folder, lib_root = os.path.realpath(folder), os.path.realpath(lib_root)
+        return folder == lib_root or folder.startswith(lib_root + os.sep)
+
+    def _downloads_in_library(self) -> bool:
+        return self._inside_library(self._settings().get("download_dir") or DEFAULT_DIR)
 
     def _on_download_done(self, job: dict) -> None:
         """Downloads inside the open library folder: rescan once the burst of downloads settles."""
-        if not self._downloads_in_library():
-            return
+        if self._downloads_in_library():
+            self._schedule_rescan()
+
+    def _schedule_rescan(self) -> None:
         if self._rescan_timer:
             self._rescan_timer.cancel()
         self._rescan_timer = threading.Timer(3.0, self._rescan_after_downloads)
@@ -386,6 +420,109 @@ class Api:
     def clear_cache(self) -> dict:
         online_cache.clear()
         return self.get_settings()
+
+    # ================================================================== sampler
+    def _sampler_state(self) -> dict:
+        s = self._sampler
+        return {"session": s.describe() if s else None, "max_seconds": self._sampler_max()}
+
+    def sampler_init(self) -> dict:
+        return {**self._sampler_state(), "supported": sampler_links.SUPPORTED,
+                "capture": {"sources": sampler_capture.sources(), **self._capture.status()},
+                "settings": self.get_settings()}
+
+    def _sampler_open(self, path: str, **kw) -> dict:
+        try:
+            self._sampler = sampler_session.load_file(path, **kw)
+        except Exception as e:
+            return {"error": f"impossibile leggere il file audio ({e})"}
+        return {"error": None, **self._sampler_state()}
+
+    def sampler_open_file(self, path: str | None = None) -> dict:
+        if not path:
+            import webview
+            res = self._window.create_file_dialog(webview.FileDialog.OPEN, file_types=AUDIO_TYPES)
+            if not res:
+                return {"error": None, "cancelled": True}
+            path = res[0] if isinstance(res, (list, tuple)) else res
+        if not os.path.isfile(path):
+            return {"error": "file non trovato"}
+        return self._sampler_open(path)
+
+    def sampler_link(self, url: str) -> dict:
+        """Resolve a pasted link; a single file opens at once, an item with several files is listed."""
+        try:
+            results = sampler_links.resolve(url, self._settings())
+        except SourceError as e:
+            return {"error": str(e)}
+        online.remember(results)
+        if len(results) == 1:
+            return self.sampler_open_result(results[0].uid)
+        return {"error": None, "files": [r.to_dict() for r in results]}
+
+    def sampler_open_result(self, uid: str) -> dict:
+        r = online.get(uid)
+        url = r and (r.download_url or r.preview_url)
+        if not url:
+            return {"error": "file non trovato"}
+        path = online_cache.ensure(url, self._cache_mb())
+        if not path:
+            return {"error": "download non riuscito (file troppo grande o host non consentito)"}
+        return self._sampler_open(path, origin="link", result=r)
+
+    def sampler_view(self, start: float = 0.0, end: float | None = None, cols: int = 1200) -> dict | None:
+        return self._sampler.peaks(float(start), None if end is None else float(end), int(cols)) if self._sampler else None
+
+    def sampler_auto_slices(self, sensitivity: float = 0.5, start: float = 0.0, end: float | None = None) -> list[dict]:
+        if not self._sampler:
+            return []
+        return slicing.auto_slices(self._sampler, float(sensitivity), self._sampler_max(), float(start),
+                                   None if end is None else float(end))
+
+    def sampler_audio(self, start: float, end: float, opts: dict | None = None) -> str | None:
+        """A region as it would be exported (fades, normalisation), for listening."""
+        if not self._sampler:
+            return None
+        o = opts or {}
+        y = slicing.render(self._sampler, float(start), float(end), PREVIEW_MAX_SECONDS,
+                           float(o.get("fade_in_ms", 1)), float(o.get("fade_out_ms", 10)), bool(o.get("normalize")))
+        return _array_data_url(y, self._sampler.sr) if y.shape[0] else None
+
+    def sampler_export(self, regions: list, opts: dict | None = None) -> dict:
+        if not self._sampler:
+            return {"error": "nessun audio aperto nel Sampler"}
+        o = opts or {}
+        root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
+        try:
+            paths = sampler_export.export(self._sampler, regions or [], root, self._sampler_max(),
+                                          float(o.get("fade_in_ms", 1)), float(o.get("fade_out_ms", 10)),
+                                          bool(o.get("normalize")))
+        except OSError as e:
+            return {"error": f"scrittura non riuscita ({e})"}
+        in_library = bool(paths) and self._inside_library(os.path.dirname(paths[0]))
+        if in_library:
+            self._schedule_rescan()
+        return {"error": None, "paths": paths, "folder": os.path.dirname(paths[0]) if paths else root,
+                "in_library": in_library}
+
+    def sampler_capture_start(self, source: str = sampler_capture.SYSTEM) -> dict:
+        try:
+            return {**self._capture.start(source, self._capture_seconds()), "error": None}
+        except sampler_capture.CaptureError as e:
+            return {**self._capture.status(), "error": str(e)}
+
+    def sampler_capture_stop(self) -> dict:
+        return self._capture.stop()
+
+    def sampler_capture_status(self) -> dict:
+        return self._capture.status()
+
+    def sampler_capture_grab(self, seconds: float | None = None) -> dict:
+        try:
+            self._sampler = self._capture.grab(None if seconds is None else float(seconds))
+        except sampler_capture.CaptureError as e:
+            return {"error": str(e)}
+        return {"error": None, **self._sampler_state()}
 
     # ================================================================== patterns
     def patterns_init(self) -> dict:

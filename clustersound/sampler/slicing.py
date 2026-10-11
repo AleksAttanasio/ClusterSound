@@ -65,7 +65,7 @@ def auto_slices(s: SamplerSession, sensitivity: float = 0.5, max_s: float = DEFA
         seg = x[int(r0 * s.sr):int(r1 * s.sr)]
         r1 = r0 + _tail_end(seg, s.sr) / s.sr
         if r1 - r0 >= MIN_REGION_S:
-            regions.append({"start": round(a + r0, 4), "end": round(a + r1, 4)})
+            regions.append({"start": round(float(a + r0), 4), "end": round(float(a + r1), 4)})
     return regions
 
 

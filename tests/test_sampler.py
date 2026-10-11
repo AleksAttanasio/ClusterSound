@@ -66,6 +66,7 @@ def test_auto_slices_one_region_per_hit():
     s = S.from_array(x, SR)
     regions = slicing.auto_slices(s, sensitivity=0.5)
     assert len(regions) == len(starts)
+    assert all(type(v) is float for r in regions for v in r.values())  # JSON-serialisable for the js bridge
     for r, t in zip(regions, starts):
         assert abs(r["start"] - t) < 0.03
         assert r["end"] <= t + 0.5  # cut before the next hit (silent tail trimmed)
