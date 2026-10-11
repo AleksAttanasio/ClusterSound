@@ -1000,7 +1000,7 @@ export class ComposeEditor {
     this.transport.stop();
     this.synth.stopAll();
     this._stopPattern();
-    this.renderToolbar();
+    if (this.project) this.renderToolbar(); // hide() also runs before the tab was ever opened
   }
 
   // ---------------------------------------------------------------- with the Sequencer pattern
