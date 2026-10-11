@@ -1,6 +1,7 @@
 // "Compose" screen: chord progressions from a MIDI chord pack. Browse the chords of a key, place them on a
-// timeline, get the next chord suggested, choose how every chord is played (strum, arpeggio, rhythm,
-// humanize), generate variations of a chord or of the whole progression and export a .mid for Ableton.
+// timeline and get the next chord suggested (the harmony, in versions A, B, C…); define how the progression
+// is played in a separate "Modalità" (a rhythm grid + strum / arpeggio / humanize settings, in modes 1, 2, 3…);
+// generate variations of either, play it together with the Sequencer pattern and export a .mid for Ableton.
 // Every note heard here comes from compose_render (Python), so preview and export are the same events.
 import { toast, showPopover } from './sendmenu.js';
 import { velGain } from './sequencer.js';
@@ -21,13 +22,41 @@ const FUNC_COLOR = { T: '#4caf50', S: '#6ea8fe', D: '#ff9f43', C: '#c77dff' };
 const FUNC_LABEL = { T: 'tonica', S: 'sottodominante', D: 'dominante', C: 'colore / prestito modale' };
 const SNAPS = [[16, '1 battuta'], [8, '1/2'], [4, '1/4'], [2, '1/8'], [1, '1/16']];
 const VERSION_NAMES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const STYLE_BADGE = { block: '▤', strum: '⟋', arp: '⋰', rhythm: '♪' };
+const STYLE_BADGE = { block: '▤', strum: '⟋', arp: '⋰' };
+const VEL_CYCLE = [0, 100, 120, 65]; // click on a step: off → strike → accent → soft → off
+const LEN_CYCLE = [0, 1, 2, 4, 8];   // alt+click: until the next strike, 1/16, 1/8, 1/4, 1/2
 const SYNTHS = [['pad', 'Pad'], ['ep', 'Piano elettrico'], ['pluck', 'Pluck'], ['organ', 'Organo']];
 
 const keyFlats = (k) => FLAT_KEYS[k.mode]?.includes(k.tonic % 12);
 const keyName = (k) => `${(keyFlats(k) ? FLATS : SHARPS)[k.tonic % 12]} ${k.mode === 'minor' ? 'minore' : 'maggiore'}`;
-const newSeq = () => ({ bpm: 100, bars: 4, keyMode: 'locked', key: { tonic: 0, mode: 'major' }, defaultStyle: null, clips: [] });
-const newProject = () => ({ name: 'Progressione', active: 'A', order: ['A'], versions: { A: newSeq() } });
+const newSeq = () => ({ bars: 4, keyMode: 'locked', key: { tonic: 0, mode: 'major' }, clips: [] });
+const newProject = (mode) => ({
+  name: 'Progressione', bpm: 100, active: 'A', order: ['A'], versions: { A: newSeq() },
+  modeActive: '1', modeOrder: ['1'], modes: { 1: mode },
+});
+
+// grid arrays exactly bars*16 long (a longer grid repeats the shorter one)
+function fixGrid(g) {
+  const bars = Math.max(1, Math.min(8, g.bars || 1));
+  const n = bars * 16;
+  const fit = (a, fill) => Array.from({ length: n }, (_, i) => (a?.length ? a[i % a.length] ?? fill : fill));
+  return { on: !!g.on, bars, preset: g.preset ?? null, vel: fit(g.vel, 0), len: fit(g.len, 0), dir: fit(g.dir, '') };
+}
+
+// Compose v1 style {type: block|strum|arp|rhythm, rhythm: {pattern, hit}, …} -> {play, rhythm}
+function legacyStyle(st, grids) {
+  const play = {};
+  for (const k of ['gate', 'strum', 'arp', 'velCurve', 'humanize', 'alternate']) if (st[k] !== undefined) play[k] = clone(st[k]);
+  play.type = st.type || 'block';
+  let rhythm = 'sustain';
+  if (play.type === 'rhythm') {
+    rhythm = clone(grids[st.rhythm?.pattern] || grids.quarters);
+    play.type = st.rhythm?.hit === 'strum' ? 'strum' : 'block';
+  }
+  if (play.type === 'strum' || st.rhythm?.hit === 'strum') play.strum = { dir: 'up', ...(play.strum || {}) };
+  if (play.alternate?.tokens) play.alternate.tokens = play.alternate.tokens.map((t) => (t === 'rhythm' ? 'block' : t));
+  return { play, rhythm };
+}
 
 export function transposeName(name, semis, flats) {
   if (!semis || !name) return name;
@@ -108,6 +137,8 @@ class ChordSynth {
     oscs[0].onended = () => { this.voices.delete(voice); g.disconnect(); };
   }
 
+  setVolume(v) { this._bus().gain.value = 0.55 * v; }
+
   chord(notes, dur = 1.3) {
     this.stopAll();
     const t = this.ctx.currentTime + 0.02;
@@ -136,7 +167,8 @@ class Transport {
   get ctx() { return this.synth.ctx; }
 
   // events: [start, end, pitch, vel, clip] ticks; plays [from, to) once or looped
-  play({ events, bpm, from = 0, to, loop = false, onEnd }) {
+  // at: AudioContext time of `from` (to start in sync with the Sequencer)
+  play({ events, bpm, from = 0, to, loop = false, onEnd, at = null }) {
     this.stop();
     this.bpm = bpm;
     this.spt = 60 / bpm / PPQ;
@@ -146,7 +178,7 @@ class Transport {
     this.onEnd = onEnd;
     this.lenSec = (to - from) * this.spt;
     this._setEvents(events);
-    this.base = this.ctx.currentTime + 0.06;
+    this.base = at ?? this.ctx.currentTime + 0.06;
     this.n = 0;
     this.idx = 0;
     this.playing = true;
@@ -202,26 +234,63 @@ class Transport {
 
 // ------------------------------------------------------------------ editor
 export class ComposeEditor {
-  constructor({ api, player }) {
+  constructor({ api, player, getPattern, onOpenSequencer }) {
     this.api = api;
     this.player = player;
+    this.getPattern = getPattern;          // -> PatternEditor (play together with its pattern)
+    this.onOpenSequencer = onOpenSequencer;
+    this._pat = null;                      // PatternEditor while its pattern plays under the progression
     this.synth = new ChordSynth(player);
     this.transport = new Transport(this.synth);
     this.ready = null;
-    this.project = newProject();
+    this.project = null;
     this.sel = new Set();
     this.primary = null;
     this.browse = { tonic: 0, mode: 'major', cats: ['triad', 'extended', 'borrowed', 'progression'], q: '' };
-    this.ui = { snap: 4, loop: true, synth: 'pad', pure: false };
+    this.ui = { snap: 4, loop: true, synth: 'pad', pure: false, withPattern: false, bassFollow: true, chordVol: 0.8, patVol: 0.8 };
     this.keyData = new Map();
     this.rendered = { events: [], byId: {}, labels: {} };
     this.undoStack = [];
     this.redoStack = [];
     this.clipKinds = null;
     this.progKinds = null;
+    this.modeKinds = null;
   }
 
   get seq() { return this.project.versions[this.project.active]; }
+
+  get mode() { return this.project.modes[this.project.modeActive]; }
+
+  // what python renders: the harmony + the project tempo + a Modalità
+  _playSeq(seq, mode = this.mode) { return { ...seq, bpm: this.project.bpm, mode, name: this.project.name }; }
+
+  get playSeq() { return this._playSeq(this.seq); }
+
+  _migrate(p) {
+    const def = this.meta.styles.defaultMode;
+    const grids = this.meta.styles.presetGrids;
+    if (!p.modes) {
+      const v = p.versions[p.active] || Object.values(p.versions)[0];
+      const mode = clone(def);
+      if (v?.defaultStyle) {
+        const { play, rhythm } = legacyStyle(v.defaultStyle, grids);
+        mode.play = mergeStyle(def.play, play);
+        if (typeof rhythm === 'object') mode.rhythm = rhythm;
+      }
+      Object.assign(p, { modes: { 1: mode }, modeOrder: ['1'], modeActive: '1' });
+    }
+    if (!p.bpm) p.bpm = p.versions[p.active]?.bpm || 100;
+    for (const v of Object.values(p.versions)) {
+      delete v.defaultStyle;
+      delete v.bpm;
+      for (const c of v.clips) if (c.style?.type && !c.style.play) c.style = legacyStyle(c.style, grids);
+    }
+    for (const [k, m] of Object.entries(p.modes)) {
+      p.modes[k] = { ...mergeStyle(def, m), rhythm: fixGrid(m.rhythm || def.rhythm) };
+    }
+    if (!p.modes[p.modeActive]) p.modeActive = p.modeOrder[0];
+    return p;
+  }
 
   // ---------------------------------------------------------------- lifecycle
   ensure() {
@@ -231,10 +300,11 @@ export class ComposeEditor {
 
   async _init() {
     this.meta = await this.api.compose_init();
+    this.project = newProject(clone(this.meta.styles.defaultMode));
     try {
       const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
       if (saved?.project?.versions) {
-        this.project = saved.project;
+        this.project = this._migrate(saved.project);
         this.browse = { ...this.browse, ...saved.browse };
         this.ui = { ...this.ui, ...saved.ui };
       }
@@ -242,7 +312,8 @@ export class ComposeEditor {
     if (!this.seq) this.project.active = this.project.order[0];
     this.synth.preset = this.ui.synth;
     this.clipKinds = this.meta.clipKinds.map(([k]) => k);
-    this.progKinds = ['reharm', 'rhythm', 'ending', 'performance'];
+    this.progKinds = ['reharm', 'rhythm', 'ending', 'voicing'];
+    this.modeKinds = ['density', 'syncopation', 'preset', 'strum', 'feel'];
     this._buildShell();
   }
 
@@ -327,6 +398,7 @@ export class ComposeEditor {
           <select id="cp-synth" class="cp-select" title="Suono dell'anteprima (non viene esportato)">${SYNTHS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
           <button class="btn primary cp-play" id="cp-play" title="Play / stop (Spazio)">▶</button>
           <button class="icon-btn" id="cp-loop" title="Loop">⟲</button>
+          <span class="cp-pat"><button class="btn" id="cp-withpat" title="Suona insieme al pattern del Sequencer">🥁 Pattern</button><button class="btn" id="cp-patset" title="Pattern: basso, volumi, BPM">▾</button></span>
           <button class="icon-btn" id="cp-undo" title="Annulla (⌘Z)">↶</button>
           <button class="icon-btn" id="cp-redo" title="Ripeti (⇧⌘Z)">↷</button>
           <button class="btn" id="cp-open">Apri…</button>
@@ -338,11 +410,13 @@ export class ComposeEditor {
           <div class="cp-tl" id="cp-tl">
             <div class="cp-ruler" id="cp-ruler"></div>
             <div class="cp-lane" id="cp-lane"></div>
+            <div class="cp-rlane" id="cp-rlane" title="Ritmica della modalità · clic: colpo → accento → soft → spento · Alt+clic: durata · ⇧+clic: pennata giù/su"></div>
             <div class="cp-playhead" id="cp-playhead" hidden></div>
           </div>
         </div>
+        <div class="cp-modes" id="cp-modes"></div>
         <div class="cp-tlbar">
-          <span class="hint">Trascina gli accordi sulla timeline · trascina un blocco per spostarlo, il bordo destro per allungarlo · doppio clic: ascolta · V: variazioni · Canc: elimina</span>
+          <span class="hint">Trascina gli accordi sulla timeline · trascina un blocco per spostarlo, il bordo destro per allungarlo · doppio clic: ascolta · V: varia armonia · Canc: elimina</span>
           <div class="spacer"></div>
           <button class="btn small" id="cp-even" title="Stessa durata per tutti gli accordi, su tutta la lunghezza">⇔ Distribuisci</button>
           <button class="btn small" id="cp-clear">Svuota</button>
@@ -393,7 +467,7 @@ export class ComposeEditor {
     });
 
     $('#cp-name').onchange = (e) => this.edit(() => { this.project.name = e.target.value.trim() || 'Progressione'; }, { redraw: false });
-    $('#cp-bpm').onchange = (e) => this.edit(() => { this.seq.bpm = Math.max(40, Math.min(240, +e.target.value || 100)); });
+    $('#cp-bpm').onchange = (e) => this.edit(() => { this.project.bpm = Math.max(40, Math.min(240, +e.target.value || 100)); });
     $('#cp-bars').onchange = (e) => this.edit(() => { this.seq.bars = Math.max(1, Math.min(128, Math.round(+e.target.value) || 4)); });
     $('#cp-snap').onchange = (e) => { this.ui.snap = +e.target.value; this._persist(); };
     $('#cp-keymode').onclick = (e) => {
@@ -412,6 +486,13 @@ export class ComposeEditor {
     $('#cp-mode').onchange = (e) => this.setKey(this.seq.key.tonic, e.target.value);
     $('#cp-synth').onchange = (e) => { this.ui.synth = this.synth.preset = e.target.value; this._persist(); };
     $('#cp-play').onclick = () => this.togglePlay();
+    $('#cp-withpat').onclick = () => {
+      this.ui.withPattern = !this.ui.withPattern;
+      this._persist();
+      this.renderToolbar();
+      if (this.transport.playing) this.play(Math.floor(this.transport.position / (16 * STEP_TICKS)) * 16 * STEP_TICKS);
+    };
+    $('#cp-patset').onclick = (e) => this.patternMenu(e.currentTarget);
     $('#cp-loop').onclick = () => { this.ui.loop = !this.ui.loop; this._persist(); this.renderToolbar(); };
     $('#cp-undo').onclick = () => this.undo();
     $('#cp-redo').onclick = () => this.redo();
@@ -429,6 +510,32 @@ export class ComposeEditor {
       else if (a.dataset.act === 'del') this.deleteVersion();
       else if (a.dataset.act === 'vary') this.progressionVariations();
     };
+
+    const modes = $('#cp-modes');
+    modes.onclick = (e) => {
+      const t = e.target.closest('[data-m]');
+      if (t) { this.project.modeActive = t.dataset.m; this._afterChange(); return; }
+      const a = e.target.closest('[data-mact]'); if (!a) return;
+      const act = a.dataset.mact;
+      if (act === 'dup') this.addMode({ ...clone(this.mode), name: `${this.mode.name} (copia)` });
+      else if (act === 'del') this.deleteMode();
+      else if (act === 'vary') this.modeVariations();
+      else if (act === 'toggle') this.edit(() => { const g = this.mode.rhythm; g.on = !g.on; if (g.on && !g.vel.some(Boolean)) Object.assign(g, fixGrid(this.meta.styles.presetGrids.quarters)); });
+      else if (act === 'rclear') this.edit(() => { const g = this.mode.rhythm; g.vel = g.vel.map(() => 0); g.len = g.len.map(() => 0); g.dir = g.dir.map(() => ''); g.preset = null; });
+    };
+    modes.ondblclick = (e) => {
+      const t = e.target.closest('[data-m]'); if (!t) return;
+      const name = prompt('Nome della modalità', this.project.modes[t.dataset.m].name);
+      if (name) this.edit(() => { this.project.modes[t.dataset.m].name = name.trim(); });
+    };
+    modes.onchange = (e) => {
+      if (e.target.id === 'cp-preset' && e.target.value) {
+        this.edit(() => { this.mode.rhythm = fixGrid(this.meta.styles.presetGrids[e.target.value]); });
+      } else if (e.target.id === 'cp-rbars') {
+        this.edit(() => { this.mode.rhythm = fixGrid({ ...this.mode.rhythm, bars: +e.target.value }); });
+      }
+    };
+    $('#cp-rlane').addEventListener('pointerdown', (e) => this._onRhythmDown(e));
 
     const lane = $('#cp-lane');
     lane.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; this._dropMarker(e); });
@@ -746,7 +853,7 @@ export class ComposeEditor {
     const seq = this.seq;
     const ids = seq.clips.map((c) => c.id);
     const token = (this._renderToken = (this._renderToken || 0) + 1);
-    const res = await this.api.compose_render(seq);
+    const res = await this.api.compose_render(this.playSeq);
     if (token !== this._renderToken || !res?.events) return;
     const byId = {};
     for (const e of res.events) (byId[ids[e[4]]] ||= []).push(e);
@@ -785,30 +892,39 @@ export class ComposeEditor {
   audition(chord) {
     if (!chord) return;
     this.stop();
-    this.synth.chord(chord.notes, 60 / this.seq.bpm * 2.5);
+    this.synth.setVolume(this.ui.chordVol);
+    this.synth.chord(chord.notes, 60 / this.project.bpm * 2.5);
   }
 
   async auditionProgression(p) {
     if (!p) return;
     const seq = { ...clone(this.seq), clips: p.chords.map((c) => this._clipFrom(c, c.start, c.len)) };
     seq.bars = Math.ceil(Math.max(...seq.clips.map((c) => c.start + c.len)) / 16);
-    const res = await this.api.compose_render(seq);
+    const res = await this.api.compose_render(this._playSeq(seq));
     this.stop();
-    this.transport.play({ events: res.events, bpm: seq.bpm, from: 0, to: seq.bars * 16 * STEP_TICKS, loop: false, onEnd: () => this.renderToolbar() });
+    this.transport.play({ events: res.events, bpm: this.project.bpm, from: 0, to: seq.bars * 16 * STEP_TICKS, loop: false, onEnd: () => this.renderToolbar() });
   }
 
   togglePlay() { if (this.transport.playing) this.stop(); else this.play(); }
 
-  play(from = 0) {
+  async play(from = 0) {
     const to = this.seq.bars * 16 * STEP_TICKS;
-    this.transport.play({ events: this.rendered.events, bpm: this.seq.bpm, from: Math.min(from, to - 1), to, loop: this.ui.loop,
-      onEnd: () => this.renderToolbar() });
+    from = Math.max(0, Math.min(from, to - 1));
+    this.stop();
+    const pe = this.ui.withPattern ? await this._preparePattern() : null;
+    const at = this.synth.ctx.currentTime + 0.08;
+    if (pe) this._startPattern(pe, at, from);
+    this.synth.setVolume(this.ui.chordVol);
+    this.transport.play({ events: this.rendered.events, bpm: this.project.bpm, from, to, loop: this.ui.loop, at,
+      onEnd: () => { this._stopPattern(); this.renderToolbar(); } });
     this.renderToolbar();
     this._animate();
   }
 
-  playRange(from, to, events = this.rendered.events) {
-    this.transport.play({ events, bpm: this.seq.bpm, from, to, loop: false, onEnd: () => this.renderToolbar() });
+  playRange(from, to, events = this.rendered.events, seqBpm = this.project.bpm) {
+    this.stop();
+    this.synth.setVolume(this.ui.chordVol);
+    this.transport.play({ events, bpm: seqBpm, from, to, loop: false, onEnd: () => this.renderToolbar() });
     this.renderToolbar();
     this._animate();
   }
@@ -816,7 +932,85 @@ export class ComposeEditor {
   stop() {
     this.transport.stop();
     this.synth.stopAll();
+    this._stopPattern();
     this.renderToolbar();
+  }
+
+  // ---------------------------------------------------------------- with the Sequencer pattern
+  async _preparePattern() {
+    const pe = this.getPattern?.();
+    if (!pe) return null;
+    await pe.ensure();
+    if (pe.seq.playing) pe.stop();
+    await pe.seq.preload(pe.p);
+    return pe.p ? pe : null;
+  }
+
+  // the pattern loops under the progression at the progression tempo; its bass can follow the chords
+  _startPattern(pe, at, fromTick) {
+    const sq = pe.seq;
+    sq.setPattern({ ...clone(pe.p), bpm: this.project.bpm });
+    const n = pe.p.bars * 16;
+    const step = Math.round(fromTick / STEP_TICKS);
+    const base = step - (step % n);
+    sq.bassShift = this.ui.bassFollow ? (g) => this._bassShiftAt(base + g, pe.p.key, sq) : null;
+    sq._graph();
+    sq.master.gain.value = 0.9 * this.ui.patVol;
+    sq.start(step % n, at);
+    this._pat = pe;
+  }
+
+  _stopPattern() {
+    if (!this._pat) return;
+    const sq = this._pat.seq;
+    sq.stop();
+    sq.bassShift = null;
+    if (sq.master) sq.master.gain.value = 0.9;
+    sq.setPattern(this._pat.p);
+    this._pat = null;
+  }
+
+  // semitones from the pattern key to the root of the chord sounding at an absolute step
+  _bassShiftAt(abs, key, sq) {
+    const L = this.seq.bars * 16;
+    const pos = ((abs % L) + L) % L;
+    const c = this.seq.clips.find((x) => x.start <= pos && pos < x.start + x.len);
+    if (!c) return 0;
+    const root = (((c.root + (c.transpose || 0)) % 12) + 12) % 12;
+    const d = (((root - sq.noteIndex(key)) % 12) + 12) % 12;
+    return d > 6 ? d - 12 : d;
+  }
+
+  async patternMenu(anchor) {
+    const pe = this.getPattern?.();
+    if (!pe) return;
+    await pe.ensure();
+    const p = pe.p;
+    const g = pe.meta?.genres?.find((x) => x.id === p.genre);
+    const pop = showPopover(anchor, `
+      <div class="cp-sec-title"><span>Pattern del Sequencer</span></div>
+      <div>${esc(g?.name || 'Pattern')} · ${esc(p.name || '')}<br><span class="hint">${Math.round(p.bpm)} BPM · ${p.bars} ${p.bars === 1 ? 'battuta' : 'battute'} · basso in ${esc(p.key)}</span></div>
+      <label class="cp-own"><input type="checkbox" data-bass ${this.ui.bassFollow ? 'checked' : ''}> il basso segue gli accordi</label>
+      <label class="cp-field">Accordi <input type="range" min="0" max="1.2" step="0.05" value="${this.ui.chordVol}" data-cv></label>
+      <label class="cp-field">Pattern <input type="range" min="0" max="1.2" step="0.05" value="${this.ui.patVol}" data-pv></label>
+      <button class="btn small" data-usebpm>Usa il BPM del pattern (${Math.round(p.bpm)})</button>
+      <button class="btn small" data-swing>Swing del pattern (${p.swing}) nella modalità</button>
+      <button class="btn small" data-open>Apri nel Sequencer</button>`);
+    pop.querySelector('[data-bass]').onchange = (e) => {
+      this.ui.bassFollow = e.target.checked;
+      this._persist();
+      if (this._pat) this._pat.seq.bassShift = null;
+      if (this.transport.playing) this.play(Math.floor(this.transport.position / (16 * STEP_TICKS)) * 16 * STEP_TICKS);
+    };
+    pop.querySelector('[data-cv]').oninput = (e) => { this.ui.chordVol = +e.target.value; this.synth.setVolume(this.ui.chordVol); this._persist(); };
+    pop.querySelector('[data-pv]').oninput = (e) => {
+      this.ui.patVol = +e.target.value;
+      if (this._pat?.seq.master) this._pat.seq.master.gain.value = 0.9 * this.ui.patVol;
+      this._persist();
+    };
+    pop.querySelector('[data-usebpm]').onclick = () => { pop.close(); this.edit(() => { this.project.bpm = Math.round(p.bpm); }); };
+    pop.querySelector('[data-swing]').onclick = () => { pop.close(); this.edit(() => { this.mode.swing = Math.max(50, Math.min(75, p.swing)); }); };
+    pop.querySelector('[data-open]').onclick = () => { pop.close(); this.stop(); this.onOpenSequencer?.(); };
   }
 
   _animate() {
@@ -836,6 +1030,7 @@ export class ComposeEditor {
   renderAll() {
     this.renderToolbar();
     this.renderVersions();
+    this.renderModes();
     this.renderTimeline();
     this.renderInspector();
   }
@@ -844,7 +1039,7 @@ export class ComposeEditor {
     const s = this.seq;
     const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = v; };
     set('#cp-name', this.project.name);
-    set('#cp-bpm', s.bpm);
+    set('#cp-bpm', this.project.bpm);
     set('#cp-bars', s.bars);
     set('#cp-snap', this.ui.snap);
     set('#cp-tonic', s.key.tonic);
@@ -853,16 +1048,17 @@ export class ComposeEditor {
     $('#cp-keymode').querySelectorAll('[data-km]').forEach((b) => b.classList.toggle('active', b.dataset.km === s.keyMode));
     $('#cp-play').textContent = this.transport.playing ? '■' : '▶';
     $('#cp-loop').classList.toggle('active', this.ui.loop);
+    $('#cp-withpat').classList.toggle('active', this.ui.withPattern);
     $('#cp-undo').disabled = !this.undoStack.length;
     $('#cp-redo').disabled = !this.redoStack.length;
   }
 
   renderVersions() {
     const p = this.project;
-    $('#cp-versions').innerHTML = `<span class="hint">Versioni</span>
+    $('#cp-versions').innerHTML = `<span class="cp-barlabel">Armonia</span>
       ${p.order.map((v) => `<button class="cp-vtab ${v === p.active ? 'active' : ''}" data-v="${v}" title="${p.versions[v].clips.length} accordi · ${p.versions[v].bars} battute">${v}</button>`).join('')}
       <button class="btn small" data-act="dup" title="Duplica la versione corrente">＋ Duplica</button>
-      <button class="btn small" data-act="vary" title="Genera variazioni della progressione">✦ Genera variazioni…</button>
+      <button class="btn small" data-act="vary" title="Variazioni degli accordi: riarmonizzazione, ritmo armonico, voicing, finali">✦ Varia armonia…</button>
       ${p.order.length > 1 ? '<button class="btn small" data-act="del" title="Elimina la versione corrente">✕</button>' : ''}`;
   }
 
@@ -883,19 +1079,130 @@ export class ComposeEditor {
     const flats = keyFlats(s.key);
     lane.innerHTML = this.sorted().map((c) => {
       const st = c.style;
-      const badge = st ? STYLE_BADGE[st.type] + (st.humanize?.timing || st.humanize?.vel ? '≈' : '') + (st.alternate?.tokens?.length && st.alternate.every !== 'off' ? '↻' : '') : '';
+      const badge = st ? (STYLE_BADGE[st.play?.type] || '') + (st.rhythm === 'sustain' ? '—' : typeof st.rhythm === 'object' ? '♪' : '') || '•' : '';
       const color = FUNC_COLOR[c.func] || '#888';
       const tr = c.transpose ? ` <span class="cp-tr">${c.transpose > 0 ? '+' : ''}${c.transpose}</span>` : '';
       return `<div class="cp-clip ${this.sel.has(c.id) ? 'sel' : ''} ${this.primary === c.id ? 'primary' : ''}" data-id="${c.id}"
           style="left:${c.start * this._pxStep}px;width:${Math.max(4, c.len * this._pxStep - 2)}px;--fc:${color}">
         <div class="cp-clip-head"><span class="cp-deg" style="--fc:${color}">${esc(c.degree || '?')}</span>
           <span class="cp-clip-name">${esc(transposeName(c.name, c.transpose || 0, flats))}${tr}</span>
-          ${badge ? `<span class="cp-badge" title="Stile proprio">${badge}</span>` : ''}</div>
+          ${badge ? `<span class="cp-badge" title="Esecuzione propria">${badge}</span>` : ''}</div>
         ${this._roll(c)}
         <div class="cp-resize" title="Trascina per cambiare la durata"></div>
       </div>`;
     }).join('') + '<div class="cp-drop" id="cp-drop" hidden></div>';
     if (!s.clips.length) lane.insertAdjacentHTML('beforeend', '<div class="cp-lane-empty">Trascina qui un accordo o una progressione dalla colonna a sinistra, oppure usa i suggerimenti qui sotto.</div>');
+    this.renderRhythm();
+  }
+
+  // ---------------------------------------------------------------- Modalità: tabs + rhythm grid
+  renderModes() {
+    const p = this.project;
+    const g = this.mode.rhythm;
+    const presets = this.meta.styles.presets;
+    $('#cp-modes').innerHTML = `<span class="cp-barlabel">Modalità</span>
+      ${p.modeOrder.map((k) => `<button class="cp-vtab cp-mtab ${k === p.modeActive ? 'active' : ''}" data-m="${k}" title="Doppio clic: rinomina">${esc(p.modes[k].name || k)}</button>`).join('')}
+      <button class="btn small" data-mact="dup" title="Duplica la modalità corrente">＋ Duplica</button>
+      <button class="btn small" data-mact="vary" title="Variazioni della ritmica e del modo di suonare">✦ Varia modalità…</button>
+      ${p.modeOrder.length > 1 ? '<button class="btn small" data-mact="del" title="Elimina la modalità corrente">✕</button>' : ''}
+      <span class="cp-sep"></span>
+      <span class="cp-barlabel">Ritmica</span>
+      <select id="cp-preset" class="cp-select" title="Parti da un preset e modificalo sulla griglia">
+        <option value="">${g.preset ? 'Preset…' : '— personalizzata —'}</option>
+        ${presets.map(([k, l]) => `<option value="${k}" ${k === g.preset ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
+      <select id="cp-rbars" class="cp-select" title="Lunghezza della ritmica (si ripete)">${[1, 2, 4].map((b) => `<option value="${b}" ${b === g.bars ? 'selected' : ''}>${b} ${b === 1 ? 'battuta' : 'battute'}</option>`).join('')}</select>
+      <button class="btn small ${g.on ? '' : 'active'}" data-mact="toggle" title="Spenta: ogni accordo suona una volta e resta tenuto">${g.on ? 'Ritmica attiva' : 'Accordi tenuti'}</button>
+      <button class="btn small" data-mact="rclear">Svuota</button>`;
+  }
+
+  _autoDir(g, j) {
+    const sixteenth = g.vel.some((v, k) => v && k % 2);
+    return (sixteenth ? j % 2 === 0 : j % 4 === 0) ? 'd' : 'u';
+  }
+
+  renderRhythm() {
+    const lane = $('#cp-rlane');
+    if (!lane || !this.project) return;
+    const g = this.mode.rhythm;
+    const n = g.vel.length;
+    const steps = this.seq.bars * 16;
+    const px = this.pxStep;
+    const play = this.mode.play;
+    const strum = play.type === 'strum' || (play.alternate?.every !== 'off' && play.alternate?.tokens?.some((t) => t.startsWith('strum')));
+    const arrows = strum && ['grid', 'guitar'].includes(play.strum?.dir);
+    const cells = [];
+    for (let s = 0; s < steps; s++) {
+      const j = s % n;
+      const v = g.vel[j];
+      const cls = `cp-rcell${s >= n ? ' ghost' : ''}${s % 4 === 0 ? ' beat' : ''}${s % 16 === 0 ? ' bar' : ''}${v ? ' on' : ''}`;
+      let inner = '';
+      if (v) {
+        const len = g.len[j] ? `<i class="cp-rlen" style="width:${g.len[j] * px - 2}px"></i>` : '';
+        const dir = arrows ? (play.strum.dir === 'grid' ? g.dir[j] || this._autoDir(g, j) : this._autoDir(g, j)) : '';
+        inner = `<b style="height:${Math.round((v / 127) * 100)}%"></b>${len}${dir ? `<em>${dir === 'd' ? '↓' : '↑'}</em>` : ''}`;
+      }
+      cells.push(`<div class="${cls}" style="left:${s * px}px;width:${Math.max(1, px - 1)}px">${inner}</div>`);
+    }
+    lane.classList.toggle('off', !g.on);
+    lane.innerHTML = cells.join('') + (g.on ? '' : '<div class="cp-rlane-off">Accordi tenuti · clicca uno step o scegli un preset per dare un ritmo alla progressione</div>');
+  }
+
+  _onRhythmDown(e) {
+    if (e.button !== 0) return;
+    const r = $('#cp-rlane').getBoundingClientRect();
+    const s = Math.floor((e.clientX - r.left) / this.pxStep);
+    if (s < 0 || s >= this.seq.bars * 16) return;
+    this.edit(() => {
+      const g = this.mode.rhythm;
+      const j = s % g.vel.length;
+      if (!g.on) {
+        g.on = true;
+        if (!e.shiftKey && !e.altKey) { g.vel = g.vel.map(() => 0); }
+      }
+      if (e.shiftKey) {
+        if (!g.vel[j]) g.vel[j] = 100;
+        const st = this.mode.play.strum;
+        if (st.dir !== 'grid') { g.dir = g.dir.map((d, k) => d || (g.vel[k] ? this._autoDir(g, k) : '')); st.dir = 'grid'; }
+        if (this.mode.play.type !== 'strum') this.mode.play.type = 'strum';
+        g.dir[j] = (g.dir[j] || this._autoDir(g, j)) === 'd' ? 'u' : 'd';
+      } else if (e.altKey) {
+        if (!g.vel[j]) g.vel[j] = 100;
+        g.len[j] = LEN_CYCLE[(LEN_CYCLE.indexOf(g.len[j]) + 1) % LEN_CYCLE.length];
+      } else {
+        const i = VEL_CYCLE.indexOf(g.vel[j]);
+        g.vel[j] = i < 0 ? 0 : VEL_CYCLE[(i + 1) % VEL_CYCLE.length];
+        if (!g.vel[j]) { g.len[j] = 0; g.dir[j] = ''; }
+      }
+      g.preset = null;
+    }, { redraw: false });
+    this.renderModes();
+    this.renderRhythm();
+  }
+
+  addMode(mode, label) {
+    const used = new Set(this.project.modeOrder);
+    let k = 1;
+    while (used.has(String(k))) k++;
+    const id = String(k);
+    this.edit(() => {
+      this.project.modes[id] = { ...clone(mode), name: mode.name && !label ? mode.name : `Modalità ${id}` };
+      const i = this.project.modeOrder.indexOf(this.project.modeActive);
+      this.project.modeOrder.splice(i + 1, 0, id);
+      this.project.modeActive = id;
+    });
+    if (label) toast(`Modalità ${id}: ${label}`);
+  }
+
+  deleteMode() {
+    const p = this.project;
+    if (p.modeOrder.length < 2) return;
+    if (!confirm(`Eliminare la modalità "${this.mode.name}"?`)) return;
+    this.edit(() => {
+      const i = p.modeOrder.indexOf(p.modeActive);
+      delete p.modes[p.modeActive];
+      p.modeOrder.splice(i, 1);
+      p.modeActive = p.modeOrder[Math.max(0, i - 1)];
+    });
   }
 
   _roll(c) {
@@ -990,18 +1297,19 @@ export class ComposeEditor {
     const box = $('#cp-insp');
     const c = this.clip(this.primary);
     const multi = this.sel.size > 1;
-    const def = this.meta.styles.default;
-    const seqStyle = mergeStyle(def, this.seq.defaultStyle);
+    const mode = this.mode;
     if (!c) {
-      box.innerHTML = `<div class="cp-sec-title"><span>Stile della sequenza</span><span class="hint">vale per gli accordi senza stile proprio</span></div>
-        ${this._styleEditor(seqStyle)}`;
-      this._bindStyleEditor(box, seqStyle, (st) => this.edit(() => { this.seq.defaultStyle = st; }));
+      const st = { play: mergeStyle(this.meta.styles.defaultPlay, mode.play), swing: mode.swing };
+      box.innerHTML = `<div class="cp-sec-title"><span>Modalità <b>${esc(mode.name)}</b>: come si suona</span><span class="hint">vale per tutti gli accordi senza esecuzione propria</span></div>
+        ${this._playEditor(st, { swing: true })}`;
+      this._bindPlayEditor(box, st, (n) => this.edit(() => { mode.play = n.play; mode.swing = n.swing; }));
       return;
     }
     const locked = this.seq.keyMode === 'locked';
     const own = !!c.style;
-    const st = mergeStyle(seqStyle, c.style);
     const src = c.srcKey ? keyName(c.srcKey) : '';
+    const st = own ? { play: mergeStyle(mode.play, c.style.play), rhythm: c.style.rhythm ?? 'inherit' } : null;
+    const rsel = !st ? '' : typeof st.rhythm === 'object' ? `preset:${st.rhythm.preset || ''}` : st.rhythm;
     box.innerHTML = `
       <div class="cp-sec-title"><span><span class="cp-deg" style="--fc:${FUNC_COLOR[c.func] || '#888'}">${esc(c.degree || '?')}</span>
         <b>${esc(this.displayName(c))}</b>${multi ? ` <span class="hint">+ altri ${this.sel.size - 1} selezionati</span>` : ''}</span>
@@ -1015,13 +1323,19 @@ export class ComposeEditor {
         <div class="cp-prop">Durata <span>${this._fmtLen(c.len)}</span></div>
       </div>
       <div class="cp-actions">
-        <button class="btn small primary" data-act="vary" title="Variazioni dell'accordo (V)">✦ Varia…</button>
+        <button class="btn small primary" data-act="vary" title="Voicing, colore e sostituzioni dell'accordo (V)">✦ Varia armonia…</button>
         <button class="btn small" data-act="dup" title="Duplica (⌘D)">Duplica</button>
         <button class="btn small" data-act="del" title="Elimina (Canc)">Elimina</button>
       </div>
       <div class="cp-sec-title"><span>Esecuzione</span>
-        <label class="cp-own"><input type="checkbox" data-own ${own ? 'checked' : ''}> stile proprio${multi ? ' (tutti i selezionati)' : ''}</label></div>
-      ${own ? this._styleEditor(st) : '<div class="hint">Usa lo stile della sequenza. Attiva "stile proprio" per suonare questo accordo diversamente (strum, arpeggio, ritmo…).</div>'}`;
+        <label class="cp-own"><input type="checkbox" data-own ${own ? 'checked' : ''}> propria${multi ? ' (tutti i selezionati)' : ''}</label></div>
+      ${own ? `<div class="cp-srow"><span>Ritmica</span><select class="cp-select" data-rsel>
+          <option value="inherit" ${rsel === 'inherit' ? 'selected' : ''}>quella della modalità</option>
+          <option value="sustain" ${rsel === 'sustain' ? 'selected' : ''}>tenuto (un colpo)</option>
+          ${this.meta.styles.presets.map(([k, l]) => `<option value="preset:${k}" ${rsel === `preset:${k}` ? 'selected' : ''}>${esc(l)}</option>`).join('')}
+          ${rsel === 'preset:' ? '<option value="preset:" selected>personalizzata</option>' : ''}</select></div>
+        ${this._playEditor(st, { swing: false })}`
+        : `<div class="hint">Suona come la modalità <b>${esc(mode.name)}</b>. Attiva "propria" per suonare questo accordo diversamente (altro strum, arpeggio, tenuto…).</div>`}`;
     box.querySelectorAll('[data-p]').forEach((b) => {
       b.onclick = () => this.edit(() => {
         for (const x of this._selClips()) {
@@ -1038,9 +1352,15 @@ export class ComposeEditor {
     box.querySelector('[data-act="dup"]').onclick = () => this.duplicateSelected();
     box.querySelector('[data-act="del"]').onclick = () => this.deleteSelected();
     box.querySelector('[data-own]').onchange = (e) => this.edit(() => {
-      for (const x of this._selClips()) x.style = e.target.checked ? clone(st) : null;
+      for (const x of this._selClips()) x.style = e.target.checked ? { play: clone(mode.play), rhythm: 'inherit' } : null;
     });
-    if (own) this._bindStyleEditor(box, st, (ns) => this.edit(() => { for (const x of this._selClips()) x.style = clone(ns); }));
+    if (!own) return;
+    box.querySelector('[data-rsel]').onchange = (e) => this.edit(() => {
+      const v = e.target.value;
+      const rhythm = v.startsWith('preset:') ? fixGrid(this.meta.styles.presetGrids[v.slice(7)] || st.rhythm) : v;
+      for (const x of this._selClips()) x.style = { ...(x.style || {}), rhythm: clone(rhythm) };
+    });
+    this._bindPlayEditor(box, st, (n) => this.edit(() => { for (const x of this._selClips()) x.style = { play: clone(n.play), rhythm: clone(n.rhythm) }; }));
   }
 
   _selClips() { return this.seq.clips.filter((c) => this.sel.has(c.id)); }
@@ -1053,36 +1373,49 @@ export class ComposeEditor {
     return parts.join(' + ');
   }
 
-  _styleEditor(st) {
+  // st: {play, swing?, rhythm?}; every control edits a path of st
+  _playEditor(st, { swing }) {
     const m = this.meta.styles;
-    const opt = (list, v) => list.map(([k, l]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${esc(l)}</option>`).join('');
-    const seg = (name, list, v) => `<div class="seg cp-seg">${list.map(([k, l]) => `<button class="seg-btn ${k === v ? 'active' : ''}" data-s="${name}" data-v="${k}">${esc(l)}</button>`).join('')}</div>`;
-    const range = (name, min, max, step, v, unit = '') => `<span class="cp-range"><input type="range" data-r="${name}" min="${min}" max="${max}" step="${step}" value="${v}"><span>${v}${unit}</span></span>`;
-    const strumUsed = st.type === 'strum' || (st.type === 'rhythm' && st.rhythm.hit === 'strum') ||
-      (st.alternate.every !== 'off' && st.alternate.tokens.some((t) => t.startsWith('strum')));
+    const p = st.play;
+    const opt = (list, v) => list.map(([k, l]) => `<option value="${k}" ${String(k) === String(v) ? 'selected' : ''}>${esc(l)}</option>`).join('');
+    const seg = (name, list, v) => `<div class="seg cp-seg">${list.map(([k, l]) => `<button class="seg-btn ${String(k) === String(v) ? 'active' : ''}" data-s="${name}" data-v="${k}">${esc(l)}</button>`).join('')}</div>`;
+    const range = (name, min, max, step, v, unit = '', title = '') => `<span class="cp-range" title="${esc(title)}"><input type="range" data-r="${name}" min="${min}" max="${max}" step="${step}" value="${v}"><span>${v}${unit}</span></span>`;
+    const row = (label, html, title = '') => `<div class="cp-srow" title="${esc(title)}"><span>${label}</span>${html}</div>`;
+    const strumUsed = p.type === 'strum' || (p.alternate.every !== 'off' && p.alternate.tokens.some((t) => t.startsWith('strum')));
+    const s = p.strum, h = p.humanize;
     const tokLabel = Object.fromEntries(m.tokens);
     return `<div class="cp-style">
-      ${seg('type', m.types, st.type)}
-      <div class="cp-srow"><span>Durata note</span>${range('gate', 25, 100, 5, Math.round(st.gate * 100), '%')}</div>
-      ${st.type === 'arp' ? `
-        <div class="cp-srow"><span>Arpeggio</span><select data-sel="arp.mode" class="cp-select">${opt(m.arpModes, st.arp.mode)}</select>
-          <select data-sel="arp.rate" class="cp-select">${opt(m.rates.map((r) => [r, r]), st.arp.rate)}</select>
-          ${seg('arp.octaves', [[1, '1 ott.'], [2, '2 ott.']], st.arp.octaves)}</div>` : ''}
-      ${st.type === 'rhythm' ? `
-        <div class="cp-srow"><span>Pattern</span><select data-sel="rhythm.pattern" class="cp-select">${opt(m.rhythms, st.rhythm.pattern)}</select>
-          ${seg('rhythm.hit', [['block', 'Block'], ['strum', 'Strum']], st.rhythm.hit)}</div>` : ''}
-      ${strumUsed ? `<div class="cp-srow"><span>Strum</span><select data-sel="strum.dir" class="cp-select">${opt(m.strumDirs, st.strum.dir)}</select>
-          ${range('strum.spread', 5, 80, 1, st.strum.spread, ' ms')}</div>` : ''}
-      <div class="cp-srow"><span>Dinamica</span><select data-sel="velCurve" class="cp-select">${opt(m.velCurves, st.velCurve)}</select></div>
-      <div class="cp-srow"><span>Humanize</span>${range('humanize.timing', 0, 40, 1, st.humanize.timing, ' ms')}${range('humanize.vel', 0, 30, 1, st.humanize.vel, ' vel')}
-        <button class="icon-btn small" data-dice title="Nuova umanizzazione">🎲</button></div>
-      <div class="cp-srow"><span>Alterna</span><select data-sel="alternate.every" class="cp-select">${opt([['off', 'no'], ['hit', 'a ogni colpo'], ['bar', 'a ogni battuta']], st.alternate.every)}</select>
-        ${st.alternate.every !== 'off' ? `<span class="cp-tokens">${st.alternate.tokens.map((t, i) => `<span class="chip on" data-tokdel="${i}" title="Rimuovi">${esc(tokLabel[t] || t)} ×</span>`).join('') || '<span class="hint">aggiungi:</span>'}</span>
-          <span class="cp-tokadd">${m.tokens.filter(([t]) => st.alternate.every === 'bar' || !['arp', 'rhythm'].includes(t)).map(([t, l]) => `<button class="chip" data-tokadd="${t}">+ ${esc(l)}</button>`).join('')}</span>` : ''}</div>
+      ${seg('play.type', m.types, p.type)}
+      ${row('Durata note', range('play.gate', 25, 100, 5, Math.round(p.gate * 100), '%'), 'Quanto dura ogni colpo rispetto allo spazio fino al successivo')}
+      ${swing ? row('Swing', range('swing', 50, 75, 1, st.swing, '', '50 = dritto, 66 = terzinato, 75 = shuffle pesante (sui sedicesimi in levare)')) : ''}
+      ${p.type === 'arp' ? row('Arpeggio', `<select data-sel="play.arp.mode" class="cp-select">${opt(m.arpModes, p.arp.mode)}</select>
+          <select data-sel="play.arp.rate" class="cp-select">${opt(m.rates.map((r) => [r, r]), p.arp.rate)}</select>
+          ${seg('play.arp.octaves', [[1, '1 ott.'], [2, '2 ott.']], p.arp.octaves)}`) : ''}
+      ${strumUsed ? `<div class="cp-subtitle">Strum</div>
+        ${row('Direzione', `<select data-sel="play.strum.dir" class="cp-select">${opt(m.strumDirs, s.dir)}</select>`, 'Chitarra: pennata giù sui battere e su in levare. Frecce: ⇧+clic sugli step della ritmica')}
+        ${row('Velocità', `${s.unit === 'ms' ? range('play.strum.spread', 3, 90, 1, s.spread, ' ms', 'Tempo tra una nota e la successiva') : ''}
+            <select data-sel="play.strum.unit" class="cp-select" title="In millisecondi o in valore musicale (segue il BPM)">${opt(m.strumUnits.map((u) => [u, u === 'ms' ? 'ms' : u]), s.unit)}</select>`)}
+        ${row('Curva', `<select data-sel="play.strum.curve" class="cp-select">${opt(m.strumCurves, s.curve)}</select>`, 'Accelera: le ultime corde arrivano più ravvicinate, come una pennata vera')}
+        ${row('Pennata su', `<select data-sel="play.strum.upNotes" class="cp-select" title="Nelle pennate dall'alto suonano solo le note più acute">${opt([[0, 'tutte le note'], [2, '2 note alte'], [3, '3 note alte'], [4, '4 note alte']], s.upNotes)}</select>
+            ${range('play.strum.upSoft', 0, 60, 5, s.upSoft, '% più piano', 'Le pennate dall\'alto sono più deboli')}`)}
+        ${row('Inclinazione', range('play.strum.velTilt', -40, 40, 5, s.velTilt, '%', 'Negativo: la prima nota più forte; positivo: l\'ultima più forte'))}` : ''}
+      <div class="cp-subtitle">Humanize <button class="icon-btn small" data-dice title="Nuova umanizzazione (stesse quantità, altro caso)">🎲</button></div>
+      ${row('Timing', range('play.humanize.timing', 0, 40, 1, h.timing, ' ms', 'Spostamento casuale di ogni colpo (tutte le note insieme)'))}
+      ${row('Note accordo', range('play.humanize.spread', 0, 25, 1, h.spread, ' ms', 'Le note dello stesso colpo non partono esattamente insieme'))}
+      ${row('Feel', range('play.humanize.feel', -25, 25, 1, h.feel, ' ms', 'Negativo: in anticipo (spinge) · positivo: in ritardo (laid back)'))}
+      ${row('Deriva', range('play.humanize.drift', 0, 100, 5, h.drift, '%', '0: ogni colpo varia per conto suo · 100: il timing ondeggia lentamente, come un musicista'))}
+      ${row('Velocity', range('play.humanize.vel', 0, 30, 1, h.vel, ''))}
+      ${row('Durate', range('play.humanize.len', 0, 40, 5, h.len, '%', 'Variazione casuale della lunghezza delle note'))}
+      ${row('Accenti', range('play.humanize.accent', 0, 40, 5, h.accent, '%', 'Più forte sul primo e sui battere, più leggero in levare'))}
+      <div class="cp-subtitle">Dinamica e alternanza</div>
+      ${row('Dinamica', `<select data-sel="play.velCurve" class="cp-select">${opt(m.velCurves, p.velCurve)}</select>`)}
+      ${row('Alterna', `<select data-sel="play.alternate.every" class="cp-select">${opt([['off', 'no'], ['hit', 'a ogni colpo'], ['bar', 'a ogni battuta']], p.alternate.every)}</select>
+        ${p.alternate.every !== 'off' ? `<span class="cp-tokens">${p.alternate.tokens.map((t, i) => `<span class="chip on" data-tokdel="${i}" title="Rimuovi">${esc(tokLabel[t] || t)} ×</span>`).join('') || '<span class="hint">aggiungi:</span>'}</span>
+          <span class="cp-tokadd">${m.tokens.filter(([t]) => p.alternate.every === 'bar' || t !== 'arp').map(([t, l]) => `<button class="chip" data-tokadd="${t}">+ ${esc(l)}</button>`).join('')}</span>` : ''}`)}
     </div>`;
   }
 
-  _bindStyleEditor(box, st, commit) {
+  _bindPlayEditor(box, st, commit) {
     const setPath = (o, path, v) => { const ks = path.split('.'); let x = o; for (const k of ks.slice(0, -1)) x = x[k]; x[ks.at(-1)] = v; };
     const ed = box.querySelector('.cp-style');
     if (!ed) return;
@@ -1090,28 +1423,30 @@ export class ComposeEditor {
     ed.querySelectorAll('[data-s]').forEach((b) => {
       b.onclick = () => { const n = clone(st); setPath(n, b.dataset.s, num(b.dataset.v)); commit(n); };
     });
-    ed.querySelectorAll('[data-sel]').forEach((s) => {
-      s.onchange = () => {
+    ed.querySelectorAll('[data-sel]').forEach((sel) => {
+      sel.onchange = () => {
         const n = clone(st);
-        setPath(n, s.dataset.sel, num(s.value));
-        if (s.dataset.sel === 'alternate.every' && s.value !== 'off' && !n.alternate.tokens.length) {
-          n.alternate.tokens = s.value === 'bar' ? ['block', 'strum_up'] : ['block', 'strum_up', 'strum_down'];
+        setPath(n, sel.dataset.sel, num(sel.value));
+        if (sel.dataset.sel === 'play.alternate.every' && sel.value !== 'off' && !n.play.alternate.tokens.length) {
+          n.play.alternate.tokens = sel.value === 'bar' ? ['block', 'strum_up'] : ['strum_up', 'strum_down'];
         }
         commit(n);
       };
     });
     ed.querySelectorAll('[data-r]').forEach((r) => {
-      r.oninput = () => { r.nextElementSibling.textContent = r.value + r.nextElementSibling.textContent.replace(/^[\d.]+/, ''); };
-      r.onchange = () => { const n = clone(st); setPath(n, r.dataset.r, r.dataset.r === 'gate' ? +r.value / 100 : +r.value); commit(n); };
+      const unit = r.nextElementSibling.textContent.replace(/^-?[\d.]+/, '');
+      r.oninput = () => { r.nextElementSibling.textContent = r.value + unit; };
+      r.onchange = () => { const n = clone(st); setPath(n, r.dataset.r, r.dataset.r === 'play.gate' ? +r.value / 100 : +r.value); commit(n); };
     });
     ed.querySelector('[data-dice]').onclick = () => {
       const n = clone(st);
-      n.humanize.seed = 1 + Math.floor(Math.random() * 1e9);
-      if (!n.humanize.timing && !n.humanize.vel) { n.humanize.timing = 10; n.humanize.vel = 10; }
+      const h = n.play.humanize;
+      h.seed = 1 + Math.floor(Math.random() * 1e9);
+      if (!h.timing && !h.vel && !h.spread) { h.timing = 8; h.spread = 4; h.vel = 8; }
       commit(n);
     };
-    ed.querySelectorAll('[data-tokdel]').forEach((b) => { b.onclick = () => { const n = clone(st); n.alternate.tokens.splice(+b.dataset.tokdel, 1); commit(n); }; });
-    ed.querySelectorAll('[data-tokadd]').forEach((b) => { b.onclick = () => { const n = clone(st); n.alternate.tokens.push(b.dataset.tokadd); commit(n); }; });
+    ed.querySelectorAll('[data-tokdel]').forEach((b) => { b.onclick = () => { const n = clone(st); n.play.alternate.tokens.splice(+b.dataset.tokdel, 1); commit(n); }; });
+    ed.querySelectorAll('[data-tokadd]').forEach((b) => { b.onclick = () => { const n = clone(st); n.play.alternate.tokens.push(b.dataset.tokadd); commit(n); }; });
   }
 
   // ---------------------------------------------------------------- variations
@@ -1134,7 +1469,7 @@ export class ComposeEditor {
     const c = this.clip(id);
     if (!c) return;
     const kinds = this.meta.clipKinds;
-    const m = this._modal(`Variazioni di ${esc(this.displayName(c))}`, `
+    const m = this._modal(`Varia armonia: ${esc(this.displayName(c))}`, `
       <div class="cp-vtools"><div class="chips" data-kinds>${kinds.map(([k, l]) => `<button class="chip ${this.clipKinds.includes(k) ? 'on' : ''}" data-kind="${k}">${esc(l)}</button>`).join('')}</div>
         <button class="btn small" data-gen>🎲 Altre proposte</button></div>
       <div class="cp-vlist" data-list><div class="hint">Genero…</div></div>
@@ -1142,7 +1477,7 @@ export class ComposeEditor {
     let seed = 1 + Math.floor(Math.random() * 1e6);
     const load = async () => {
       m.querySelector('[data-list]').innerHTML = '<div class="hint">Genero…</div>';
-      const res = await this.api.compose_vary_clip(this.seq, id, this.clipKinds, seed);
+      const res = await this.api.compose_vary_clip(this.playSeq, id, this.clipKinds, seed);
       this._clipProposals = res || [];
       const groups = Object.fromEntries(kinds);
       m.querySelector('[data-list]').innerHTML = this._clipProposals.map((p, i) => `
@@ -1163,7 +1498,7 @@ export class ComposeEditor {
       const use = e.target.closest('[data-use]');
       if (play) {
         const p = this._clipProposals[+play.dataset.play];
-        const seq = clone(this.seq);
+        const seq = clone(this.playSeq);
         seq.clips = seq.clips.map((x) => (x.id === id ? { ...p.clip, id } : x));
         const res = await this.api.compose_render(seq);
         const cur = this.clip(id);
@@ -1183,7 +1518,7 @@ export class ComposeEditor {
   async progressionVariations() {
     if (!this.seq.clips.length) { toast('Aggiungi prima qualche accordo'); return; }
     const kinds = this.meta.progKinds;
-    const m = this._modal(`Variazioni della versione ${this.project.active}`, `
+    const m = this._modal(`Varia armonia: versione ${this.project.active}`, `
       <div class="cp-vtools"><div class="chips" data-kinds>${kinds.map(([k, l]) => `<button class="chip ${this.progKinds.includes(k) ? 'on' : ''}" data-kind="${k}">${esc(l)}</button>`).join('')}</div></div>
       <div class="cp-vtools"><label class="cp-field">Quanto variare <input type="range" min="10" max="100" step="5" value="${this.ui.amount || 50}" data-amount></label>
         <button class="btn small primary" data-gen>🎲 Genera</button></div>
@@ -1192,7 +1527,7 @@ export class ComposeEditor {
     let seed = 1 + Math.floor(Math.random() * 1e6);
     const load = async () => {
       m.querySelector('[data-list]').innerHTML = '<div class="hint">Genero…</div>';
-      const res = await this.api.compose_vary_progression(this.seq, this.progKinds, (this.ui.amount || 50) / 100, seed);
+      const res = await this.api.compose_vary_progression(this.playSeq, this.progKinds, (this.ui.amount || 50) / 100, seed);
       this._progProposals = res || [];
       m.querySelector('[data-list]').innerHTML = this._progProposals.map((p, i) => `
         <div class="cp-vrow cp-vprog"><div class="cp-vmain"><span class="cp-vlabel">${esc(p.label)}</span>${this._miniTimeline(p.seq)}</div>
@@ -1214,10 +1549,10 @@ export class ComposeEditor {
       if (b.dataset.play !== undefined) {
         if (this.transport.playing) { this.stop(); return; }
         const res = await this.api.compose_render(p.seq);
-        this.transport.play({ events: res.events, bpm: p.seq.bpm, from: 0, to: p.seq.bars * 16 * STEP_TICKS, loop: false });
+        this.playRange(0, p.seq.bars * 16 * STEP_TICKS, res.events);
       } else if (b.dataset.keep !== undefined) {
         this.stop();
-        this.addVersion(this._freshIds(clone(p.seq)), p.label);
+        this.addVersion(this._freshIds(this._harmonyOf(p.seq)), p.label);
         m.close();
       } else {
         this.stop();
@@ -1231,6 +1566,69 @@ export class ComposeEditor {
       }
     };
     load();
+  }
+
+  // a proposal comes back with the playing fields of playSeq: keep only the harmony
+  _harmonyOf(seq) {
+    const { mode, bpm, name, ...h } = clone(seq);
+    void mode; void bpm; void name;
+    return h;
+  }
+
+  async modeVariations() {
+    const kinds = this.meta.modeKinds;
+    const m = this._modal(`Varia modalità: ${esc(this.mode.name)}`, `
+      <div class="cp-vtools"><div class="chips" data-kinds>${kinds.map(([k, l]) => `<button class="chip ${this.modeKinds.includes(k) ? 'on' : ''}" data-kind="${k}">${esc(l)}</button>`).join('')}</div></div>
+      <div class="cp-vtools"><label class="cp-field">Quanto variare <input type="range" min="10" max="100" step="5" value="${this.ui.modeAmount || 50}" data-amount></label>
+        <button class="btn small primary" data-gen>🎲 Genera</button></div>
+      <div class="cp-vlist" data-list></div>
+      <div class="hint">Gli accordi non cambiano. ▶ ascolta · Usa: sostituisce la modalità corrente (⌘Z per tornare indietro) · Tieni: la aggiunge come nuova modalità</div>`);
+    let seed = 1 + Math.floor(Math.random() * 1e6);
+    const load = async () => {
+      m.querySelector('[data-list]').innerHTML = '<div class="hint">Genero…</div>';
+      const res = await this.api.compose_vary_mode(this.mode, this.modeKinds, (this.ui.modeAmount || 50) / 100, seed);
+      this._modeProposals = res || [];
+      const names = Object.fromEntries(kinds);
+      m.querySelector('[data-list]').innerHTML = this._modeProposals.map((p, i) => `
+        <div class="cp-vrow cp-vprog"><div class="cp-vmain"><span class="cp-vlabel"><span class="cp-vkind">${esc(names[p.kind] || p.kind)}</span> ${esc(p.label)}</span>${this._miniGrid(p.mode)}</div>
+          <button class="icon-btn small" data-play="${i}" title="Ascolta">▶</button>
+          <button class="btn small primary" data-use="${i}">Usa</button>
+          <button class="btn small" data-keep="${i}">Tieni</button></div>`).join('') || '<div class="hint">Nessuna variazione con questi tipi.</div>';
+    };
+    m.querySelector('[data-kinds]').onclick = (e) => {
+      const b = e.target.closest('[data-kind]'); if (!b) return;
+      const k = b.dataset.kind;
+      this.modeKinds = this.modeKinds.includes(k) ? this.modeKinds.filter((x) => x !== k) : [...this.modeKinds, k];
+      b.classList.toggle('on', this.modeKinds.includes(k));
+    };
+    m.querySelector('[data-amount]').onchange = (e) => { this.ui.modeAmount = +e.target.value; this._persist(); };
+    m.querySelector('[data-gen]').onclick = () => { seed++; load(); };
+    m.querySelector('[data-list]').onclick = async (e) => {
+      const b = e.target.closest('[data-play],[data-use],[data-keep]'); if (!b) return;
+      const p = this._modeProposals[+(b.dataset.play ?? b.dataset.use ?? b.dataset.keep)];
+      if (b.dataset.play !== undefined) {
+        if (this.transport.playing) { this.stop(); return; }
+        const res = await this.api.compose_render(this._playSeq(this.seq, p.mode));
+        this.playRange(0, this.seq.bars * 16 * STEP_TICKS, res.events);
+      } else if (b.dataset.use !== undefined) {
+        this.stop();
+        const name = this.mode.name;
+        this.edit(() => { this.project.modes[this.project.modeActive] = { ...clone(p.mode), name, rhythm: fixGrid(p.mode.rhythm) }; });
+        toast(p.label);
+        m.close();
+      } else {
+        this.stop();
+        this.addMode({ ...clone(p.mode), rhythm: fixGrid(p.mode.rhythm) }, p.label);
+        m.close();
+      }
+    };
+    load();
+  }
+
+  _miniGrid(mode) {
+    const g = mode.rhythm;
+    if (!g.on) return '<div class="cp-minigrid"><span class="hint">accordi tenuti</span></div>';
+    return `<div class="cp-minigrid">${g.vel.map((v, j) => `<i class="${j % 4 === 0 ? 'beat' : ''}" style="opacity:${v ? 0.35 + 0.65 * v / 127 : 0.08}"></i>`).join('')}</div>`;
   }
 
   _freshIds(seq) {
@@ -1271,7 +1669,13 @@ export class ComposeEditor {
       }
       if (e.target.closest('[data-new]')) {
         pop.close();
-        this.edit(() => { const key = this.seq.key; this.project = newProject(); this.project.versions.A.key = { ...key }; this.sel.clear(); this.primary = null; });
+        this.edit(() => {
+          const key = this.seq.key;
+          this.project = newProject(clone(this.meta.styles.defaultMode));
+          this.project.versions.A.key = { ...key };
+          this.sel.clear();
+          this.primary = null;
+        });
         this.loadBrowser();
         return;
       }
@@ -1279,31 +1683,38 @@ export class ComposeEditor {
       if (!row) return;
       const p = list.find((x) => x.id === row.dataset.id);
       pop.close();
-      this.edit(() => { this.project = clone(p); this.sel.clear(); this.primary = null; });
+      this.edit(() => { this.project = this._migrate(clone(p)); this.sel.clear(); this.primary = null; });
       this.loadBrowser();
     };
   }
 
   exportMenu(anchor) {
-    const many = this.project.order.length > 1;
+    const p = this.project;
+    const many = p.order.length > 1;
+    const manyModes = p.modeOrder.length > 1;
+    const label = (v, mk) => `${p.name}${many ? ` ${v}` : ''}${manyModes ? ` - ${p.modes[mk].name}` : ''}`;
     const pop = showPopover(anchor, `
-      <button class="btn primary" data-one>Versione ${this.project.active} → .mid</button>
-      ${many ? `<button class="btn" data-all>Tutte le versioni (${this.project.order.join(', ')}) → cartella</button>` : ''}
-      <label class="cp-own"><input type="checkbox" data-pure ${this.ui.pure ? 'checked' : ''}> solo accordi (senza strum/arpeggi/ritmo/humanize)</label>
-      <div class="hint">In Ableton: trascina il file su una traccia MIDI. Il tempo del file è ${this.seq.bpm} BPM.</div>`);
+      <button class="btn primary" data-one>Versione ${p.active} · ${esc(this.mode.name)} → .mid</button>
+      ${many ? `<button class="btn" data-all>Tutte le versioni (${p.order.join(', ')}) con ${esc(this.mode.name)} → cartella</button>` : ''}
+      ${manyModes ? `<button class="btn" data-modes>Versione ${p.active} con tutte le modalità → cartella</button>` : ''}
+      <label class="cp-own"><input type="checkbox" data-pure ${this.ui.pure ? 'checked' : ''}> solo accordi (senza ritmica, strum, arpeggi e humanize)</label>
+      <div class="hint">In Ableton: trascina il file su una traccia MIDI. Il tempo del file è ${p.bpm} BPM.</div>`);
     pop.querySelector('[data-pure]').onchange = (e) => { this.ui.pure = e.target.checked; this._persist(); };
     pop.querySelector('[data-one]').onclick = async () => {
       pop.close();
-      const p = await this.api.compose_export_midi({ ...this.seq, name: `${this.project.name}${many ? ` ${this.project.active}` : ''}` }, this.ui.pure);
-      if (p) toast(`MIDI salvato: ${p.split('/').pop()}`);
+      const r = await this.api.compose_export_midi({ ...this.playSeq, name: label(p.active, p.modeActive) }, this.ui.pure);
+      if (r) toast(`MIDI salvato: ${r.split('/').pop()}`);
     };
-    pop.querySelector('[data-all]')?.addEventListener('click', async () => {
+    const many_ = async (seqs) => {
       pop.close();
-      const seqs = this.project.order.map((v) => ({ ...this.project.versions[v], name: this.project.name, version: v }));
       const r = await this.api.compose_export_versions(seqs, this.ui.pure);
       if (r?.files) toast(`${r.files.length} file MIDI salvati`);
       else if (r?.error) toast(r.error);
-    });
+    };
+    pop.querySelector('[data-all]')?.addEventListener('click', () =>
+      many_(p.order.map((v) => ({ ...this._playSeq(p.versions[v]), name: label(v, p.modeActive) }))));
+    pop.querySelector('[data-modes]')?.addEventListener('click', () =>
+      many_(p.modeOrder.map((mk) => ({ ...this._playSeq(this.seq, p.modes[mk]), name: label(p.active, mk) }))));
   }
 
   // ---------------------------------------------------------------- keyboard (from app.js)

@@ -1,26 +1,16 @@
-"""Variations of a single chord clip and of a whole progression (deterministic for a given seed)."""
+"""Variations, deterministic for a given seed: harmony (a chord, the whole progression) and Modalità
+(rhythm grid and way of playing), kept apart."""
 import copy
+import math
 import random
 
 from . import harmony, theory
+from . import perform
 from .perform import voicing
 
-CLIP_KINDS = [("voicing", "Voicing"), ("color", "Colore"), ("substitute", "Sostituzione"), ("performance", "Esecuzione")]
+CLIP_KINDS = [("voicing", "Voicing"), ("color", "Colore"), ("substitute", "Sostituzione")]
 PROG_KINDS = [("reharm", "Riarmonizzazione"), ("rhythm", "Ritmo armonico"), ("voicing", "Voice leading"),
-              ("richer", "Più ricca"), ("sparser", "Più scarna"), ("performance", "Esecuzione"), ("ending", "Finale")]
-_PERF = [
-    ("Strum ↑", {"type": "strum", "strum": {"dir": "up", "spread": 30}}),
-    ("Strum alternato a ottavi", {"type": "rhythm", "rhythm": {"pattern": "eighths", "hit": "strum"}, "strum": {"dir": "alt", "spread": 18}, "gate": .9}),
-    ("Arpeggio su-giù 1/8", {"type": "arp", "arp": {"mode": "updown", "rate": "1/8", "octaves": 1}, "gate": .9}),
-    ("Arpeggio 1/16 su due ottave", {"type": "arp", "arp": {"mode": "up", "rate": "1/16", "octaves": 2}, "gate": .7}),
-    ("Offbeat staccato", {"type": "rhythm", "rhythm": {"pattern": "offbeat", "hit": "block"}, "gate": .5}),
-    ("Tresillo con strum", {"type": "rhythm", "rhythm": {"pattern": "tresillo", "hit": "strum"}, "strum": {"dir": "up", "spread": 14}, "gate": .8}),
-    ("Sincopato house", {"type": "rhythm", "rhythm": {"pattern": "syncopated", "hit": "block"}, "gate": .7}),
-    ("Block umanizzato", {"type": "block", "humanize": {"timing": 12, "vel": 10}, "velCurve": "bass"}),
-    ("Alterna block / strum ogni battuta", {"type": "block", "alternate": {"every": "bar", "tokens": ["block", "strum_up"]}}),
-    ("Ottavi: block, strum ↑, strum ↓", {"type": "rhythm", "rhythm": {"pattern": "eighths", "hit": "block"}, "gate": .8,
-                                         "alternate": {"every": "hit", "tokens": ["block", "strum_up", "strum_down"]}}),
-]
+              ("richer", "Più ricca"), ("sparser", "Più scarna"), ("ending", "Finale")]
 _ENDINGS = {
     "major": [((5, False), (7, False), "IV → V"), ((8, False), (10, False), "bVI → bVII"),
               ((5, False), (5, True), "IV → iv"), ((2, True), (7, False), "ii → V")],
@@ -159,13 +149,6 @@ def vary_clip(seq: dict, clip_id: str, kinds: list[str], seed: int, pool: list[d
             why = ", ".join(r["reasons"][:2])
             out.append({"kind": "substitute", "label": f"{_deg(clip, key)} → {r['degree']} ({r['chord']['name']})" + (f" · {why}" if why else ""),
                         "clip": _swap(clip, r["chord"])})
-    if "performance" in kinds:
-        cur = (clip.get("style") or {}).get("type")
-        opts = [p for p in _PERF if p[1]["type"] != cur or "alternate" in p[1]]
-        for name, st in rng.sample(opts, min(4, len(opts))):
-            c = copy.deepcopy(clip)
-            c["style"] = {**copy.deepcopy(st), "humanize": {**st.get("humanize", {"timing": 0, "vel": 0}), "seed": rng.randrange(1, 1 << 30)}}
-            out.append({"kind": "performance", "label": name, "clip": c})
     return out
 
 
@@ -273,15 +256,6 @@ def _density(seq, amount, rng, pool, key, bigrams, richer: bool):
     return clips, ("Più ricca: " if richer else "Più scarna: ") + ", ".join(changes)
 
 
-def _perf(seq, amount, rng, pool, key, bigrams):
-    clips = [copy.deepcopy(c) for c in _sorted(seq)]
-    name, st = rng.choice(_PERF)
-    seed = rng.randrange(1, 1 << 30)
-    for c in clips:
-        c["style"] = {**copy.deepcopy(st), "humanize": {**st.get("humanize", {"timing": round(6 * amount), "vel": round(8 * amount)}), "seed": seed}}
-    return clips, f"Esecuzione: {name}"
-
-
 def _ending(seq, amount, rng, pool, key, bigrams):
     clips = _sorted(seq)
     if len(clips) < 2:
@@ -304,7 +278,7 @@ def _ending(seq, amount, rng, pool, key, bigrams):
     return None
 
 
-_GEN = {"reharm": _reharm, "rhythm": _rhythm, "voicing": _revoice, "performance": _perf, "ending": _ending,
+_GEN = {"reharm": _reharm, "rhythm": _rhythm, "voicing": _revoice, "ending": _ending,
         "richer": lambda *a: _density(*a, richer=True), "sparser": lambda *a: _density(*a, richer=False)}
 
 
@@ -330,4 +304,151 @@ def vary_progression(seq: dict, kinds: list[str], amount: float, seed: int, pool
         new = copy.deepcopy(seq)
         new["clips"] = clips
         out.append({"kind": kind, "label": label, "seq": new})
+    return out
+
+
+# ------------------------------------------------------------------ Modalità (rhythm + playing)
+MODE_KINDS = [("density", "Densità"), ("syncopation", "Sincope"), ("accents", "Accenti"), ("preset", "Altra ritmica"),
+              ("play", "Modo di suonare"), ("strum", "Strum"), ("feel", "Feel / humanize")]
+
+
+def _colpi(n: int) -> str:
+    return f"{n} colpo" if n == 1 else f"{n} colpi"
+
+
+def _hits(g: dict) -> list[int]:
+    return [j for j, v in enumerate(g["vel"]) if v]
+
+
+def _m_density(m, amount, rng):
+    g = m["rhythm"]
+    if not g["on"] or not _hits(g):
+        m["rhythm"] = perform.preset_grid(rng.choice(["quarters", "eighths", "pop"]))
+        return m, f"Ritmica: {perform.RHYTHM_PRESETS[m['rhythm']['preset']][0]}"
+    n = max(1, round(amount * 4))
+    hits = _hits(g)
+    if rng.random() < .5 or len(hits) <= 2:
+        empty = [j for j in range(len(g["vel"])) if not g["vel"][j]]
+        empty.sort(key=lambda j: (j % 2, j % 4 != 0, rng.random()))
+        add = empty[:n]
+        for j in add:
+            g["vel"][j], g["len"][j], g["dir"][j] = (88 if j % 4 == 0 else 72), 0, "d" if j % 4 == 0 else "u"
+        label = f"Più densa: +{_colpi(len(add))}"
+    else:
+        rem = [j for j in hits if j % 16 != 0]
+        rng.shuffle(rem)
+        for j in rem[:n]:
+            g["vel"][j] = 0
+        label = f"Più rada: −{_colpi(len(rem[:n]))}"
+    g["preset"] = None
+    return m, label
+
+
+def _m_syncopation(m, amount, rng):
+    g = m["rhythm"]
+    cand = [j for j in _hits(g) if j % 4 == 0 and j % 16 != 0 and not g["vel"][j - 1]]
+    if not cand:
+        return None
+    rng.shuffle(cand)
+    moved = cand[:max(1, round(amount * len(cand)))]
+    for j in moved:
+        g["vel"][j - 1], g["len"][j - 1], g["dir"][j - 1] = g["vel"][j], g["len"][j], "u"
+        g["vel"][j] = 0
+    g["preset"] = None
+    return m, f"Sincopata: {_colpi(len(moved))} anticipat{'o' if len(moved) == 1 else 'i'} di un sedicesimo"
+
+
+def _m_accents(m, amount, rng):
+    g = m["rhythm"]
+    hits = _hits(g)
+    if not hits:
+        return None
+    name, fn = rng.choice([
+        ("accento sui battere", lambda j: 115 if j % 4 == 0 else 72),
+        ("accento in levare", lambda j: 112 if j % 4 == 2 else 78),
+        ("accento sul primo della battuta", lambda j: 120 if j % 16 == 0 else 80),
+        ("ghost notes sui sedicesimi", lambda j: 45 if j % 2 else 100),
+        ("onda dinamica", lambda j: round(80 + 30 * math.cos(j / len(g["vel"]) * 2 * math.pi))),
+    ])
+    for j in hits:
+        g["vel"][j] = max(1, min(127, round(g["vel"][j] * (1 - amount) + fn(j) * amount)))
+    return m, f"Accenti: {name}"
+
+
+def _m_preset(m, amount, rng):
+    count = len(_hits(m["rhythm"])) / m["rhythm"]["bars"]
+    others = [k for k in perform.RHYTHM_PRESETS if k != m["rhythm"].get("preset")]
+    others.sort(key=lambda k: abs(len(perform.RHYTHM_PRESETS[k][2]) / perform.RHYTHM_PRESETS[k][1] - count) * (1 - amount) + rng.random() * 4 * amount)
+    k = others[0]
+    m["rhythm"] = perform.preset_grid(k)
+    return m, f"Ritmica: {perform.RHYTHM_PRESETS[k][0]}"
+
+
+def _m_play(m, amount, rng):
+    p = m["play"]
+    choices = [t for t in ("block", "strum", "arp") if t != p["type"]]
+    p["type"] = rng.choice(choices)
+    if p["type"] == "arp":
+        p["arp"] = {"mode": rng.choice(["up", "updown", "down"]), "rate": rng.choice(["1/8", "1/16", "1/8t"]), "octaves": rng.choice([1, 2])}
+        return m, f"Arpeggio {p['arp']['rate']} ({p['arp']['mode']})"
+    if p["type"] == "strum":
+        p["strum"]["dir"] = "guitar"
+        return m, "Strum (pennate chitarra)"
+    return m, "Block"
+
+
+def _m_strum(m, amount, rng):
+    p = m["play"]
+    p["type"] = "strum"
+    st = p["strum"]
+    st["dir"] = rng.choice(["guitar", "alt", "grid", "up"])
+    st["unit"] = "ms"
+    st["spread"] = rng.randrange(8, 20 + round(40 * amount))
+    st["curve"] = rng.choice(["linear", "accel", "decel"])
+    st["upNotes"] = rng.choice([0, 0, 3, 4])
+    st["upSoft"] = rng.choice([0, 10, 20, 30])
+    st["velTilt"] = rng.choice([0, -15, 10, 20])
+    if st["dir"] == "grid":
+        g = m["rhythm"]
+        g["dir"] = ["d" if j % 4 == 0 or (rng.random() < .3 and j % 2 == 0) else "u" if v else "" for j, v in enumerate(g["vel"])]
+    meta = perform.meta()
+    dirs, curves = dict(meta["strumDirs"]), dict(meta["strumCurves"])
+    return m, f"Strum {st['spread']} ms, {dirs[st['dir']].lower()}, {curves[st['curve']].lower()}" + (f", pennate su sulle {st['upNotes']} note alte" if st["upNotes"] else "")
+
+
+def _m_feel(m, amount, rng):
+    h = m["play"]["humanize"]
+    h.update(timing=round(rng.uniform(3, 18) * amount + 2), spread=round(rng.uniform(2, 10) * amount),
+             drift=rng.choice([0, 30, 60, 85]), vel=round(rng.uniform(4, 16) * amount + 2),
+             feel=rng.choice([-10, -5, 0, 5, 10, 15]), accent=rng.choice([0, 10, 20]), seed=rng.randrange(1, 1 << 30))
+    m["swing"] = rng.choice([50, 50, 54, 58, 62])
+    who = "in ritardo" if h["feel"] > 0 else "in anticipo" if h["feel"] < 0 else "a tempo"
+    return m, f"Feel {who} ({h['feel']:+d} ms), humanize ±{h['timing']} ms, swing {m['swing']}"
+
+
+_MODE_GEN = {"density": _m_density, "syncopation": _m_syncopation, "accents": _m_accents, "preset": _m_preset,
+             "play": _m_play, "strum": _m_strum, "feel": _m_feel}
+
+
+def vary_mode(mode: dict, kinds: list[str], amount: float, seed: int, count: int = 4) -> list[dict]:
+    """Alternative Modalità (same harmony): [{kind, label, mode}]."""
+    base = perform.mode_of({"mode": mode})
+    kinds = [k for k in kinds if k in _MODE_GEN] or ["density"]
+    amount = max(.05, min(1.0, float(amount)))
+    rng = random.Random(seed)
+    out, seen = [], set()
+    for attempt in range(count * 4):
+        if len(out) >= count:
+            break
+        kind = kinds[attempt % len(kinds)]
+        res = _MODE_GEN[kind](copy.deepcopy(base), amount, random.Random(rng.randrange(1 << 30)))
+        if not res:
+            continue
+        m, label = res
+        sig = repr(m)
+        if sig in seen or m == base:
+            continue
+        seen.add(sig)
+        m["name"] = base.get("name", "Modalità")
+        out.append({"kind": kind, "label": label, "mode": m})
     return out

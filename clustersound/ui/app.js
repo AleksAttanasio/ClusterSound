@@ -61,7 +61,7 @@ async function main() {
   pattern = new PatternEditor({ api: state.api, player, classes: state.classes, onLoadFromRack: () => rack.openLoadDialog() });
   rack = new DrumRackEditor({ api: state.api, player, classes: state.classes, getTrail,
     getSequencer: () => pattern, onOpenSequencer: () => setTab('pattern') });
-  compose = new ComposeEditor({ api: state.api, player });
+  compose = new ComposeEditor({ api: state.api, player, getPattern: () => pattern, onOpenSequencer: () => setTab('pattern') });
   online.onSend = (ref, x, y) => sendRef(ref, x, y);
   buildSidebar();
   bindUi();

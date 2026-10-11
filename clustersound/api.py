@@ -512,7 +512,7 @@ class Api:
         lib = self._chord_lib()
         return {"dir": lib.root, "exists": lib.exists(), "keys": lib.available_keys() if lib.exists() else [],
                 "categories": CHORD_CATEGORIES, "styles": chord_perform.meta(),
-                "clipKinds": chord_variations.CLIP_KINDS, "progKinds": chord_variations.PROG_KINDS,
+                "clipKinds": chord_variations.CLIP_KINDS, "progKinds": chord_variations.PROG_KINDS, "modeKinds": chord_variations.MODE_KINDS,
                 "saved": pat_store.list_progressions()}
 
     def compose_pick_folder(self, path: str | None = None) -> dict:
@@ -576,6 +576,9 @@ class Api:
         key = self._seq_key(seq)
         pool = self._pool(seq)
         return chord_variations.vary_progression(seq, kinds, amount, int(seed), pool, key, self._chord_lib().bigrams(key["mode"]))
+
+    def compose_vary_mode(self, mode: dict, kinds: list, amount: float = .5, seed: int = 1) -> list[dict]:
+        return chord_variations.vary_mode(mode, kinds, amount, int(seed))
 
     @staticmethod
     def _prog_title(seq: dict) -> str:
