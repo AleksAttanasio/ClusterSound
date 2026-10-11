@@ -293,7 +293,7 @@ def test_instrument_types_and_pools():
     assert cats == [("sounds:Bass", "Bass"), ("sounds:Piano & Keys", "Piano & Keys"), ("sounds:Pad", "Pad"),
                     (proto.DRUM_KITS, "Kit di batteria"), ("instruments:Operator", "Preset di Operator")]
     d = proto.defaults([k for k, _ in cats])
-    assert d == {"chords": "sounds:Piano & Keys", "bass": "sounds:Bass", "drums": proto.DRUM_KITS}
+    assert d == {"chords": "sounds:Piano & Keys", "melody": "sounds:Piano & Keys", "bass": "sounds:Bass", "drums": proto.DRUM_KITS}
     assert proto.defaults(["sounds:Pad"])["chords"] == "sounds:Pad" and proto.defaults([])["bass"] is None
     assert len(proto.category_pool(b, "sounds:Bass")) == 150                       # every preset of the type
     assert [i.name for i, _ in proto.category_pool(b, "sounds:Piano & Keys")] == ["Grand.adv", "Rhodes.adg"]

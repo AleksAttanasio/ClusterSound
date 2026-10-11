@@ -232,6 +232,7 @@ function importPayload(p) {
             for (var c = 0; c < t.clips.length; c++) {
                 (function (clip, slot) {
                     steps.push(function () {
+                        if (!clip.notes.length) return;  // placeholder: keeps the next clips in their scene
                         var clipId = writeClip(set, trackIndex(ref.trackId), slot, clip);
                         if (!ref.clipId) ref.clipId = clipId;
                     });
