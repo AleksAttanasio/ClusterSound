@@ -120,6 +120,49 @@ def collect(roots, limit=MAX_ITEMS, max_visits=MAX_VISITS):
     return out
 
 
+# A drum bus of a sequence ("bus:<id>"): single hits (samples or Simpler presets, not whole kits) from Live's
+# Drums category whose name, or the name of a folder above them, contains one of these words.
+BUS_WORDS = {
+    "kick": ["kick", "bassdrum", "bass drum", "bd "],
+    "snare": ["snare", "sd "],
+    "clap": ["clap", "snap"],
+    "rim": ["rim", "stick", "woodblock"],
+    "chat": ["closed", "hihat", "hi-hat", "hi hat", "hat"],
+    "ohat": ["open", "hihat", "hi-hat", "hi hat", "hat"],
+    "cymbal": ["cymbal", "ride", "crash", "china", "splash"],
+    "perc": ["perc", "conga", "bongo", "shaker", "tamb", "cowbell", "clave", "block"],
+    "tom": ["tom"],
+    "fx": ["fx", "noise", "riser", "impact", "sweep", "reverse"],
+}
+BUS_MAX_VISITS = 6000
+
+
+def _matches(name, words):
+    n = " " + name.lower().replace("_", " ") + " "
+    return any(w in n for w in words)
+
+
+def collect_bus(roots, words, limit=MAX_ITEMS, max_visits=BUS_MAX_VISITS):
+    """[(item, folder name)] of single hits for a drum bus under the given browser items, breadth first."""
+    out, visits = [], 0
+    queue = [(r, getattr(r, "name", ""), False) for r in roots]
+    while queue and len(out) < limit and visits < max_visits:
+        item, folder, matched = queue.pop(0)
+        visits += 1
+        name = item.name
+        if getattr(item, "is_folder", False) or getattr(item, "is_device", False):
+            here = matched or _matches(name, words)
+            queue.extend((c, name, here) for c in item.children)
+        elif getattr(item, "is_loadable", False) and not name.lower().endswith(".adg") \
+                and (matched or _matches(name, words)):
+            out.append((item, folder))
+    return out
+
+
+def bus_of(role):
+    return role[4:] if role and role.startswith("bus:") and role[4:] in BUS_WORDS else None
+
+
 def role_roots(browser, role):
     """Browser items to search for a role, and whether they are the generic fallback."""
     for sources, fallback in ((ROLE_SOURCES.get(role, []), False), (FALLBACK_SOURCES, True)):

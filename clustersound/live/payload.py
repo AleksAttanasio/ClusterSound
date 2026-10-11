@@ -97,6 +97,17 @@ def _first(folder: str, pattern: str) -> str | None:
     return hits[0] if hits else None
 
 
+def drum_buses(p: dict, resolve=None) -> list[dict]:
+    """[{id, label, note}] of the drum buses that play, with the Drum Rack pad of each (its first pad when
+    the bus alternates layers). With resolve, only buses with a sample, as in export_package's rack."""
+    include = None
+    if resolve is not None:
+        include = {b for b in pat_model.DRUM_IDS
+                   if any(resolve(ly.get("ref")) for ly in pat_model.active_layers(p["buses"][b]))}
+    layout = pat_midi.drum_layout(p, "drumrack", include=include)
+    return [{"id": b, "label": pat_model.BUS_BY_ID[b][1], "note": notes[0]} for b, notes in layout.items()]
+
+
 def pattern(p: dict, stage: Stage, resolve, describe, title: str) -> dict:
     """A pattern (or a flattened sequence): Drums and Bass tracks with their racks and clips.
 
@@ -116,7 +127,9 @@ def pattern(p: dict, stage: Stage, resolve, describe, title: str) -> dict:
     else:
         notes = notes_from_events(pat_midi.drum_events(p, "drumrack"), pat_model.PPQ)
     if notes:
-        tracks.append(_track("Drums", "drums", drum_adg, stage, [{"name": f"{name} – Drums", "length": length, "notes": notes}]))
+        drums = _track("Drums", "drums", drum_adg, stage, [{"name": f"{name} – Drums", "length": length, "notes": notes}])
+        drums["buses"] = drum_buses(p, resolve if drum_adg else None)
+        tracks.append(drums)
 
     bass_adg = _first(folder, "* Bass.adg")
     notes = notes_from_events(pat_midi.bass_events(p), pat_model.PPQ)

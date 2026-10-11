@@ -128,8 +128,13 @@ class ClusterSoundBridge(ControlSurface):
         role = msg.get("role") or "chords"
         if role not in self._pools or msg.get("rescan"):
             browser = Live.Application.get_application().browser
-            roots, fallback = protocol.role_roots(browser, role)
-            self._pools[role] = protocol.collect(roots)
+            bus = protocol.bus_of(role)
+            if bus:
+                roots, fallback = list(browser.drums.children), False
+                self._pools[role] = protocol.collect_bus(roots, protocol.BUS_WORDS[bus])
+            else:
+                roots, fallback = protocol.role_roots(browser, role)
+                self._pools[role] = protocol.collect(roots)
             self._log("%d presets for %s%s" % (len(self._pools[role]), role, " (fallback)" if fallback else ""))
         chosen = protocol.pick(self._pools[role], int(msg.get("count", 6)), msg.get("seed", 0))
         out = []
@@ -150,9 +155,35 @@ class ClusterSoundBridge(ControlSurface):
             return
         if not self._midi(track, msg):
             return
-        self.song().view.selected_track = track
-        Live.Application.get_application().browser.load_item(item)
+        browser = Live.Application.get_application().browser
+        song = self.song()
+        song.view.selected_track = track
+        if msg.get("pad") is not None:
+            if not self._load_on_pad(track, int(msg["pad"]), item, browser, msg):
+                return
+        else:
+            browser.load_item(item)
         self._reply(msg, True, name=protocol.display_name(item.name))
+
+    def _load_on_pad(self, track, note, item, browser, msg):
+        """Replace what a Drum Rack pad plays (a sample or a Simpler preset) through the browser's hotswap."""
+        rack = next((d for d in track.devices if d.can_have_drum_pads), None)
+        if rack is None:
+            self._reply(msg, False, error="nessun Drum Rack su «%s»" % track.name)
+            return False
+        pad = rack.drum_pads[note]
+        self.song().view.select_device(rack)
+        rack.view.selected_drum_pad = pad
+        try:
+            browser.hotswap_target = pad
+        except Exception as e:  # older APIs: loading goes to the selected pad of the selected rack
+            self._log("hotswap_target on pad %d: %s" % (note, e))
+        browser.load_item(item)
+        try:
+            browser.hotswap_target = None
+        except Exception:
+            pass
+        return True
 
     @staticmethod
     def _roots(browser, root):

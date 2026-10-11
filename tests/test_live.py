@@ -78,6 +78,8 @@ def test_pattern_payload_matches_drum_rack(stage, samples):
     layout = midi.drum_layout(p, "drumrack", include=loaded)
     assert {n[0] for n in clip["notes"]} == {n for notes in layout.values() for n in notes}
     assert all(0 <= n[1] < clip["length"] for n in clip["notes"])
+    assert {(b["id"], b["note"]) for b in drums["buses"]} == {(b, notes[0]) for b, notes in layout.items()}
+    assert drums["buses"][0]["label"] == model.BUS_BY_ID[drums["buses"][0]["id"]][1]
     if p["buses"]["bass"]["notes"]:
         assert bass["name"] == "Bass" and os.path.isfile(bass["adg"]) and bass["clips"][0]["notes"]
 
@@ -87,6 +89,7 @@ def test_pattern_without_samples_has_clip_only(stage):
     out = payload.pattern(p, stage, _resolve, lambda r: None, "No Kit")
     drums = out["tracks"][0]
     assert drums["adg"] is None and drums["adg_path"] is None and drums["clips"][0]["notes"]
+    assert [b["id"] for b in drums["buses"]] == list(midi.drum_layout(p, "drumrack"))  # every bus that plays
 
 
 def test_rack_payload(stage, samples):
@@ -298,3 +301,23 @@ def test_suggestions_by_role():
     roots, fallback = proto.role_roots(b, "bass")
     assert fallback and [i.name for i, _ in proto.collect(roots)] == ["Operator", "Init.adv"]
     assert proto.display_name("Warm Pad.adg") == "Warm Pad"
+
+
+def test_bus_suggestions():
+    proto = _protocol()
+
+    class Item:
+        def __init__(self, name, *children, folder=False):
+            self.name, self.children, self.is_folder, self.is_device = name, list(children), folder, False
+            self.is_loadable = not folder
+
+    drums = [Item("909 Kit.adg"),
+             Item("Drum Hits", Item("Kick", Item("Kick 808.wav"), Item("Deep.aif"), folder=True),
+                  Item("Snare", Item("Snare Tight.wav"), folder=True),
+                  Item("Hihat", Item("Closed Hat 1.wav"), Item("Open Hat 2.wav"), folder=True), folder=True),
+             Item("Kick Punchy.adv")]
+    names = lambda bus: sorted(i.name for i, _ in proto.collect_bus(drums, proto.BUS_WORDS[bus]))
+    assert names("kick") == ["Deep.aif", "Kick 808.wav", "Kick Punchy.adv"]  # folder or own name; no kits
+    assert names("snare") == ["Snare Tight.wav"]
+    assert "Open Hat 2.wav" in names("ohat") and names("tom") == []
+    assert proto.bus_of("bus:kick") == "kick" and proto.bus_of("bass") is None and proto.bus_of("bus:nope") is None
