@@ -185,8 +185,11 @@ e rumore delle etichette (es. "snare roll" dentro un fill di batteria).
 ## Build dell'app
 
 ```bash
-.venv/bin/pyinstaller --noconfirm ClusterSound.spec   # -> dist/ClusterSound.app
+tools/build_app.sh   # -> dist/ClusterSound.app
 ```
+
+Apri e copia solo `ClusterSound.app`: la cartella `dist/ClusterSound/` contiene un eseguibile nudo che
+il Finder lancia dentro il Terminale (lo script la elimina dopo la build).
 
 ## Strumenti di sviluppo
 
