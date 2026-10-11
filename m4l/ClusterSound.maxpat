@@ -49,7 +49,7 @@
      "id": "js",
      "maxclass": "newobj",
      "numinlets": 1,
-     "numoutlets": 4,
+     "numoutlets": 6,
      "patching_rect": [
       20,
       330,
@@ -57,6 +57,8 @@
       22
      ],
      "outlettype": [
+      "",
+      "",
       "",
       "",
       "",
@@ -608,6 +610,337 @@
    },
    {
     "box": {
+     "id": "snd_title",
+     "maxclass": "comment",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      480,
+      450,
+      100,
+      20
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      300,
+      4,
+      200,
+      20
+     ],
+     "text": "Suoni da provare",
+     "fontface": 1,
+     "fontsize": 12.0
+    }
+   },
+   {
+    "box": {
+     "id": "sndtracks",
+     "maxclass": "umenu",
+     "numinlets": 1,
+     "numoutlets": 3,
+     "patching_rect": [
+      480,
+      120,
+      200,
+      22
+     ],
+     "outlettype": [
+      "int",
+      "",
+      ""
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      300,
+      26,
+      250,
+      22
+     ],
+     "items": [],
+     "parameter_enable": 0
+    }
+   },
+   {
+    "box": {
+     "id": "snditems",
+     "maxclass": "umenu",
+     "numinlets": 1,
+     "numoutlets": 3,
+     "patching_rect": [
+      480,
+      200,
+      250,
+      22
+     ],
+     "outlettype": [
+      "int",
+      "",
+      ""
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      300,
+      52,
+      250,
+      22
+     ],
+     "items": [],
+     "parameter_enable": 0
+    }
+   },
+   {
+    "box": {
+     "id": "psndt",
+     "maxclass": "newobj",
+     "numinlets": 1,
+     "numoutlets": 1,
+     "patching_rect": [
+      480,
+      160,
+      100,
+      22
+     ],
+     "outlettype": [
+      ""
+     ],
+     "text": "prepend sndtrack"
+    }
+   },
+   {
+    "box": {
+     "id": "psndp",
+     "maxclass": "newobj",
+     "numinlets": 1,
+     "numoutlets": 1,
+     "patching_rect": [
+      480,
+      240,
+      100,
+      22
+     ],
+     "outlettype": [
+      ""
+     ],
+     "text": "prepend sndpick"
+    }
+   },
+   {
+    "box": {
+     "id": "bprova",
+     "maxclass": "textbutton",
+     "numinlets": 1,
+     "numoutlets": 3,
+     "patching_rect": [
+      760,
+      20,
+      80,
+      22
+     ],
+     "outlettype": [
+      "",
+      "",
+      "int"
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      300,
+      80,
+      80,
+      24
+     ],
+     "text": "Prova ▶",
+     "mode": 0
+    }
+   },
+   {
+    "box": {
+     "id": "bprovat",
+     "maxclass": "newobj",
+     "numinlets": 1,
+     "numoutlets": 1,
+     "patching_rect": [
+      760,
+      50,
+      30,
+      22
+     ],
+     "outlettype": [
+      "bang"
+     ],
+     "text": "t b"
+    }
+   },
+   {
+    "box": {
+     "id": "bprovam",
+     "maxclass": "message",
+     "numinlets": 2,
+     "numoutlets": 1,
+     "patching_rect": [
+      760,
+      80,
+      60,
+      22
+     ],
+     "outlettype": [
+      ""
+     ],
+     "text": "prova"
+    }
+   },
+   {
+    "box": {
+     "id": "baltri",
+     "maxclass": "textbutton",
+     "numinlets": 1,
+     "numoutlets": 3,
+     "patching_rect": [
+      850,
+      20,
+      80,
+      22
+     ],
+     "outlettype": [
+      "",
+      "",
+      "int"
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      386,
+      80,
+      80,
+      24
+     ],
+     "text": "Altri",
+     "mode": 0
+    }
+   },
+   {
+    "box": {
+     "id": "baltrit",
+     "maxclass": "newobj",
+     "numinlets": 1,
+     "numoutlets": 1,
+     "patching_rect": [
+      850,
+      50,
+      30,
+      22
+     ],
+     "outlettype": [
+      "bang"
+     ],
+     "text": "t b"
+    }
+   },
+   {
+    "box": {
+     "id": "baltrim",
+     "maxclass": "message",
+     "numinlets": 2,
+     "numoutlets": 1,
+     "patching_rect": [
+      850,
+      80,
+      60,
+      22
+     ],
+     "outlettype": [
+      ""
+     ],
+     "text": "altri"
+    }
+   },
+   {
+    "box": {
+     "id": "bferma",
+     "maxclass": "textbutton",
+     "numinlets": 1,
+     "numoutlets": 3,
+     "patching_rect": [
+      940,
+      20,
+      80,
+      22
+     ],
+     "outlettype": [
+      "",
+      "",
+      "int"
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      472,
+      80,
+      78,
+      24
+     ],
+     "text": "Stop",
+     "mode": 0
+    }
+   },
+   {
+    "box": {
+     "id": "bfermat",
+     "maxclass": "newobj",
+     "numinlets": 1,
+     "numoutlets": 1,
+     "patching_rect": [
+      940,
+      50,
+      30,
+      22
+     ],
+     "outlettype": [
+      "bang"
+     ],
+     "text": "t b"
+    }
+   },
+   {
+    "box": {
+     "id": "bfermam",
+     "maxclass": "message",
+     "numinlets": 2,
+     "numoutlets": 1,
+     "patching_rect": [
+      940,
+      80,
+      60,
+      22
+     ],
+     "outlettype": [
+      ""
+     ],
+     "text": "ferma"
+    }
+   },
+   {
+    "box": {
+     "id": "snd_hint",
+     "maxclass": "comment",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      760,
+      120,
+      250,
+      34
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      300,
+      110,
+      250,
+      50
+     ],
+     "linecount": 3,
+     "text": "Prova carica lo strumento sulla traccia e suona la clip in loop. Altri: nuove proposte dalla libreria di Live."
+    }
+   },
+   {
+    "box": {
      "id": "status",
      "maxclass": "comment",
      "numinlets": 1,
@@ -923,6 +1256,186 @@
     "patchline": {
      "source": [
       "js",
+      4
+     ],
+     "destination": [
+      "sndtracks",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "sndtracks",
+      0
+     ],
+     "destination": [
+      "psndt",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "psndt",
+      0
+     ],
+     "destination": [
+      "js",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "js",
+      5
+     ],
+     "destination": [
+      "snditems",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "snditems",
+      0
+     ],
+     "destination": [
+      "psndp",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "psndp",
+      0
+     ],
+     "destination": [
+      "js",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "bprova",
+      0
+     ],
+     "destination": [
+      "bprovat",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "bprovat",
+      0
+     ],
+     "destination": [
+      "bprovam",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "bprovam",
+      0
+     ],
+     "destination": [
+      "js",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "baltri",
+      0
+     ],
+     "destination": [
+      "baltrit",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "baltrit",
+      0
+     ],
+     "destination": [
+      "baltrim",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "baltrim",
+      0
+     ],
+     "destination": [
+      "js",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "bferma",
+      0
+     ],
+     "destination": [
+      "bfermat",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "bfermat",
+      0
+     ],
+     "destination": [
+      "bfermam",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "bfermam",
+      0
+     ],
+     "destination": [
+      "js",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "js",
       2
      ],
      "destination": [
@@ -933,6 +1446,6 @@
    }
   ],
   "autosave": 0,
-  "devicewidth": 300.0
+  "devicewidth": 560.0
  }
 }

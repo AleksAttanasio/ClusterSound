@@ -4,16 +4,21 @@
 // Remote Script (OSC/JSON over UDP: [udpsend 127.0.0.1 9101] / [udpreceive 9102]). With "Ricevi" on it also
 // imports what the app sends with "Invia a Live".
 //
+// "Suoni": for every imported track the Remote Script proposes a few presets from Live's library (Sounds,
+// Drums, installed Packs); "Prova" loads one on the track and plays its clip in loop. Tracks that arrive
+// without an instrument get the first proposal right away, so every import plays.
+//
 // inlet: bang (from live.thisdevice), refresh, kind <i>, item <i>, importa, newtracks/tempo/receive <0|1>,
-//        port <n>, /clustersound <json> (Remote Script replies)
-// outlets: 0 kinds umenu, 1 items umenu, 2 status comment, 3 udpsend
+//        port <n>, sndtrack <i>, sndpick <i>, prova, altri, ferma, /clustersound <json> (Remote Script replies)
+// outlets: 0 kinds umenu, 1 items umenu, 2 status comment, 3 udpsend, 4 sound tracks umenu, 5 sounds umenu
 
 autowatch = 1;
 inlets = 1;
-outlets = 4;
+outlets = 6;
 
 var KINDS = [["pattern", "Pattern salvati"], ["sequence", "Sequenze"], ["rack", "Drum rack"], ["compose", "Progressioni"]];
-var OUT_MENU_KINDS = 0, OUT_MENU_ITEMS = 1, OUT_STATUS = 2, OUT_UDP = 3;
+var OUT_MENU_KINDS = 0, OUT_MENU_ITEMS = 1, OUT_STATUS = 2, OUT_UDP = 3, OUT_SND_TRACKS = 4, OUT_SND_ITEMS = 5;
+var SUGGESTIONS = 6;
 var ACK_TIMEOUT = 12000;  // the Remote Script retries for ~8 s while a new preset is indexed
 
 var port = 8770;
@@ -25,6 +30,7 @@ var bridgeOk = false, msgId = 0;
 var steps = [], waiting = null, waitTask = null;
 var poll = new Task(tick, this);
 var pings = 0;
+var imported = [], sndIdx = 0;  // tracks of the last import: {name, role, index, slot, options, pick, seed, hasSound}
 
 // ------------------------------------------------------------------ inlet messages
 function bang() {  // live.thisdevice: the Live API is usable from now on
@@ -166,14 +172,15 @@ function importPayload(p) {
     var selTrack = pathIndex(new LiveAPI("live_set view selected_track"), "tracks");
     var scene = Math.max(0, pathIndex(new LiveAPI("live_set view selected_scene"), "scenes"));
     var insertAt = selTrack >= 0 ? selTrack + 1 : -1;
-    var notes = [];
-    steps = [];
+    var notes = [], refs = [];
 
     if (opts.tempo && p.bpm) steps.push(function () { set.set("tempo", p.bpm); });
 
     for (var i = 0; i < p.tracks.length; i++) {
         (function (t, first) {
-            var ref = { index: -1 };
+            var ref = { name: t.name, role: t.role || "chords", index: -1, slot: -1, options: [], pick: 0,
+                        seed: Math.floor(Math.random() * 1000000), hasSound: false };
+            refs.push(ref);
             steps.push(function () {
                 if (first && !opts.newtracks && selTrack >= 0) { ref.index = selTrack; return; }
                 set.call("create_midi_track", insertAt);
@@ -185,19 +192,36 @@ function importPayload(p) {
                 steps.push(function () {
                     if (!bridgeOk) { notes.push(t.name + ": Remote Script non attiva, trascina il rack dal browser → " + t.adg_path); return; }
                     var id = sendOsc({ cmd: "load", track: ref.index, root: t.adg_root, path: t.adg_path });
-                    wait(id, function (msg) { if (!msg.ok) notes.push(t.name + ": " + msg.error); });
+                    wait(id, function (msg) {
+                        if (msg.ok) ref.hasSound = true;
+                        else notes.push(t.name + ": " + msg.error);
+                    });
                 });
             }
             for (var c = 0; c < t.clips.length; c++) {
                 (function (clip, slot) {
-                    steps.push(function () { writeClip(set, ref.index, slot, clip); });
+                    steps.push(function () {
+                        var at = writeClip(set, ref.index, slot, clip);
+                        if (ref.slot < 0) ref.slot = at;
+                    });
                 })(t.clips[c], scene + c);
             }
         })(p.tracks[i], i === 0);
     }
     steps.push(function () {
         busy = false;
+        imported = refs;
+        sndIdx = 0;
+        for (var k = 0; k < refs.length; k++) if (!refs[k].hasSound) { sndIdx = k; break; }
+        fillSoundTracks();
         status("Importato «" + p.name + "»" + (notes.length ? " · " + notes.join(" · ") : ""));
+        // a track without an instrument gets the first proposal from Live's library, so the import plays
+        for (var j = 0; j < refs.length; j++) {
+            (function (r) {
+                if (r.hasSound || !bridgeOk) return;
+                suggest(r, function () { loadOption(r, false); });
+            })(refs[j]);
+        }
     });
     runSteps();
 }
@@ -243,5 +267,97 @@ function writeClip(set, track, slot, clip) {
         c.call("note", n[0], n[1].toFixed(6), n[2].toFixed(6), n[3], 0);
     }
     c.call("done");
+    return slot;
 }
 writeClip.local = 1;
+
+// ------------------------------------------------------------------ Suoni
+function current() {
+    return imported[Math.min(sndIdx, imported.length - 1)] || null;
+}
+current.local = 1;
+
+function fillSoundTracks() {
+    outlet(OUT_SND_TRACKS, "clear");
+    for (var i = 0; i < imported.length; i++) outlet(OUT_SND_TRACKS, "append", imported[i].name);
+    if (imported.length) outlet(OUT_SND_TRACKS, "set", sndIdx);
+    fillSoundItems();
+}
+fillSoundTracks.local = 1;
+
+function fillSoundItems() {
+    var r = current();
+    outlet(OUT_SND_ITEMS, "clear");
+    if (!r) return;
+    for (var i = 0; i < r.options.length; i++) outlet(OUT_SND_ITEMS, "append", r.options[i].name + " · " + r.options[i].folder);
+    if (r.options.length) outlet(OUT_SND_ITEMS, "set", r.pick);
+}
+fillSoundItems.local = 1;
+
+function suggest(r, then) {
+    steps.push(function () {
+        if (!bridgeOk) return status("Remote Script non attiva: impossibile proporre strumenti");
+        var id = sendOsc({ cmd: "suggest", role: r.role, count: SUGGESTIONS, seed: r.seed });
+        wait(id, function (msg) {
+            if (!msg.ok) return status(r.name + ": " + msg.error);
+            r.options = msg.items;
+            r.pick = 0;
+            if (r === current()) fillSoundItems();
+            if (then) then();
+        });
+    });
+}
+suggest.local = 1;
+
+function loadOption(r, play) {
+    steps.push(function () {
+        var opt = r.options[r.pick];
+        if (!opt) return;
+        var id = sendOsc({ cmd: "load_item", track: r.index, item: opt.id });
+        wait(id, function (msg) {
+            if (!msg.ok) return status(r.name + ": " + msg.error);
+            r.hasSound = true;
+            status(r.name + ": " + opt.name + (play ? " ▶" : ""));
+            if (play) fire(r);
+        });
+    });
+}
+loadOption.local = 1;
+
+function fire(r) {
+    if (r.slot >= 0) new LiveAPI("live_set tracks " + r.index + " clip_slots " + r.slot).call("fire");
+}
+fire.local = 1;
+
+function sndtrack(i) {
+    sndIdx = i;
+    var r = current();
+    fillSoundItems();
+    if (r && !r.options.length) { suggest(r); runSteps(); }
+}
+
+function sndpick(i) {
+    var r = current();
+    if (r) r.pick = i;
+}
+
+function prova() {
+    var r = current();
+    if (!r) return status("Importa prima qualcosa: le proposte sono per le tracce importate");
+    if (!r.options.length) suggest(r, function () { loadOption(r, true); });
+    else loadOption(r, true);
+    runSteps();
+}
+
+function altri() {
+    var r = current();
+    if (!r) return;
+    r.seed++;
+    suggest(r);
+    runSteps();
+}
+
+function ferma() {
+    var r = current();
+    if (r) new LiveAPI("live_set tracks " + r.index).call("stop_all_clips");
+}
