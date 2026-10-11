@@ -11,4 +11,5 @@ def run(debug: bool = False) -> None:
         "ClusterSound", url=str(resource_path("ui/index.html")), js_api=api,
         width=1480, height=920, min_size=(1000, 640), background_color="#101216")
     api._set_window(window)
+    api.live_start()  # localhost bridge for the Max for Live device
     webview.start(http_server=True, debug=debug)

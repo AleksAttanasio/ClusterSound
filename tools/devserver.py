@@ -100,4 +100,6 @@ if __name__ == "__main__":
     ap.add_argument("--port", type=int, default=8765)
     port = ap.parse_args().port
     print(f"http://localhost:{port}")
+    live = api.live_start()
+    print(f"Live bridge: http://127.0.0.1:{live['port']}/live/ping" if live["running"] else f"Live bridge: {live['error']}")
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
