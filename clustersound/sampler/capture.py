@@ -97,6 +97,27 @@ def _wait(start, timeout: float = 10.0):
     return out["args"]
 
 
+_OUTPUT_CLASS = None
+_active: "SystemAudioBackend | None" = None  # the backend receiving audio (one capture at a time)
+
+
+def _output_class(NSObject):
+    """The SCStreamOutput class, defined once: an Objective-C class name can be registered only once."""
+    global _OUTPUT_CLASS
+    if _OUTPUT_CLASS is None:
+        class ClusterSoundAudioOutput(NSObject):
+            def stream_didOutputSampleBuffer_ofType_(self, stream, sbuf, kind):
+                try:
+                    b = _active
+                    if b is not None and kind == b.SCK.SCStreamOutputTypeAudio:
+                        b._deliver(sbuf)
+                except Exception:  # an exception here would abort the whole app
+                    pass
+
+        _OUTPUT_CLASS = ClusterSoundAudioOutput
+    return _OUTPUT_CLASS
+
+
 class SystemAudioBackend:
     """ScreenCaptureKit audio of the whole system (this app's own process excluded)."""
     sr = SCK_RATE
@@ -109,17 +130,7 @@ class SystemAudioBackend:
         self.CM, self.SCK, NSObject = mods
         self.on_block = on_block
         self.stream = None
-        backend = self
-
-        class _Output(NSObject):
-            def stream_didOutputSampleBuffer_ofType_(self, stream, sbuf, kind):
-                try:
-                    if kind == backend.SCK.SCStreamOutputTypeAudio:
-                        backend._deliver(sbuf)
-                except Exception:  # an exception here would abort the whole app
-                    pass
-
-        self._output = _Output.alloc().init()
+        self._output = _output_class(NSObject).alloc().init()
 
     def _deliver(self, sbuf) -> None:
         CM = self.CM
@@ -161,18 +172,24 @@ class SystemAudioBackend:
             self._output, SCK.SCStreamOutputTypeAudio, None, None)
         if not ok:
             raise CaptureError(f"impossibile avviare la cattura ({err})")
+        global _active
+        _active = self
         (err,) = _wait(stream.startCaptureWithCompletionHandler_)
         if err is not None:
+            _active = None
             raise CaptureError(f"cattura rifiutata: {err.localizedDescription()}")
         self.stream = stream
 
     def stop(self) -> None:
+        global _active
         if self.stream is not None:
             try:
                 _wait(self.stream.stopCaptureWithCompletionHandler_, timeout=3)
             except CaptureError:
                 pass
             self.stream = None
+        if _active is self:
+            _active = None
 
 
 class InputBackend:

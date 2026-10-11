@@ -240,3 +240,11 @@ def test_hit_at_time_zero_is_found():
     x, starts = _hits()
     x = x[int(starts[0] * SR):]  # the first hit starts at sample 0
     assert len(slicing.auto_slices(S.from_array(x, SR))) == len(starts)
+
+
+def test_system_backend_can_be_created_twice():
+    """The Objective-C output class must be registered once, or the second capture fails."""
+    pytest.importorskip("ScreenCaptureKit")
+    a = capture.SystemAudioBackend(lambda b: None)
+    b = capture.SystemAudioBackend(lambda b: None)
+    assert type(a._output) is type(b._output)
