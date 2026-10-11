@@ -12,7 +12,7 @@ autowatch = 1;
 inlets = 1;
 outlets = 4;
 
-var KINDS = [["pattern", "Pattern salvati"], ["genre", "Generi"], ["rack", "Drum rack"], ["compose", "Progressioni"]];
+var KINDS = [["pattern", "Pattern salvati"], ["sequence", "Sequenze"], ["rack", "Drum rack"], ["compose", "Progressioni"]];
 var OUT_MENU_KINDS = 0, OUT_MENU_ITEMS = 1, OUT_STATUS = 2, OUT_UDP = 3;
 var ACK_TIMEOUT = 6000;
 

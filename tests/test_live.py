@@ -131,12 +131,48 @@ def test_bridge_catalog_and_payload(bridge):
     prog = pat_store.save_progression({"name": "P", "bpm": 100, "order": ["A"], "versions": {"A": seq}})
     status, cat = _get(bridge, "/live/catalog")
     assert status == 200 and cat["compose"] == [{"id": prog["id"], "name": "P"}]
-    assert any(g["id"] == "house:0" for g in cat["genre"])
+    assert "genre" not in cat and cat["sequence"] == []
     status, out = _get(bridge, f"/live/payload?kind=compose&id={prog['id']}")
     assert status == 200 and out["tracks"][0]["clips"][0]["notes"]
-    status, out = _get(bridge, "/live/payload?kind=genre&id=house:0")
-    assert status == 200 and out["tracks"][0]["name"] == "Drums"
     assert _get(bridge, "/live/payload?kind=rack&id=rack:nope")[0] == 404
+
+
+def _sequence(kit=None, source=None):
+    from clustersound.patterns import arrange
+    a, b = genres.build("house", 0), genres.build("house", 1)
+    seq = {"name": "Seq", "blocks": [
+        {"id": "b1", "label": "A", "source": source or {}, "repeat": 2, "groove": arrange.groove_of(a)},
+        {"id": "b2", "label": "B", "source": {}, "repeat": 1, "groove": arrange.groove_of(b)}]}
+    if kit:
+        seq["kit"] = kit
+    return seq
+
+
+def test_bridge_sequences(bridge, samples):
+    from clustersound.patterns import arrange
+    from clustersound.patterns import store as pat_store
+    kit = genres.build("house", 0)
+    kit["buses"]["kick"]["layers"] = [model.new_layer(samples["kick"], "kick")]
+    kit["buses"]["bass"]["layers"] = [model.new_layer(samples["sub"], "sub")]
+    with_kit = pat_store.save_sequence(_sequence(kit))
+    user = pat_store.save(kit)
+    from_user = pat_store.save_sequence({**_sequence(source={"genre": "house", "user": user["id"]}), "name": "U"})
+    midi_only = pat_store.save_sequence({**_sequence(source={"genre": "house", "variant": 0}), "name": "G"})
+    orphan = pat_store.save_sequence({**_sequence(), "name": "X"})
+
+    names = {s["id"]: s["name"] for s in _get(bridge, "/live/catalog")[1]["sequence"]}
+    assert names[with_kit["id"]] == "Seq" and names[from_user["id"]] == "U" and names[midi_only["id"]] == "G (solo MIDI)"
+
+    status, out = _get(bridge, f"/live/payload?kind=sequence&id={with_kit['id']}")
+    assert status == 200 and out["kind"] == "pattern"
+    drums = out["tracks"][0]
+    assert drums["adg"] and drums["clips"][0]["length"] == arrange.total_bars(with_kit) * 4
+    assert max(n[1] for n in drums["clips"][0]["notes"]) >= 4 * arrange.total_bars(with_kit) - 4  # notes up to the last bar
+    assert _get(bridge, f"/live/payload?kind=sequence&id={from_user['id']}")[1]["tracks"][0]["adg"]
+    status, out = _get(bridge, f"/live/payload?kind=sequence&id={midi_only['id']}")
+    assert status == 200 and out["tracks"][0]["adg"] is None and out["tracks"][0]["clips"][0]["notes"]
+    status, out = _get(bridge, f"/live/payload?kind=sequence&id={orphan['id']}")
+    assert status == 500 and "senza kit" in out["error"]
 
 
 def test_bridge_push_queue_and_routes(bridge):

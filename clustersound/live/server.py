@@ -1,8 +1,8 @@
 """Localhost HTTP bridge for the Max for Live device.
 
     GET /live/ping                     -> {"app", "version", "pending"}
-    GET /live/catalog                  -> saved user patterns, genre presets, racks and progressions
-    GET /live/payload?kind=…&id=…      -> payload.py output for a saved item (kind: pattern|genre|rack|compose)
+    GET /live/catalog                  -> saved user patterns, sequences, racks and progressions
+    GET /live/payload?kind=…&id=…      -> payload.py output for a saved item (kind: pattern|sequence|rack|compose)
     GET /live/next                     -> the oldest item pushed from the app ("Invia a Live"), or 204
 
 Only these routes exist (no generic RPC) and the server binds to 127.0.0.1.
@@ -13,6 +13,7 @@ import urllib.parse
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from ..patterns import arrange as pat_arrange
 from ..patterns import genres as pat_genres
 from ..patterns import store as pat_store
 from ..racks import store as rack_store
@@ -35,7 +36,7 @@ class Bridge:
 
     # ------------------------------------------------------------ payloads
     def build(self, kind: str, data: dict, **opts) -> dict:
-        if kind in ("pattern", "genre", "sequence"):
+        if kind in ("pattern", "sequence"):
             return payload.pattern(data, self.export_dir, self.resolve, self.describe, self.title(data))
         if kind == "rack":
             return payload.rack(data, self.export_dir, self.resolve, self.describe)
@@ -44,20 +45,43 @@ class Bridge:
         raise ValueError(f"tipo sconosciuto: {kind}")
 
     @staticmethod
-    def find(kind: str, item_id: str) -> dict | None:
-        if kind == "genre":
-            gid, _, variant = item_id.rpartition(":")
-            return pat_genres.build(gid, int(variant)) if gid in pat_genres.GENRE_BY_ID else None
+    def sequence_kit(seq: dict) -> tuple[dict | None, bool]:
+        """(kit pattern, has samples) of a saved sequence: the kit saved with it, else the user pattern its
+        first block comes from, else that block's genre preset (no samples: MIDI only)."""
+        if seq.get("kit"):
+            return seq["kit"], True
+        src = next((b.get("source") or {} for b in seq.get("blocks", []) if b.get("groove")), {})
+        if src.get("user"):
+            user = next((p for p in pat_store.list_user() if p.get("id") == src["user"]), None)
+            if user:
+                return user, True
+        if src.get("genre") in pat_genres.GENRE_BY_ID:
+            n = len(pat_genres.variants(src["genre"]))
+            return pat_genres.build(src["genre"], min(int(src.get("variant") or 0), n - 1)), False
+        return None, False
+
+    @classmethod
+    def find(cls, kind: str, item_id: str) -> dict | None:
+        if kind == "sequence":
+            seq = next((s for s in pat_store.list_sequences() if s.get("id") == item_id), None)
+            if seq is None:
+                return None
+            kit, _ = cls.sequence_kit(seq)
+            if kit is None:
+                raise ValueError("sequenza senza kit: aprila nel Sequencer e salvala di nuovo")
+            flat = pat_arrange.flatten(kit, seq)
+            flat["name"] = seq.get("name") or "Sequenza"
+            return flat
         items = {"pattern": pat_store.list_user, "rack": rack_store.list_racks,
                  "compose": pat_store.list_progressions}.get(kind)
         return next((x for x in items() if x.get("id") == item_id), None) if items else None
 
-    @staticmethod
-    def catalog() -> dict:
+    @classmethod
+    def catalog(cls) -> dict:
         return {
             "pattern": [{"id": p["id"], "name": p.get("name") or "Pattern"} for p in pat_store.list_user()],
-            "genre": [{"id": f"{g['id']}:{i}", "name": f"{g['name']} – {v}"}
-                      for g in pat_genres.catalog() for i, v in enumerate(g["variants"])],
+            "sequence": [{"id": s["id"], "name": (s.get("name") or "Sequenza") + ("" if cls.sequence_kit(s)[1] else " (solo MIDI)")}
+                         for s in pat_store.list_sequences()],
             "rack": [{"id": r["id"], "name": r.get("name") or "Rack"} for r in rack_store.list_racks()],
             "compose": [{"id": p["id"], "name": p.get("name") or "Progressione"} for p in pat_store.list_progressions()],
         }
