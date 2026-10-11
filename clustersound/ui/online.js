@@ -1,4 +1,5 @@
 // "Online" screen: search free samples on Freesound, Openverse, Internet Archive and ccMixter.
+import { svg } from './icons.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -15,6 +16,9 @@ const PRESETS = [
 ];
 const SORTS = [['relevance', 'Rilevanza'], ['downloads', 'Più scaricati'], ['rating', 'Voto'], ['newest', 'Più recenti'], ['duration', 'Durata']];
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const ANY_KEY = 'any'; // wa-option values cannot be empty
+const chip = (attrs, label) => `<wa-button size="xs" pill class="chip" ${attrs}>${label}</wa-button>`;
+const SPIN = '<wa-spinner class="spin"></wa-spinner>';
 
 export class Online {
   constructor({ api, player, classes, groups, types }) {
@@ -83,10 +87,10 @@ export class Online {
           <span class="dot" style="background:${c.color}"></span><span class="cls-name">${esc(c.label)}</span></div>`);
       }
     }
-    const keyOpts = ['<option value="">Qualsiasi</option>']
-      .concat(NOTES.flatMap((n) => [`<option>${n} major</option>`, `<option>${n} minor</option>`])).join('');
+    const keyOpts = [`<wa-option value="${ANY_KEY}">Qualsiasi</wa-option>`]
+      .concat(NOTES.flatMap((n) => [`<wa-option value="${n} major">${n} major</wa-option>`, `<wa-option value="${n} minor">${n} minor</wa-option>`])).join('');
     const grp = (id, title) => `<div class="filter-group collapsed" data-group="${id}">
-        <div class="fg-head"><span class="caret"></span><span>${title}</span><span class="fg-count" data-fg-count="${id}"></span></div>
+        <div class="fg-head"><span class="caret">${svg('chevron-down', 12)}</span><span>${title}</span><wa-badge pill variant="brand" class="fg-count" data-fg-count="${id}"></wa-badge></div>
         <div class="fg-body">`;
     sb.innerHTML = `
       <div class="filter-block">
@@ -98,44 +102,44 @@ export class Online {
       <div class="filter-block">
         <div class="filter-title">Fonti</div>
         <div id="o-sources">${this.meta.sources.map((s) => `
-          <label class="o-src"><input type="checkbox" data-src="${s.id}" checked>
-          <span class="o-src-name">${esc(s.label)}</span><span class="o-src-status" data-src-status="${s.id}"></span></label>`).join('')}
+          <div class="o-src"><wa-checkbox size="s" class="o-src-name" data-src="${s.id}" checked>${esc(s.label)}</wa-checkbox>
+          <span class="o-src-status" data-src-status="${s.id}"></span></div>`).join('')}
         </div>
       </div>
       <div class="filter-block">
         <div class="filter-title">Licenza <span data-srv="license"></span></div>
-        <div class="chips" id="o-lic">${LICENSE_FILTERS.map(([k, l]) => `<button class="chip" data-lic="${k}">${l}</button>`).join('')}</div>
-        <label class="o-check"><input type="checkbox" id="o-commercial"> Solo uso commerciale (no NC/ND) <span data-srv="commercial"></span></label>
+        <div class="chips" id="o-lic">${LICENSE_FILTERS.map(([k, l]) => chip(`data-lic="${k}"`, l)).join('')}</div>
+        <wa-checkbox size="s" class="o-check" id="o-commercial">Solo uso commerciale (no NC/ND) <span data-srv="commercial"></span></wa-checkbox>
       </div></div></div>
       ${grp('char', 'Tipo e caratteristiche')}
       <div class="filter-block">
         <div class="filter-title">Tipo <span data-srv="type"></span></div>
-        <div class="chips" id="o-types">${this.types.map((t) => `<button class="chip" data-type="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+        <div class="chips" id="o-types">${this.types.map((t) => chip(`data-type="${esc(t)}"`, esc(t))).join('')}</div>
       </div>
       <div class="filter-block">
         <div class="filter-title">Durata (s) <span data-srv="duration"></span></div>
-        <div class="o-range"><input type="number" min="0" step="0.1" id="o-dmin" placeholder="min"><span>–</span><input type="number" min="0" step="0.1" id="o-dmax" placeholder="max"></div>
+        <div class="o-range"><wa-number-input size="s" without-steppers min="0" step="0.1" id="o-dmin" placeholder="min"></wa-number-input><span>–</span><wa-number-input size="s" without-steppers min="0" step="0.1" id="o-dmax" placeholder="max"></wa-number-input></div>
       </div>
       <div class="filter-block">
         <div class="filter-title">BPM <span data-srv="bpm"></span></div>
-        <div class="o-range"><input type="number" min="40" max="250" id="o-bmin" placeholder="min"><span>–</span><input type="number" min="40" max="250" id="o-bmax" placeholder="max"></div>
+        <div class="o-range"><wa-number-input size="s" without-steppers min="40" max="250" id="o-bmin" placeholder="min"></wa-number-input><span>–</span><wa-number-input size="s" without-steppers min="40" max="250" id="o-bmax" placeholder="max"></wa-number-input></div>
       </div>
       <div class="filter-block">
         <div class="filter-title">Tonalità <span data-srv="key"></span></div>
-        <select id="o-key" class="cls-select">${keyOpts}</select>
+        <wa-select size="s" id="o-key" value="${ANY_KEY}">${keyOpts}</wa-select>
       </div></div></div>
       ${grp('fmt', 'Formato, pack e ordine')}
       <div class="filter-block">
         <div class="filter-title">Formato e pack <span data-srv="lossless"></span></div>
-        <label class="o-check"><input type="checkbox" id="o-lossless"> Solo lossless (wav / aiff / flac)</label>
-        <select id="o-packs" class="cls-select" style="margin-top:6px">
-          <option value="all">File singoli e pack</option><option value="files">Solo file singoli</option><option value="packs">Solo pack</option>
-        </select>
-        <label class="o-check" title="Pack di librerie commerciali (es. Big Fish Audio, Sound Ideas, Loopmasters) ricaricati con una licenza libera che probabilmente non hanno"><input type="checkbox" id="o-suspect"> Mostra pack sospetti di materiale commerciale</label>
+        <wa-checkbox size="s" class="o-check" id="o-lossless">Solo lossless (wav / aiff / flac)</wa-checkbox>
+        <wa-select size="s" id="o-packs" value="all" style="margin-top:8px">
+          <wa-option value="all">File singoli e pack</wa-option><wa-option value="files">Solo file singoli</wa-option><wa-option value="packs">Solo pack</wa-option>
+        </wa-select>
+        <wa-checkbox size="s" class="o-check" id="o-suspect" title="Pack di librerie commerciali (es. Big Fish Audio, Sound Ideas, Loopmasters) ricaricati con una licenza libera che probabilmente non hanno">Mostra pack sospetti di materiale commerciale</wa-checkbox>
       </div>
       <div class="filter-block">
         <div class="filter-title">Ordina <span data-srv="sort"></span></div>
-        <select id="o-sort" class="cls-select">${SORTS.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
+        <wa-select size="s" id="o-sort" value="relevance">${SORTS.map(([k, l]) => `<wa-option value="${k}">${l}</wa-option>`).join('')}</wa-select>
       </div></div></div>`;
     sb.onclick = (e) => {
       const h = e.target.closest('.fg-head'); if (!h) return;
@@ -174,7 +178,7 @@ export class Online {
 
   _bind() {
     const changed = () => { this._refreshSrvHints(); this._debouncedSearch(); };
-    $('#online-presets').innerHTML = PRESETS.map(([l, ids]) => `<button class="chip" data-ins='${JSON.stringify(ids)}'>${l}</button>`).join('');
+    $('#online-presets').innerHTML = PRESETS.map(([l, ids]) => chip(`data-ins='${JSON.stringify(ids)}'`, l)).join('');
     $('#online-presets').onclick = (e) => {
       const b = e.target.closest('.chip'); if (!b) return;
       const ids = JSON.parse(b.dataset.ins);
@@ -223,18 +227,17 @@ export class Online {
     bindVal('#o-dmax', 'dur_max', 'input');
     bindVal('#o-bmin', 'bpm_min', 'input');
     bindVal('#o-bmax', 'bpm_max', 'input');
-    bindVal('#o-key', 'key');
+    bindVal('#o-key', 'key', 'change', (el) => (el.value === ANY_KEY ? '' : el.value));
     bindVal('#o-packs', 'packs');
     bindVal('#o-sort', 'sort');
 
-    $('#online-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { this.p.q = e.target.value; this.search(); } });
-    $('#online-go').onclick = () => { this.p.q = $('#online-q').value; this.search(); };
-    $('#online-group').onclick = (e) => {
-      const b = e.target.closest('[data-group]'); if (!b) return;
-      this.groupBy = b.dataset.group;
-      document.querySelectorAll('#online-group .seg-btn').forEach((x) => x.classList.toggle('active', x === b));
+    $('#online-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { this.p.q = $('#online-q').value || ''; this.search(); } });
+    $('#online-go').onclick = () => { this.p.q = $('#online-q').value || ''; this.search(); };
+    $('#online-group').addEventListener('change', (e) => {
+      if (e.target.id !== 'online-group') return;
+      this.groupBy = e.target.value;
       this.render();
-    };
+    });
     $('#online-results').onclick = (e) => this._onResultsClick(e);
     $('#btn-settings').onclick = () => this.openSettings();
     $('#dl-open').onclick = () => this.api.open_download_dir();
@@ -286,7 +289,7 @@ export class Online {
   // ---------------------------------------------------------------- render
   _statusLine(s) {
     const d = this.data[s];
-    if (this.loading.has(s) && !d?.results?.length) return '<span class="spin"></span> ricerca…';
+    if (this.loading.has(s) && !d?.results?.length) return `${SPIN} ricerca…`;
     if (!d) return '';
     if (d.error) return `<span class="error">${esc(d.error)}</span>`;
     const tot = d.total ? ` di ${d.total.toLocaleString('it-IT')}` : '';
@@ -299,7 +302,7 @@ export class Online {
       const el = document.querySelector(`[data-src-status="${s.id}"]`);
       if (el) {
         const d = this.data[s.id];
-        el.innerHTML = !this.p.sources.has(s.id) ? '' : this.loading.has(s.id) ? '<span class="spin"></span>'
+        el.innerHTML = !this.p.sources.has(s.id) ? '' : this.loading.has(s.id) ? SPIN
           : d?.error ? (d.needs_key ? '<span class="error">chiave</span>' : '<span class="error">errore</span>') : d ? d.results.length : '';
       }
     }
@@ -312,11 +315,11 @@ export class Online {
         const open = !this.collapsed.has(s.id);
         const rows = d?.results || [];
         html.push(`<section class="o-section">
-          <header class="o-sec-head" data-collapse="${s.id}"><span class="caret">${open ? '▾' : '▸'}</span>
+          <header class="o-sec-head" data-collapse="${s.id}"><span class="caret">${svg(open ? 'chevron-down' : 'chevron-right', 14)}</span>
             <span class="o-sec-title">${esc(s.label)}</span><span class="o-sec-status">${this._statusLine(s.id)}</span>
-            ${d?.needs_key ? '<button class="btn small" data-settings="1">Inserisci API key</button>' : ''}</header>
+            ${d?.needs_key ? '<wa-button size="xs" variant="brand" data-settings="1"><wa-icon slot="start" name="settings"></wa-icon>Inserisci API key</wa-button>' : ''}</header>
           ${open ? `<div class="o-rows">${rows.map((r) => this._row(r)).join('')}</div>
-            ${d?.more ? `<button class="btn o-more" data-more="${s.id}" ${this.loading.has(s.id) ? 'disabled' : ''}>${this.loading.has(s.id) ? 'Caricamento…' : 'Carica altri'}</button>` : ''}
+            ${d?.more ? `<wa-button size="s" appearance="filled-outlined" class="o-more" data-more="${s.id}" ${this.loading.has(s.id) ? 'loading disabled' : ''}>Carica altri</wa-button>` : ''}
             ${d && !d.error && !rows.length && !this.loading.has(s.id) ? `<div class="o-none">Nessun risultato con questi filtri${d.fetched ? ` (${d.fetched} scartati dai filtri)` : ''}.</div>` : ''}` : ''}
         </section>`);
       }
@@ -331,15 +334,15 @@ export class Online {
         const c = cid ? this.byId[cid] : null;
         const key = `ins:${cid}`;
         const open = !this.collapsed.has(key);
-        html.push(`<section class="o-section"><header class="o-sec-head" data-collapse="${key}"><span class="caret">${open ? '▾' : '▸'}</span>
+        html.push(`<section class="o-section"><header class="o-sec-head" data-collapse="${key}"><span class="caret">${svg(open ? 'chevron-down' : 'chevron-right', 14)}</span>
           ${c ? `<span class="dot" style="background:${c.color}"></span>` : ''}<span class="o-sec-title">${esc(c ? c.label : 'Strumento non determinato / pack misti')}</span>
           <span class="o-sec-status">${rows.length}</span></header>
           ${open ? `<div class="o-rows">${rows.map((r) => this._row(r, true)).join('')}</div>` : ''}</section>`);
       }
       const loadingAny = active.some((s) => this.loading.has(s.id));
-      if (loadingAny) html.push('<div class="o-none"><span class="spin"></span> ricerca in corso…</div>');
+      if (loadingAny) html.push(`<div class="o-none">${SPIN} ricerca in corso…</div>`);
       const moreSrc = active.filter((s) => this.data[s.id]?.more);
-      if (moreSrc.length && !loadingAny) html.push(`<button class="btn o-more" data-more-all="1">Carica altri da tutte le fonti</button>`);
+      if (moreSrc.length && !loadingAny) html.push('<wa-button size="s" appearance="filled-outlined" class="o-more" data-more-all="1">Carica altri da tutte le fonti</wa-button>');
     }
     box.innerHTML = html.join('');
     this._syncPlayButtons(this.player.playing, this.player.id);
@@ -359,11 +362,11 @@ export class Online {
     const packInfo = r.is_pack ? `<span class="pack-badge">PACK${r.filesize ? ' · ' + fmtSize(r.filesize) : ''}</span>` : '';
     const playable = !r.is_pack || r.preview_url;
     return `<div class="o-row ${child ? 'child' : ''} ${r.suspect ? 'suspect' : ''}" data-uid="${esc(r.uid)}">
-      ${r.is_pack && !child ? `<button class="o-btn o-expand" data-expand="${esc(r.uid)}" title="Mostra i file del pack">${ex ? '▾' : '▸'}</button>`
-        : `<button class="o-btn o-play" data-play="${esc(r.uid)}" ${playable ? '' : 'disabled'} title="Ascolta">▶</button>`}
-      <span class="dot" style="background:${c ? c.color : 'transparent'};${c ? '' : 'box-shadow:0 0 0 1px #3a4152 inset'}" title="${esc(c ? c.label : 'strumento non determinato')}"></span>
+      ${r.is_pack && !child ? `<button class="o-btn o-expand" data-expand="${esc(r.uid)}" title="Mostra i file del pack">${svg(ex ? 'chevron-down' : 'chevron-right')}</button>`
+        : `<button class="o-btn o-play" data-play="${esc(r.uid)}" ${playable ? '' : 'disabled'} title="Ascolta">${svg('play', 12)}</button>`}
+      <span class="dot" style="background:${c ? c.color : 'transparent'};${c ? '' : 'box-shadow:0 0 0 1px var(--line-2) inset'}" title="${esc(c ? c.label : 'strumento non determinato')}"></span>
       <div class="o-main">
-        <div class="o-title" title="${esc(r.title)}">${esc(r.title)} ${packInfo} ${r.suspect ? '<span class="warn" title="Probabile libreria commerciale ricaricata: verifica i diritti">⚠ sospetto</span>' : ''}</div>
+        <div class="o-title" title="${esc(r.title)}">${esc(r.title)} ${packInfo} ${r.suspect ? `<span class="warn" title="Probabile libreria commerciale ricaricata: verifica i diritti">${svg('triangle-alert', 11)} sospetto</span>` : ''}</div>
         <div class="o-sub">${sub}${tags ? ` <span class="tags">${tags}</span>` : ''}</div>
       </div>
       <div class="o-wave">${r.waveform_img ? `<img src="${esc(r.waveform_img)}" alt="" loading="lazy">` : ''}</div>
@@ -371,17 +374,17 @@ export class Online {
       <div class="num o-dur">${fmtDur(r.duration)}</div>
       <div class="o-meta" title="${esc(meta)}">${esc(meta)}</div>
       <div class="o-actions">
-        ${playable && (r.preview_url || r.download_url) ? `<button class="o-btn" data-send="${esc(r.uid)}" title="Invia al Sequencer o al Drum Rack (file temporaneo, nessun download)">→</button>` : ''}
-        ${r.download_url ? `<button class="o-btn" data-dl="${esc(r.uid)}" title="Scarica${r.download_note ? ' — ' + esc(r.download_note) : ''}${r.filesize ? ' (' + fmtSize(r.filesize) + ')' : ''}">⬇</button>` : ''}
-        ${r.page_url ? `<button class="o-btn" data-open="${esc(r.page_url)}" title="Apri la pagina della fonte">↗</button>` : ''}
+        ${playable && (r.preview_url || r.download_url) ? `<button class="o-btn" data-send="${esc(r.uid)}" title="Invia al Sequencer o al Drum Rack (file temporaneo, nessun download)">${svg('arrow-right')}</button>` : ''}
+        ${r.download_url ? `<button class="o-btn" data-dl="${esc(r.uid)}" title="Scarica${r.download_note ? ' — ' + esc(r.download_note) : ''}${r.filesize ? ' (' + fmtSize(r.filesize) + ')' : ''}">${svg('download')}</button>` : ''}
+        ${r.page_url ? `<button class="o-btn" data-open="${esc(r.page_url)}" title="Apri la pagina della fonte">${svg('external-link')}</button>` : ''}
       </div>
     </div>${ex ? this._expansion(r, ex) : ''}`;
   }
 
   _expansion(r, ex) {
-    if (ex.loading) return '<div class="o-children"><div class="o-none"><span class="spin"></span> lettura del pack…</div></div>';
+    if (ex.loading) return `<div class="o-children"><div class="o-none">${SPIN} lettura del pack…</div></div>`;
     if (ex.error) return `<div class="o-children"><div class="o-none error">${esc(ex.error)}</div></div>`;
-    const archives = (ex.archives || []).map((a) => `<button class="btn small" data-dl-archive="${esc(a.url)}" data-pack="${esc(r.uid)}" title="Scarica l'archivio intero">⬇ ${esc(a.name)} ${a.size ? '(' + fmtSize(a.size) + ')' : ''}</button>`).join(' ');
+    const archives = (ex.archives || []).map((a) => `<wa-button size="xs" appearance="filled-outlined" data-dl-archive="${esc(a.url)}" data-pack="${esc(r.uid)}" title="Scarica l'archivio intero"><wa-icon slot="start" name="download"></wa-icon>${esc(a.name)} ${a.size ? '(' + fmtSize(a.size) + ')' : ''}</wa-button>`).join(' ');
     const filtered = ex.files.length < ex.total;
     return `<div class="o-children">
       <div class="o-pack-bar">${ex.total} file nel pack${filtered ? ` · ${ex.files.length} corrispondono ai filtri <a href="#" data-expand-all="${esc(r.uid)}">mostra tutti</a>` : ''} ${archives}</div>
@@ -392,7 +395,7 @@ export class Online {
   }
 
   async _onResultsClick(e) {
-    const t = e.target.closest('button, a, header');
+    const t = e.target.closest('button, wa-button, a, header');
     if (!t) return;
     if (t.dataset.play) return this.togglePlay(t.dataset.play, t);
     if (t.dataset.send) {
@@ -432,12 +435,12 @@ export class Online {
     this.player.stop();
     this.pending = uid;
     btn.classList.add('busy');
-    btn.innerHTML = '<span class="spin"></span>';
+    btn.innerHTML = SPIN;
     let buf = null;
     try { buf = await this.player.load(uid, (id) => this.api.online_preview(id)); } catch (err) { console.warn(err); }
     btn.classList.remove('busy');
-    btn.textContent = '▶';
-    if (!buf) { btn.textContent = '✕'; btn.title = 'Anteprima non disponibile'; return; }
+    btn.innerHTML = svg('play', 12);
+    if (!buf) { btn.innerHTML = svg('x', 12); btn.dataset.failed = '1'; btn.title = 'Anteprima non disponibile'; return; }
     if (this.pending === uid) this.player.play(uid, buf);
   }
 
@@ -445,7 +448,7 @@ export class Online {
     document.querySelectorAll('#online-results [data-play]').forEach((b) => {
       if (b.classList.contains('busy')) return;
       const on = playing && b.dataset.play === id;
-      if (b.textContent !== '✕') b.textContent = on ? '■' : '▶';
+      if (!b.dataset.failed) b.innerHTML = svg(on ? 'square' : 'play', 12);
       b.closest('.o-row')?.classList.toggle('playing', on);
     });
   }
@@ -470,7 +473,7 @@ export class Online {
       const pct = j.total ? Math.min(100, (100 * j.bytes) / j.total) : (j.status === 'done' ? 100 : 0);
       return `<div class="dl-row ${j.status}" ${j.path ? `data-path="${esc(j.path)}" title="Mostra nel Finder"` : ''}>
         <span class="dl-name">${esc(j.title)}</span><span class="dl-src">${esc(j.source)}</span>
-        <span class="dl-state">${j.status === 'done' ? '✓' : j.status === 'error' ? `<span class="error" title="${esc(j.error)}">errore</span>` : `${Math.round(pct)}%`}</span>
+        <span class="dl-state">${j.status === 'done' ? svg('check', 12) : j.status === 'error' ? `<span class="error" title="${esc(j.error)}">errore</span>` : `${Math.round(pct)}%`}</span>
         <span class="dl-bar"><span style="width:${pct}%"></span></span></div>`;
     }).join('');
     if (active || force) this._dlT = setTimeout(() => this._pollDownloads(), 700);
@@ -485,7 +488,7 @@ export class Online {
   openSettings() {
     const s = this.meta.settings;
     const m = $('#settings');
-    m.hidden = false;
+    m.open = true;
     $('#set-key').value = '';
     $('#set-key').placeholder = s.freesound_key_set ? `impostata (${s.freesound_key_hint}) — lascia vuoto per mantenerla` : 'incolla qui la tua API key';
     $('#set-dir').value = s.download_dir;
@@ -503,17 +506,17 @@ export class Online {
         ? `Attivo su 127.0.0.1:${st.port}. Preset per Live in ${st.stage}${st.stage_root === 'places' ? ' (aggiungi la cartella ai Places di Live)' : ''}`
         : `Non attivo: ${st.error || 'riavvia l\'app'}`;
     });
-    $('#set-cancel').onclick = () => { m.hidden = true; };
+    $('#set-cancel').onclick = () => { m.open = false; };
     $('#set-getkey').onclick = (e) => { e.preventDefault(); this.api.open_url('https://freesound.org/apiv2/apply'); };
     $('#set-pick').onclick = async () => { const p = await this.api.pick_folder(); if (p) $('#set-dir').value = p; };
-    $('#set-clear').onclick = async (e) => { e.preventDefault(); this.meta.settings = await this.api.set_setting('freesound_key', ''); m.hidden = true; this._renderKeyHint(); this.search(); };
+    $('#set-clear').onclick = async (e) => { e.preventDefault(); this.meta.settings = await this.api.set_setting('freesound_key', ''); m.open = false; this._renderKeyHint(); this.search(); };
     $('#set-save').onclick = async () => {
-      const key = $('#set-key').value.trim();
+      const key = ($('#set-key').value || '').trim();
       if (key) this.meta.settings = await this.api.set_setting('freesound_key', key);
-      this.meta.settings = await this.api.set_setting('download_dir', $('#set-dir').value.trim());
+      this.meta.settings = await this.api.set_setting('download_dir', ($('#set-dir').value || '').trim());
       this.meta.settings = await this.api.set_setting('cache_mb', $('#set-cache').value);
       this.meta.settings = await this.api.set_setting('live_port', $('#set-live-port').value);
-      m.hidden = true;
+      m.open = false;
       this._renderKeyHint();
       if (key) this.search();
     };

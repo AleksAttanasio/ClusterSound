@@ -21,7 +21,7 @@ clustersound = "clustersound.__main__:main"
 include = ["clustersound*"]
 
 [tool.setuptools.package-data]
-clustersound = ["models/*", "ui/*", "ui/vendor/*"]
+clustersound = ["models/*", "ui/*", "ui/vendor/*", "ui/vendor/**/*", "ui/assets/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

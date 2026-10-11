@@ -63,6 +63,10 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
+    def end_headers(self):  # edits show up on reload: no heuristic caching of the ES modules
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
     def do_GET(self):
         if self.path in ("/", "/index.html"):
             html = (UI / "index.html").read_text()

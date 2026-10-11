@@ -3,6 +3,7 @@
 # That folder holds a bare Unix executable which Finder opens inside Terminal.app.
 set -e
 cd "$(dirname "$0")/.."
+[ -f brand/ClusterSound.icns ] || sh tools/build_icon.sh
 .venv/bin/pyinstaller --noconfirm ClusterSound.spec
 rm -rf dist/ClusterSound
 echo "Pronto: dist/ClusterSound.app"

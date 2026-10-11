@@ -2,6 +2,8 @@
 // The kit (samples, layers, mix) is the one of the pattern editor; every block stores only its groove.
 import { toast } from './sendmenu.js';
 import { sendToLive } from './live.js';
+import { btn, setPlayButton } from './kit.js';
+import { svg } from './icons.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -53,22 +55,22 @@ export class Arranger {
     this.root = root;
     root.innerHTML = `
       <div class="sq-head">
-        <button class="sq-toggle" data-a="toggle" title="Mostra/nascondi la sequenza">▾</button>
+        <button class="sq-toggle" data-a="toggle" title="Mostra/nascondi la sequenza">${svg('chevron-down')}</button>
         <span class="sq-title">Sequenza</span>
-        <input id="sq-name" class="sq-name" value="" title="Nome della sequenza (usato nell'export)">
+        <wa-input id="sq-name" class="sq-name" size="s" value="" title="Nome della sequenza (usato nell'export)"></wa-input>
         <span id="sq-info" class="sq-info"></span>
-        <button id="sq-play" class="btn primary" data-a="play" title="Suona tutta la sequenza">▶ Play sequenza</button>
-        <label class="sq-follow" title="Durante la riproduzione la griglia mostra il blocco che sta suonando"><input type="checkbox" id="sq-follow" checked> Segui</label>
+        ${btn('<wa-icon slot="start" name="play"></wa-icon>Play sequenza', { variant: 'brand', id: 'sq-play', 'data-a': 'play', title: 'Suona tutta la sequenza' })}
+        <wa-checkbox size="s" class="sq-follow" id="sq-follow" checked title="Durante la riproduzione la griglia mostra il blocco che sta suonando">Segui</wa-checkbox>
         <div class="spacer"></div>
-        <button class="btn" data-a="add-current" title="Aggiunge in fondo il pattern che vedi nella griglia (con le tue modifiche)">+ Pattern corrente</button>
-        <button class="btn" data-a="save">Salva…</button>
-        <select id="sq-open" class="sq-open" title="Apri una sequenza salvata"><option value="">Apri…</option></select>
-        <button class="btn" data-a="clear">Svuota</button>
+        ${btn('Pattern corrente', { icon: 'plus', 'data-a': 'add-current', title: 'Aggiunge in fondo il pattern che vedi nella griglia (con le tue modifiche)' })}
+        ${btn('Salva…', { icon: 'save', 'data-a': 'save' })}
+        <wa-select id="sq-open" class="sq-open" size="s" placeholder="Apri…" title="Apri una sequenza salvata"></wa-select>
+        ${btn('Svuota', { icon: 'trash-2', 'data-a': 'clear' })}
         <span class="sq-exp">Esporta sequenza:</span>
-        <button class="btn" data-a="exp-midi">MIDI</button>
-        <button class="btn" data-a="exp-wav">WAV</button>
-        <button class="btn primary" data-a="exp-abl">Ableton</button>
-        <button class="btn" data-a="exp-live" title="Crea in Live le tracce della sequenza (serve il device ClusterSound nel set)">Live</button>
+        <wa-button-group label="Esporta sequenza">
+          ${btn('MIDI', { 'data-a': 'exp-midi' })}${btn('WAV', { 'data-a': 'exp-wav' })}${btn('Live', { 'data-a': 'exp-live', title: 'Crea in Live le tracce della sequenza (serve il device ClusterSound nel set)' })}
+        </wa-button-group>
+        ${btn('Ableton', { variant: 'brand', icon: 'file-down', 'data-a': 'exp-abl' })}
       </div>
       <div class="sq-body">
         <div id="sq-track" class="sq-track"></div>
@@ -225,8 +227,7 @@ export class Arranger {
     const sec = flat.sections.find((s) => s.index === fromBlock) || flat.sections[0];
     this.ed.seq.start(sec.start_bar * 16);
     this.playing = true;
-    $('#sq-play').textContent = '■ Stop';
-    $('#sq-play').classList.add('on');
+    setPlayButton($('#sq-play'), true, 'Play sequenza');
     this.ed._meterLoop();
   }
 
@@ -235,7 +236,7 @@ export class Arranger {
   onStopped() {
     this.playing = false;
     const b = $('#sq-play');
-    if (b) { b.textContent = '▶ Play sequenza'; b.classList.remove('on'); }
+    setPlayButton(b, false, 'Play sequenza');
     this._cursor(null);
     document.querySelectorAll('.sq-card.now').forEach((c) => c.classList.remove('now'));
   }
@@ -300,7 +301,8 @@ export class Arranger {
   async _refreshSaved() {
     const list = await this.api.list_sequences();
     this.saved = list;
-    $('#sq-open').innerHTML = '<option value="">Apri…</option>' + list.map((s) => `<option value="${esc(s.id)}">${esc(s.name)} (${s.blocks.length} blocchi)</option>`).join('');
+    $('#sq-open').innerHTML = list.length ? list.map((s) => `<wa-option value="${esc(s.id)}">${esc(s.name)} (${s.blocks.length} blocchi)</wa-option>`).join('')
+      : '<wa-option value="none" disabled>Nessuna sequenza salvata</wa-option>';
   }
 
   async _saveAs() {
@@ -414,7 +416,7 @@ export class Arranger {
   render() {
     if (!this.root) return;
     this.root.classList.toggle('closed', !this.open);
-    $('.sq-toggle', this.root).textContent = this.open ? '▾' : '▸';
+    $('.sq-toggle', this.root).innerHTML = svg(this.open ? 'chevron-down' : 'chevron-right');
     $('#sq-name').value = this.seq.name || 'Sequenza';
     this._info();
     const track = $('#sq-track');
@@ -423,11 +425,11 @@ export class Arranger {
       const len = b.groove.bars * (b.repeat || 1);
       const html = `<div class="sq-card ${this.editing === i ? 'editing' : ''}" draggable="true" data-i="${i}" style="width:${130 + len * PX_PER_BAR}px" title="Clic: mostra e modifica nella griglia · trascina per spostare">
         <div class="sq-card-top"><span class="sq-num">${i + 1}</span><span class="sq-label">${esc(b.label)}</span>
-          <button class="sq-ib" data-a="play-from" title="Suona da qui">▶</button></div>
+          <button class="sq-ib" data-a="play-from" title="Suona da qui">${svg('play', 10)}</button></div>
         <canvas class="sq-thumb" data-i="${i}"></canvas>
         <div class="sq-card-bot"><span class="sq-bars">batt. ${bar}–${bar + len - 1}</span>
-          <span class="sq-rep"><button class="sq-ib" data-a="rep-">−</button><b>×${b.repeat || 1}</b><button class="sq-ib" data-a="rep+">+</button></span>
-          <span class="sq-tools"><button class="sq-ib" data-a="dup" title="Duplica">⧉</button><button class="sq-ib" data-a="ren" title="Rinomina">✎</button><button class="sq-ib danger" data-a="del" title="Elimina">×</button></span></div>
+          <span class="sq-rep"><button class="sq-ib" data-a="rep-">${svg('minus', 10)}</button><b>×${b.repeat || 1}</b><button class="sq-ib" data-a="rep+">${svg('plus', 10)}</button></span>
+          <span class="sq-tools"><button class="sq-ib" data-a="dup" title="Duplica">${svg('copy', 10)}</button><button class="sq-ib" data-a="ren" title="Rinomina">${svg('pencil', 10)}</button><button class="sq-ib danger" data-a="del" title="Elimina">${svg('x', 10)}</button></span></div>
       </div>`;
       bar += len;
       return html;
@@ -439,8 +441,8 @@ export class Arranger {
     const banner = $('#sq-banner');
     if (this.editing !== null && this.seq.blocks[this.editing]) {
       banner.hidden = false;
-      banner.innerHTML = `✎ Nella griglia stai modificando il <b>blocco ${this.editing + 1}</b> · ${esc(this.seq.blocks[this.editing].label)} — ogni modifica aggiorna il blocco.
-        <button class="btn small" data-a="back">Torna al pattern libero</button>`;
+      banner.innerHTML = `${svg('pencil', 12)} <span>Nella griglia stai modificando il <b>blocco ${this.editing + 1}</b> · ${esc(this.seq.blocks[this.editing].label)} — ogni modifica aggiorna il blocco.</span>
+        ${btn('Torna al pattern libero', { size: 'xs', 'data-a': 'back' })}`;
     } else banner.hidden = true;
   }
 
