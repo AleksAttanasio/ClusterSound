@@ -84,10 +84,10 @@
      "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.12,
+      0.12,
+      0.12,
+      1.0
      ],
      "bordercolor": [
       1.0,
@@ -98,6 +98,9 @@
      "saved_attribute_attributes": {
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
       }
      }
     }
@@ -126,10 +129,10 @@
      "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.12,
+      0.12,
+      0.12,
+      1.0
      ],
      "bordercolor": [
       1.0,
@@ -140,6 +143,9 @@
      "saved_attribute_attributes": {
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
       }
      }
     }
@@ -168,10 +174,10 @@
      "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.12,
+      0.12,
+      0.12,
+      1.0
      ],
      "bordercolor": [
       1.0,
@@ -182,6 +188,9 @@
      "saved_attribute_attributes": {
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
       }
      }
     }
@@ -210,10 +219,10 @@
      "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.12,
+      0.12,
+      0.12,
+      1.0
      ],
      "bordercolor": [
       1.0,
@@ -224,6 +233,9 @@
      "saved_attribute_attributes": {
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
       }
      }
     }
@@ -252,10 +264,10 @@
      "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.12,
+      0.12,
+      0.12,
+      1.0
      ],
      "bordercolor": [
       1.0,
@@ -266,6 +278,9 @@
      "saved_attribute_attributes": {
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
       }
      }
     }
@@ -294,10 +309,10 @@
      "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.12,
+      0.12,
+      0.12,
+      1.0
      ],
      "bordercolor": [
       1.0,
@@ -308,6 +323,9 @@
      "saved_attribute_attributes": {
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
       }
      }
     }
@@ -336,10 +354,10 @@
      "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.12,
+      0.12,
+      0.12,
+      1.0
      ],
      "bordercolor": [
       1.0,
@@ -350,6 +368,9 @@
      "saved_attribute_attributes": {
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
       }
      }
     }
@@ -378,10 +399,10 @@
      "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.12,
+      0.12,
+      0.12,
+      1.0
      ],
      "bordercolor": [
       1.0,
@@ -392,6 +413,9 @@
      "saved_attribute_attributes": {
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
       }
      }
     }
@@ -420,10 +444,10 @@
      "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.12,
+      0.12,
+      0.12,
+      1.0
      ],
      "bordercolor": [
       1.0,
@@ -434,6 +458,9 @@
      "saved_attribute_attributes": {
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
       }
      }
     }
@@ -462,10 +489,10 @@
      "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.12,
+      0.12,
+      0.12,
+      1.0
      ],
      "bordercolor": [
       1.0,
@@ -476,6 +503,9 @@
      "saved_attribute_attributes": {
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
       }
      }
     }
@@ -504,10 +534,10 @@
      "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.12,
+      0.12,
+      0.12,
+      1.0
      ],
      "bordercolor": [
       1.0,
@@ -518,6 +548,9 @@
      "saved_attribute_attributes": {
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
       }
      }
     }
@@ -546,10 +579,10 @@
      "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.12,
+      0.12,
+      0.12,
+      1.0
      ],
      "bordercolor": [
       1.0,
@@ -560,6 +593,9 @@
      "saved_attribute_attributes": {
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
       }
      }
     }
@@ -588,10 +624,10 @@
      "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.12,
+      0.12,
+      0.12,
+      1.0
      ],
      "bordercolor": [
       1.0,
@@ -602,6 +638,9 @@
      "saved_attribute_attributes": {
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
       }
      }
     }
@@ -630,10 +669,10 @@
      "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.12,
+      0.12,
+      0.12,
+      1.0
      ],
      "bordercolor": [
       1.0,
@@ -644,6 +683,9 @@
      "saved_attribute_attributes": {
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
       }
      }
     }
@@ -672,10 +714,10 @@
      "rounded": 6,
      "border": 1,
      "bgcolor": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.12,
+      0.12,
+      0.12,
+      1.0
      ],
      "bordercolor": [
       1.0,
@@ -686,6 +728,9 @@
      "saved_attribute_attributes": {
       "bordercolor": {
        "expression": "themecolor.live_lcd_control_fg"
+      },
+      "bgcolor": {
+       "expression": "themecolor.live_control_bg"
       }
      }
     }
