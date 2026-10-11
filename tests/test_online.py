@@ -112,21 +112,26 @@ def test_freesound_packs(monkeypatch):
 
     def fake_get(url, params=None, headers=None, as_json=True, ttl=None):
         calls.append((url, params))
-        if "/packs/" in url:
-            info = load("freesound_pack.json")
-            return dict(info, id=int(url.rstrip("/").rsplit("/", 1)[-1]))
         return load("freesound_packs_grouped.json")
 
     monkeypatch.setattr(freesound, "http_get", fake_get)
-    cards, total, more = freesound.packs({"q": "kick", "sort": "downloads"}, 1, {"freesound_key": "k"})
-    assert calls[0][1]["group_by_pack"] == 1 and calls[0][1]["sort"] == "downloads_desc"
+    cards, total, more = freesound.packs({"q": "kick", "commercial": True, "sort": "downloads"}, 1,
+                                         {"freesound_key": "k"})
+    assert len(calls) == 1  # names come with the search: no request per pack
+    params = calls[0][1]
+    assert params["group_by_pack"] == 1 and params["sort"] == "downloads_desc"
+    assert params["filter"].endswith(" pack:*") and "license:" in params["filter"]
     assert [c.uid for c in cards] == ["freesound:pack:41", "freesound:pack:77"]  # the loose sound is skipped
     c = cards[0]
     assert c.is_pack and c.title == "808 Kicks Vol. 1" and c.author == "beatsmith"
     assert c.license == "cc0" and c.waveform_img and c.preview_url.endswith("-hq.mp3")
-    assert c.extra["matching"] == 8 and c.extra["num_sounds"] == 20 and c.extra["downloads"] == 5400
+    assert c.extra["matching"] == 8
     assert c.page_url == "https://freesound.org/people/beatsmith/packs/41/"
-    assert freesound.parse(load("freesound_packs_grouped.json"))[0].extra["pack_id"] == "41"
+    whole, _, _ = freesound.packs({}, 1, {"freesound_key": "k"})
+    assert calls[-1][1]["filter"] == "pack:*"
+    assert whole[0].extra["num_sounds"] == 8 and "matching" not in whole[0].extra  # no query: whole pack
+    sound = freesound.parse(load("freesound_packs_grouped.json"))[0]
+    assert sound.extra["pack_id"] == "41" and sound.extra["pack_title"] == "808 Kicks Vol. 1"
     with pytest.raises(SourceError, match="API key"):
         freesound.packs({}, 1, {})
 

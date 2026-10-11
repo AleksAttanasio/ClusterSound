@@ -11,8 +11,7 @@ USER_PACKS_API = "https://freesound.org/apiv2/users/{user}/packs/"
 LABEL = "Freesound"
 PAGE_SIZE = 30
 FIELDS = ("id,name,username,license,duration,tags,previews,images,type,samplerate,filesize,url,"
-          "bpm,tonality,single_event,loopable,pack,num_downloads,avg_rating")
-PACKS_PAGE_SIZE = 12  # every pack card needs one extra request for its name (60 requests/minute limit)
+          "bpm,tonality,single_event,loopable,pack,pack_name,num_downloads,avg_rating")
 PACK_TTL = 3600
 SORT = {"relevance": "score", "downloads": "downloads_desc", "rating": "rating_desc",
         "newest": "created_desc", "duration": "duration_asc"}
@@ -77,8 +76,8 @@ def parse(data: dict) -> list[OnlineResult]:
             page_url=s.get("url") or f"https://freesound.org/s/{s['id']}/",
             waveform_img=(s.get("images") or {}).get("waveform_m"), format=s.get("type", ""),
             samplerate=s.get("samplerate"), filesize=s.get("filesize"), type=typ,
-            extra={"pack_id": pack_id(s.get("pack")), "downloads": s.get("num_downloads"),
-                   "rating": s.get("avg_rating")}))
+            extra={"pack_id": pack_id(s.get("pack")), "pack_title": s.get("pack_name"),
+                   "downloads": s.get("num_downloads"), "rating": s.get("avg_rating")}))
     return out
 
 
@@ -126,25 +125,25 @@ def pack_info(pid: str, settings: dict) -> dict:
     return http_get(PACK_API.format(id=pid), headers=_auth(settings), ttl=PACK_TTL)
 
 
+def pack_card(hit: OnlineResult, raw: dict) -> OnlineResult:
+    """Pack card from a grouped search hit (pack_name is returned by the search: no extra request)."""
+    user = raw.get("username", "")
+    card = parse_pack({"id": hit.extra["pack_id"], "name": hit.extra.get("pack_title"), "username": user}, hit)
+    card.extra["matching"] = (raw.get("n_from_same_pack") or 0) + 1
+    return card
+
+
 def packs(p: dict, page: int, settings: dict):
-    """Search grouped by pack: one card per pack (sounds without a pack are skipped)."""
-    headers = _auth(settings)
-    params = dict(build_params(p, page), group_by_pack=1, page_size=PACKS_PAGE_SIZE)
-    data = http_get(API, params, headers=headers)
-    hits = [(s, r) for s, r in zip(data.get("results", []), parse(data)) if r.extra.get("pack_id")]
-
-    def card(hit):
-        s, r = hit
-        try:
-            info = pack_info(r.extra["pack_id"], settings)
-        except SourceError:
-            return None
-        out = parse_pack(info, r)
-        out.extra["matching"] = (s.get("n_from_same_pack") or 0) + 1
-        return out
-
-    with ThreadPoolExecutor(max_workers=6) as ex:
-        cards = [c for c in ex.map(card, hits) if c]
+    """Search grouped by pack: one card per pack, from its best matching sound."""
+    params = dict(build_params(p, page), group_by_pack=1)
+    # only sounds that belong to a pack (without a query Freesound would not group otherwise)
+    params["filter"] = (params.get("filter", "") + " pack:*").strip()
+    data = http_get(API, params, headers=_auth(settings))
+    raws = data.get("results", [])
+    cards = [pack_card(r, raw) for r, raw in zip(parse(data), raws) if r.extra.get("pack_id")]
+    if not p.get("q") and params["filter"] == "pack:*":  # nothing narrows the match: it is the whole pack
+        for c in cards:
+            c.extra["num_sounds"] = c.extra.pop("matching")
     return cards, data.get("count"), bool(data.get("next"))
 
 
