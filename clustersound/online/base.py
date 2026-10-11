@@ -154,7 +154,9 @@ def http_get(url: str, params: dict | None = None, headers: dict | None = None,
         raise SourceError(f"errore HTTP {e.code}") from e
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         raise SourceError(f"non raggiungibile ({getattr(e, 'reason', e)})") from e
-    data = json.loads(body) if as_json else body.decode("utf-8", "replace")
+    # some sources (ccMixter) mix in latin-1 bytes: never let one bad character drop a whole page
+    text = body.decode("utf-8", "replace")
+    data = json.loads(text) if as_json else text
     with _cache_lock:
         if len(_cache) > 500:
             _cache.clear()
