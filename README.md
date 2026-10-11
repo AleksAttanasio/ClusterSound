@@ -43,6 +43,109 @@ Ogni sample ha anche un **Tipo** (One-shot / Loop / Long-Texture) e un **sottocl
 la sua classe (k-means sugli embedding, k scelto con silhouette).
 Colori, keyword e mappatura AudioSet stanno in `clustersound/taxonomy.py`.
 
+## Scheda Online: sample gratuiti
+
+Il tab **Online** in alto (alternato a **Libreria**) cerca sample gratuiti su quattro fonti e li
+mostra raggruppati **per fonte** oppure **per strumento**:
+
+| Fonte | Cosa offre | Accesso |
+|---|---|---|
+| Freesound | ~600k suoni CC (one-shot, loop, field recording) con BPM, tonalità, waveform | API key gratuita (⚙ → "richiedi una chiave") |
+| Openverse | Aggregatore CC (Freesound, Wikimedia Commons) | anonimo, limiti di frequenza bassi |
+| Internet Archive | Sample pack interi, sfogliabili file per file anche dentro gli ZIP | anonimo |
+| ccMixter | Stem, a cappella e loop CC | anonimo |
+
+- **Filtro per strumento**: le stesse 34 classi e gli stessi colori della libreria. Ogni fonte
+  riceve la query nel proprio formato (tag Freesound, ricerca Openverse, subject/title su IA, tag
+  ccMixter), poi ogni risultato viene etichettato da titolo/tag/cartelle con lo stesso parser dei
+  nomi della libreria. I falsi positivi non musicali ("soccer kick", "waves crashing") vengono scartati.
+- **Altri filtri**: fonte, licenza (CC0/PD, BY, BY-SA, NC, ND, non dichiarata), *solo uso
+  commerciale*, tipo (one-shot/loop/long), durata, BPM, tonalità, solo lossless, file singoli o
+  pack, ordinamento. Accanto a ogni filtro un'etichetta (FS·OV·IA·CC) indica quali fonti lo applicano
+  lato server; sulle altre viene applicato localmente.
+- **Anteprima**: ▶ riproduce subito (l'audio passa da Python, con cache in `~/Library/Caches/ClusterSound`).
+- **Download** (⬇): in `~/Music/ClusterSound Downloads/<Fonte>/` (configurabile), con accanto un
+  `.license.txt` che riporta autore, licenza, link e testo di attribuzione. Da Freesound senza
+  login OAuth si scarica l'anteprima HQ mp3; l'originale si scarica dalla pagina (↗).
+- I pack di Internet Archive che sembrano librerie commerciali ricaricate con una licenza libera
+  (Big Fish Audio, Sound Ideas, Loopmasters, GarageBand…) sono marcati ⚠ e nascosti per default;
+  quelli senza licenza dichiarata compaiono solo se scegli "Non dichiarata".
+
+## Scheda Sequencer: prova dei sample su groove tipici
+
+La terza scheda (**Libreria | Online | Sequencer | Drum Rack**) è un sequencer per provare i sample su pattern tipici e portarli in Ableton.
+
+- **47 generi, 191 pattern**, con la bass music in primo piano:
+  - *Bass music UK*: UK garage 2-step, speed garage, bassline, UK funky, grime, dubstep, riddim, tearout, halftime, breaks, future garage;
+  - *Drum & bass / jungle*: liquid, rollers, jump-up, neurofunk, dancefloor, jungle (amen), minimal, drumfunk, footwork;
+  - *Hip hop / trap*: boom bap, lo-fi, trap, UK e NY drill, phonk, memphis, jersey club, baltimore club;
+  - *House / techno*: house, deep, tech house, techno, minimal, electro, trance, hardstyle, disco;
+  - *Global*: afrobeats, amapiano, reggaeton/dembow, dancehall, moombahton, pop, funk, rock, breakbeat.
+
+  Ogni genere ha le sue varianti tipiche più *Fill* e *Breakdown* generate automaticamente, con BPM, swing e tonalità del genere. **Varia** crea una variazione; **Salva variante** la salva tra le tue (★).
+- **Bus separati**: Kick, Snare, Clap, Rim, Closed Hat, Open Hat, Ride/Crash, Perc, Tom, FX e Bass. Ogni bus ha step, volume, pan, filtro, mute/solo e meter.
+- **Layer**: ogni bus può avere più sample che suonano insieme (es. 3 snare nel bus Snare), ciascuno con volume, pitch, offset in ms, mute/solo ed eventualmente step propri.
+- **Step**: clic per accendere/spegnere, Shift per l'accento, Alt per la ghost note, tasto destro per i roll ×2/×3/×4. Hi-hat chiuso e aperto sono in choke.
+- **Basso**: piano-roll con glide (Alt+clic su una nota); la radice del sample viene rilevata da sola, così il basso suona intonato.
+- **Invio ai bus**: dalla Libreria (tasto destro su un punto 3D o su una riga, oppure "Invia ▾" nella tendina) e dalla scheda Online (→), come nuovo layer o al posto di quello selezionato.
+- **Alternanza dei layer**: quando un bus ha 2 o più layer, accanto al nome scegli come suonano:
+  - *insieme*: tutti a ogni colpo;
+  - *a giro*: uno dopo l'altro;
+  - *casuale*: un layer estratto a caso per ogni colpo, uguale a ogni giro (⚄ rifà l'estrazione);
+  - *casuale ogni giro*: un'estrazione nuova a ogni ripetizione.
+
+  L'export registra esattamente quello che senti: nel Drum Rack ogni layer alternato ha il suo pad e il MIDI suona quello giusto (con *casuale ogni giro* viene registrato il primo giro).
+- **🎲 Kit casuale**: per ogni bus che suona sceglie a caso un gruppo di sample simili (classe e sotto-gruppo) e ne prende sample a caso. Puoi chiedere 1, 2 o 4 sample per bus (alternati a caso), limitare la scelta a una cartella o pack e tenere solo i one-shot. I bus bloccati con 🔒 non cambiano, e il groove resta lo stesso.
+- **▦ Carica dal Drum Rack**: porta i sample del Drum Rack nei bus della loro classe (vedi sotto).
+  - I sample online restano in una **cache temporanea limitata** (300 MB, configurabile in ⚙ insieme a "Svuota cache"); diventano file veri solo quando esporti.
+- **Export**:
+  - **MIDI**, con mappatura Drum Rack (pad consecutivi da C1) o General MIDI;
+  - **WAV** del loop;
+  - **Esporta per Ableton**: una cartella con
+    - `Samples/<Bus>/…wav`, più un `.license.txt` per i sample online;
+    - `… Drum Rack.adg`: un pad per bus, con Instrument Rack annidato quando il bus ha più layer;
+    - `… Bass.adg`: Simpler mono con nota radice e glide;
+    - `Drums.mid`, `Bass.mid`, `Loop.wav` e `LEGGIMI.txt` con i 3 passi da fare in Live.
+
+- **Sequenza (arrangiamento)**: nel pannello *Sequenza* sopra la griglia componi una scaletta di pattern, anche di generi diversi:
+  - per aggiungere un pattern trascina un chip di variante (o fai doppio clic), oppure usa "+ Pattern corrente";
+  - le card si riordinano trascinandole e hanno ×N ripetizioni, duplica, rinomina ed elimina;
+  - ogni card mostra la miniatura del groove ed è larga in proporzione alle battute;
+  - clic su una card: la griglia mostra e modifica quel blocco;
+  - "Play sequenza" fa scorrere un cursore sulla timeline e, con "Segui", la griglia mostra il blocco che suona;
+  - kit e BPM sono condivisi, mentre lo swing resta quello di ogni blocco;
+  - "Esporta sequenza" crea MIDI, WAV o il pacchetto Ableton dell'intera sequenza, con `Sequenza.wav` e la scaletta in `LEGGIMI.txt`;
+  - "Salva…" e "Apri…" gestiscono le sequenze salvate.
+
+  Verificato con Ableton Live 10.1: i preset si aprono con i sample al loro posto.
+
+## Scheda Drum Rack: kit a 64 pad per Launchpad Pro
+
+La quarta scheda costruisce un Drum Rack 8×8 pensato per un controller come il Novation Launchpad Pro MK3.
+
+- **Mappatura delle note**: *Launchpad / Live* (default), cioè 4 quadranti 4×4 con 36–51 in basso a sinistra, 52–67 in basso a destra, 68–83 in alto a sinistra e 84–99 in alto a destra; oppure *righe sequenziali* (36 + riga×8 + colonna), per le Custom Mode.
+- **Geometrie**: ognuna divide i 64 pad in gruppi di sample simili; i pad restano al loro posto quando cambi geometria.
+  - *Colonne ×8*: 8 colonne da 8 (es. tutti gli hat su una colonna);
+  - *Blocchi 2×2*: 16 gruppi da 4;
+  - *Blocchi 4×4*: 4 quadranti da 16;
+  - *4×4 a colonne*: ogni quadrante è una famiglia e ogni colonna un gruppo di 4 (gruppi diversi della stessa classe prendono sotto-cluster diversi);
+  - *Libero*: un pad alla volta.
+- **Seed**: è l'ultimo sample cliccato, nel browser a sinistra o su un pad. **Riempi gruppo** mette il seed sul pad selezionato e i sample simili sugli altri pad del gruppo.
+- **Dalla vista 3D**: tasto destro su un punto (o "Invia ▾" nel pannello del sample) apre il menu *Invia*. In alto c'è la sezione **Drum Rack** con **+ aggiungi** (sul pad selezionato, o sul primo libero del gruppo) e **+ aggiungi e apri ▦**, che passa anche alla scheda Drum Rack. Con *con i simili* il sample riempie l'intero gruppo insieme ai suoi simili.
+- **Modalità**:
+  - *Più simili*;
+  - *Casuale*: pesca per somiglianza con uno slider di variazione; *Rigenera* rifà l'estrazione;
+  - *Manuale*: spunti i simili da una lista ordinata per somiglianza;
+  - *Percorso*: usa le tappe di "Trova simili" (anche dal pulsante ▦ Drum Rack nella barra dei simili) e, se sono poche, le completa con i simili dell'ultima tappa.
+- **Filtri**: stessa classe del seed, famiglia del gruppo o tutta la libreria; solo one-shot; evita i sample già presenti nel kit.
+- **Gruppi**: famiglia (usata da *Auto-riempi* e dal browser), choke group (attivo di default sugli hat) e **🔒 blocca gruppo**. Trascina i pad per scambiarli e un sample dal browser per metterlo su un pad; il tasto destro apre il menu del pad.
+- **🎲 Casuale**: ogni gruppo non bloccato prende un gruppo di sample simili scelto a caso tra quelli della sua famiglia, con sample a caso da lì. Puoi applicarlo a tutti i gruppi o solo a quelli vuoti, limitarlo a una cartella o pack e tenere solo i one-shot.
+- **→ Sequencer**: carica i sample nei bus del Sequencer secondo la loro classe, fino a 8 per bus. Un riquadro chiede:
+  - quali bus caricare;
+  - se *sovrascrivere* i bus scelti, *aggiungere* ai layer esistenti o *svuotare anche gli altri bus*;
+  - per ogni bus, come alternare i sample. Il default è *casuale*, tranne per kick, FX e basso, dove suona solo il primo sample e gli altri entrano muti.
+- **Esporta per Ableton**: una cartella con `Samples/<gruppo>/<nota> - <nome>.wav`, `… Drum Rack.adg` (un pad per tasto, con la nota del Launchpad e i choke group), i `.license.txt` dei sample online e `LEGGIMI.txt` con la mappa 8×8 dei pad.
+
 ## Come classifica
 
 Quattro segnali fusi in log-probabilità (`clustersound/classifier.py`):
@@ -82,13 +185,18 @@ e rumore delle etichette (es. "snare roll" dentro un fill di batteria).
 ## Build dell'app
 
 ```bash
-.venv/bin/pyinstaller --noconfirm ClusterSound.spec   # -> dist/ClusterSound.app
+tools/build_app.sh   # -> dist/ClusterSound.app
 ```
+
+Apri e copia solo `ClusterSound.app`: la cartella `dist/ClusterSound/` contiene un eseguibile nudo che
+il Finder lancia dentro il Terminale (lo script la elimina dopo la build).
 
 ## Strumenti di sviluppo
 
 - `tools/build_yamnet_npz.py` — converte i pesi Keras di YAMNet nel modello numpy.
 - `tools/train_base_head.py` — riaddestra la head base su una o più librerie.
+- `tools/extract_adg_template.py` — rigenera i template (solo struttura) dei rack Live 10 dai preset installati con Live.
 - `tools/evaluate.py` — accuratezza a nomi nascosti (`--oneshots`, `--all-hidden`, `--no-base`).
 - `tools/devserver.py` — UI in un browser normale con l'API Python via HTTP.
-- `pytest` — test su segnali sintetici (kick, 808, hat, clap, pad, riser, loop) e pipeline end-to-end.
+- `pytest` — test su segnali sintetici e pipeline end-to-end; per le fonti online usa risposte registrate
+  in `tests/fixtures/online` (`CLUSTERSOUND_NETWORK_TESTS=1 pytest` interroga anche i servizi reali).

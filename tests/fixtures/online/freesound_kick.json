@@ -1,0 +1,11 @@
+{"count": 2, "next": "https://freesound.org/apiv2/search/?page=2", "previous": null, "results": [
+ {"id": 2086, "name": "Kick 01.wav", "username": "producer", "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+  "duration": 0.42, "tags": ["kick", "drum", "one-shot"], "type": "wav", "samplerate": 44100, "filesize": 74000,
+  "url": "https://freesound.org/people/producer/sounds/2086/", "bpm": null, "tonality": null, "single_event": true, "loopable": false,
+  "previews": {"preview-hq-mp3": "https://cdn.freesound.org/previews/2/2086_1-hq.mp3", "preview-lq-mp3": "https://cdn.freesound.org/previews/2/2086_1-lq.mp3"},
+  "images": {"waveform_m": "https://cdn.freesound.org/displays/2/2086_1_wave_M.png"}},
+ {"id": 5150, "name": "Funky drum loop", "username": "beats", "license": "http://creativecommons.org/licenses/by-nc/4.0/",
+  "duration": 7.5, "tags": ["loop", "drums", "funk"], "type": "flac", "samplerate": 48000, "filesize": 900000,
+  "url": "https://freesound.org/people/beats/sounds/5150/", "bpm": 128, "tonality": "A minor", "single_event": false, "loopable": true,
+  "previews": {"preview-hq-mp3": "https://cdn.freesound.org/previews/5/5150_2-hq.mp3"}, "images": {}}
+]}

@@ -8,8 +8,8 @@ from pathlib import Path
 
 import numpy as np
 
-from . import audio_io, classifier, clustering, embedder, features, projection
-from .cache import Cache
+from . import audio_io, classifier, clustering, embedder, features, projection, snapshot
+from .cache import Cache, unpack
 from .paths import data_dir
 
 EMBED_SECONDS = 10.0
@@ -75,28 +75,41 @@ class Library:
         self._lock = threading.RLock()
         self._scan_thread: threading.Thread | None = None
         self._cancel = threading.Event()
+        self._files_sig: str | None = None  # snapshot signature of the scanned folder
 
     # ------------------------------------------------------------------ scanning
-    def start_scan(self, root: str) -> None:
+    def start_scan(self, root: str, snapshot_only: bool = False) -> None:
         if self._scan_thread and self._scan_thread.is_alive():
             self._cancel.set()
             self._scan_thread.join()
         self._cancel.clear()
-        self._scan_thread = threading.Thread(target=self.scan, args=(root,), daemon=True)
+        self._scan_thread = threading.Thread(target=self.scan, args=(root, snapshot_only), daemon=True)
         self._scan_thread.start()
 
     def _set_progress(self, phase, done=0, total=0, message=""):
         self.progress = {"phase": phase, "done": done, "total": total, "message": message}
 
-    def scan(self, root: str) -> None:
+    def scan(self, root: str, snapshot_only: bool = False) -> None:
+        """Full scan; with snapshot_only, just restore an up-to-date snapshot (phase 'stale' if none)."""
         try:
-            self._scan(root)
+            self._scan(root, snapshot_only)
         except Exception as e:  # surface to the UI instead of dying silently
             self._set_progress("error", message=f"{type(e).__name__}: {e}")
             raise
 
-    def _scan(self, root: str) -> None:
-        if not self.scan_analysis_only(root):
+    def _scan(self, root: str, snapshot_only: bool = False) -> None:
+        root = os.path.abspath(os.path.expanduser(root))
+        listing = self._list(root)
+        if self._load_snapshot(root, listing):
+            self._set_progress("layout", 0, 0, "Layout 3D…")
+            self.compute_layout()
+            n = len(self.items)
+            self._set_progress("done", n, n, f"{n} sample, {len(self.errors)} errori · da snapshot")
+            return
+        if snapshot_only:
+            self._set_progress("stale", message="Nessuno snapshot aggiornato per questa cartella: premi Riscansiona")
+            return
+        if not self.scan_analysis_only(root, listing):
             return
         self._set_progress("classifying", 0, 0, "Classificazione…")
         self.reclassify()
@@ -105,29 +118,77 @@ class Library:
         n = len(self.items)
         self._set_progress("done", n, n, f"{n} sample, {len(self.errors)} errori")
 
-    def scan_analysis_only(self, root: str) -> bool:
+    def _list(self, root: str) -> list[tuple[str, os.stat_result | None]]:
+        self._set_progress("scanning", message="Ricerca file audio…")
+        listing = []
+        for p in scan_files(root):
+            try:
+                listing.append((p, os.stat(p)))
+            except OSError:
+                listing.append((p, None))
+        return listing
+
+    def _load_snapshot(self, root: str, listing) -> bool:
+        files_sig = snapshot.files_signature(root, listing)
+        paths = [p for p, _ in listing]
+        snap = snapshot.load(self._snapshot_dir(), root,
+                             snapshot.fingerprint(files_sig, paths, self.cache.labels()))
+        if snap is None:
+            return False
+        a = snap["arrays"]
+        with self._lock:
+            self.root = root
+            self.items = snap["items"]
+            self.errors = snap["errors"]
+            self.stats = snap["stats"]
+            self.emb = a["emb"].reshape(-1, 1024)
+            self.prof = a["prof"].reshape(len(self.items), -1)
+            self.X = self._head_features()
+            self.probs = a.get("probs")
+            self._files_sig = files_sig
+            self.version += 1
+        return True
+
+    def _snapshot_dir(self) -> Path:
+        return self.cache.path.parent / "snapshots"
+
+    def _save_snapshot(self) -> None:
+        if not self._files_sig or self.root is None:
+            return
+        try:
+            paths = [it["path"] for it in self.items] + [e["path"] for e in self.errors]
+            fp = snapshot.fingerprint(self._files_sig, paths, self.cache.labels())
+            snapshot.save(self._snapshot_dir(), self.root, fp, self.items, {
+                "emb": self.emb, "prof": self.prof, "probs": self.probs,
+                "scores_max": np.array([it["scores_max"] for it in self.items]).reshape(len(self.items), -1),
+                "scores_mean": np.array([it["scores_mean"] for it in self.items]).reshape(len(self.items), -1),
+            }, self.stats, self.errors)
+        except Exception as e:  # a missing snapshot only costs speed next time
+            print("snapshot not saved:", type(e).__name__, e)
+
+    def scan_analysis_only(self, root: str, listing=None) -> bool:
         """Walk + analyse (with cache). Returns False if cancelled."""
         root = os.path.abspath(os.path.expanduser(root))
-        self._set_progress("scanning", message="Ricerca file audio…")
-        paths = scan_files(root)
-        total = len(paths)
+        if listing is None:
+            listing = self._list(root)
+        total = len(listing)
         self._set_progress("analysing", 0, total)
         results: list[tuple[str, dict, dict] | None] = [None] * total
         errors = []
         done = 0
         todo = []
-        for i, p in enumerate(paths):
-            try:
-                st = os.stat(p)
-            except OSError as e:
-                errors.append({"path": p, "error": str(e)})
+        rows = self.cache.get_many(root)
+        for i, (p, st) in enumerate(listing):
+            if st is None:
+                errors.append({"path": p, "error": "file non leggibile"})
                 continue
-            hit = self.cache.get(p, st.st_mtime, st.st_size)
-            if hit is not None:
-                results[i] = (p, *hit)
+            row = rows.get(p)
+            if row is not None and row[0] == st.st_mtime and row[1] == st.st_size:
+                results[i] = (p, *unpack(row[2]))
                 done += 1
             else:
                 todo.append((i, p, st))
+        del rows
         self._set_progress("analysing", done, total, f"{done} in cache")
 
         def work(job):
@@ -179,9 +240,11 @@ class Library:
             self.items = items
             self.errors = errors
             self.emb = np.array(embs, np.float32).reshape(-1, 1024)
-            self.prof = np.array(profs, np.float32).reshape(len(items), -1)
+            self.prof = (np.array(profs, np.float32).reshape(len(items), -1) if items
+                         else np.zeros((0, 144), np.float32))
             self.X = self._head_features()
             self.probs = None
+            self._files_sig = snapshot.files_signature(root, listing)
         return True
 
     def _head_features(self) -> np.ndarray:
@@ -205,6 +268,7 @@ class Library:
             self.stats = res
             self._subclusters()
             self.version += 1
+            self._save_snapshot()
 
     def _subclusters(self) -> None:
         by_cls: dict[str, list[int]] = {}
@@ -271,8 +335,12 @@ class Library:
             })
         return out
 
-    def similar(self, item_id: int, k: int = 12) -> list[int]:
-        return clustering.knn(self.emb, item_id, k) if len(self.emb) > 1 else []
+    def similar(self, item_id: int, k: int = 12) -> list[dict]:
+        """The k nearest items in embedding space, most similar first, with cosine similarity."""
+        if len(self.emb) <= 1:
+            return []
+        ids, sims = clustering.knn(self.emb, item_id, k, return_sims=True)
+        return [{"id": int(i), "sim": float(s)} for i, s in zip(ids, sims)]
 
 
 __all__ = ["Library", "scan_files", "analyse_file", "Path"]

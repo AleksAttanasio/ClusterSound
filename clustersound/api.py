@@ -2,19 +2,55 @@
 import base64
 import io
 import json
+import mimetypes
 import os
 import subprocess
 import threading
+import urllib.parse
+import webbrowser
 
 import numpy as np
 import soundfile as sf
 
-from . import dynamics, export, taxonomy
+from . import classifier, dynamics, export, taxonomy
 from .features import TYPES
 from .library import Library
+from .online import cache as online_cache
+from .online import search as online
+from .online.base import LICENSES, OnlineResult
+from .online.downloads import DEFAULT_DIR, Downloader
+from .patterns import ableton as pat_ableton
+from .patterns import arrange as pat_arrange
+from .patterns import genres as pat_genres
+from .patterns import midi as pat_midi
+from .patterns import model as pat_model
+from .patterns import render as pat_render
+from .patterns import store as pat_store
 from .paths import data_dir
+from .racks import ableton as rack_ableton
+from .racks import layouts as rack_layouts
+from .racks import select as rack_select
+from .racks import store as rack_store
 
 PREVIEW_MAX_SECONDS = 60
+EXPORT_DIR = os.path.expanduser("~/Music/ClusterSound Patterns")
+AUDIO_TYPES = ("Audio (*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg)",)
+
+
+def _wav_data_url(src) -> str | None:
+    """Decode any libsndfile-readable file (path or file object) to a 16-bit WAV data URL."""
+    try:
+        with sf.SoundFile(src) as f:
+            n = min(f.frames, PREVIEW_MAX_SECONDS * f.samplerate) if f.frames > 0 else -1
+            data = f.read(frames=n, dtype="float32", always_2d=True)
+            sr = f.samplerate
+    except Exception:
+        return None
+    if data.shape[1] > 2:
+        data = data[:, :2]
+    buf = io.BytesIO()
+    sf.write(buf, np.clip(data, -1, 1), sr, format="WAV", subtype="PCM_16")
+    return "data:audio/wav;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
 class Api:
@@ -23,6 +59,10 @@ class Api:
         self._window = None
         self._settings_path = data_dir() / "settings.json"
         self._relabel_lock = threading.Lock()
+        self._downloader = Downloader()
+        self._protected: dict[str, list[str]] = {}  # owner (pattern, rack) -> cached online files in use
+        self._rack_cache: dict = {}
+        threading.Thread(target=online_cache.prune, args=(self._cache_mb(),), daemon=True).start()
 
     # pywebview exposes public attributes too, so keep internals underscored
     def _set_window(self, window):
@@ -55,6 +95,13 @@ class Api:
             return False
         self._save_settings(last_folder=path)
         self._lib.start_scan(path)
+        return True
+
+    def restore(self, path: str) -> bool:
+        """At startup: show the last folder from its snapshot, without re-analysing it."""
+        if not path or not os.path.isdir(path):
+            return False
+        self._lib.start_scan(path, snapshot_only=True)
         return True
 
     def progress(self) -> dict:
@@ -104,19 +151,7 @@ class Api:
 
     def audio(self, item_id: int) -> str | None:
         """The sample as a base64 WAV data URL (decoded here so every format plays)."""
-        path = self._lib.items[int(item_id)]["path"]
-        try:
-            with sf.SoundFile(path) as f:
-                n = min(f.frames, PREVIEW_MAX_SECONDS * f.samplerate) if f.frames > 0 else -1
-                data = f.read(frames=n, dtype="float32", always_2d=True)
-                sr = f.samplerate
-        except Exception:
-            return None
-        if data.shape[1] > 2:
-            data = data[:, :2]
-        buf = io.BytesIO()
-        sf.write(buf, np.clip(data, -1, 1), sr, format="WAV", subtype="PCM_16")
-        return "data:audio/wav;base64," + base64.b64encode(buf.getvalue()).decode()
+        return _wav_data_url(self._lib.items[int(item_id)]["path"])
 
     def reveal(self, item_id: int) -> bool:
         path = self._lib.items[int(item_id)]["path"]
@@ -125,7 +160,7 @@ class Api:
         subprocess.run(["open", "-R", path], check=False)
         return True
 
-    def similar(self, item_id: int, k: int = 12) -> list[int]:
+    def similar(self, item_id: int, k: int = 12) -> list[dict]:
         return self._lib.similar(int(item_id), int(k))
 
     def relabel(self, item_id: int, cls: str | None) -> dict:
@@ -161,3 +196,448 @@ class Api:
         path = res[0] if isinstance(res, (list, tuple)) else res
         export.write(self._lib.items, path)
         return path
+
+    # ================================================================== online
+    def online_init(self) -> dict:
+        return {"sources": [{"id": k, "label": v} for k, v in online.LABELS.items()],
+                "licenses": {k: v["label"] for k, v in LICENSES.items()},
+                "server_filters": online.server_filters(),
+                "settings": self.get_settings()}
+
+    def get_settings(self) -> dict:
+        s = self._settings()
+        key = s.get("freesound_key") or ""
+        return {"freesound_key_set": bool(key), "cache_mb": self._cache_mb(),
+                "cache_used_mb": round(online_cache.size() / (1 << 20), 1),
+                "freesound_key_hint": (key[:4] + "…" + key[-3:]) if len(key) > 8 else "",
+                "download_dir": s.get("download_dir") or DEFAULT_DIR}
+
+    def set_setting(self, key: str, value) -> dict:
+        if key not in ("freesound_key", "download_dir", "cache_mb"):
+            return self.get_settings()
+        if key == "cache_mb":
+            try:
+                value = max(50, min(10000, int(value)))
+            except (TypeError, ValueError):
+                return self.get_settings()
+            self._save_settings(cache_mb=value)
+            online_cache.prune(value)
+            return self.get_settings()
+        value = (value or "").strip() or None
+        if key == "download_dir" and value:
+            value = os.path.expanduser(value)
+        self._save_settings(**{key: value})
+        return self.get_settings()
+
+    def online_search(self, params: dict) -> dict:
+        return online.search(params or {}, self._settings())
+
+    def online_more(self, source: str, params: dict, page: int) -> dict:
+        if source not in online.SOURCES:
+            return {"error": "fonte sconosciuta", "results": []}
+        return online.search_source(source, params or {}, int(page), self._settings())
+
+    def online_expand(self, uid: str, params: dict) -> dict:
+        return online.expand(uid, params or {})
+
+    def online_preview(self, uid: str) -> str | None:
+        """Fetch (into the bounded temporary cache) a result's audio, as a playable data URL."""
+        r = online.get(uid)
+        url = r and (r.preview_url or r.download_url)
+        if not url:
+            return None
+        path = online_cache.ensure(url, self._cache_mb())
+        return _media_data_url(path) if path else None
+
+    def online_download(self, uid: str, url: str | None = None) -> dict:
+        """Queue a download. For packs, `url` picks one of the pack's archives."""
+        r = online.get(uid)
+        if r is None:
+            return {"error": "risultato non trovato"}
+        if url:
+            ident = r.extra.get("identifier", "")
+            if not (r.is_pack and url.startswith(f"https://archive.org/download/{urllib.parse.quote(ident)}/")):
+                return {"error": "file non appartenente al pack"}
+        root = self._settings().get("download_dir") or DEFAULT_DIR
+        try:
+            return self._downloader.enqueue(r, url or r.download_url, root)
+        except ValueError as e:
+            return {"error": str(e)}
+
+    def downloads(self) -> list[dict]:
+        return self._downloader.status()
+
+    def reveal_path(self, path: str) -> bool:
+        root = os.path.realpath(self._settings().get("download_dir") or DEFAULT_DIR)
+        path = os.path.realpath(path or "")
+        if not (path == root or path.startswith(root + os.sep)) or not os.path.exists(path):
+            return False
+        subprocess.run(["open", "-R", path] if os.path.isfile(path) else ["open", path], check=False)
+        return True
+
+    def open_download_dir(self) -> bool:
+        root = self._settings().get("download_dir") or DEFAULT_DIR
+        os.makedirs(root, exist_ok=True)
+        subprocess.run(["open", root], check=False)
+        return True
+
+    def open_url(self, url: str) -> bool:
+        if not isinstance(url, str) or not url.startswith(("https://", "http://")):
+            return False
+        webbrowser.open(url)
+        return True
+
+
+    def _cache_mb(self) -> int:
+        return int(self._settings().get("cache_mb") or online_cache.DEFAULT_MAX_MB)
+
+    def clear_cache(self) -> dict:
+        online_cache.clear()
+        return self.get_settings()
+
+    # ================================================================== patterns
+    def patterns_init(self) -> dict:
+        return {"genres": pat_genres.catalog(), "groups": pat_genres.GROUPS, "buses": pat_model.ui_buses(),
+                "user": pat_store.list_user(), "sequences": pat_store.list_sequences(),
+                "note_names": pat_model.NOTE_NAMES}
+
+    def pattern_build(self, genre_id: str, variant: int) -> dict:
+        return pat_genres.build(genre_id, int(variant))
+
+    def pattern_candidates(self, bus_id: str, query: str = "", limit: int = 200, strict: bool = False) -> list[dict]:
+        """Library samples for a bus: its classes first (by confidence), then the rest if searching.
+        strict (auto-fill): never a loop, and drum buses only take one-shots."""
+        classes = pat_model.BUS_BY_ID[bus_id][2] if bus_id in pat_model.BUS_BY_ID else []
+        q = (query or "").lower().strip()
+        rank = {c: i for i, c in enumerate(classes)}
+        sel = [it for it in self._lib.items if (it["cls"] in rank if not q else q in it["rel"].lower())]
+        if strict:
+            ok = {"One-shot"} if bus_id != "bass" else {"One-shot", "Long/Texture"}
+            sel = [it for it in sel if it["feats"].get("type") in ok and not classifier.name_scores(it["rel"])[1]]
+        return [self._library_ref_of(it) for it in self._ranked(sel, classes)[: int(limit)]]
+
+    @staticmethod
+    def _ranked(sel: list[dict], classes: list[str]) -> list[dict]:
+        """Classes in the given order, one-shots first (a "snare roll" loop is a poor default for a
+        snare pad), then confidence."""
+        rank = {c: i for i, c in enumerate(classes)}
+        return sorted(sel, key=lambda it: (rank.get(it["cls"], 99), it["feats"].get("type") != "One-shot",
+                                           bool(classifier.name_scores(it["rel"])[1]), -it["conf"]))
+
+    def _library_ref_of(self, it: dict) -> dict:
+        f = it["feats"]
+        root = None
+        if f.get("f0") and f.get("harmonicity", 0) > 0.5:
+            root = round(69 + 12 * np.log2(f["f0"] / 440.0))
+        return {"kind": "library", "id": it["id"], "path": it["path"], "name": it["name"], "cls": it["cls"],
+                "conf": it["conf"], "dur": round(float(it["info"].get("duration", 0)), 3), "root": root,
+                "type": f.get("type")}
+
+    def library_ref(self, item_id: int) -> dict:
+        return self._library_ref_of(self._lib.items[int(item_id)])
+
+    def online_ref(self, uid: str) -> dict | None:
+        r = online.get(uid)
+        url = r and (r.preview_url or r.download_url)
+        if not url:
+            return None
+        return {"kind": "online", "uid": uid, "url": url, "name": r.path.rsplit("/", 1)[-1] if r.path else r.title,
+                "cls": r.instrument, "source_label": r.source_label, "license": r.license,
+                "license_label": LICENSES.get(r.license, LICENSES["unknown"])["label"], "author": r.author,
+                "license_url": r.license_url, "page_url": r.page_url, "download_note": r.download_note,
+                "title": r.title, "root": None}
+
+    def pick_sample_file(self) -> dict | None:
+        import webview
+        res = self._window.create_file_dialog(webview.FileDialog.OPEN, file_types=AUDIO_TYPES)
+        if not res:
+            return None
+        path = res[0] if isinstance(res, (list, tuple)) else res
+        return {"kind": "file", "path": path, "name": os.path.basename(path), "cls": None, "root": None}
+
+    def _resolve(self, ref: dict | None) -> str | None:
+        """Local file for a sample ref (online samples come from the temporary cache)."""
+        if not ref:
+            return None
+        if ref.get("kind") == "online":
+            return online_cache.ensure(ref["url"], self._cache_mb()) if ref.get("url") else None
+        path = ref.get("path")
+        return path if path and os.path.isfile(path) else None
+
+    def _describe(self, ref: dict) -> OnlineResult | None:
+        if not ref or ref.get("kind") != "online":
+            return None
+        return OnlineResult(uid=ref.get("uid", ""), source="online", source_label=ref.get("source_label", ""),
+                            title=ref.get("title") or ref.get("name", ""), author=ref.get("author", ""),
+                            license=ref.get("license", "unknown"), license_url=ref.get("license_url", ""),
+                            page_url=ref.get("page_url", ""), download_url=ref.get("url"),
+                            download_note=ref.get("download_note", ""))
+
+    def sample_audio(self, ref: dict) -> str | None:
+        path = self._resolve(ref)
+        return _media_data_url(path) if path else None
+
+    def sample_root(self, ref: dict) -> int | None:
+        """MIDI note of a (tonal) sample, for tuning bass layers."""
+        if ref and ref.get("root") is not None:
+            return ref["root"]
+        path = self._resolve(ref)
+        if not path:
+            return None
+        from . import audio_io, features
+        try:
+            x, sr = audio_io.load_mono(path, max_seconds=3)
+            x = audio_io.resample(audio_io.trim_silence(x, sr), sr, features.FEAT_SR)
+            harm, f0 = features._harmonicity(x, features.FEAT_SR)
+        except Exception:
+            return None
+        return round(69 + 12 * np.log2(f0 / 440.0)) if f0 and harm > 0.4 else None
+
+    def protect_samples(self, refs: list, owner: str = "pattern") -> None:
+        """Online samples used by the open pattern / rack must survive cache pruning."""
+        self._protected[owner] = [online_cache.path_for(r["url"]) for r in refs or [] if r and r.get("url")]
+        online_cache.protect([p for paths in self._protected.values() for p in paths])
+
+    def sequence_flatten(self, kit: dict, seq: dict) -> dict:
+        try:
+            return pat_arrange.flatten(kit, seq)
+        except ValueError as e:
+            return {"error": str(e)}
+
+    def list_sequences(self) -> list[dict]:
+        return pat_store.list_sequences()
+
+    def save_sequence(self, seq: dict) -> dict:
+        return pat_store.save_sequence(seq)
+
+    def delete_sequence(self, sid: str) -> bool:
+        return pat_store.delete_sequence(sid)
+
+    def save_user_pattern(self, p: dict) -> dict:
+        return pat_store.save(p)
+
+    def delete_user_pattern(self, pid: str) -> bool:
+        return pat_store.delete(pid)
+
+    def _save_dialog(self, filename: str, types: tuple) -> str | None:
+        import webview
+        os.makedirs(EXPORT_DIR, exist_ok=True)
+        res = self._window.create_file_dialog(webview.FileDialog.SAVE, directory=EXPORT_DIR,
+                                              save_filename=filename, file_types=types)
+        if not res:
+            return None
+        return res[0] if isinstance(res, (list, tuple)) else res
+
+    @staticmethod
+    def _title(p: dict) -> str:
+        if p.get("sections"):
+            return f"{p.get('name') or 'Sequenza'} {int(round(p.get('bpm', 120)))}bpm - {p['bars']} battute"
+        g = pat_genres.GENRE_BY_ID.get(p.get("genre"), {})
+        return f"{g.get('name', 'Pattern')} - {p.get('name', 'Main')} {int(round(p.get('bpm', 120)))}bpm"
+
+    def export_midi(self, p: dict, mapping: str = "drumrack") -> str | None:
+        path = self._save_dialog(self._title(p) + ".mid", ("MIDI (*.mid)",))
+        if path:
+            pat_midi.write(path, p, "both", "gm" if mapping == "gm" else "drumrack")
+        return path
+
+    def export_wav(self, p: dict) -> str | None:
+        path = self._save_dialog(self._title(p) + ".wav", ("WAV (*.wav)",))
+        if path:
+            pat_render.write_wav(path, p, self._resolve)
+        return path
+
+    def export_ableton(self, p: dict) -> dict:
+        import webview
+        os.makedirs(EXPORT_DIR, exist_ok=True)
+        res = self._window.create_file_dialog(webview.FileDialog.FOLDER, directory=EXPORT_DIR)
+        if not res:
+            return {"cancelled": True}
+        root = res[0] if isinstance(res, (list, tuple)) else res
+        try:
+            folder = pat_ableton.export_package(p, root, self._resolve, self._describe, self._title(p))
+        except Exception as e:
+            return {"error": f"{type(e).__name__}: {e}"}
+        subprocess.run(["open", folder], check=False)
+        return {"folder": folder}
+
+
+    # ================================================================== 64-pad racks
+    def racks_init(self) -> dict:
+        return {**rack_layouts.ui_layouts(), "saved": rack_store.list_racks()}
+
+    def _rack_arrays(self) -> dict:
+        """Normalised embeddings and per-item class / type arrays, rebuilt when the library changes."""
+        lib = self._lib
+        c = self._rack_cache
+        if c.get("emb") is not lib.emb:
+            c.clear()
+            c["emb"] = lib.emb
+            c["Xn"] = rack_select.l2norm(lib.emb) if len(lib.emb) else lib.emb
+        if c.get("version") != (lib.version, len(lib.items)):
+            c["version"] = (lib.version, len(lib.items))
+            c["cls"] = np.array([it["cls"] for it in lib.items], dtype=object)
+            c["oneshot"] = np.array([it["feats"].get("type") == "One-shot" for it in lib.items], bool)
+            c["group"] = np.array([f'{it["cls"]}:{it.get("sub", 0)}' for it in lib.items], dtype=object)
+        return c
+
+    def _rack_mask(self, seed: int | None, opts: dict) -> np.ndarray | None:
+        """Allowed companions: same class as the seed, the group's family, or anything; optionally one-shots only."""
+        a = self._rack_arrays()
+        mask = np.ones(len(a["cls"]), bool)
+        flt = opts.get("filter", "class")
+        if flt == "class" and seed is not None:
+            mask &= a["cls"] == a["cls"][seed]
+        elif flt == "family":
+            classes = rack_layouts.family_classes(opts.get("family", "any"))
+            if classes:
+                mask &= np.isin(a["cls"], classes)
+        if opts.get("oneshot", True):
+            mask &= a["oneshot"]
+        return mask
+
+    def _rack_refs(self, picks: list[tuple[int, float]]) -> list[dict]:
+        return [self._library_ref_of(self._lib.items[i]) | {"sim": round(s, 4)} for i, s in picks]
+
+    def rack_browse(self, query: str = "", family: str = "any", limit: int = 300) -> list[dict]:
+        """Library samples for the browser: a family's classes and/or a name search."""
+        classes = rack_layouts.family_classes(family)
+        q = (query or "").lower().strip()
+        sel = [it for it in self._lib.items
+               if (not classes or it["cls"] in classes) and (not q or q in it["rel"].lower())]
+        return [self._library_ref_of(it) for it in self._ranked(sel, classes)[: int(limit)]]
+
+    def rack_fill(self, seed_id: int, count: int, mode: str = "nearest", opts: dict | None = None) -> list[dict]:
+        """The seed followed by `count` - 1 companions (most similar first)."""
+        opts = opts or {}
+        seed = int(seed_id)
+        if not 0 <= seed < len(self._lib.items):
+            return []
+        a = self._rack_arrays()
+        picks = rack_select.pick(a["Xn"], seed, int(count) - 1, mode, self._rack_mask(seed, opts),
+                                 float(opts.get("variation", 0.3)), set(map(int, opts.get("exclude") or [])),
+                                 opts.get("rng_seed"))
+        return self._rack_refs([(seed, 1.0)] + picks)
+
+    def rack_trail_fill(self, ids: list, count: int, opts: dict | None = None) -> list[dict]:
+        opts = opts or {}
+        n = len(self._lib.items)
+        ids = [int(i) for i in ids or [] if 0 <= int(i) < n]
+        if not ids:
+            return []
+        a = self._rack_arrays()
+        picks = rack_select.trail(a["Xn"], ids, int(count), self._rack_mask(ids[-1], opts),
+                                  set(map(int, opts.get("exclude") or [])))
+        return self._rack_refs(picks)
+
+    def rack_candidates(self, seed_id: int, k: int = 60, opts: dict | None = None) -> list[dict]:
+        """Neighbours of the seed for manual picking."""
+        seed = int(seed_id)
+        if not 0 <= seed < len(self._lib.items):
+            return []
+        opts = opts or {}
+        a = self._rack_arrays()
+        return self._rack_refs(rack_select.neighbours(a["Xn"], seed, int(k), self._rack_mask(seed, opts)))
+
+    def rack_autofill(self, rack: dict, only_empty: bool = True, variation: float = 0.3) -> dict:
+        """Fill every (empty) group: seed = best one-shot of its family not used yet, trying a different
+        sub-cluster for groups that share a family, then its nearest companions with a little variation."""
+        rack = rack_layouts.validate(rack)
+        items = self._lib.items
+        if not items:
+            return rack
+        a = self._rack_arrays()
+        used = {r["id"] for r in rack["pads"] if r and r.get("kind") == "library"}
+        used_subs: dict[str, set] = {}
+        settings = rack_layouts.group_settings(rack)
+        for g, pads in enumerate(rack_layouts.groups(rack["geometry"])):
+            if settings[g]["lock"] or (only_empty and any(rack["pads"][p] for p in pads)):
+                continue
+            fam = settings[g]["family"]
+            classes = rack_layouts.family_classes(fam)
+            pool = [it for it in items if (not classes or it["cls"] in classes) and it["id"] not in used
+                    and it["feats"].get("type") == "One-shot"]
+            if not pool:
+                continue
+            pool = self._ranked(pool, classes)[:300]
+            subs = used_subs.setdefault(fam, set())
+            seed = next((it for it in pool if (it["cls"], it.get("sub")) not in subs), pool[0])
+            subs.add((seed["cls"], seed.get("sub")))
+            opts = {"filter": "family", "family": fam, "oneshot": True}
+            picks = rack_select.pick(a["Xn"], seed["id"], len(pads) - 1, "random", self._rack_mask(None, opts),
+                                     variation, used | {seed["id"]})
+            for p, ref in zip(pads, self._rack_refs([(seed["id"], 1.0)] + picks)):
+                rack["pads"][p] = ref
+                used.add(ref["id"])
+        return rack
+
+    def _random_mask(self, classes: list[str], opts: dict) -> np.ndarray:
+        a = self._rack_arrays()
+        mask = np.isin(a["cls"], classes) if classes else np.ones(len(a["cls"]), bool)
+        if opts.get("oneshot", True):
+            mask &= a["oneshot"]
+        folder = (opts.get("folder") or "").lower().strip()
+        if folder:
+            mask &= np.array([folder in it["rel"].lower() for it in self._lib.items], bool)
+        mask[[int(i) for i in opts.get("exclude") or [] if 0 <= int(i) < len(mask)]] = False
+        return mask
+
+    def random_refs(self, classes: list[str], count: int, opts: dict | None = None) -> list[dict]:
+        """Random samples of the given classes: a random sample group (class + sub-cluster), a random
+        seed in it and similar companions. opts: oneshot, folder (path substring), exclude, variation."""
+        opts = opts or {}
+        if not self._lib.items:
+            return []
+        a = self._rack_arrays()
+        picks = rack_select.random_group(a["Xn"], a["group"], self._random_mask(classes or [], opts), int(count),
+                                         float(opts.get("variation", 0.6)), opts.get("rng_seed"))
+        return self._rack_refs(picks)
+
+    def rack_randomize(self, rack: dict, only_empty: bool = False, opts: dict | None = None) -> dict:
+        """Every unlocked (or every empty) group: random samples from a random group of its family."""
+        opts = dict(opts or {})
+        rack = rack_layouts.validate(rack)
+        settings = rack_layouts.group_settings(rack)
+        groups = rack_layouts.groups(rack["geometry"])
+        used = {r["id"] for g, pads in enumerate(groups) if settings[g]["lock"] or only_empty
+                for p in pads if (r := rack["pads"][p]) and r.get("kind") == "library"}
+        for g, pads in enumerate(groups):
+            if settings[g]["lock"] or (only_empty and any(rack["pads"][p] for p in pads)):
+                continue
+            refs = self.random_refs(rack_layouts.family_classes(settings[g]["family"]), len(pads),
+                                    {**opts, "exclude": list(used)})
+            for p, ref in zip(pads, refs + [None] * len(pads)):
+                rack["pads"][p] = ref
+            used |= {r["id"] for r in refs}
+        return rack
+
+    def list_racks(self) -> list[dict]:
+        return rack_store.list_racks()
+
+    def save_rack(self, rack: dict) -> dict:
+        return rack_store.save(rack)
+
+    def delete_rack(self, rid: str) -> bool:
+        return rack_store.delete(rid)
+
+    def export_rack(self, rack: dict) -> dict:
+        import webview
+        os.makedirs(EXPORT_DIR, exist_ok=True)
+        res = self._window.create_file_dialog(webview.FileDialog.FOLDER, directory=EXPORT_DIR)
+        if not res:
+            return {"cancelled": True}
+        root = res[0] if isinstance(res, (list, tuple)) else res
+        try:
+            folder = rack_ableton.export_rack(rack, root, self._resolve, self._describe)
+        except Exception as e:
+            return {"error": f"{type(e).__name__}: {e}"}
+        subprocess.run(["open", folder], check=False)
+        return {"folder": folder}
+
+def _media_data_url(path: str) -> str | None:
+    out = _wav_data_url(path)
+    if out is None:  # a format libsndfile can't read: hand the bytes to the web view
+        mime = mimetypes.guess_type(path)[0] or "audio/mpeg"
+        with open(path, "rb") as f:
+            out = f"data:{mime};base64," + base64.b64encode(f.read()).decode()
+    return out

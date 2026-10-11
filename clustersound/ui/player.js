@@ -10,7 +10,7 @@ export class Player {
     this.startedAt = 0;
     this.offset = 0;
     this.playing = false;
-    this.onState = onState;
+    this.listeners = new Set(onState ? [onState] : []);
     const unlock = () => this._ensure().resume();
     window.addEventListener('pointerdown', unlock, true);
     window.addEventListener('keydown', unlock, true);
@@ -41,7 +41,7 @@ export class Player {
     src.buffer = buffer;
     src.connect(ctx.destination);
     src.onended = () => {
-      if (this.src === src) { this.src = null; this.playing = false; this.onState(false); }
+      if (this.src === src) { this.src = null; this.playing = false; this._emit(false); }
     };
     src.start(0, Math.min(offset, buffer.duration));
     this.src = src;
@@ -49,8 +49,12 @@ export class Player {
     this.offset = offset;
     this.startedAt = ctx.currentTime;
     this.playing = true;
-    this.onState(true);
+    this._emit(true);
   }
+
+  // listeners get (playing, id); several views share one player
+  subscribe(fn) { this.listeners.add(fn); }
+  _emit(playing) { for (const fn of this.listeners) fn(playing, this.id); }
 
   stop(notify = true) {
     if (this.src) {
@@ -60,7 +64,7 @@ export class Player {
     }
     if (this.playing) {
       this.playing = false;
-      if (notify) this.onState(false);
+      if (notify) this._emit(false);
     }
   }
 

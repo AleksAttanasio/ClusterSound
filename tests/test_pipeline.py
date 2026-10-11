@@ -174,6 +174,10 @@ def test_end_to_end(library):
     assert lib.xyz.shape == (len(truth), 3)
     assert all("sub" in it for it in lib.items)
 
+    sim = lib.similar(0, 8)
+    assert len(sim) == 8 and all(s["id"] != 0 for s in sim)
+    assert [s["sim"] for s in sim] == sorted((s["sim"] for s in sim), reverse=True)
+
     # second scan comes from the cache, user labels win and survive
     target = lib.items[0]
     lib.relabel(target["id"], "crash")

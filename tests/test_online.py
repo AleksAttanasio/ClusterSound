@@ -1,0 +1,224 @@
+import json
+import os
+from pathlib import Path
+
+import pytest
+
+from clustersound.online import archive, ccmixter, downloads, freesound, openverse
+from clustersound.online import instruments as inst
+from clustersound.online import search as S
+from clustersound.online.base import OnlineResult, SourceError, normalize_license
+
+FIX = Path(__file__).parent / "fixtures" / "online"
+
+
+def load(name):
+    return json.loads((FIX / name).read_text())
+
+
+# ---------------------------------------------------------------- licences
+@pytest.mark.parametrize("text,expected", [
+    ("http://creativecommons.org/publicdomain/zero/1.0/", "cc0"),
+    ("Creative Commons 0", "cc0"),
+    ("https://creativecommons.org/publicdomain/mark/1.0/", "pd"),
+    ("https://creativecommons.org/licenses/by/4.0/", "by"),
+    ("Attribution", "by"),
+    ("Attribution NonCommercial", "by-nc"),
+    ("Attribution Noncommercial (4.0)", "by-nc"),
+    ("https://creativecommons.org/licenses/by-nc-sa/3.0/", "by-nc-sa"),
+    ("https://creativecommons.org/licenses/by-nd/4.0/", "by-nd"),
+    ("http://creativecommons.org/licenses/sampling+/1.0/", "sampling+"),
+    (None, "unknown"),
+    ("all rights reserved", "unknown"),
+])
+def test_normalize_license(text, expected):
+    assert normalize_license(text) == expected
+
+
+def test_commercial_flag():
+    r = OnlineResult(uid="x", source="s", source_label="S", title="t")
+    for lic, ok in [("cc0", True), ("by", True), ("by-sa", True), ("by-nc", False), ("by-nd", False),
+                    ("unknown", False)]:
+        r.license = lic
+        assert r.commercial_ok is ok, lic
+
+
+# ---------------------------------------------------------------- instruments
+def test_instrument_terms_per_source():
+    fs = freesound.build_params({"instruments": ["closed_hat"]}, 1)["filter"]
+    assert "hihat" in fs and "hi-hat" in fs and "closed" in fs
+    assert "snare" not in " ".join(inst.query_terms(["sub808"]))
+    ov = openverse.build_params({"instruments": ["open_hat"]}, 1, "open_hat")["q"]
+    assert ov == "open hihat"
+    ia = archive.build_params({"instruments": ["kick"]}, 1)["q"]
+    assert '"bass drum"' in ia and "licenseurl:*" in ia and "midi" in ia
+    cc = ccmixter.build_params({"instruments": ["kick", "snare"]}, 2)
+    assert cc["type"] == "any" and "kick" in cc["tags"] and "snare" in cc["tags"] and cc["offset"] == 30
+
+
+@pytest.mark.parametrize("title,tags,path,expected", [
+    ("soccer kick 02.wav", ["ball", "football", "kick", "soccer"], "", None),
+    ("808 Snare", [], "", "snare"),
+    ("hihat closed.aif", [], "", "closed_hat"),
+    ("open hihat 2", [], "", "open_hat"),
+    ("Ganon Kick Bass Drum", ["drum"], "", "kick"),
+    ("BrRidC.wav", [], "DR660 Samples/Cymbal/BrRidC.wav", "cymbal_other"),
+    ("K1.wav", [], "Pack/Kicks/K1.wav", "kick"),
+    ("Some sound", ["hi-hat", "drum"], "", "closed_hat"),
+])
+def test_infer_instrument(title, tags, path, expected):
+    assert inst.infer(title, tags, path) == expected
+
+
+def test_name_metadata():
+    assert inst.bpm_from_text("Drum Loop 128bpm") == 128
+    assert inst.bpm_from_text("BPM 90 groove") == 90
+    assert inst.bpm_from_text("Kick 01") is None
+    assert inst.key_from_text("Bass_C#min.wav") == "C# minor"
+    assert inst.key_from_text("Pad Am 120") == "A minor"
+    assert inst.key_from_text("A Snare hit") is None
+    assert inst.infer_type(0.4, "Kick") == "One-shot"
+    assert inst.infer_type(8.0, "Drum loop") == "Loop"
+    assert inst.infer_type(20.0, "Rain texture") == "Long/Texture"
+
+
+# ---------------------------------------------------------------- parsers
+def test_parse_freesound():
+    # shape follows the documented APIv2 search response (no key available to record a real one)
+    rs = freesound.parse(load("freesound_kick.json"))
+    assert [r.license for r in rs] == ["cc0", "by-nc"]
+    assert rs[0].type == "One-shot" and rs[1].type == "Loop"
+    assert rs[1].bpm == 128 and rs[1].key == "A minor"
+    assert rs[0].preview_url.endswith("-hq.mp3") and rs[0].waveform_img
+    assert rs[0].page_url.startswith("https://freesound.org/")
+
+
+def test_freesound_needs_key():
+    with pytest.raises(SourceError, match="API key"):
+        freesound.search({}, 1, {})
+
+
+def test_freesound_filters():
+    f = freesound.build_params({"commercial": True, "dur_max": 2, "bpm_min": 120, "key": "C minor",
+                                "types": ["One-shot"], "lossless": True, "sort": "downloads"}, 1)
+    assert '"Creative Commons 0"' in f["filter"] and "NonCommercial" not in f["filter"]
+    assert "duration:[* TO 2]" in f["filter"] and "bpm:[120 TO *]" in f["filter"]
+    assert 'tonality:"C minor"' in f["filter"] and "single_event:true" in f["filter"]
+    assert "type:(wav OR aiff OR flac)" in f["filter"] and f["sort"] == "downloads_desc"
+
+
+def test_parse_openverse():
+    rs = openverse.parse(load("openverse_snare.json"))
+    assert rs and all(r.uid.startswith("openverse:") for r in rs)
+    assert all(r.duration is None or r.duration < 600 for r in rs)  # ms converted to s
+    assert rs[0].source_label.startswith("Openverse · ")
+    assert all(r.license != "unknown" for r in rs)
+
+
+def test_parse_ccmixter():
+    rs = ccmixter.parse(load("ccmixter_drums.json"))
+    assert rs and rs[0].page_url.startswith("https://ccmixter.org/")
+    assert all("mp3" not in r.tags and "44k" not in r.tags for r in rs)
+    assert any(r.bpm for r in rs)
+    assert all(r.preview_url is None or r.preview_url.endswith(".mp3") for r in rs)
+
+
+def test_parse_archive_and_suspects():
+    rs = archive.parse(load("archive_search.json"))
+    assert rs and all(r.is_pack for r in rs)
+    by_id = {r.extra["identifier"]: r for r in rs}
+    assert by_id["titanium-rhythms-2"].suspect  # Big Fish Audio library
+    assert by_id["sony-pictures-sound-effects-library-volume-1-10"].suspect
+    assert not by_id["DR660Samples"].suspect
+    assert by_id["DR660Samples"].license == "by"
+
+
+def test_archive_expand(monkeypatch):
+    meta = load("archive_metadata.json")
+    listing = (FIX / "archive_zip_listing.html").read_text()
+
+    def fake_get(url, params=None, headers=None, as_json=True, ttl=0):
+        return meta if as_json else listing
+
+    monkeypatch.setattr(archive, "http_get", fake_get)
+    parent = archive.parse(load("archive_search.json"))
+    parent = next(r for r in parent if r.extra["identifier"] == "DR660Samples")
+    files, archives = archive.expand(parent)
+    assert archives and archives[0]["name"].endswith(".zip") and archives[0]["browsable"]
+    assert len(files) == 25 and all(f.preview_url.startswith("https://archive.org/download/") for f in files)
+    assert all("__MACOSX" not in f.path for f in files)
+    assert files[0].instrument == "cymbal_other"  # from the "Cymbal" folder
+    assert files[0].license == parent.license
+
+
+# ---------------------------------------------------------------- aggregator
+def test_search_isolates_failing_source(monkeypatch):
+    def ok(p, page, settings):
+        return [OnlineResult(uid="ok:1", source="openverse", source_label="Openverse", title="Kick 1.wav",
+                             license="cc0", duration=0.5)], 1, False
+
+    def boom(p, page, settings):
+        raise SourceError("non raggiungibile")
+
+    monkeypatch.setattr(openverse, "search", ok)
+    monkeypatch.setattr(ccmixter, "search", boom)
+    res = S.search({"sources": ["openverse", "ccmixter"], "instruments": ["kick"]}, {})
+    assert res["openverse"]["results"][0]["instrument"] == "kick"
+    assert res["ccmixter"]["error"] == "non raggiungibile" and res["ccmixter"]["results"] == []
+
+
+def test_client_filters():
+    def r(**kw):
+        base = dict(uid="u", source="openverse", source_label="O", title="Kick 120bpm Am.wav",
+                    license="by", duration=1.0, format="wav")
+        return S.enrich(OnlineResult(**{**base, **kw}))
+
+    assert S.passes(r(), {"instruments": ["kick"]})
+    assert not S.passes(r(), {"instruments": ["snare"]})
+    assert not S.passes(r(license="by-nc"), {"commercial": True})
+    assert S.passes(r(license="by-nc"), {"licenses": ["nc"]})
+    assert not S.passes(r(duration=5.0), {"dur_max": 2})
+    assert S.passes(r(), {"bpm_min": 100, "bpm_max": 130})
+    assert not S.passes(r(title="Kick.wav"), {"bpm_min": 100})  # unknown BPM is excluded
+    assert S.passes(r(), {"key": "A minor"})
+    assert not S.passes(r(format="mp3"), {"lossless": True})
+    assert not S.passes(r(suspect=True), {})
+    assert S.passes(r(suspect=True), {"include_suspect": True})
+    assert not S.passes(r(is_pack=True), {"packs": "files"})
+
+
+# ---------------------------------------------------------------- downloads
+def test_download_paths_and_license(tmp_path):
+    r = OnlineResult(uid="u", source="archive", source_label="Internet Archive", title="Kick: 01/hard?",
+                     author="Me", license="by", license_url="https://creativecommons.org/licenses/by/4.0/",
+                     page_url="https://archive.org/details/x", path="Pack/Kicks/Kick 01.wav",
+                     extra={"pack_title": "My Pack"})
+    p1 = downloads.target_path(str(tmp_path), r, "https://archive.org/download/x/Pack%2FKicks%2FKick%2001.wav")
+    assert p1.endswith(os.path.join("Internet Archive", "My Pack", "Me - Kick 01.wav"))
+    os.makedirs(os.path.dirname(p1))
+    Path(p1).write_bytes(b"x")
+    p2 = downloads.target_path(str(tmp_path), r, "https://archive.org/download/x/k.wav")
+    assert p2 != p1 and "(2)" in p2
+    text = downloads.license_text(r, "https://archive.org/download/x/k.wav")
+    assert "CC BY" in text and "Attribuzione richiesta" in text and "Me" in text
+    assert downloads.safe_name('a/b:c*?"d') == "a b c d"
+
+
+def test_download_hosts():
+    assert downloads.host_allowed("https://cdn.freesound.org/previews/1/1-hq.mp3")
+    assert downloads.host_allowed("https://ia800401.us.archive.org/x.zip")
+    assert downloads.host_allowed("https://upload.wikimedia.org/a.ogg")
+    assert not downloads.host_allowed("https://evil.example.com/archive.org/x.zip")
+    assert not downloads.host_allowed("https://archive.org.evil.com/x")
+
+
+# ---------------------------------------------------------------- live (opt-in)
+network = pytest.mark.skipif(not os.environ.get("CLUSTERSOUND_NETWORK_TESTS"),
+                             reason="set CLUSTERSOUND_NETWORK_TESTS=1 to query the real services")
+
+
+@network
+@pytest.mark.parametrize("source", ["openverse", "archive", "ccmixter"])
+def test_live_sources(source):
+    res = S.search_source(source, {"instruments": ["kick"]}, 1, {})
+    assert res["error"] is None and res["fetched"] > 0
