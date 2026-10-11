@@ -83,5 +83,8 @@ def load_file(path: str, origin: str = "file", result: OnlineResult | None = Non
         if n > 0:
             n = min(n, int(max_seconds * sr))
         data = f.read(frames=n, dtype="float32", always_2d=True)
-    title = result.title if result else os.path.splitext(os.path.basename(path))[0]
+    if result:  # files inside a pack are titled by their file name
+        title = os.path.splitext(result.title)[0] if result.path else result.title
+    else:
+        title = os.path.splitext(os.path.basename(path))[0]
     return from_array(data, sr, origin=origin, title=title, path=path, result=result, truncated=truncated)
