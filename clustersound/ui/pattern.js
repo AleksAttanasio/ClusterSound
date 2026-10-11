@@ -48,15 +48,17 @@ export class PatternEditor {
     } else {
       await this.loadVariant('dnb_rollers', 0, false);
     }
+    this.noAutofill = !!this.p._noAutofill; // the user emptied the buses: don't refill them by itself
     delete this.p._source;
-    await this.autofill();
+    delete this.p._noAutofill;
+    await (this.noAutofill ? this.seq.preload(this.p) : this.autofill());
     this.renderAll();
   }
 
   async show() {
     await this.ensure();
     // the library may have been scanned after the pattern was first opened
-    if (!Object.values(this.p.buses).some((b) => b.layers.length)) await this.autofill();
+    if (!this.noAutofill && !Object.values(this.p.buses).some((b) => b.layers.length)) await this.autofill();
     this.renderAll();
   }
 
@@ -65,7 +67,8 @@ export class PatternEditor {
   // ---------------------------------------------------------------- pattern state
   _persist(fromArranger = false) {
     if (this.playMode !== 'sequence') this.seq.setPattern(this.p);
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ ...this.p, _source: this.source })); } catch (e) { /* private mode */ }
+    if (Object.values(this.p.buses).some((b) => b.layers.length)) this.noAutofill = false;
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ ...this.p, _source: this.source, _noAutofill: this.noAutofill })); } catch (e) { /* private mode */ }
     const refs = [];
     for (const b of Object.values(this.p.buses)) for (const l of b.layers) if (l.ref?.kind === 'online') refs.push(l.ref);
     this.api.protect_samples(refs);
@@ -230,6 +233,20 @@ export class PatternEditor {
     toast(done ? `Kit casuale: ${done} bus${locked ? ` · ${locked} bloccati` : ''}` : 'Nessun sample adatto (controlla il filtro cartella)');
   }
 
+  clearSamples() {
+    if (!confirm('Rimuovere tutti i sample da tutti i bus (anche quelli bloccati 🔒)? Il groove resta.')) return;
+    this.stop();
+    for (const [id, b] of Object.entries(this.p.buses)) {
+      b.layers = [];
+      if (id !== 'bass') b.alt = { mode: 'off', seed: 0 };
+    }
+    this.selected = {};
+    this.noAutofill = true;
+    this._persist();
+    this.renderGrid();
+    toast('Sample rimossi da tutti i bus');
+  }
+
   layerCounts() {
     const out = {};
     if (this.p) for (const [id, b] of Object.entries(this.p.buses)) out[id] = b.layers.length;
@@ -288,16 +305,20 @@ export class PatternEditor {
       .map((x) => `<option value="${x.id}">${esc(x.name)} · ${x.bpm}</option>`).join('')}</optgroup>`).join('');
     const keys = this.meta.note_names.map((n) => `<option>${n}</option>`).join('');
     this.root.innerHTML = `
+      <div id="sq-panel" class="sq"></div>
       <div class="pt-bar">
+        <span class="pt-row-label">Genere</span>
         <select id="pt-genre" class="cls-select pt-genre" title="Genere">${groups}</select>
+      </div>
+      <div class="pt-bar">
+        <span class="pt-row-label">Pattern</span>
         <div id="pt-variants" class="chips pt-variants"></div>
         <div class="spacer"></div>
-        <button id="pt-random" class="btn" title="Sceglie a caso un gruppo di sample simili per ogni bus non bloccato (🔒) e ne prende sample a caso">🎲 Kit casuale</button>
-        <button id="pt-fromrack" class="btn" title="Carica i sample del Drum Rack nei bus del Sequencer">▦ Carica dal Drum Rack</button>
         <button id="pt-vary" class="btn" title="Genera una variazione del pattern corrente">Varia</button>
         <button id="pt-save" class="btn" title="Salva come variante personale del genere">Salva variante</button>
         <button id="pt-del" class="btn" hidden title="Elimina questa variante personale">Elimina</button>
       </div>
+      <div class="pt-seqblock">
       <div class="pt-bar pt-transport">
         <button id="pt-play" class="btn primary pt-play">▶ Play</button>
         <label>BPM <input id="pt-bpm" type="number" min="40" max="250" step="1"></label>
@@ -310,11 +331,18 @@ export class PatternEditor {
         <button id="pt-wav" class="btn">Esporta WAV</button>
         <button id="pt-abl" class="btn primary" title="Cartella con Drum Rack .adg, sample, MIDI e loop pronta per Ableton Live">Esporta per Ableton</button>
       </div>
+      <div class="pt-bar pt-tools">
+        <button id="pt-random" class="btn" title="Sceglie a caso un gruppo di sample simili per ogni bus non bloccato (🔒) e ne prende sample a caso">🎲 Kit casuale</button>
+        <button id="pt-fromrack" class="btn" title="Carica i sample del Drum Rack nei bus del Sequencer">▦ Carica dal Drum Rack</button>
+        <button id="pt-expand" class="btn" title="Mostra o nasconde i sample (layer) di tutti i bus"></button>
+        <div class="spacer"></div>
+        <button id="pt-clear" class="btn danger" title="Rimuove tutti i sample da tutti i bus (il groove resta)">🗑 Svuota sample</button>
+      </div>
       <div class="pt-help hint">Clic: step on/off · Shift+clic: accento · Alt+clic: ghost · Tasto destro: roll ×2/×3/×4 · Spazio: play/stop.
         Invia sample ai bus dalla Libreria (tasto destro su un punto 3D o una riga), dalla scheda Online o dal Drum Rack.</div>
-      <div id="sq-panel" class="sq"></div>
       <div id="pt-empty" class="pt-empty hint" hidden></div>
-      <div id="pt-grid" class="pt-grid"></div>`;
+      <div id="pt-grid" class="pt-grid"></div>
+      </div>`;
     this._bindShell();
     this.arr = new Arranger(this);
     this.arr.mount($('#sq-panel'));
@@ -337,6 +365,13 @@ export class PatternEditor {
     $('#pt-vary').onclick = () => this.vary();
     $('#pt-random').onclick = (e) => this.openRandomKit(e.currentTarget);
     $('#pt-fromrack').onclick = () => this.onLoadFromRack?.();
+    $('#pt-expand').onclick = () => {
+      const ids = this.buses.map((b) => b.id).filter((id) => this.p.buses[id].layers.length);
+      if (ids.some((id) => !this.expanded.has(id))) ids.forEach((id) => this.expanded.add(id));
+      else this.expanded.clear();
+      this.renderGrid();
+    };
+    $('#pt-clear').onclick = () => this.clearSamples();
     $('#pt-save').onclick = () => this.saveVariant();
     $('#pt-del').onclick = () => this.deleteVariant();
     $('#pt-midi').onclick = async () => { const p = await this.api.export_midi(this._exportable(), $('#pt-map').value); if (p) toast(`MIDI salvato: ${p.split('/').pop()}`); };
@@ -549,6 +584,11 @@ export class PatternEditor {
       </div>`);
     }
     $('#pt-grid').innerHTML = rows.join('');
+    const withLayers = this.buses.filter((b) => p.buses[b.id].layers.length);
+    const allOpen = withLayers.length && withLayers.every((b) => this.expanded.has(b.id));
+    $('#pt-expand').textContent = allOpen ? '▸ Chiudi tutti' : '▾ Espandi tutti';
+    $('#pt-expand').disabled = !withLayers.length;
+    $('#pt-clear').disabled = !withLayers.length;
     const anySample = Object.values(p.buses).some((b) => b.layers.length);
     const empty = $('#pt-empty');
     empty.hidden = anySample;

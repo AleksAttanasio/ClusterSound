@@ -451,3 +451,11 @@ select.cls-select { width: 100%; background: var(--bg); color: var(--text); bord
 .rk-cand b { color: var(--text-2); font-weight: 600; font-size: 11px; }
 .rk-actions { display: flex; gap: 8px; }
 .rk-actions .btn.primary { flex: 1; }
+
+/* sequencer tab: section labels, sample toolbar, danger button */
+.pt-row-label { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--text-3); min-width: 62px; }
+.pt-seqblock { margin-top: 4px; }
+.pt-tools { margin-top: 8px; }
+.btn.danger { background: #a8322a; border-color: #a8322a; color: #fff; }
+.btn.danger:hover:not(:disabled) { background: #c0392b; border-color: #c0392b; }
+.pt-bar .pt-genre { width: 320px; flex: none; }
