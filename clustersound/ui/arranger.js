@@ -307,7 +307,8 @@ export class Arranger {
     const name = prompt('Nome della sequenza', this.seq.name || 'Sequenza');
     if (!name) return;
     this.seq.name = name;
-    const saved = await this.api.save_sequence(this.seq);
+    // the kit (samples, layers, mix) goes with the saved copy, so the Max for Live device can import it as heard
+    const saved = await this.api.save_sequence({ ...this.seq, kit: clone(this.ed.p) });
     this.seq.id = saved.id;
     this._save();
     this.render();
@@ -322,6 +323,7 @@ export class Arranger {
     if (this.seq.blocks.length && !confirm('Sostituire la sequenza attuale?')) return;
     this.backToFree();
     this.seq = clone(s);
+    delete this.seq.kit;  // the editor keeps its own kit; the saved one is for Live
     this._changed();
   }
 
