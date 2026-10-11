@@ -110,6 +110,27 @@ La terza scheda (**Libreria | Online | Pattern**) è un sequencer per provare i 
 
   Verificato con Ableton Live 10.1: i preset si aprono con i sample al loro posto.
 
+## Scheda Drum Rack: kit a 64 pad per Launchpad Pro
+
+La quarta scheda costruisce un Drum Rack 8×8 pensato per un controller come il Novation Launchpad Pro MK3.
+
+- **Mappatura delle note**: *Launchpad / Live* (default), cioè 4 quadranti 4×4 con 36–51 in basso a sinistra, 52–67 in basso a destra, 68–83 in alto a sinistra e 84–99 in alto a destra; oppure *righe sequenziali* (36 + riga×8 + colonna), per le Custom Mode.
+- **Geometrie**: ognuna divide i 64 pad in gruppi di sample simili; i pad restano al loro posto quando cambi geometria.
+  - *Colonne ×8*: 8 colonne da 8 (es. tutti gli hat su una colonna);
+  - *Blocchi 2×2*: 16 gruppi da 4;
+  - *Blocchi 4×4*: 4 quadranti da 16;
+  - *4×4 a colonne*: ogni quadrante è una famiglia e ogni colonna un gruppo di 4 (gruppi diversi della stessa classe prendono sotto-cluster diversi);
+  - *Libero*: un pad alla volta.
+- **Seed**: è l'ultimo sample cliccato, nel browser a sinistra, su un pad o con "Drum Rack" nel menu *Invia* della Libreria e della scheda Online. **Riempi gruppo** mette il seed sul pad selezionato e i sample simili sugli altri pad del gruppo.
+- **Modalità**:
+  - *Più simili*;
+  - *Casuale*: pesca per somiglianza con uno slider di variazione; *Rigenera* rifà l'estrazione;
+  - *Manuale*: spunti i simili da una lista ordinata per somiglianza;
+  - *Percorso*: usa le tappe di "Trova simili" (anche dal pulsante ▦ Drum Rack nella barra dei simili) e, se sono poche, le completa con i simili dell'ultima tappa.
+- **Filtri**: stessa classe del seed, famiglia del gruppo o tutta la libreria; solo one-shot; evita i sample già presenti nel kit.
+- **Gruppi**: famiglia (usata da *Auto-riempi* e dal browser) e choke group, attivo di default sugli hat. Trascina i pad per scambiarli e un sample dal browser per metterlo su un pad; il tasto destro apre il menu del pad.
+- **Esporta per Ableton**: una cartella con `Samples/<gruppo>/<nota> - <nome>.wav`, `… Drum Rack.adg` (un pad per tasto, con la nota del Launchpad e i choke group), i `.license.txt` dei sample online e `LEGGIMI.txt` con la mappa 8×8 dei pad.
+
 ## Come classifica
 
 Quattro segnali fusi in log-probabilità (`clustersound/classifier.py`):

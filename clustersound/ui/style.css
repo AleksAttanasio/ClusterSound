@@ -377,3 +377,57 @@ select.cls-select { width: 100%; background: var(--bg); color: var(--text); bord
 .sq-banner { margin-top: 8px; padding: 7px 10px; border-radius: 6px; background: #1b2638; border: 1px solid #34507f; font-size: 12px; display: flex; align-items: center; gap: 10px; }
 .sq-banner[hidden] { display: none; }
 .pt-variants .chip[draggable="true"] { cursor: grab; }
+
+/* ---------- drum rack (64 pads) ---------- */
+.send-row.send-rack { grid-template-columns: 12px auto 1fr auto; border-top: 1px solid var(--line); margin-top: 4px; padding-top: 7px; border-radius: 0 0 5px 5px; }
+.send-rack .send-count { text-align: right; }
+.rk-menu { width: 280px; }
+.rk-menu .send-row { display: block; cursor: pointer; }
+.rack-layout .rk-browser { gap: 8px; }
+.rk-select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; color: var(--text); padding: 5px 6px; font: inherit; max-width: 100%; }
+.rk-browser .links label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-2); }
+.rk-blist { flex: 1; min-height: 120px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.rk-brow { display: flex; align-items: center; gap: 7px; padding: 4px 8px; cursor: pointer; border-bottom: 1px solid #1a1e27; -webkit-user-select: none; user-select: none; }
+.rk-brow:hover { background: var(--bg-3); }
+.rk-brow.seed { background: #1e2a40; }
+.rk-bname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-bmeta { color: var(--text-3); font-size: 11px; white-space: nowrap; }
+.rk-trail-box { flex: none; }
+.rk-trail { display: flex; flex-wrap: wrap; gap: 4px; max-height: 110px; overflow-y: auto; }
+.rk-trail button { background: var(--bg-3); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; font-size: 11px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 10px 14px; gap: 10px; }
+.rk-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rk-name { width: 170px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; color: var(--text); padding: 6px 8px; font: inherit; font-weight: 600; }
+.rk-stage { flex: 1; min-height: 0; display: flex; gap: 14px; align-items: flex-start; }
+.rk-grid { --g: 5px; display: grid; grid-template-columns: repeat(4, 1fr) 6px repeat(4, 1fr); grid-template-rows: repeat(4, 1fr) 6px repeat(4, 1fr);
+  gap: var(--g); aspect-ratio: 1; height: min(100%, calc(100vw - 270px - 28px - 330px)); max-height: 100%; flex: none; padding: 8px; background: #0b0d11; border: 1px solid var(--line); border-radius: 12px; }
+.rk-pad { position: relative; border-radius: 6px; background: #1a1e27; border: 1px solid #252a35; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 4px 5px; min-width: 0; -webkit-user-select: none; user-select: none; }
+.rk-pad:hover { border-color: #3a4152; }
+.rk-pad.full { background: color-mix(in srgb, var(--pc) 28%, #161a22); border-color: color-mix(in srgb, var(--pc) 55%, #252a35); }
+.rk-pad.sel { outline: 2px solid #fff; outline-offset: 1px; z-index: 3; }
+.rk-pad.drop { outline: 2px dashed var(--accent); outline-offset: 1px; }
+.rk-note { position: absolute; top: 3px; left: 5px; font: 10px var(--mono); color: var(--text-3); }
+.rk-pad.full .rk-note { color: color-mix(in srgb, var(--pc) 60%, #fff); }
+.rk-badge { position: absolute; top: 3px; right: 4px; font-size: 8px; font-weight: 700; color: var(--accent); }
+.rk-pname { font-size: 10px; line-height: 1.15; max-height: 2.3em; overflow: hidden; word-break: break-all; color: var(--text); }
+.rk-frame { pointer-events: none; border: 1.5px solid color-mix(in srgb, var(--gc) 45%, transparent); border-radius: 8px; margin: -3px; z-index: 2; position: relative; }
+.rk-frame.sel { border: 2px solid var(--gc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gc) 25%, transparent); }
+.rk-frame span { position: absolute; top: -8px; left: 6px; font-size: 9px; padding: 0 4px; background: #0b0d11; color: var(--gc); border-radius: 3px; white-space: nowrap; opacity: .85; }
+.rk-frame:not(.sel) span { display: none; }
+.rk-insp { width: 316px; flex: none; max-height: 100%; overflow-y: auto; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 9px; }
+.rk-ihead { display: flex; align-items: center; gap: 8px; }
+.rk-ihead .hint { margin-left: auto; }
+.rk-field { display: flex; flex-direction: column; gap: 4px; color: var(--text-2); font-size: 12px; }
+.rk-field input[type=range] { width: 100%; }
+.rk-check { display: flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 12px; cursor: pointer; }
+.rk-sep { border-top: 1px solid var(--line); }
+.rk-seed { display: flex; align-items: center; gap: 7px; min-height: 26px; }
+.rk-seed-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.rk-modes .seg-btn { flex: 1; padding: 6px 4px; font-size: 12px; }
+.rk-cands { max-height: 260px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.rk-cand { display: flex; align-items: center; gap: 6px; padding: 3px 6px; font-size: 12px; cursor: pointer; }
+.rk-cand:hover { background: var(--bg-3); }
+.rk-cname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-cand b { color: var(--text-2); font-weight: 600; font-size: 11px; }
+.rk-actions { display: flex; gap: 8px; }
+.rk-actions .btn.primary { flex: 1; }

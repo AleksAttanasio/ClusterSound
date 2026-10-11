@@ -13,6 +13,7 @@
       <button id="tab-library" class="seg-btn active" role="tab">Libreria</button>
       <button id="tab-online" class="seg-btn" role="tab">Online</button>
       <button id="tab-pattern" class="seg-btn" role="tab">Pattern</button>
+      <button id="tab-rack" class="seg-btn" role="tab">Drum Rack</button>
     </div>
     <button id="btn-folder" class="btn primary lib-only">Scegli cartella…</button>
     <div id="folder-path" class="folder-path lib-only" title="">Nessuna cartella</div>
@@ -70,6 +71,7 @@
               <input type="range" id="fb-k" min="5" max="60" step="1"><span id="fb-k-val"></span>
             </label>
             <button id="fb-trail" class="btn small" title="Inquadra tutto il percorso">⤢ Percorso</button>
+            <button id="fb-rack" class="btn small" title="Carica il percorso sul gruppo selezionato del Drum Rack">▦ Drum Rack</button>
             <button id="fb-exit" class="btn small" title="Torna alla mappa (Esc)">✕ Esci</button>
           </div>
           <div id="fb-crumbs" class="fb-crumbs" hidden></div>
@@ -115,6 +117,8 @@
   </div>
 
   <div class="pattern-layout" id="pattern" hidden></div>
+
+  <div class="layout rack-layout" id="rack" hidden></div>
 
   <div id="settings" class="modal" hidden>
     <div class="modal-box">

@@ -154,7 +154,7 @@ def write_adg(doc: ET.Element, path: str) -> None:
 
 
 # ------------------------------------------------------------------ package
-def _write_sample(src: str, dest: str) -> dict:
+def write_sample(src: str, dest: str) -> dict:
     """Copy as 24-bit WAV (Live 10 reads every file the same way; frames needed by Simpler)."""
     x, sr = sf.read(src, dtype="float32", always_2d=True)
     if x.shape[1] > 2:
@@ -186,7 +186,7 @@ def export_package(p: dict, dest_root: str, resolve, describe, title: str) -> st
         os.makedirs(sub, exist_ok=True)
         base = os.path.splitext(layer.get("name") or os.path.basename(src))[0]
         dest = unique_path(os.path.join(sub, safe_name(f"{idx:02d} {bus_label} - {base}") + ".wav"))
-        info = _write_sample(src, dest)
+        info = write_sample(src, dest)
         meta = describe(layer["ref"])
         if meta is not None:
             with open(dest + ".license.txt", "w", encoding="utf-8") as f:

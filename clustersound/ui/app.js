@@ -3,6 +3,7 @@ import { Panel } from './panel.js';
 import { Player } from './player.js';
 import { Online } from './online.js';
 import { PatternEditor } from './pattern.js';
+import { DrumRackEditor } from './drumrack.js';
 import { showSendMenu } from './sendmenu.js';
 
 const $ = (s) => document.querySelector(s);
@@ -16,11 +17,12 @@ const state = {
   mask: null, selected: -1, scanning: false,
   view: '3d', sort: { key: 'cls', dir: 1 }, rows: [], tab: 'library',
   focus: null, // {center, items: [{id, sim}], trail: [id…]} while the similar-samples view is open
+  lastTrail: [], // trail of the last similar-samples view (kept after closing it, for the Drum Rack)
   simK: (() => { try { return Math.min(60, Math.max(5, +localStorage.getItem('cs.simK') || 12)); } catch { return 12; } })(),
 };
 
 const player = new Player({ onState: onPlayState });
-window.__cs = { state, player, get pattern() { return pattern; }, get scene() { return scene; } }; // handy from the web inspector (--debug)
+window.__cs = { state, player, get pattern() { return pattern; }, get rack() { return rack; }, get scene() { return scene; } }; // handy from the web inspector (--debug)
 
 // ------------------------------------------------------------------ boot
 function whenApiReady() {
@@ -30,7 +32,7 @@ function whenApiReady() {
   });
 }
 
-let scene, panel, online, pattern;
+let scene, panel, online, pattern, rack;
 
 async function main() {
   state.api = await whenApiReady();
@@ -56,6 +58,7 @@ async function main() {
 
   online = new Online({ api: state.api, player, classes: state.classes, groups: state.groups, types: state.types });
   pattern = new PatternEditor({ api: state.api, player, classes: state.classes });
+  rack = new DrumRackEditor({ api: state.api, player, classes: state.classes, getTrail });
   online.onSend = (ref, x, y) => sendRef(ref, x, y);
   buildSidebar();
   bindUi();
@@ -179,7 +182,7 @@ async function loadResults() {
   const d = await state.api.results();
   state.version = d.version;
   if (!d.cls.length) return;
-  if (state.focus && d.cls.length !== state.data?.cls.length) exitFocus(false);
+  if (d.cls.length !== state.data?.cls.length) { exitFocus(false); state.lastTrail = []; }
   state.data = d;
   $('#empty').hidden = true;
   $('#btn-export').disabled = false;
@@ -308,6 +311,7 @@ async function loadFocus(center, trail) {
   if (tok !== focusTok) return; // a newer request (slider, re-centre) won
   const entering = !state.focus;
   state.focus = { center, items, trail };
+  state.lastTrail = trail;
   renderFocusBar();
   syncInset();
   scene.setFocus(center, items, trail);
@@ -545,11 +549,13 @@ function setView(v) {
   if (v === 'list') { renderHead(); renderList(true); } else scene.resize();
 }
 
-// ------------------------------------------------------------------ send to pattern buses
+const getTrail = () => (state.data ? state.lastTrail.map((id) => ({ id, name: state.data.name[id] })) : []);
+
+// ------------------------------------------------------------------ send to pattern buses / drum rack
 async function sendRef(ref, x, y) {
   await pattern.ensure();
   showSendMenu({ x, y, ref, buses: pattern.buses, counts: pattern.layerCounts(),
-    onPick: (bus, mode) => pattern.addSample(bus, ref, mode) });
+    onPick: (bus, mode) => pattern.addSample(bus, ref, mode), onRack: () => rack.sendSeed(ref) });
 }
 
 async function sendLibraryItem(id, x, y) {
@@ -561,21 +567,26 @@ function setTab(tab) {
   state.tab = tab;
   player.stop();
   if (tab !== 'pattern' && pattern) pattern.hide();
+  if (tab !== 'rack' && rack) rack.hide();
   $('#tab-library').classList.toggle('active', tab === 'library');
   $('#tab-online').classList.toggle('active', tab === 'online');
   $('#tab-pattern').classList.toggle('active', tab === 'pattern');
+  $('#tab-rack').classList.toggle('active', tab === 'rack');
   $('#library').hidden = tab !== 'library';
   $('#online').hidden = tab !== 'online';
   $('#pattern').hidden = tab !== 'pattern';
+  $('#rack').hidden = tab !== 'rack';
   document.querySelectorAll('.lib-only').forEach((el) => el.classList.toggle('tab-hidden', tab !== 'library'));
   document.querySelectorAll('.online-only').forEach((el) => { el.hidden = tab !== 'online'; });
-  if (tab === 'online') { online.show(); $('#online-q').focus(); } else if (tab === 'pattern') pattern.show(); else scene.resize();
+  if (tab === 'online') { online.show(); $('#online-q').focus(); } else if (tab === 'pattern') pattern.show();
+  else if (tab === 'rack') rack.show(); else scene.resize();
 }
 
 function bindUi() {
   $('#tab-library').onclick = () => setTab('library');
   $('#tab-online').onclick = () => setTab('online');
   $('#tab-pattern').onclick = () => setTab('pattern');
+  $('#tab-rack').onclick = () => setTab('rack');
   $('#list-body').addEventListener('contextmenu', (e) => {
     const r = e.target.closest('.list-row');
     if (!r) return;
@@ -604,6 +615,7 @@ function bindUi() {
   $('#btn-reset').onclick = () => { exitFocus(false); scene.resetView(); };
   $('#fb-exit').onclick = () => exitFocus();
   $('#fb-trail').onclick = () => scene.frameTrail();
+  $('#fb-rack').onclick = () => rack.sendTrail(getTrail());
   let kTimer = 0;
   $('#fb-k').oninput = (e) => {
     state.simK = +e.target.value;

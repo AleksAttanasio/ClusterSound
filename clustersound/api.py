@@ -27,6 +27,10 @@ from .patterns import model as pat_model
 from .patterns import render as pat_render
 from .patterns import store as pat_store
 from .paths import data_dir
+from .racks import ableton as rack_ableton
+from .racks import layouts as rack_layouts
+from .racks import select as rack_select
+from .racks import store as rack_store
 
 PREVIEW_MAX_SECONDS = 60
 EXPORT_DIR = os.path.expanduser("~/Music/ClusterSound Patterns")
@@ -56,6 +60,8 @@ class Api:
         self._settings_path = data_dir() / "settings.json"
         self._relabel_lock = threading.Lock()
         self._downloader = Downloader()
+        self._protected: dict[str, list[str]] = {}  # owner (pattern, rack) -> cached online files in use
+        self._rack_cache: dict = {}
         threading.Thread(target=online_cache.prune, args=(self._cache_mb(),), daemon=True).start()
 
     # pywebview exposes public attributes too, so keep internals underscored
@@ -303,16 +309,20 @@ class Api:
         strict (auto-fill): never a loop, and drum buses only take one-shots."""
         classes = pat_model.BUS_BY_ID[bus_id][2] if bus_id in pat_model.BUS_BY_ID else []
         q = (query or "").lower().strip()
-        items = self._lib.items
         rank = {c: i for i, c in enumerate(classes)}
-        sel = [it for it in items if (it["cls"] in rank if not q else q in it["rel"].lower())]
+        sel = [it for it in self._lib.items if (it["cls"] in rank if not q else q in it["rel"].lower())]
         if strict:
             ok = {"One-shot"} if bus_id != "bass" else {"One-shot", "Long/Texture"}
             sel = [it for it in sel if it["feats"].get("type") in ok and not classifier.name_scores(it["rel"])[1]]
-        # one-shots first (a "snare roll" loop is a poor default for a snare pad), then confidence
-        sel.sort(key=lambda it: (rank.get(it["cls"], 99), it["feats"].get("type") != "One-shot",
-                                 bool(classifier.name_scores(it["rel"])[1]), -it["conf"]))
-        return [self._library_ref_of(it) for it in sel[: int(limit)]]
+        return [self._library_ref_of(it) for it in self._ranked(sel, classes)[: int(limit)]]
+
+    @staticmethod
+    def _ranked(sel: list[dict], classes: list[str]) -> list[dict]:
+        """Classes in the given order, one-shots first (a "snare roll" loop is a poor default for a
+        snare pad), then confidence."""
+        rank = {c: i for i, c in enumerate(classes)}
+        return sorted(sel, key=lambda it: (rank.get(it["cls"], 99), it["feats"].get("type") != "One-shot",
+                                           bool(classifier.name_scores(it["rel"])[1]), -it["conf"]))
 
     def _library_ref_of(self, it: dict) -> dict:
         f = it["feats"]
@@ -383,9 +393,10 @@ class Api:
             return None
         return round(69 + 12 * np.log2(f0 / 440.0)) if f0 and harm > 0.4 else None
 
-    def protect_samples(self, refs: list) -> None:
-        """Online samples used by the open pattern must survive cache pruning."""
-        online_cache.protect([online_cache.path_for(r["url"]) for r in refs or [] if r and r.get("url")])
+    def protect_samples(self, refs: list, owner: str = "pattern") -> None:
+        """Online samples used by the open pattern / rack must survive cache pruning."""
+        self._protected[owner] = [online_cache.path_for(r["url"]) for r in refs or [] if r and r.get("url")]
+        online_cache.protect([p for paths in self._protected.values() for p in paths])
 
     def sequence_flatten(self, kit: dict, seq: dict) -> dict:
         try:
@@ -450,6 +461,137 @@ class Api:
         subprocess.run(["open", folder], check=False)
         return {"folder": folder}
 
+
+    # ================================================================== 64-pad racks
+    def racks_init(self) -> dict:
+        return {**rack_layouts.ui_layouts(), "saved": rack_store.list_racks()}
+
+    def _rack_arrays(self) -> dict:
+        """Normalised embeddings and per-item class / type arrays, rebuilt when the library changes."""
+        lib = self._lib
+        c = self._rack_cache
+        if c.get("emb") is not lib.emb:
+            c.clear()
+            c["emb"] = lib.emb
+            c["Xn"] = rack_select.l2norm(lib.emb) if len(lib.emb) else lib.emb
+        if c.get("version") != (lib.version, len(lib.items)):
+            c["version"] = (lib.version, len(lib.items))
+            c["cls"] = np.array([it["cls"] for it in lib.items], dtype=object)
+            c["oneshot"] = np.array([it["feats"].get("type") == "One-shot" for it in lib.items], bool)
+        return c
+
+    def _rack_mask(self, seed: int | None, opts: dict) -> np.ndarray | None:
+        """Allowed companions: same class as the seed, the group's family, or anything; optionally one-shots only."""
+        a = self._rack_arrays()
+        mask = np.ones(len(a["cls"]), bool)
+        flt = opts.get("filter", "class")
+        if flt == "class" and seed is not None:
+            mask &= a["cls"] == a["cls"][seed]
+        elif flt == "family":
+            classes = rack_layouts.family_classes(opts.get("family", "any"))
+            if classes:
+                mask &= np.isin(a["cls"], classes)
+        if opts.get("oneshot", True):
+            mask &= a["oneshot"]
+        return mask
+
+    def _rack_refs(self, picks: list[tuple[int, float]]) -> list[dict]:
+        return [self._library_ref_of(self._lib.items[i]) | {"sim": round(s, 4)} for i, s in picks]
+
+    def rack_browse(self, query: str = "", family: str = "any", limit: int = 300) -> list[dict]:
+        """Library samples for the browser: a family's classes and/or a name search."""
+        classes = rack_layouts.family_classes(family)
+        q = (query or "").lower().strip()
+        sel = [it for it in self._lib.items
+               if (not classes or it["cls"] in classes) and (not q or q in it["rel"].lower())]
+        return [self._library_ref_of(it) for it in self._ranked(sel, classes)[: int(limit)]]
+
+    def rack_fill(self, seed_id: int, count: int, mode: str = "nearest", opts: dict | None = None) -> list[dict]:
+        """The seed followed by `count` - 1 companions (most similar first)."""
+        opts = opts or {}
+        seed = int(seed_id)
+        if not 0 <= seed < len(self._lib.items):
+            return []
+        a = self._rack_arrays()
+        picks = rack_select.pick(a["Xn"], seed, int(count) - 1, mode, self._rack_mask(seed, opts),
+                                 float(opts.get("variation", 0.3)), set(map(int, opts.get("exclude") or [])),
+                                 opts.get("rng_seed"))
+        return self._rack_refs([(seed, 1.0)] + picks)
+
+    def rack_trail_fill(self, ids: list, count: int, opts: dict | None = None) -> list[dict]:
+        opts = opts or {}
+        n = len(self._lib.items)
+        ids = [int(i) for i in ids or [] if 0 <= int(i) < n]
+        if not ids:
+            return []
+        a = self._rack_arrays()
+        picks = rack_select.trail(a["Xn"], ids, int(count), self._rack_mask(ids[-1], opts),
+                                  set(map(int, opts.get("exclude") or [])))
+        return self._rack_refs(picks)
+
+    def rack_candidates(self, seed_id: int, k: int = 60, opts: dict | None = None) -> list[dict]:
+        """Neighbours of the seed for manual picking."""
+        seed = int(seed_id)
+        if not 0 <= seed < len(self._lib.items):
+            return []
+        opts = opts or {}
+        a = self._rack_arrays()
+        return self._rack_refs(rack_select.neighbours(a["Xn"], seed, int(k), self._rack_mask(seed, opts)))
+
+    def rack_autofill(self, rack: dict, only_empty: bool = True, variation: float = 0.3) -> dict:
+        """Fill every (empty) group: seed = best one-shot of its family not used yet, trying a different
+        sub-cluster for groups that share a family, then its nearest companions with a little variation."""
+        rack = rack_layouts.validate(rack)
+        items = self._lib.items
+        if not items:
+            return rack
+        a = self._rack_arrays()
+        used = {r["id"] for r in rack["pads"] if r and r.get("kind") == "library"}
+        used_subs: dict[str, set] = {}
+        settings = rack_layouts.group_settings(rack)
+        for g, pads in enumerate(rack_layouts.groups(rack["geometry"])):
+            if only_empty and any(rack["pads"][p] for p in pads):
+                continue
+            fam = settings[g]["family"]
+            classes = rack_layouts.family_classes(fam)
+            pool = [it for it in items if (not classes or it["cls"] in classes) and it["id"] not in used
+                    and it["feats"].get("type") == "One-shot"]
+            if not pool:
+                continue
+            pool = self._ranked(pool, classes)[:300]
+            subs = used_subs.setdefault(fam, set())
+            seed = next((it for it in pool if (it["cls"], it.get("sub")) not in subs), pool[0])
+            subs.add((seed["cls"], seed.get("sub")))
+            opts = {"filter": "family", "family": fam, "oneshot": True}
+            picks = rack_select.pick(a["Xn"], seed["id"], len(pads) - 1, "random", self._rack_mask(None, opts),
+                                     variation, used | {seed["id"]})
+            for p, ref in zip(pads, self._rack_refs([(seed["id"], 1.0)] + picks)):
+                rack["pads"][p] = ref
+                used.add(ref["id"])
+        return rack
+
+    def list_racks(self) -> list[dict]:
+        return rack_store.list_racks()
+
+    def save_rack(self, rack: dict) -> dict:
+        return rack_store.save(rack)
+
+    def delete_rack(self, rid: str) -> bool:
+        return rack_store.delete(rid)
+
+    def export_rack(self, rack: dict) -> dict:
+        import webview
+        os.makedirs(EXPORT_DIR, exist_ok=True)
+        res = self._window.create_file_dialog(webview.FileDialog.FOLDER, directory=EXPORT_DIR)
+        if not res:
+            return {"cancelled": True}
+        root = res[0] if isinstance(res, (list, tuple)) else res
+        try:
+            folder = rack_ableton.export_rack(rack, root, self._resolve, self._describe)
+        except Exception as e:
+            return {"error": f"{type(e).__name__}: {e}"}
+        subprocess.run(["open", folder], check=False)
+        return {"folder": folder}
 
 def _media_data_url(path: str) -> str | None:
     out = _wav_data_url(path)

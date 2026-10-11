@@ -22,7 +22,7 @@ function onOutside(e) {
 }
 
 // buses: ui buses (id, label, color, melodic); counts: bus id -> number of layers (for the hint)
-export function showSendMenu({ x, y, ref, buses, counts = {}, onPick }) {
+export function showSendMenu({ x, y, ref, buses, counts = {}, onPick, onRack }) {
   closeSendMenu();
   const sug = suggestBus(buses, ref.cls);
   const ordered = sug ? [buses.find((b) => b.id === sug), ...buses.filter((b) => b.id !== sug)] : buses;
@@ -34,7 +34,10 @@ export function showSendMenu({ x, y, ref, buses, counts = {}, onPick }) {
       <span class="send-count">${counts[b.id] ? counts[b.id] + ' layer' : 'vuoto'}</span>
       <button class="btn small" data-mode="add" title="Aggiungi come nuovo layer del bus">+ layer</button>
       <button class="btn small" data-mode="replace" title="Sostituisci il layer selezionato (o il primo)" ${counts[b.id] ? '' : 'disabled'}>sostituisci</button>
-    </div>`).join('')}`;
+    </div>`).join('')}
+    ${onRack ? `<div class="send-row send-rack" data-rack="1"><span class="dot" style="background:var(--accent)"></span>
+      <span class="send-bus">Drum Rack</span><span class="send-count">${ref.kind === 'library' ? 'gruppo selezionato + simili' : 'pad selezionato'}</span>
+      <button class="btn small" data-mode="rack">riempi</button></div>` : ''}`;
   document.body.appendChild(el);
   const W = window.innerWidth, H = window.innerHeight;
   const r = el.getBoundingClientRect();
@@ -43,9 +46,9 @@ export function showSendMenu({ x, y, ref, buses, counts = {}, onPick }) {
   el.onclick = (e) => {
     const btn = e.target.closest('button[data-mode]');
     if (!btn) return;
-    const bus = btn.closest('[data-bus]').dataset.bus;
     closeSendMenu();
-    onPick(bus, btn.dataset.mode);
+    if (btn.dataset.mode === 'rack') { onRack(); return; }
+    onPick(btn.closest('[data-bus]').dataset.bus, btn.dataset.mode);
   };
   current = el;
   setTimeout(() => document.addEventListener('pointerdown', onOutside, true), 0);
