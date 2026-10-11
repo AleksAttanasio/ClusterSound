@@ -183,3 +183,24 @@ def test_find_item_in_places():
     assert proto.find_item(places, "ClusterSound Patterns/_Live/rack/Kit/Kit Drum Rack.adg") is adg
     assert proto.find_item(places, "ClusterSound Patterns/_Live/rack/Other/x.adg") is None
     assert proto.find_item(places, "") is None
+
+
+# ---------------------------------------------------------------- device build
+def test_build_amxd(tmp_path):
+    import importlib.util
+    import json
+    import struct
+    spec = importlib.util.spec_from_file_location("build_amxd", os.path.join(os.path.dirname(__file__), "..", "tools", "build_amxd.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    data = mod.build(tmp_path).read_bytes()
+    assert data[:12] == b"ampf\x04\x00\x00\x00mmmm" and data[12:24] == b"meta\x04\x00\x00\x00\x00\x00\x00\x00"
+    assert data[24:28] == b"ptch"
+    n = struct.unpack("<I", data[28:32])[0]
+    assert len(data) == 32 + n and data.endswith(b"\0")
+    patcher = json.loads(data[32:-1])["patcher"]
+    texts = {b["box"].get("text") for b in patcher["boxes"]}
+    assert {"js ClusterSound.js", "udpsend 127.0.0.1 9101", "udpreceive 9102", "live.thisdevice"} <= texts
+    ids = {b["box"]["id"] for b in patcher["boxes"]}
+    assert all(ln["patchline"]["source"][0] in ids and ln["patchline"]["destination"][0] in ids for ln in patcher["lines"])
+    assert (tmp_path / "ClusterSound.js").is_file()
