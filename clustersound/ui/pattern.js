@@ -2,6 +2,7 @@
 import { Sequencer, refKey } from './sequencer.js';
 import { suggestBus, toast, showPopover } from './sendmenu.js';
 import { Arranger } from './arranger.js';
+import { sendToLive } from './live.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -86,6 +87,8 @@ export class PatternEditor {
     if (this.playMode !== 'sequence') this.seq.setPattern(this.p);
     if (Object.values(this.p.buses).some((b) => b.layers.length)) this.noAutofill = false;
     try { localStorage.setItem(LS_KEY, JSON.stringify({ ...this.p, _source: this.source, _noAutofill: this.noAutofill })); } catch (e) { /* private mode */ }
+    clearTimeout(this._kitT);  // the kit for Live imports of sequences saved without one
+    this._kitT = setTimeout(() => this.api.live_set_kit(this.p), 1500);
     const refs = [];
     for (const b of Object.values(this.p.buses)) for (const l of b.layers) if (l.ref?.kind === 'online') refs.push(l.ref);
     this.api.protect_samples(refs);
@@ -372,6 +375,7 @@ export class PatternEditor {
         <button id="pt-midi" class="btn">Esporta MIDI</button>
         <button id="pt-wav" class="btn">Esporta WAV</button>
         <button id="pt-abl" class="btn primary" title="Cartella con Drum Rack .adg, sample, MIDI e loop pronta per Ableton Live">Esporta per Ableton</button>
+        <button id="pt-live" class="btn" title="Crea in Live le tracce Drums e Bass con rack e clip (serve il device ClusterSound nel set)">Invia a Live</button>
       </div>
       <div class="pt-bar pt-tools">
         <button id="pt-random" class="btn" title="Sceglie a caso un gruppo di sample simili per ogni bus non bloccato (🔒) e ne prende sample a caso">🎲 Kit casuale</button>
@@ -423,6 +427,7 @@ export class PatternEditor {
       const r = await this.api.export_ableton(this._exportable());
       if (r.error) alert(r.error); else if (r.folder) toast(`Pacchetto creato: ${r.folder.split('/').pop()}`);
     };
+    $('#pt-live').onclick = () => sendToLive(this.api, 'pattern', this._exportable());
     $('#pt-grid').addEventListener('click', (e) => this._onGridClick(e));
     $('#pt-grid').addEventListener('contextmenu', (e) => this._onGridContext(e));
     $('#pt-grid').addEventListener('input', (e) => this._onGridInput(e));

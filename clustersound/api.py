@@ -22,6 +22,8 @@ from .chords.library import DEFAULT_DIR as CHORD_DIR
 from .chords.library import ChordLibrary
 from .features import TYPES
 from .library import Library
+from .live import payload as live_payload
+from .live import server as live_server
 from .online import cache as online_cache
 from .online import search as online
 from .online.base import LICENSES, OnlineResult
@@ -72,6 +74,7 @@ class Api:
         self._rack_cache: dict = {}
         self._rack_lock = threading.Lock()  # js_api calls run on several threads
         self._chords: ChordLibrary | None = None
+        self._live = live_server.Bridge(self._live_stage(), self._resolve, self._describe, self._title)
         threading.Thread(target=online_cache.prune, args=(self._cache_mb(),), daemon=True).start()
 
     # pywebview exposes public attributes too, so keep internals underscored
@@ -220,10 +223,21 @@ class Api:
         return {"freesound_key_set": bool(key), "cache_mb": self._cache_mb(),
                 "cache_used_mb": round(online_cache.size() / (1 << 20), 1),
                 "freesound_key_hint": (key[:4] + "…" + key[-3:]) if len(key) > 8 else "",
-                "download_dir": s.get("download_dir") or DEFAULT_DIR}
+                "download_dir": s.get("download_dir") or DEFAULT_DIR, "live_port": self._live_port(),
+                "live_library": s.get("live_library") or live_payload.USER_LIBRARY}
 
     def set_setting(self, key: str, value) -> dict:
-        if key not in ("freesound_key", "download_dir", "cache_mb"):
+        if key not in ("freesound_key", "download_dir", "cache_mb", "live_port", "live_library"):
+            return self.get_settings()
+        if key == "live_port":
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                return self.get_settings()
+            if 1024 <= value <= 65535 and value != self._live_port():
+                self._save_settings(live_port=value)
+                self._live.stop()
+                self.live_start()
             return self.get_settings()
         if key == "cache_mb":
             try:
@@ -234,9 +248,11 @@ class Api:
             online_cache.prune(value)
             return self.get_settings()
         value = (value or "").strip() or None
-        if key == "download_dir" and value:
+        if key in ("download_dir", "live_library") and value:
             value = os.path.expanduser(value)
         self._save_settings(**{key: value})
+        if key == "live_library":
+            self._live.stage = self._live_stage()
         return self.get_settings()
 
     def online_search(self, params: dict) -> dict:
@@ -799,6 +815,40 @@ class Api:
             return {"error": f"{type(e).__name__}: {e}"}
         subprocess.run(["open", folder], check=False)
         return {"folder": folder}
+
+    # ================================================================== Ableton Live (Max for Live bridge)
+    def _live_stage(self) -> live_payload.Stage:
+        """Presets for Live go to the User Library (always indexed by Live's browser), else to Places."""
+        return live_payload.Stage.default(EXPORT_DIR, self._settings().get("live_library"))
+
+    def _live_port(self) -> int:
+        return int(self._settings().get("live_port") or live_server.DEFAULT_PORT)
+
+    def live_start(self) -> dict:
+        """Start the localhost bridge for the Max for Live device (app start, or after a port change)."""
+        if not self._live.server:
+            self._live.error = None
+            self._live.start(self._live_port())
+        return self.live_status()
+
+    def live_status(self) -> dict:
+        return {"running": self._live.server is not None, "port": self._live.port or self._live_port(),
+                "error": self._live.error, "pending": self._live.pending(),
+                "stage": os.path.join(self._live.stage.base, self._live.stage.sub), "stage_root": self._live.stage.root}
+
+    def live_set_kit(self, p: dict) -> None:
+        """The Sequencer reports its kit, used for saved sequences that do not carry one."""
+        live_server.save_current_kit(p)
+
+    def live_send(self, kind: str, data: dict, opts: dict | None = None) -> dict:
+        """Build the payload of what is open in the UI and queue it for the device in Live ("Invia a Live")."""
+        try:
+            item = self._live.build(kind, data, **(opts or {}))
+        except Exception as e:
+            return {"error": f"{type(e).__name__}: {e}"}
+        return {"queued": self._live.push(item), "name": item["name"],
+                "tracks": [t["name"] for t in item["tracks"]], **self.live_status()}
+
 
 def _media_data_url(path: str) -> str | None:
     out = _wav_data_url(path)

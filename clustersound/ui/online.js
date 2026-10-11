@@ -496,6 +496,13 @@ export class Online {
       this.meta.settings = await this.api.clear_cache();
       $('#set-cache-used').textContent = `In uso: ${this.meta.settings.cache_used_mb} MB`;
     };
+    $('#set-live-port').value = s.live_port;
+    $('#set-live-status').textContent = '';
+    this.api.live_status().then((st) => {
+      $('#set-live-status').textContent = st.running
+        ? `Attivo su 127.0.0.1:${st.port}. Preset per Live in ${st.stage}${st.stage_root === 'places' ? ' (aggiungi la cartella ai Places di Live)' : ''}`
+        : `Non attivo: ${st.error || 'riavvia l\'app'}`;
+    });
     $('#set-cancel').onclick = () => { m.hidden = true; };
     $('#set-getkey').onclick = (e) => { e.preventDefault(); this.api.open_url('https://freesound.org/apiv2/apply'); };
     $('#set-pick').onclick = async () => { const p = await this.api.pick_folder(); if (p) $('#set-dir').value = p; };
@@ -505,6 +512,7 @@ export class Online {
       if (key) this.meta.settings = await this.api.set_setting('freesound_key', key);
       this.meta.settings = await this.api.set_setting('download_dir', $('#set-dir').value.trim());
       this.meta.settings = await this.api.set_setting('cache_mb', $('#set-cache').value);
+      this.meta.settings = await this.api.set_setting('live_port', $('#set-live-port').value);
       m.hidden = true;
       this._renderKeyHint();
       if (key) this.search();
