@@ -1,5 +1,5 @@
-// "Drum Rack" screen: 8×8 pads (Launchpad Pro layout), grouped by a geometry and filled with a seed
-// sample plus similar ones; exported as an Ableton Drum Rack.
+// "Drum Rack" screen: 8×8 pads (Launchpad Pro layout) or a Roland SPD-SX (9 pads + pedal / Trig 2), grouped
+// by a geometry / configuration and filled with a seed sample plus similar ones; exported as an Ableton Drum Rack.
 import { refKey } from './sequencer.js';
 import { toast, suggestBus, showPopover } from './sendmenu.js';
 import { sendToLive } from './live.js';
@@ -8,6 +8,9 @@ import { NO_ALT, dynControls, wireDynControls, readDynControls } from './pattern
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const LS_KEY = 'clustersound.rack';
+const LS_SPD = 'clustersound.rack.spdsx';
+const LS_DEVICE = 'clustersound.rackDevice';
+const DEVICES = [['grid64', 'Controller 8×8 (Launchpad)'], ['spdsx', 'Roland SPD-SX']];
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const noteName = (n) => `${NOTE_NAMES[n % 12]}${Math.floor(n / 12) - 2}`; // Live: C1 = 36
 const HAT_FAMILIES = new Set(['chat', 'ohat', 'hats']);
@@ -16,9 +19,12 @@ const KIND_BADGE = { library: '', online: 'WEB', file: 'FILE' };
 const DRAG_TYPE = 'application/x-clustersound-rack';
 const LS_RANDOM = 'clustersound.randomRack';
 const MAX_PER_BUS = 8;
+const PEDAL_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20h16M7 20l3-12h4l3 12M10 8l-1-4h6l-1 4"/></svg>';
 const ALT_LABELS = [['off', 'insieme (solo il 1° attivo)'], ['cycle', 'a giro'], ['random', 'casuale'], ['random_pass', 'casuale ogni giro']];
 
 const newRack = () => ({ name: 'Kit', geometry: 'cols8', mapping: 'launchpad', pads: new Array(64).fill(null), groups: {} });
+const newSpdRack = () => ({ device: 'spdsx', name: 'Kit SPD-SX', geometry: 'spd_kit', triggers: { trig1: true, trig2: false },
+  pads: new Array(11).fill(null), groups: {} });
 
 export class DrumRackEditor {
   constructor({ api, player, classes, getTrail, getSequencer, onOpenSequencer }) {
@@ -30,13 +36,22 @@ export class DrumRackEditor {
     this.classColor = Object.fromEntries(classes.map((c) => [c.id, c.color]));
     this.classLabel = Object.fromEntries(classes.map((c) => [c.id, c.label]));
     this.ready = null;
-    this.rack = newRack();
-    this.pad = 0;                          // selected pad (its group is the target of every fill)
+    this.device = 'grid64';                // 'grid64' | 'spdsx': one kit per device, this.rack is the active one
+    this.racks = { grid64: newRack(), spdsx: newSpdRack() };
+    this.pads = { grid64: 0, spdsx: 4 };   // selected pad per device (its group is the target of every fill)
+    this.check = null;                     // SPD-SX: {warnings, allowed} from rack_check
     this.seed = null;                      // last clicked sample: ref
     this.opts = { mode: 'nearest', variation: 0.3, filter: 'class', oneshot: true, avoid: true };
     this.browse = { q: '', family: null, follow: true, items: [] };
     this.manual = { seedKey: '', cands: [], picked: [] };
   }
+
+  get rack() { return this.racks[this.device]; }
+  set rack(r) { this.racks[this.device] = r; }
+  get pad() { return this.pads[this.device]; }
+  set pad(p) { this.pads[this.device] = p; }
+  get isSpd() { return this.device === 'spdsx'; }
+  get padCount() { return this.isSpd ? this.meta.spdsx.pads : 64; }
 
   // ---------------------------------------------------------------- lifecycle
   ensure() {
@@ -57,6 +72,16 @@ export class DrumRackEditor {
       }
     } catch { /* private mode / bad JSON */ }
     if (!this.geoById[this.rack.geometry]) this.rack.geometry = 'cols8';
+    try {
+      const spd = JSON.parse(localStorage.getItem(LS_SPD) || 'null');
+      if (spd?.rack?.pads?.length === this.meta.spdsx.pads) {
+        this.racks.spdsx = { ...newSpdRack(), ...spd.rack };
+        this.pads.spdsx = spd.pad ?? 4;
+      }
+      if (localStorage.getItem(LS_DEVICE) === 'spdsx') this.device = 'spdsx';
+    } catch { /* private mode / bad JSON */ }
+    if (!this.meta.spdsx.configs.some((c) => c.id === this.racks.spdsx.geometry)) this.racks.spdsx.geometry = 'spd_kit';
+    this._fixPad();
     this._buildShell();
     this._persist();
   }
@@ -70,29 +95,65 @@ export class DrumRackEditor {
   hide() { this.player.stop(); }
 
   _persist() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ rack: this.rack, pad: this.pad, opts: this.opts })); } catch { /* private mode */ }
-    this.api.protect_samples(this.rack.pads.filter((r) => r?.kind === 'online'), 'rack');
+    try {
+      if (this.isSpd) localStorage.setItem(LS_SPD, JSON.stringify({ rack: this.rack, pad: this.pad }));
+      else localStorage.setItem(LS_KEY, JSON.stringify({ rack: this.rack, pad: this.pad, opts: this.opts }));
+    } catch { /* private mode */ }
+    const online = [...this.racks.grid64.pads, ...this.racks.spdsx.pads].filter((r) => r?.kind === 'online');
+    this.api.protect_samples(online, 'rack');
+  }
+
+  setDevice(device) {
+    if (device === this.device) return;
+    this.player.stop();
+    this.device = device;
+    this.manual.seedKey = '';
+    try { localStorage.setItem(LS_DEVICE, device); } catch { /* private mode */ }
+    this._fixPad();
+    this._buildBar();
+    this.renderAll();
+    this._followGroup();
+  }
+
+  // the selected pad must belong to a group (a trigger may have been disconnected)
+  _fixPad() {
+    if (this.groupOf(this.pad) < 0) this.pad = this.groups[0][0];
   }
 
   // ---------------------------------------------------------------- geometry helpers
-  get groups() { return this.geoById[this.rack.geometry].groups; }
+  // {id, groups, families, keys?}: the 8×8 geometry, or the SPD-SX configuration for the current triggers
+  get geo() {
+    if (!this.isSpd) return this.geoById[this.rack.geometry];
+    const t = this.rack.triggers || {};
+    return this.meta.spdsx.layouts[`${this.rack.geometry}|${t.trig1 ? 1 : 0}${t.trig2 ? 1 : 0}`];
+  }
+
+  get groups() { return this.geo.groups; }
 
   groupOf(p) { return this.groups.findIndex((g) => g.includes(p)); }
 
+  _groupKey(g) {
+    const geo = this.geo;
+    return `${geo.id}:${geo.keys ? geo.keys[g] : g}`;
+  }
+
   settings(g) {
-    const geo = this.geoById[this.rack.geometry];
-    const s = this.rack.groups[`${geo.id}:${g}`] || {};
+    const geo = this.geo;
+    const s = this.rack.groups[this._groupKey(g)] || {};
     const family = this.famById[s.family] ? s.family : geo.families[g];
     return { family, choke: s.choke ?? (HAT_FAMILIES.has(family) ? 1 : 0), lock: !!s.lock };
   }
 
   setSetting(g, key, value) {
-    const k = `${this.rack.geometry}:${g}`;
+    const k = this._groupKey(g);
     this.rack.groups[k] = { ...this.settings(g), ...this.rack.groups[k], [key]: value };
     this._persist();
   }
 
-  note(p) { return this.meta.notes[this.rack.mapping][p]; }
+  note(p) { return this.isSpd ? this.meta.spdsx.notes[p] : this.meta.notes[this.rack.mapping][p]; }
+
+  // how a pad is named in menus and messages: its note on the 8×8, its number / input on the SPD-SX
+  padName(p) { return this.isSpd ? this.meta.spdsx.labels[p] : noteName(this.note(p)); }
 
   // ---------------------------------------------------------------- shell
   _buildShell() {
@@ -111,6 +172,7 @@ export class DrumRackEditor {
       </aside>
       <main class="rk-main">
         <div class="rk-bar">
+          <select id="rk-device" class="rk-select rk-device" title="Per quale strumento è il kit">${DEVICES.map(([id, l]) => `<option value="${id}">${l}</option>`).join('')}</select>
           <input id="rk-name" class="rk-name" type="text" maxlength="80" title="Nome del kit (anche del file .adg)">
           <div class="seg" id="rk-geo"></div>
           <select id="rk-map" class="rk-select" title="Note MIDI dei pad">
@@ -120,6 +182,7 @@ export class DrumRackEditor {
           <div class="spacer"></div>
           <button class="btn" id="rk-auto" title="Riempie i gruppi vuoti in base alla famiglia (Alt+clic: rigenera tutti i gruppi non bloccati)">Auto-riempi</button>
           <button class="btn" id="rk-random" title="Per ogni gruppo non bloccato (🔒): un gruppo di sample simili a caso della sua famiglia, con sample a caso">🎲 Casuale</button>
+          <button class="btn" id="rk-gen" title="Kit SPD-SX casuale e suonabile: configurazione a caso, ogni gruppo da un gruppo di sample simili diverso" hidden>🎲 Genera kit</button>
           <select id="rk-saved" class="rk-select" title="Kit salvati"></select>
           <button class="btn" id="rk-save" title="Salva il kit">Salva</button>
           <button class="btn" id="rk-del" title="Elimina il kit salvato" hidden>Elimina</button>
@@ -134,7 +197,7 @@ export class DrumRackEditor {
         </div>
       </main>`;
 
-    $('#rk-geo').innerHTML = this.meta.geometries.map((g) => `<button class="seg-btn" data-geo="${g.id}">${esc(g.label)}</button>`).join('');
+    this._buildBar();
     $('#rk-bfam').innerHTML = this.meta.families.map((f) => `<option value="${f.id}">${esc(f.label)}</option>`).join('');
     $('#rk-follow').checked = this.browse.follow;
 
@@ -142,18 +205,26 @@ export class DrumRackEditor {
       const b = e.target.closest('[data-geo]');
       if (!b) return;
       this.rack.geometry = b.dataset.geo;
+      this._fixPad();
       this._persist();
       this.renderAll();
       this._followGroup();
     };
+    $('#rk-device').onchange = (e) => this.setDevice(e.target.value);
+    $('#rk-gen').onclick = (e) => this.openGenerate(e.currentTarget);
     $('#rk-map').onchange = (e) => { this.rack.mapping = e.target.value; this._persist(); this.renderGrid(); };
-    $('#rk-name').oninput = (e) => { this.rack.name = e.target.value; this._persist(); };
+    $('#rk-name').oninput = (e) => {
+      this.rack.name = e.target.value;
+      this._persist();
+      const lcd = $('#rk-grid .spd-lcd');
+      if (lcd) lcd.textContent = this.rack.name || 'Kit';
+    };
     $('#rk-auto').onclick = (e) => this.autofill(!e.altKey);
     $('#rk-random').onclick = (e) => this.openRandomize(e.currentTarget);
     $('#rk-toseq').onclick = () => this.openLoadDialog();
     $('#rk-clear').onclick = () => {
-      if (!this.rack.pads.some(Boolean) || !confirm('Svuotare tutti i 64 pad?')) return;
-      this.rack.pads = new Array(64).fill(null);
+      if (!this.rack.pads.some(Boolean) || !confirm(`Svuotare tutti i ${this.padCount} pad?`)) return;
+      this.rack.pads = new Array(this.padCount).fill(null);
       this._persist();
       this.renderAll();
     };
@@ -189,7 +260,12 @@ export class DrumRackEditor {
 
     // grid
     const grid = $('#rk-grid');
+    grid.onchange = (e) => {
+      const t = e.target.dataset.trig;
+      if (t) this.setTrigger(t, e.target.checked);
+    };
     grid.onclick = (e) => {
+      if (e.target.closest('[data-trig]')) return;
       const el = e.target.closest('.rk-pad');
       if (!el) return;
       const p = +el.dataset.p;
@@ -269,6 +345,28 @@ export class DrumRackEditor {
     };
   }
 
+  // device-dependent part of the toolbar
+  _buildBar() {
+    const list = this.isSpd ? this.meta.spdsx.configs : this.meta.geometries;
+    $('#rk-device').value = this.device;
+    $('#rk-geo').innerHTML = list.map((g) => `<button class="seg-btn" data-geo="${g.id}">${esc(g.label)}</button>`).join('');
+    $('#rk-geo').title = this.isSpd ? 'Configurazione dei pad: quali gruppi e quali famiglie' : '';
+    $('#rk-map').hidden = this.isSpd;
+    $('#rk-gen').hidden = !this.isSpd;
+    $('#rk-export').textContent = this._exportLabel();
+    $('#rk-export').title = this.isSpd ? 'Drum Rack per Live sulle note della SPD-SX + WAV 16 bit per SPD-SX Wave Manager' : '';
+  }
+
+  _exportLabel() { return this.isSpd ? 'Esporta (Live + SPD-SX)' : 'Esporta per Ableton'; }
+
+  setTrigger(key, on) {
+    this.rack.triggers = { ...this.rack.triggers, [key]: on };
+    this._fixPad();
+    this._persist();
+    this.renderAll();
+    this._followGroup();
+  }
+
   // ---------------------------------------------------------------- render
   renderAll() {
     $('#rk-name').value = this.rack.name;
@@ -278,9 +376,15 @@ export class DrumRackEditor {
     this.renderGrid();
     this.renderInspector();
     this.renderTrail();
+    this.refreshCheck();
   }
 
   renderGrid() {
+    if (this.isSpd) this.renderSpd();
+    else this.renderGrid64();
+  }
+
+  renderGrid64() {
     // css grid: 4 columns, a gutter, 4 columns (same for rows), top row first
     const at = (r, c) => `grid-row:${8 - r + (r < 4 ? 1 : 0)};grid-column:${c + 1 + (c >= 4 ? 1 : 0)}`;
     const sel = this.groupOf(this.pad);
@@ -306,7 +410,51 @@ export class DrumRackEditor {
       html.push(`<div class="rk-frame ${g === sel ? 'sel' : ''} ${lock ? 'lock' : ''}" style="grid-row:${rowStart}/${rowEnd};grid-column:${colStart}/${colEnd};--gc:${fam.color}">
         ${this.rack.geometry !== 'free' || lock ? `<span>${lock ? '🔒 ' : ''}${this.rack.geometry !== 'free' ? esc(fam.label) : ''}</span>` : ''}</div>`);
     });
-    $('#rk-grid').innerHTML = html.join('');
+    const grid = $('#rk-grid');
+    grid.className = 'rk-grid';
+    grid.innerHTML = html.join('');
+  }
+
+  // SPD-SX as seen from the player: the narrow pads 1-3 at the top, 4-9 below, then the trigger inputs
+  renderSpd() {
+    const spd = this.meta.spdsx;
+    const sel = this.groupOf(this.pad);
+    const t = this.rack.triggers || {};
+    const famOf = {};
+    const firstOf = {};
+    this.groups.forEach((pads, g) => pads.forEach((p, k) => { famOf[p] = g; if (k === 0) firstOf[p] = g; }));
+    const cell = (p, extra = '') => {
+      const ref = this.rack.pads[p];
+      const g = famOf[p];
+      const s = this.settings(g);
+      const fam = this.famById[s.family];
+      const color = ref ? this.classColor[ref.cls] || '#8a8f98' : '';
+      const badge = ref ? KIND_BADGE[ref.kind] : '';
+      const tag = firstOf[p] != null && this.rack.geometry !== 'spd_free'
+        ? `<span class="spd-fam">${s.lock ? '🔒 ' : ''}${esc(fam.label)}</span>` : (s.lock ? '<span class="spd-fam">🔒</span>' : '');
+      return `<div class="rk-pad spd-pad ${extra} ${ref ? 'full' : ''} ${p === this.pad ? 'sel' : ''} ${g === sel ? 'gsel' : ''}" data-p="${p}"
+        draggable="${ref ? 'true' : 'false'}" style="--gc:${fam.color};${ref ? `--pc:${color}` : ''}"
+        title="${esc(spd.labels[p])} · ${noteName(spd.notes[p])}${ref ? ` · ${esc(ref.name)}` : ' · vuoto'}">
+        <span class="rk-note">${p < 9 ? p + 1 : ''} <i>${noteName(spd.notes[p])}</i></span>${badge ? `<span class="rk-badge">${badge}</span>` : ''}
+        ${tag}<span class="rk-pname">${ref ? esc(ref.name.replace(/\.[^.]+$/, '')) : ''}</span></div>`;
+    };
+    const trig = (p, key, label, icon) => `<div class="spd-trig ${t[key] ? '' : 'off'}">
+        ${t[key] ? cell(p, 'spd-tpad') : `<div class="spd-tpad spd-empty">${icon}<span>non collegato</span></div>`}
+        <label class="rk-check" data-trig-wrap><input type="checkbox" data-trig="${key}" ${t[key] ? 'checked' : ''}> ${label}</label>
+      </div>`;
+    const grid = $('#rk-grid');
+    grid.className = 'rk-spd';
+    grid.innerHTML = `
+      <div class="spd-body">
+        <div class="spd-head"><b>SPD-SX</b><span class="spd-lcd">${esc(this.rack.name || 'Kit')}</span><span class="spd-brand">Roland</span></div>
+        <div class="spd-pads">${Array.from({ length: 9 }, (_, p) => cell(p, p < 3 ? 'spd-top' : '')).join('')}</div>
+      </div>
+      <div class="spd-trigs">
+        ${trig(spd.trig1, 'trig1', 'Pedale (Trig 1)', PEDAL_ICON)}
+        ${trig(spd.trig2, 'trig2', 'Trig 2', '◎')}
+      </div>
+      <div id="rk-warn" class="rk-warn" hidden></div>`;
+    this._renderWarnings();
   }
 
   renderInspector() {
@@ -318,11 +466,18 @@ export class DrumRackEditor {
     const seed = this.seed;
     const similarOk = seed?.kind === 'library';
     const filled = pads.filter((p) => this.rack.pads[p]).length;
+    const where = this.isSpd ? pads.map((p) => this.padName(p)).join(' · ') : `${noteName(this.note(pads[0]))}${pads.length > 1 ? '…' : ''}`;
+    // SPD-SX: families that would make the kit unplayable (too many kicks / snares / hats) are disabled
+    const allowed = this.isSpd && this.rack.geometry !== 'spd_free' ? this.check?.allowed?.[g] : null;
+    const famOpt = (f) => {
+      const off = allowed && !allowed.includes(f.id);
+      return `<option value="${f.id}" ${f.id === s.family ? 'selected' : ''} ${off ? 'disabled' : ''}>${esc(f.label)}${off ? ' — troppi pad di questo tipo' : ''}</option>`;
+    };
     const html = [`
       <div class="rk-ihead"><span class="dot" style="background:${fam.color}"></span>
-        <b>Gruppo ${g + 1}</b><span class="hint">${pads.length} pad · ${filled} pieni · ${noteName(this.note(pads[0]))}${pads.length > 1 ? '…' : ''}</span></div>
+        <b>Gruppo ${g + 1}</b><span class="hint">${pads.length} pad · ${filled} pieni · ${esc(where)}</span></div>
       <label class="rk-field">Famiglia
-        <select data-set="family" class="rk-select">${this.meta.families.map((f) => `<option value="${f.id}" ${f.id === s.family ? 'selected' : ''}>${esc(f.label)}</option>`).join('')}</select></label>
+        <select data-set="family" class="rk-select">${this.meta.families.map(famOpt).join('')}</select></label>
       <label class="rk-field" title="I pad con lo stesso choke group si zittiscono a vicenda (es. hat aperto/chiuso)">Choke group
         <select data-set="choke" class="rk-select"><option value="0">nessuno</option>${Array.from({ length: 16 }, (_, i) => `<option value="${i + 1}" ${s.choke === i + 1 ? 'selected' : ''}>${i + 1}</option>`).join('')}</select></label>
       <label class="rk-check" title="Casuale e Auto-riempi (Alt) non cambiano i gruppi bloccati"><input type="checkbox" data-set="lock" ${s.lock ? 'checked' : ''}> 🔒 blocca gruppo</label>
@@ -363,6 +518,26 @@ export class DrumRackEditor {
     if (o.mode === 'manual' && similarOk) this._loadCandidates();
   }
 
+  // SPD-SX playability: warnings under the pads and the families each group may take
+  async refreshCheck() {
+    if (!this.isSpd) { this.check = null; return; }
+    const token = (this._checkToken = (this._checkToken || 0) + 1);
+    const chk = await this.api.rack_check(this.rack);
+    if (token !== this._checkToken || !this.isSpd) return;
+    const changed = JSON.stringify(chk.allowed) !== JSON.stringify(this.check?.allowed);
+    this.check = chk;
+    this._renderWarnings();
+    if (changed) this.renderInspector();
+  }
+
+  _renderWarnings() {
+    const box = $('#rk-warn');
+    const w = this.check?.warnings || [];
+    if (!box) return;
+    box.hidden = !w.length;
+    box.innerHTML = w.map((x) => `<div>⚠︎ ${esc(x)}</div>`).join('');
+  }
+
   async _loadCandidates() {
     const seed = this.seed;
     const key = `${seed.id}:${this.opts.filter}:${this.opts.oneshot}:${this.groupOf(this.pad)}`;
@@ -393,7 +568,7 @@ export class DrumRackEditor {
   }
 
   renderSaved() {
-    const saved = this.meta.saved || [];
+    const saved = (this.meta.saved || []).filter((r) => (r.device || 'grid64') === this.device);
     $('#rk-saved').innerHTML = `<option value="">${saved.length ? 'Carica kit…' : 'Nessun kit salvato'}</option>`
       + saved.map((r) => `<option value="${esc(r.id)}" ${r.id === this.rack.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('');
     $('#rk-del').hidden = !this.rack.id;
@@ -531,7 +706,7 @@ export class DrumRackEditor {
     const ref = this.rack.pads[p];
     const el = document.createElement('div');
     el.className = 'send-menu rk-menu';
-    el.innerHTML = `<div class="send-title">Pad ${noteName(this.note(p))}${ref ? ` · <b>${esc(ref.name)}</b>` : ''}</div>
+    el.innerHTML = `<div class="send-title">Pad ${esc(this.padName(p))}${ref ? ` · <b>${esc(ref.name)}</b>` : ''}</div>
       ${ref ? '<div class="send-row" data-m="seed">Usa come seed e riempi il gruppo</div><div class="send-row" data-m="clear">Svuota pad</div>' : ''}
       <div class="send-row" data-m="group">Svuota gruppo</div>`;
     document.body.appendChild(el);
@@ -566,7 +741,8 @@ export class DrumRackEditor {
     const g = this.groupOf(this.pad);
     const pads = this.rack.pads;
     // selected pad if free, else the first free pad of its group, else of the kit; kit full: the selected pad
-    let p = !pads[this.pad] ? this.pad : this.groups[g].find((q) => !pads[q]) ?? pads.findIndex((r) => !r);
+    const firstFree = this.isSpd ? this.groups.flat().find((q) => !pads[q]) ?? -1 : pads.findIndex((r) => !r);
+    let p = !pads[this.pad] ? this.pad : this.groups[g].find((q) => !pads[q]) ?? firstFree;
     if (p < 0) p = this.pad;
     const replaced = !!pads[p];
     pads[p] = ref;
@@ -574,7 +750,7 @@ export class DrumRackEditor {
     this.seed = ref;
     this._persist();
     if (!$('#rack').hidden) this.renderAll();
-    toast(`Drum Rack · pad ${noteName(this.note(p))} (gruppo ${this.groupOf(p) + 1})${replaced ? ', kit pieno: sostituito' : ''}: ${ref.name}`);
+    toast(`Drum Rack · pad ${this.padName(p)} (gruppo ${this.groupOf(p) + 1})${replaced ? ', kit pieno: sostituito' : ''}: ${ref.name}`);
   }
 
   openRandomize(anchor) {
@@ -604,6 +780,40 @@ export class DrumRackEditor {
       this.renderAll();
       const n = this.rack.pads.filter(Boolean).length;
       toast(n ? `Kit casuale: ${n} pad pieni${o.dyn ? ` · dinamica ±${Math.round(o.margin * 100)}%` : ''}` : 'Nessun sample adatto (controlla il filtro cartella)');
+    };
+  }
+
+  // SPD-SX: a whole random, playable kit (configuration + samples), see Api.rack_generate
+  openGenerate(anchor) {
+    let o = { keep: false, folder: '', oneshot: true, dyn: false, margin: 0.3 };
+    try { o = { ...o, ...JSON.parse(localStorage.getItem(LS_RANDOM + '.spdsx') || '{}') }; } catch { /* private mode */ }
+    const pop = showPopover(anchor, `
+      <div class="pop-title">🎲 Genera kit SPD-SX</div>
+      <div class="hint">Sceglie una configurazione suonabile a caso (al massimo pedale + 1 pad di kick, 3 di snare/clap)
+        e riempie ogni gruppo con sample simili tra loro, ognuno da un gruppo di suoni diverso. Il pedale prende un kick.
+        Con un gruppo bloccato (🔒) la configurazione resta quella attuale.</div>
+      <label class="pop-check"><input type="checkbox" data-o="keep" ${o.keep ? 'checked' : ''}> mantieni la configurazione attuale</label>
+      <label class="pop-field">Solo dalla cartella / pack (facoltativo)<input type="text" data-o="folder" value="${esc(o.folder)}" placeholder="es. Cymatics"></label>
+      <label class="pop-check"><input type="checkbox" data-o="oneshot" ${o.oneshot ? 'checked' : ''}> solo one-shot (niente loop)</label>
+      ${dynControls(o, 'gruppi')}
+      <div class="pop-actions"><button class="btn primary" data-go>Genera</button></div>`);
+    wireDynControls(pop);
+    pop.querySelector('[data-go]').onclick = async () => {
+      o = { keep: pop.querySelector('[data-o=keep]').checked, folder: pop.querySelector('[data-o=folder]').value.trim(),
+        oneshot: pop.querySelector('[data-o=oneshot]').checked, ...readDynControls(pop) };
+      try { localStorage.setItem(LS_RANDOM + '.spdsx', JSON.stringify(o)); } catch { /* private mode */ }
+      pop.close();
+      const out = await this.api.rack_generate(this.rack, { keep_config: o.keep, folder: o.folder, oneshot: o.oneshot,
+        ...(o.dyn ? { dyn_margin: o.margin } : {}) });
+      this.rack = { ...this.rack, geometry: out.geometry, groups: out.groups, pads: out.pads };
+      this._fixPad();
+      this._persist();
+      this._buildBar();
+      this.renderAll();
+      this._followGroup();
+      const n = this.rack.pads.filter(Boolean).length;
+      const cfg = this.meta.spdsx.configs.find((c) => c.id === out.geometry)?.label;
+      toast(n ? `Kit SPD-SX: ${cfg} · ${n} pad pieni` : 'Nessun sample adatto (controlla il filtro cartella)');
     };
   }
 
@@ -702,6 +912,7 @@ export class DrumRackEditor {
     const r = (this.meta.saved || []).find((x) => x.id === id);
     if (!r) return;
     this.rack = JSON.parse(JSON.stringify(r));
+    this._fixPad();
     this._persist();
     this.renderAll();
     this._followGroup();
@@ -732,7 +943,7 @@ export class DrumRackEditor {
       else if (res.folder) toast(`Esportato in ${res.folder}`);
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Esporta per Ableton';
+      btn.textContent = this._exportLabel();
     }
   }
 }
