@@ -90,10 +90,23 @@ def passes(r: OnlineResult, p: dict) -> bool:
     return True
 
 
-def search_source(name: str, p: dict, page: int, settings: dict) -> dict:
+# sources that group their results in packs (store "Pack" view)
+PACK_SOURCES = ["freesound", "archive", "ccmixter"]
+
+
+def _packs_fn(name: str):
+    if name == "freesound":
+        return freesound.packs
+    # Internet Archive items are always packs; ccMixter uploads are packs when they ship a zip
+    return lambda p, page, settings: SOURCES[name].search(dict(p, packs="packs"), page, settings)
+
+
+def search_source(name: str, p: dict, page: int, settings: dict, packs: bool = False) -> dict:
     mod = SOURCES[name]
+    if packs:
+        p = dict(p, packs="packs")
     try:
-        results, total, more = mod.search(p, page, settings)
+        results, total, more = (_packs_fn(name) if packs else mod.search)(p, page, settings)
     except SourceError as e:
         return {"source": name, "label": LABELS[name], "results": [], "total": 0, "more": False,
                 "page": page, "error": str(e), "needs_key": "API key" in str(e)}
@@ -130,3 +143,95 @@ def expand(uid: str, p: dict) -> dict:
     shown = [f for f in files if passes(f, child_p)]
     return {"error": None, "total": len(files), "files": [f.to_dict() for f in shown],
             "archives": archives}
+
+
+# ------------------------------------------------------------------ store: packs
+def _pack_card(parent: OnlineResult) -> dict:
+    return enrich(parent).to_dict()
+
+
+def pack(uid: str, page: int, settings: dict) -> dict:
+    """Pack page: details, one page of its sounds, the archives to download and more packs by the author."""
+    parent = get(uid)
+    try:
+        if uid.startswith("freesound:pack:"):
+            pid = uid.rsplit(":", 1)[-1]
+            info = freesound.pack_info(pid, settings)
+            card = freesound.parse_pack(info, parent if parent and parent.waveform_img else None)
+            if parent:  # keep what the search card knew (licence, matching sounds)
+                card.extra = {**parent.extra, **card.extra}
+            remember([card])
+            files, total, more = freesound.pack_sounds(pid, page, settings)
+            for f in files:
+                f.extra["pack_title"] = card.title
+            others = []
+            if page == 1:
+                try:
+                    others = [o for o in freesound.user_packs(card.author, settings) if o.uid != uid]
+                except SourceError:
+                    pass
+                remember(others)
+            files = [enrich(f) for f in files]
+            remember(files)
+            if not card.license or card.license == "unknown":
+                lics = {f.license for f in files}
+                card.license = lics.pop() if len(lics) == 1 else card.license
+            return {"error": None, "pack": _pack_card(card), "files": [f.to_dict() for f in files],
+                    "total": total, "more": more, "page": page, "archives": [],
+                    "others": [_pack_card(o) for o in others]}
+        if parent is None or not parent.is_pack:
+            return {"error": "pack non trovato"}
+        if parent.source == "archive":
+            files, archives = archive.expand(parent)
+            files = [enrich(f) for f in files]
+            remember(files)
+            return {"error": None, "pack": _pack_card(parent), "files": [f.to_dict() for f in files],
+                    "total": len(files), "more": False, "page": 1, "archives": archives, "others": []}
+        # ccMixter: a single upload with its zip
+        return {"error": None, "pack": _pack_card(parent), "files": [], "total": 0, "more": False, "page": 1,
+                "archives": [{"name": parent.title + ".zip", "url": parent.download_url, "size": parent.filesize}]
+                if parent.download_url else [], "others": []}
+    except SourceError as e:
+        return {"error": str(e)}
+
+
+MAX_PACK_DOWNLOAD = 500
+
+
+def pack_files(uid: str, settings: dict) -> list[OnlineResult]:
+    """Every downloadable file of a pack (Freesound: HQ previews; Internet Archive: loose files)."""
+    if uid.startswith("freesound:pack:"):
+        pid = uid.rsplit(":", 1)[-1]
+        title = (get(uid).title if get(uid) else None) or freesound.pack_info(pid, settings).get("name") or pid
+        out, page, more = [], 1, True
+        while more and len(out) < MAX_PACK_DOWNLOAD:
+            files, _, more = freesound.pack_sounds(pid, page, settings)
+            if not files:
+                break
+            out += files
+            page += 1
+        for f in out:
+            f.extra["pack_title"] = title
+        remember(out)
+        return out[:MAX_PACK_DOWNLOAD]
+    parent = get(uid)
+    if parent is None or parent.source != "archive":
+        return []
+    files, _ = archive.expand(parent)
+    return files[:MAX_PACK_DOWNLOAD]
+
+
+# ------------------------------------------------------------------ store: home
+def featured(settings: dict) -> dict:
+    """Home rows of the store. Each row is independent: a failing source just leaves its row empty."""
+    has_key = bool((settings or {}).get("freesound_key"))
+    jobs = {
+        "freesound_packs": lambda: search_source("freesound", {"sort": "downloads"}, 1, settings, packs=True)
+        if has_key else {"results": [], "error": "API key mancante", "needs_key": True},
+        "archive_packs": lambda: search_source("archive", {"sort": "downloads"}, 1, settings),
+        "cc0_new": lambda: search_source("freesound" if has_key else "openverse",
+                                         {"licenses": ["cc0"], "sort": "newest"}, 1, settings),
+    }
+    with ThreadPoolExecutor(max_workers=len(jobs)) as ex:
+        futs = {k: ex.submit(fn) for k, fn in jobs.items()}
+        return {k: f.result() for k, f in futs.items()}

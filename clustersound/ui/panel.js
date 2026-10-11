@@ -20,12 +20,12 @@ function ramp(t) {
 }
 
 export class Panel {
-  constructor(root, content, { classes, groups, onRelabel, onReveal, onSimilar, onPlayToggle, onSeek, onClose, onSend }) {
+  constructor(root, content, { classes, groups, onRelabel, onReveal, onSimilar, onPlayToggle, onSeek, onClose, onSend, onStore }) {
     this.root = root;
     this.content = content;
     this.classes = classes;
     this.groups = groups;
-    this.cb = { onRelabel, onReveal, onSimilar, onPlayToggle, onSeek, onClose, onSend };
+    this.cb = { onRelabel, onReveal, onSimilar, onPlayToggle, onSeek, onClose, onSend, onStore };
     this.d = null;
     this.playhead = null;
   }
@@ -74,6 +74,7 @@ export class Panel {
         ${btn('Mostra nella cartella', { icon: 'folder-open', 'data-act': 'reveal', title: 'Apre il Finder con il file selezionato' })}
         ${btn('Trova simili', { icon: 'sparkles', 'data-act': 'similar' })}
         ${btn('Invia', { 'data-act': 'send', 'with-caret': true, title: 'Aggiungi il sample a un bus del Sequencer o al Drum Rack' })}
+        ${btn('Altri nello Store', { icon: 'store', 'data-act': 'store', title: `Cerca sample gratuiti di tipo «${cls.label}» nello Store` })}
       </div>
 
       <div>
@@ -117,6 +118,7 @@ export class Panel {
     this.content.querySelector('[data-act=play]').onclick = () => this.cb.onPlayToggle();
     this.content.querySelector('[data-act=reveal]').onclick = () => this.cb.onReveal(d.id);
     this.content.querySelector('[data-act=similar]').onclick = () => this.cb.onSimilar(d.id);
+    this.content.querySelector('[data-act=store]').onclick = () => this.cb.onStore(d.cls);
     this.content.querySelector('[data-act=send]').onclick = (e) => {
       const r = e.currentTarget.getBoundingClientRect();
       this.cb.onSend(d.id, r.left - 120, r.bottom + 4);

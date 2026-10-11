@@ -42,7 +42,7 @@ def target_path(root: str, r: OnlineResult, url: str) -> str:
     title = os.path.splitext(r.path.rsplit("/", 1)[-1] if r.path else r.title)[0]
     name = safe_name(f"{r.author} - {title}" if r.author else title)
     folder = os.path.join(root, src)
-    if r.path:  # file inside a pack: keep it grouped by pack
+    if r.path or r.extra.get("pack_title"):  # file inside a pack: keep it grouped by pack
         folder = os.path.join(folder, safe_name(r.extra.get("pack_title") or "pack"))
     return unique_path(os.path.join(folder, name + ext))
 
@@ -71,7 +71,8 @@ def license_text(r: OnlineResult, url: str) -> str:
 
 
 class Downloader:
-    def __init__(self):
+    def __init__(self, on_done=None):
+        self.on_done = on_done  # called with the finished job (from a worker thread)
         self.jobs: dict[str, dict] = {}
         self._lock = threading.Lock()
         self._pool = ThreadPoolExecutor(max_workers=3)
@@ -110,6 +111,8 @@ class Downloader:
             with open(dest + ".license.txt", "w", encoding="utf-8") as f:
                 f.write(license_text(r, job["url"]))
             job["path"], job["status"] = dest, "done"
+            if self.on_done:
+                self.on_done(dict(job))
         except Exception as e:
             job["status"], job["error"] = "error", str(e)
             if os.path.exists(tmp):

@@ -1,0 +1,90 @@
+{
+ "count": 3,
+ "next": null,
+ "previous": null,
+ "results": [
+  {
+   "id": 3001,
+   "name": "808 Kick Long.wav",
+   "username": "beatsmith",
+   "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+   "duration": 1.2,
+   "tags": [
+    "808",
+    "kick"
+   ],
+   "type": "wav",
+   "samplerate": 44100,
+   "filesize": 210000,
+   "url": "https://freesound.org/people/beatsmith/sounds/3001/",
+   "bpm": null,
+   "tonality": null,
+   "single_event": true,
+   "loopable": false,
+   "pack": "https://freesound.org/apiv2/packs/41/",
+   "num_downloads": 900,
+   "avg_rating": 4.5,
+   "n_from_same_pack": 7,
+   "more_from_same_pack": "https://freesound.org/apiv2/search/?query=kick&filter=grouping_pack:41",
+   "previews": {
+    "preview-hq-mp3": "https://cdn.freesound.org/previews/3/3001_1-hq.mp3"
+   },
+   "images": {
+    "waveform_m": "https://cdn.freesound.org/displays/3/3001_1_wave_M.png"
+   },
+   "pack_name": "808 Kicks Vol. 1"
+  },
+  {
+   "id": 3002,
+   "name": "lonely kick.wav",
+   "username": "solo",
+   "license": "http://creativecommons.org/licenses/by/4.0/",
+   "duration": 0.3,
+   "tags": [
+    "kick"
+   ],
+   "type": "wav",
+   "samplerate": 48000,
+   "filesize": 50000,
+   "url": "https://freesound.org/people/solo/sounds/3002/",
+   "bpm": null,
+   "tonality": null,
+   "single_event": true,
+   "loopable": false,
+   "pack": null,
+   "n_from_same_pack": 0,
+   "previews": {
+    "preview-hq-mp3": "https://cdn.freesound.org/previews/3/3002_1-hq.mp3"
+   },
+   "images": {}
+  },
+  {
+   "id": 3003,
+   "name": "Acoustic Kick 3.wav",
+   "username": "drummer",
+   "license": "http://creativecommons.org/licenses/by/4.0/",
+   "duration": 0.6,
+   "tags": [
+    "kick",
+    "acoustic"
+   ],
+   "type": "wav",
+   "samplerate": 44100,
+   "filesize": 90000,
+   "url": "https://freesound.org/people/drummer/sounds/3003/",
+   "bpm": null,
+   "tonality": null,
+   "single_event": true,
+   "loopable": false,
+   "pack": "https://freesound.org/apiv2/packs/77/",
+   "n_from_same_pack": 2,
+   "previews": {
+    "preview-hq-mp3": "https://cdn.freesound.org/previews/3/3003_1-hq.mp3"
+   },
+   "images": {
+    "waveform_m": "https://cdn.freesound.org/displays/3/3003_1_wave_M.png"
+   },
+   "pack_name": "Acoustic Kicks"
+  }
+ ]
+}
