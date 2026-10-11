@@ -308,6 +308,426 @@
    },
    {
     "box": {
+     "id": "ol_bref",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      20,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      208,
+      5,
+      64,
+      18
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_bimp",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      90,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      8,
+      76,
+      130,
+      22
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_tg_newtracks",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      160,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      8,
+      104,
+      92,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_tg_tempo",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      230,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      104,
+      104,
+      80,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_tg_receive",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      300,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      188,
+      104,
+      84,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_bprev",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      370,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      288,
+      104,
+      32,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_bprova",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      440,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      324,
+      104,
+      120,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_bnext",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      510,
+      520,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      448,
+      104,
+      32,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_bferma",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      20,
+      560,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      484,
+      104,
+      64,
+      20
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
+     "id": "ol_bclip",
+     "maxclass": "panel",
+     "numinlets": 1,
+     "numoutlets": 0,
+     "patching_rect": [
+      90,
+      560,
+      60,
+      30
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      142,
+      76,
+      130,
+      22
+     ],
+     "background": 1,
+     "ignoreclick": 1,
+     "rounded": 6,
+     "border": 1,
+     "bgcolor": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "bordercolor": [
+      1.0,
+      0.709,
+      0.196,
+      1.0
+     ],
+     "saved_attribute_attributes": {
+      "bordercolor": {
+       "expression": "themecolor.live_lcd_control_fg"
+      }
+     }
+    }
+   },
+   {
+    "box": {
      "id": "thisdevice",
      "maxclass": "newobj",
      "numinlets": 1,
