@@ -1,0 +1,75 @@
+/* ClusterSound theme: the project's only place for --wa-* overrides.
+   Colors are sampled from the logos in assets/: navy surfaces of the app icon, the cyan → royal blue
+   gradient of the "S" and the sound bars, and the lavender white of the wordmark. The app is dark only. */
+
+:where(:root),
+.wa-light,
+.wa-dark,
+.wa-invert {
+  --wa-font-family-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --wa-font-family-heading: var(--wa-font-family-body);
+  --wa-font-family-code: ui-monospace, "SF Mono", Menlo, monospace;
+  --wa-font-size-scale: 0.8125;   /* 13px body, as before: this is a dense desktop tool */
+  --wa-space-scale: 0.875;
+  --wa-border-radius-scale: 1.15;
+  --wa-transition-normal: 180ms;
+  --wa-transition-fast: 110ms;
+}
+
+.wa-dark,
+.wa-invert {
+  /* surfaces: icon background #151e30 → #0b0f1d */
+  --wa-color-surface-lowered: #080c17;
+  --wa-color-surface-default: #0c111e;
+  --wa-color-surface-raised: #121a2b;
+  --wa-color-surface-border: #1f2a42;
+  --wa-color-shadow: rgb(2 5 14 / 0.6);
+
+  /* text: wordmark white #eaeef6 / #dde2f0 */
+  --wa-color-text-normal: #e6eaf4;
+  --wa-color-text-quiet: #8f9bb6;
+  --wa-color-text-link: #3fb6fd;
+  --wa-color-focus: #2f9dfd;
+
+  /* brand: S #2fa7fc → #2086fd → #1877fb, bars #32d5fe → #0141fd */
+  --wa-color-brand-fill-quiet: #0d1f3d;
+  --wa-color-brand-fill-normal: #123366;
+  --wa-color-brand-fill-loud: #1f6ffb;
+  --wa-color-brand-border-quiet: #173462;
+  --wa-color-brand-border-normal: #1e4c94;
+  --wa-color-brand-border-loud: #2f8dfd;
+  --wa-color-brand-on-quiet: #6cc2fd;
+  --wa-color-brand-on-normal: #9dd6fe;
+  --wa-color-brand-on-loud: #ffffff;
+
+  /* neutral: navy-tinted greys so buttons and fields sit on the same hue as the surfaces */
+  --wa-color-neutral-fill-quiet: #151d30;
+  --wa-color-neutral-fill-normal: #1b2539;
+  --wa-color-neutral-fill-loud: #c9d1e3;
+  --wa-color-neutral-border-quiet: #1b2438;
+  --wa-color-neutral-border-normal: #26324c;
+  --wa-color-neutral-border-loud: #33415f;
+  --wa-color-neutral-on-quiet: #a8b3cb;
+  --wa-color-neutral-on-normal: #dfe5f1;
+  --wa-color-neutral-on-loud: #0c111e;
+
+  --wa-form-control-background-color: var(--wa-color-surface-lowered);
+  --wa-form-control-border-color: var(--wa-color-neutral-border-normal);
+}
+
+/* Project tokens (concepts Web Awesome has no word for) */
+:root {
+  --cs-gradient: linear-gradient(135deg, #32d5fe 0%, #1f86fd 50%, #0b3bfa 100%);
+  --cs-gradient-h: linear-gradient(90deg, #32d5fe, #1f86fd 55%, #0b3bfa);
+  --cs-glow: 0 0 0 1px rgb(47 141 253 / 0.35), 0 4px 18px rgb(11 59 250 / 0.25);
+  --cs-amber: #ffb84d;   /* playheads, focus trail, rhythm: kept from 0.1.0 */
+}
+
+/* Brand gradient on the primary action only */
+wa-button[variant="brand"]:not([appearance])::part(button),
+wa-button[variant="brand"][appearance="accent"]::part(button) {
+  background: var(--cs-gradient);
+  border-color: transparent;
+}
+wa-button[variant="brand"]:not([appearance]):hover::part(button),
+wa-button[variant="brand"][appearance="accent"]:hover::part(button) { filter: brightness(1.08); box-shadow: var(--cs-glow); }
