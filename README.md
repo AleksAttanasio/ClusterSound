@@ -43,17 +43,35 @@ Ogni sample ha anche un **Tipo** (One-shot / Loop / Long-Texture) e un **sottocl
 la sua classe (k-means sugli embedding, k scelto con silhouette).
 Colori, keyword e mappatura AudioSet stanno in `clustersound/taxonomy.py`.
 
-## Scheda Online: sample gratuiti
+## Store: sample e pack gratuiti (Libreria → Store)
 
-Il tab **Online** in alto (alternato a **Libreria**) cerca sample gratuiti su quattro fonti e li
-mostra raggruppati **per fonte** oppure **per strumento**:
+Nella scheda **Libreria** il selettore **La mia libreria | Store** passa dalla cartella locale a uno
+store di sample gratuiti. Ci si arriva anche dalla libreria vuota ("Sfoglia lo Store gratuito") e
+dalla tendina di un sample ("Altri nello Store": apre lo store sulla stessa classe).
+
+- **Home**: i provider con il loro logo, le categorie (Kick, Snare, Hat, 808…), i pack in evidenza
+  di Freesound e Internet Archive, i nuovi suoni CC0 e una **vetrina** di pack royalty-free.
+- **Risultati**: *Suoni* o *Pack*, in griglia (card con forma d'onda, licenza, durata, BPM,
+  tonalità) oppure nella lista classica raggruppata per fonte o per strumento.
+- **Pagina pack**: descrizione, licenza, numero di suoni e download, "Ascolta tutto", "Scarica pack",
+  tracce una per una e gli altri pack dello stesso autore. Per Freesound i nomi dei pack arrivano
+  con la ricerca (`group_by_pack`), senza richieste aggiuntive.
+- **Pagina provider**: descrizione, licenze tipiche, link al sito e i suoi pack/suoni.
+- Se la cartella dei download sta dentro la cartella della libreria aperta, a fine download la
+  libreria si riscansiona da sola (i file già analizzati vengono dalla cache); altrimenti il pannello
+  dei download offre "Apri in libreria".
 
 | Fonte | Cosa offre | Accesso |
 |---|---|---|
-| Freesound | ~600k suoni CC (one-shot, loop, field recording) con BPM, tonalità, waveform | API key gratuita (⚙ → "richiedi una chiave") |
+| Freesound | ~600k suoni CC (one-shot, loop, field recording) con BPM, tonalità, waveform, organizzati in pack | API key gratuita (⚙ → "richiedi una chiave") |
 | Openverse | Aggregatore CC (Freesound, Wikimedia Commons) | anonimo, limiti di frequenza bassi |
 | Internet Archive | Sample pack interi, sfogliabili file per file anche dentro gli ZIP | anonimo |
 | ccMixter | Stem, a cappella e loop CC | anonimo |
+
+La **vetrina** (`clustersound/online/catalog.py`) elenca pack di siti senza API pubblica, tutti
+utilizzabili in produzioni commerciali: Kenney (CC0), Sonniss GameAudioGDC, 99Sounds e SampleRadar
+(royalty-free, vietata la ridistribuzione dei file così come sono). Il pulsante apre la pagina
+ufficiale da cui scaricarli: niente scraping. I loghi stanno in `clustersound/ui/assets/providers/`.
 
 - **Filtro per strumento**: le stesse 34 classi e gli stessi colori della libreria. Ogni fonte
   riceve la query nel proprio formato (tag Freesound, ricerca Openverse, subject/title su IA, tag
@@ -73,7 +91,7 @@ mostra raggruppati **per fonte** oppure **per strumento**:
 
 ## Scheda Sequencer: prova dei sample su groove tipici
 
-La terza scheda (**Libreria | Online | Sequencer | Drum Rack**) è un sequencer per provare i sample su pattern tipici e portarli in Ableton.
+La seconda scheda (**Libreria | Sequencer | Drum Rack | Compose**) è un sequencer per provare i sample su pattern tipici e portarli in Ableton.
 
 - **47 generi, 191 pattern**, con la bass music in primo piano:
   - *Bass music UK*: UK garage 2-step, speed garage, bassline, UK funky, grime, dubstep, riddim, tearout, halftime, breaks, future garage;
@@ -87,7 +105,7 @@ La terza scheda (**Libreria | Online | Sequencer | Drum Rack**) è un sequencer 
 - **Layer**: ogni bus può avere più sample che suonano insieme (es. 3 snare nel bus Snare), ciascuno con volume, pitch, offset in ms, mute/solo ed eventualmente step propri.
 - **Step**: clic per accendere/spegnere, Shift per l'accento, Alt per la ghost note, tasto destro per i roll ×2/×3/×4. Hi-hat chiuso e aperto sono in choke.
 - **Basso**: piano-roll con glide (Alt+clic su una nota); la radice del sample viene rilevata da sola, così il basso suona intonato.
-- **Invio ai bus**: dalla Libreria (tasto destro su un punto 3D o su una riga, oppure "Invia ▾" nella tendina) e dalla scheda Online (→), come nuovo layer o al posto di quello selezionato.
+- **Invio ai bus**: dalla Libreria (tasto destro su un punto 3D o su una riga, oppure "Invia ▾" nella tendina) e dallo Store (→), come nuovo layer o al posto di quello selezionato.
 - **Alternanza dei layer**: quando un bus ha 2 o più layer, accanto al nome scegli come suonano:
   - *insieme*: tutti a ogni colpo;
   - *a giro*: uno dopo l'altro;
