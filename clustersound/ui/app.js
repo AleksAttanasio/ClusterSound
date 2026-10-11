@@ -653,7 +653,7 @@ function bindUi() {
   window.addEventListener('keydown', (e) => {
     if (document.querySelector('wa-dialog[open]') || isTypingTarget(e)) return; // dialogs handle their own Esc
     if (state.tab === 'pattern' && e.key === ' ') { e.preventDefault(); pattern.togglePlay(); return; }
-    if (state.tab === 'compose') { if (!document.querySelector('.cp-modal, .popover') && compose.onKey(e)) e.preventDefault(); return; }
+    if (state.tab === 'compose') { if (!document.querySelector('.popover') && compose.onKey(e)) e.preventDefault(); return; }
     if (state.tab !== 'library') return;
     if (e.key === 'Escape') { if (state.focus) exitFocus(); else closePanel(); }
     if (e.key === ' ' && state.selected >= 0) { e.preventDefault(); togglePlay(); }
