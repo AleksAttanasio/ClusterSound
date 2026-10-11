@@ -8,6 +8,8 @@ A rack is plain JSON shared with the UI:
   "groups": {"<geometry>:<group index>": {"family": FAMILIES id, "choke": 0..16, "lock": bool}}
 }
 Pads do not depend on the geometry: switching it only regroups them.
+Racks with "device": "spdsx" (geometries "spd_*") are the Roland SPD-SX's 11 pads: see spdsx.py; the
+functions below dispatch to it, a rack without "device" is a 64-pad one.
 """
 from .. import taxonomy
 
@@ -76,8 +78,16 @@ def _block(r0: int, c0: int, h: int, w: int) -> list[int]:
 QUADRANTS = [(0, 0), (0, 4), (4, 0), (4, 4)]
 
 
-def groups(geometry: str) -> list[list[int]]:
+def is_spd(rack_or_geometry) -> bool:
+    if isinstance(rack_or_geometry, dict):
+        return rack_or_geometry.get("device") == "spdsx" or str(rack_or_geometry.get("geometry", "")).startswith("spd_")
+    return str(rack_or_geometry).startswith("spd_")
+
+
+def groups(geometry: str, triggers: dict | None = None) -> list[list[int]]:
     """Pads of each group, in fill order (row by row from the bottom-left, columns bottom to top)."""
+    if is_spd(geometry):
+        return spdsx.groups(geometry, triggers)
     if geometry == "cols8":
         return [_block(0, c, 8, 1) for c in range(N)]
     if geometry == "blocks2":
@@ -106,7 +116,23 @@ _DEFAULT_FAMILIES = {
 }
 
 
-def default_families(geometry: str) -> list[str]:
+def groups_of(rack: dict) -> list[list[int]]:
+    """Effective groups of a rack (an SPD-SX rack's disconnected triggers have none)."""
+    if is_spd(rack):
+        return spdsx.groups(rack["geometry"], spdsx.triggers_of(rack))
+    return groups(rack["geometry"])
+
+
+def group_keys(geometry: str, triggers: dict | None = None) -> list[str]:
+    """Key of each group in rack["groups"] (after "<geometry>:"): its index, or the SPD-SX group key."""
+    if is_spd(geometry):
+        return spdsx.group_keys(geometry, triggers)
+    return [str(g) for g in range(len(groups(geometry)))]
+
+
+def default_families(geometry: str, triggers: dict | None = None) -> list[str]:
+    if is_spd(geometry):
+        return spdsx.default_families(geometry, triggers)
     if geometry == "free":
         return ["any"] * PADS
     return list(_DEFAULT_FAMILIES[geometry])
@@ -115,10 +141,11 @@ def default_families(geometry: str) -> list[str]:
 def group_settings(rack: dict, geometry: str | None = None) -> list[dict]:
     """Effective {family, choke, lock} of every group of the rack's (or the given) geometry."""
     geometry = geometry or rack.get("geometry", "cols8")
+    triggers = spdsx.triggers_of(rack) if is_spd(geometry) else None
     saved = rack.get("groups") or {}
     out = []
-    for g, fam in enumerate(default_families(geometry)):
-        s = saved.get(f"{geometry}:{g}") or {}
+    for key, fam in zip(group_keys(geometry, triggers), default_families(geometry, triggers)):
+        s = saved.get(f"{geometry}:{key}") or {}
         fam = s.get("family") if s.get("family") in FAMILY_BY_ID else fam
         choke = s.get("choke")
         if choke is None:
@@ -136,11 +163,15 @@ def family_color(fam: str) -> str:
     return taxonomy.BY_ID[classes[0]].color if classes else "#8a8f98"
 
 
-def new_rack(name: str = "Kit") -> dict:
+def new_rack(name: str = "Kit", device: str = "grid64") -> dict:
+    if device == "spdsx":
+        return spdsx.new_rack(name)
     return {"name": name, "geometry": "cols8", "mapping": "launchpad", "pads": [None] * PADS, "groups": {}}
 
 
 def validate(rack: dict) -> dict:
+    if is_spd(rack or {}):
+        return spdsx.validate(rack)
     r = dict(rack or {})
     r["name"] = str(r.get("name") or "Kit")[:80]
     if r.get("geometry") not in GEOMETRIES:
@@ -154,6 +185,14 @@ def validate(rack: dict) -> dict:
     return r
 
 
+def pad_count(rack: dict) -> int:
+    return spdsx.PADS if is_spd(rack) else PADS
+
+
+def note_of(rack: dict, p: int) -> int:
+    return spdsx.NOTES[p] if is_spd(rack) else note_for(p, rack.get("mapping", "launchpad"))
+
+
 def ui_layouts() -> dict:
     return {
         "geometries": [{"id": g, "label": GEOMETRY_LABELS[g], "groups": groups(g), "families": default_families(g)}
@@ -161,4 +200,8 @@ def ui_layouts() -> dict:
         "families": [{"id": f, "label": label, "classes": classes, "color": family_color(f)}
                      for f, label, classes in FAMILIES],
         "notes": {m: [note_for(p, m) for p in range(PADS)] for m in ("launchpad", "rows")},
+        "spdsx": spdsx.ui_layout(),
     }
+
+
+from . import spdsx  # noqa: E402  (spdsx uses the families defined above)

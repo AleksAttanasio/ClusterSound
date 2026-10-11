@@ -43,6 +43,7 @@ from .racks import ableton as rack_ableton
 from .racks import dynamics_match
 from .racks import layouts as rack_layouts
 from .racks import select as rack_select
+from .racks import spdsx as rack_spdsx
 from .racks import store as rack_store
 
 PREVIEW_MAX_SECONDS = 60
@@ -796,7 +797,7 @@ class Api:
         used = {r["id"] for r in rack["pads"] if r and r.get("kind") == "library"}
         used_subs: dict[str, set] = {}
         settings = rack_layouts.group_settings(rack)
-        for g, pads in enumerate(rack_layouts.groups(rack["geometry"])):
+        for g, pads in enumerate(rack_layouts.groups_of(rack)):
             if settings[g]["lock"] or (only_empty and any(rack["pads"][p] for p in pads)):
                 continue
             fam = settings[g]["family"]
@@ -848,20 +849,54 @@ class Api:
         """Every unlocked (or every empty) group: random samples from a random group of its family.
         With opts["dyn_margin"] each group's envelopes stay close to the groups kept or generated before it."""
         opts = dict(opts or {})
+        distinct = bool(opts.pop("distinct_groups", False))
         rack = rack_layouts.validate(rack)
         settings = rack_layouts.group_settings(rack)
-        groups = rack_layouts.groups(rack["geometry"])
+        groups = rack_layouts.groups_of(rack)
         used = {r["id"] for g, pads in enumerate(groups) if settings[g]["lock"] or only_empty
                 for p in pads if (r := rack["pads"][p]) and r.get("kind") == "library"}
+        a = self._rack_arrays() if distinct and self._lib.items else None
+        used_groups = {a["group"][i] for i in used} if a is not None else set()
         for g, pads in enumerate(groups):
             if settings[g]["lock"] or (only_empty and any(rack["pads"][p] for p in pads)):
                 continue
-            refs = self.random_refs(rack_layouts.family_classes(settings[g]["family"]), len(pads),
-                                    {**opts, "exclude": list(used), "dyn_ref": list(used)})
+            classes = rack_layouts.family_classes(settings[g]["family"])
+            o = {**opts, "exclude": list(used), "dyn_ref": list(used)}
+            refs = []
+            if used_groups:  # a sample group (class + sub-cluster) not used by another pad group, if any is left
+                taken = np.flatnonzero(np.isin(a["group"], list(used_groups))).tolist()
+                refs = self.random_refs(classes, len(pads), {**o, "exclude": o["exclude"] + taken})
+            if len(refs) < len(pads):
+                refs = max(refs, self.random_refs(classes, len(pads), o), key=len)
             for p, ref in zip(pads, refs + [None] * len(pads)):
                 rack["pads"][p] = ref
             used |= {r["id"] for r in refs}
+            if a is not None:
+                used_groups |= {a["group"][r["id"]] for r in refs}
         return rack
+
+    def rack_generate(self, rack: dict, opts: dict | None = None) -> dict:
+        """A whole random kit. SPD-SX: a random playable configuration (kept when opts["keep_config"] or a
+        group is locked), then every unlocked group gets similar samples from a sample group no other pad
+        group uses, so the pedal kick and a pad kick, or two hat rows, sound different."""
+        opts = dict(opts or {})
+        rack = rack_layouts.validate(rack)
+        if not rack_layouts.is_spd(rack):
+            return self.rack_randomize(rack, False, opts)
+        locked = any(s["lock"] for s in rack_layouts.group_settings(rack))
+        if not (opts.pop("keep_config", False) or locked):
+            cfg = rack_spdsx.random_config(opts.get("rng_seed"), rack["triggers"])
+            rack["geometry"] = cfg["geometry"]
+            prefix = cfg["geometry"] + ":"
+            rack["groups"] = {k: v for k, v in rack["groups"].items() if not k.startswith(prefix)} | cfg["groups"]
+        return self.rack_randomize(rack, False, {**opts, "distinct_groups": True})
+
+    def rack_check(self, rack: dict) -> dict:
+        """Playability warnings and, per group, the families it can take (SPD-SX; None for the 8×8)."""
+        rack = rack_layouts.validate(rack)
+        if not rack_layouts.is_spd(rack):
+            return {"warnings": [], "allowed": None}
+        return {"warnings": rack_spdsx.playability(rack), "allowed": rack_spdsx.allowed_families(rack)}
 
     def list_racks(self) -> list[dict]:
         return rack_store.list_racks()
