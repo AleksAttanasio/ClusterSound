@@ -1,6 +1,6 @@
 // "Pattern" screen: genre patterns on drum buses (with sample layers) + bass line, MIDI/Ableton export.
 import { Sequencer, refKey } from './sequencer.js';
-import { suggestBus, toast } from './sendmenu.js';
+import { suggestBus, toast, showPopover } from './sendmenu.js';
 import { Arranger } from './arranger.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -8,10 +8,16 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const LS_KEY = 'clustersound.pattern';
 const KIND_BADGE = { library: 'LIB', online: 'WEB', file: 'FILE' };
+const ALT_MODES = [['off', 'insieme'], ['cycle', 'a giro'], ['random', 'casuale'], ['random_pass', 'casuale ogni giro']];
+// buses where alternating samples makes no sense by default (one kick, one FX, a melodic bass)
+export const NO_ALT = new Set(['kick', 'fx', 'bass']);
+export const newSeed = () => Math.floor(Math.random() * 2 ** 32) >>> 0;
+const LS_RANDOM = 'clustersound.randomKit';
 
 export class PatternEditor {
-  constructor({ api, player, classes }) {
+  constructor({ api, player, classes, onLoadFromRack }) {
     this.api = api;
+    this.onLoadFromRack = onLoadFromRack;
     this.player = player;
     this.classColor = Object.fromEntries(classes.map((c) => [c.id, c.color]));
     this.ready = null;
@@ -147,6 +153,83 @@ export class PatternEditor {
     toast(`${mode === 'replace' ? 'Sostituito in' : 'Aggiunto a'} ${this.busById[busId].label} (layer ${idx + 1})`);
   }
 
+  // Samples from the Drum Rack: assign = {busId: {refs, alt}}. replace: the bus loses its layers;
+  // clearOthers: buses not in assign are emptied too. Without alternation only the first new layer plays.
+  async loadKit(assign, { replace = true, clearOthers = false } = {}) {
+    await this.ensure();
+    for (const bdef of this.buses) {
+      const bus = this.p.buses[bdef.id];
+      const a = assign[bdef.id];
+      if (!a) { if (clearOthers) bus.layers = []; continue; }
+      await this._setLayers(bdef.id, a.refs, a.alt, replace);
+    }
+    this._persist();
+    await this.seq.preload(this.p);
+    this.renderAll();
+  }
+
+  async _setLayers(id, refs, alt, replace = true) {
+    const bus = this.p.buses[id];
+    const fresh = refs.map((r) => this._layer(r));
+    if (id === 'bass') {
+      await Promise.all(fresh.map(async (l) => { if (l.root == null) l.root = await this.api.sample_root(l.ref); }));
+    } else {
+      bus.alt = { mode: alt || 'off', seed: newSeed() };
+    }
+    if (id === 'bass' || (alt || 'off') === 'off') fresh.forEach((l, k) => { l.mute = k > 0 || (!replace && bus.layers.some((x) => !x.mute)); });
+    bus.layers = replace ? fresh : bus.layers.concat(fresh);
+    this.selected[id] = 0;
+    if (fresh.length > 1) this.expanded.add(id);
+  }
+
+  _randomOpts() {
+    try { return { variants: 1, folder: '', oneshot: true, ...JSON.parse(localStorage.getItem(LS_RANDOM) || '{}') }; } catch { return { variants: 1, folder: '', oneshot: true }; }
+  }
+
+  openRandomKit(anchor) {
+    const o = this._randomOpts();
+    const pop = showPopover(anchor, `
+      <div class="pop-title">🎲 Kit casuale</div>
+      <div class="hint">Per ogni bus non bloccato (🔒) sceglie a caso un gruppo di sample simili delle sue classi e ne prende sample a caso. Il groove non cambia.</div>
+      <label class="pop-field">Sample per bus
+        <select data-o="variants">${[1, 2, 4].map((n) => `<option value="${n}" ${o.variants === n ? 'selected' : ''}>${n}${n > 1 ? ' (alternati a caso)' : ''}</option>`).join('')}</select></label>
+      <label class="pop-field">Solo dalla cartella / pack (facoltativo)<input type="text" data-o="folder" value="${esc(o.folder)}" placeholder="es. Cymatics"></label>
+      <label class="pop-check"><input type="checkbox" data-o="oneshot" ${o.oneshot ? 'checked' : ''}> solo one-shot (niente loop)</label>
+      <div class="pop-actions"><button class="btn primary" data-go>Genera</button></div>`);
+    pop.querySelector('[data-go]').onclick = async () => {
+      const opts = {
+        variants: +pop.querySelector('[data-o=variants]').value,
+        folder: pop.querySelector('[data-o=folder]').value.trim(),
+        oneshot: pop.querySelector('[data-o=oneshot]').checked,
+      };
+      try { localStorage.setItem(LS_RANDOM, JSON.stringify(opts)); } catch { /* private mode */ }
+      pop.close();
+      await this.randomKit(opts);
+    };
+  }
+
+  async randomKit({ variants = 1, folder = '', oneshot = true } = {}) {
+    await this.ensure();
+    const used = [];
+    let done = 0, locked = 0;
+    for (const bdef of this.buses) {
+      const bus = this.p.buses[bdef.id];
+      const plays = bdef.melodic ? bus.notes.length : bus.steps.some((v) => v) || bus.layers.some((l) => l.steps?.some((v) => v));
+      if (!plays) continue;
+      if (bus.lock) { locked++; continue; }
+      const n = bdef.melodic ? 1 : variants;
+      const refs = await this.api.random_refs(bdef.classes, n, { oneshot: bdef.melodic ? false : oneshot, folder, exclude: used });
+      if (!refs.length) continue;
+      used.push(...refs.map((r) => r.id));
+      await this._setLayers(bdef.id, refs, NO_ALT.has(bdef.id) || refs.length < 2 ? 'off' : 'random');
+      done++;
+    }
+    this._persist();
+    await this.seq.preload(this.p);
+    this.renderAll();
+    toast(done ? `Kit casuale: ${done} bus${locked ? ` · ${locked} bloccati` : ''}` : 'Nessun sample adatto (controlla il filtro cartella)');
+  }
+
   layerCounts() {
     const out = {};
     if (this.p) for (const [id, b] of Object.entries(this.p.buses)) out[id] = b.layers.length;
@@ -209,6 +292,8 @@ export class PatternEditor {
         <select id="pt-genre" class="cls-select pt-genre" title="Genere">${groups}</select>
         <div id="pt-variants" class="chips pt-variants"></div>
         <div class="spacer"></div>
+        <button id="pt-random" class="btn" title="Sceglie a caso un gruppo di sample simili per ogni bus non bloccato (🔒) e ne prende sample a caso">🎲 Kit casuale</button>
+        <button id="pt-fromrack" class="btn" title="Carica i sample del Drum Rack nei bus del Sequencer">▦ Carica dal Drum Rack</button>
         <button id="pt-vary" class="btn" title="Genera una variazione del pattern corrente">Varia</button>
         <button id="pt-save" class="btn" title="Salva come variante personale del genere">Salva variante</button>
         <button id="pt-del" class="btn" hidden title="Elimina questa variante personale">Elimina</button>
@@ -226,7 +311,7 @@ export class PatternEditor {
         <button id="pt-abl" class="btn primary" title="Cartella con Drum Rack .adg, sample, MIDI e loop pronta per Ableton Live">Esporta per Ableton</button>
       </div>
       <div class="pt-help hint">Clic: step on/off · Shift+clic: accento · Alt+clic: ghost · Tasto destro: roll ×2/×3/×4 · Spazio: play/stop.
-        Invia sample ai bus dalla Libreria (tasto destro su un punto 3D o una riga) o dalla scheda Online.</div>
+        Invia sample ai bus dalla Libreria (tasto destro su un punto 3D o una riga), dalla scheda Online o dal Drum Rack.</div>
       <div id="sq-panel" class="sq"></div>
       <div id="pt-empty" class="pt-empty hint" hidden></div>
       <div id="pt-grid" class="pt-grid"></div>`;
@@ -250,6 +335,8 @@ export class PatternEditor {
     $('#pt-key').onchange = (e) => { this.p.key = e.target.value; this._persist(); this.renderGrid(); };
     $('#pt-oct').onchange = (e) => { this.p.octave = +e.target.value; this._persist(); this.renderGrid(); };
     $('#pt-vary').onclick = () => this.vary();
+    $('#pt-random').onclick = (e) => this.openRandomKit(e.currentTarget);
+    $('#pt-fromrack').onclick = () => this.onLoadFromRack?.();
     $('#pt-save').onclick = () => this.saveVariant();
     $('#pt-del').onclick = () => this.deleteVariant();
     $('#pt-midi').onclick = async () => { const p = await this.api.export_midi(this._exportable(), $('#pt-map').value); if (p) toast(`MIDI salvato: ${p.split('/').pop()}`); };
@@ -388,6 +475,21 @@ export class PatternEditor {
     </div>`;
   }
 
+  _lock(id, b) {
+    return `<button class="pt-ib pt-lock ${b.lock ? 'on' : ''}" data-act="lock" data-bus="${id}"
+      title="${b.lock ? 'Bloccato: Kit casuale non lo cambia (clic per sbloccare)' : 'Blocca: Kit casuale non cambierà questo bus'}">${b.lock ? '🔒' : '🔓'}</button>`;
+  }
+
+  // how the layers share the hits (only meaningful with 2+ layers)
+  _alt(id, b) {
+    if (b.layers.length < 2) return '';
+    const mode = b.alt?.mode || 'off';
+    return `<select class="pt-alt ${mode !== 'off' ? 'on' : ''}" data-field="alt" data-bus="${id}"
+        title="Layer: insieme = suonano tutti a ogni colpo; a giro / casuale = un layer diverso a ogni colpo">
+        ${ALT_MODES.map(([m, l]) => `<option value="${m}" ${m === mode ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      ${mode.startsWith('random') ? `<button class="pt-ib" data-act="reseed" data-bus="${id}" title="Nuova estrazione casuale dei layer">⚄</button>` : ''}`;
+  }
+
   _layerRow(id, b, l, j) {
     const sel = (this.selected[id] ?? 0) === j;
     const badge = l.ref ? KIND_BADGE[l.ref.kind] : '';
@@ -427,7 +529,7 @@ export class PatternEditor {
         rows.push(`<div class="pt-bus bass" data-bus="${id}">
           <div class="pt-head"><span class="caret" data-act="expand">${open ? '▾' : '▸'}</span>
             <span class="dot" style="background:${bdef.color}"></span><span class="pt-name">${bdef.label}</span>
-            <span class="pt-nl">${nl ? `${nl} layer` : 'nessun sample'}</span>${this._mix(id, b)}</div>
+            <span class="pt-nl">${nl ? `${nl} layer` : 'nessun sample'}</span>${this._lock(id, b)}${this._mix(id, b)}</div>
           ${this._roll(b, n)}
           ${open ? `<div class="pt-layers">${b.layers.map((l, j) => this._layerRow(id, b, l, j)).join('')}
             <button class="btn small pt-add" data-act="add-layer" data-bus="${id}">+ layer</button></div>` : ''}
@@ -438,7 +540,7 @@ export class PatternEditor {
         <div class="pt-row">
           <div class="pt-head"><span class="caret" data-act="expand">${open ? '▾' : '▸'}</span>
             <span class="dot" style="background:${bdef.color}"></span><span class="pt-name">${bdef.label}</span>
-            <span class="pt-nl">${nl ? `${nl} layer` : '—'}</span></div>
+            <span class="pt-nl">${nl ? `${nl} layer` : '—'}</span>${this._lock(id, b)}${this._alt(id, b)}</div>
           <div class="pt-steps" style="--n:${n}">${this._cells(b.steps, b.ratchet, id)}</div>
           ${this._mix(id, b)}
         </div>
@@ -451,7 +553,7 @@ export class PatternEditor {
     const empty = $('#pt-empty');
     empty.hidden = anySample;
     empty.textContent = 'Nessun sample assegnato: scegli una cartella nella scheda Libreria (i bus si riempiono da soli), '
-      + 'oppure usa "…" su un layer, o "Invia al bus" dalla Libreria e dalla scheda Online.';
+      + 'oppure usa "…" su un layer, "Invia" dalla Libreria e dalla scheda Online, o "Carica dal Drum Rack".';
     this._bindRoll();
   }
 
@@ -580,6 +682,8 @@ export class PatternEditor {
     switch (t.dataset.act) {
       case 'expand': this.expanded.has(id) ? this.expanded.delete(id) : this.expanded.add(id); this.renderGrid(); return;
       case 'mute': bus.mute = !bus.mute; break;
+      case 'lock': bus.lock = !bus.lock; break;
+      case 'reseed': bus.alt = { mode: bus.alt?.mode || 'random', seed: newSeed() }; break;
       case 'solo': bus.solo = !bus.solo; break;
       case 'lmute': layer.mute = !layer.mute; break;
       case 'lsolo': layer.solo = !layer.solo; break;
@@ -604,6 +708,13 @@ export class PatternEditor {
     if (!id) return;
     const bus = this.p.buses[id];
     if (el.dataset.field === 'volume' || el.dataset.field === 'pan') bus[el.dataset.field] = +el.value;
+    else if (el.dataset.field === 'alt') {
+      if (!committed) return;
+      bus.alt = { mode: el.value, seed: bus.alt?.seed || newSeed() };
+      this._persist();
+      this.renderGrid();
+      return;
+    }
     else if (el.dataset.field === 'filter') {
       const [kind, f] = (el.value || ':').split(':');
       bus.hp = kind === 'hp' ? +f : 0;

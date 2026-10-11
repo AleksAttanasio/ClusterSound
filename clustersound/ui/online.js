@@ -345,7 +345,7 @@ export class Online {
       <div class="num o-dur">${fmtDur(r.duration)}</div>
       <div class="o-meta" title="${esc(meta)}">${esc(meta)}</div>
       <div class="o-actions">
-        ${playable && (r.preview_url || r.download_url) ? `<button class="o-btn" data-send="${esc(r.uid)}" title="Invia al bus del Pattern (file temporaneo, nessun download)">→</button>` : ''}
+        ${playable && (r.preview_url || r.download_url) ? `<button class="o-btn" data-send="${esc(r.uid)}" title="Invia al Sequencer o al Drum Rack (file temporaneo, nessun download)">→</button>` : ''}
         ${r.download_url ? `<button class="o-btn" data-dl="${esc(r.uid)}" title="Scarica${r.download_note ? ' — ' + esc(r.download_note) : ''}${r.filesize ? ' (' + fmtSize(r.filesize) + ')' : ''}">⬇</button>` : ''}
         ${r.page_url ? `<button class="o-btn" data-open="${esc(r.page_url)}" title="Apri la pagina della fonte">↗</button>` : ''}
       </div>

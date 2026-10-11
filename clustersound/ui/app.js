@@ -57,8 +57,9 @@ async function main() {
   });
 
   online = new Online({ api: state.api, player, classes: state.classes, groups: state.groups, types: state.types });
-  pattern = new PatternEditor({ api: state.api, player, classes: state.classes });
-  rack = new DrumRackEditor({ api: state.api, player, classes: state.classes, getTrail });
+  pattern = new PatternEditor({ api: state.api, player, classes: state.classes, onLoadFromRack: () => rack.openLoadDialog() });
+  rack = new DrumRackEditor({ api: state.api, player, classes: state.classes, getTrail,
+    getSequencer: () => pattern, onOpenSequencer: () => setTab('pattern') });
   online.onSend = (ref, x, y) => sendRef(ref, x, y);
   buildSidebar();
   bindUi();
@@ -256,7 +257,8 @@ function onHover(i, x, y) {
   const sim = state.focus?.items.find((it) => it.id === i);
   tip.innerHTML = `<div class="t-name">${esc(d.name[i])}</div>
     <div class="t-sub"><span class="dot" style="background:${c.color}"></span>${esc(c.label)} · ${d.user[i] ? 'manuale' : Math.round(d.conf[i] * 100) + '%'} · gruppo ${d.sub[i]}</div>
-    ${sim ? `<div class="t-sub">Somiglianza ${Math.round(sim.sim * 100)}%</div>` : ''}`;
+    ${sim ? `<div class="t-sub">Somiglianza ${Math.round(sim.sim * 100)}%</div>` : ''}
+    <div class="t-hint">Tasto destro: invia al Sequencer o al Drum Rack</div>`;
   tip.hidden = false;
   const W = $('#view3d').clientWidth;
   tip.style.left = `${Math.min(x + 14, W - tip.offsetWidth - 8)}px`;
@@ -555,7 +557,11 @@ const getTrail = () => (state.data ? state.lastTrail.map((id) => ({ id, name: st
 async function sendRef(ref, x, y) {
   await pattern.ensure();
   showSendMenu({ x, y, ref, buses: pattern.buses, counts: pattern.layerCounts(),
-    onPick: (bus, mode) => pattern.addSample(bus, ref, mode), onRack: () => rack.sendSeed(ref) });
+    onPick: (bus, mode) => pattern.addSample(bus, ref, mode),
+    rack: { target: await rack.sendTarget(), onAdd: async (similar, open) => {
+      await rack.addSample(ref, { similar });
+      if (open) setTab('rack');
+    } } });
 }
 
 async function sendLibraryItem(id, x, y) {

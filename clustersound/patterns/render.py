@@ -97,8 +97,7 @@ def render(p: dict, resolve) -> np.ndarray:
     cache = SampleCache(resolve)
     audible = model.audible_buses(p)
     # closed hat chokes the open hat (choke group 1 in the exported Drum Rack)
-    chokes = sorted(t for ly in model.active_layers(p["buses"]["chat"]) for t, _ in model.drum_hits(p, "chat", ly)) \
-        if "chat" in audible else []
+    chokes = sorted({t for _, t, _ in model.bus_hits(p, "chat")}) if "chat" in audible else []
     loop_ticks = model.n_steps(p) * model.TICKS_PER_STEP
     for bid in audible:
         bus = p["buses"][bid]
@@ -106,9 +105,9 @@ def render(p: dict, resolve) -> np.ndarray:
         if not layers:
             continue
         busbuf = np.zeros_like(mix)
-        for layer in layers:
-            off = int(layer.get("offset_ms", 0) / 1000 * SR)
-            if bid == "bass":
+        if bid == "bass":
+            for layer in layers:
+                off = int(layer.get("offset_ms", 0) / 1000 * SR)
                 for nt in bus["notes"]:
                     x = cache.get(layer["ref"], bass_semitones(p, layer, nt["semi"]))
                     if x is None:
@@ -116,17 +115,18 @@ def render(p: dict, resolve) -> np.ndarray:
                     start = int(model.tick(p, nt["step"]) * sec_per_tick * SR) + off
                     length = int(nt["len"] * model.TICKS_PER_STEP * sec_per_tick * SR)
                     _add(busbuf, x, start, layer["volume"] * vel_gain(nt.get("vel", 100)), length)
-            else:
+        else:
+            for j, tick, vel in model.bus_hits(p, bid):
+                layer = layers[j]
                 x = cache.get(layer["ref"], layer.get("pitch", 0))
                 if x is None:
                     continue
-                for tick, vel in model.drum_hits(p, bid, layer):
-                    start = int(tick * sec_per_tick * SR) + off
-                    gate = None
-                    if bid == "ohat" and chokes:
-                        nxt = next((c for c in chokes if c > tick), chokes[0] + loop_ticks)
-                        gate = int((nxt - tick) * sec_per_tick * SR)
-                    _add(busbuf, x, start, layer["volume"] * vel_gain(vel), gate)
+                start = int(tick * sec_per_tick * SR) + int(layer.get("offset_ms", 0) / 1000 * SR)
+                gate = None
+                if bid == "ohat" and chokes:
+                    nxt = next((c for c in chokes if c > tick), chokes[0] + loop_ticks)
+                    gate = int((nxt - tick) * sec_per_tick * SR)
+                _add(busbuf, x, start, layer["volume"] * vel_gain(vel), gate)
         busbuf = _filter(busbuf, bus.get("hp", 0), bus.get("lp", 0))
         gl, gr = pan_gains(bus.get("pan", 0.0))
         busbuf[:, 0] *= gl * np.sqrt(2) * bus["volume"]

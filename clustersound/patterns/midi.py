@@ -32,30 +32,46 @@ def _track(name: str, events: list[tuple[int, bytes]], tempo_bpm: float | None, 
     return b"MTrk" + struct.pack(">I", len(data)) + bytes(data)
 
 
-def drum_notes(p: dict, mapping: str = "drumrack", include: set | None = None) -> dict[str, int]:
-    """bus id -> MIDI note. Drum Rack: consecutive pads from C1 for the buses that are used
-    (optionally only those in `include`, e.g. the buses that actually have a sample)."""
+def drum_layout(p: dict, mapping: str = "drumrack", include: set | None = None) -> dict[str, list[int]]:
+    """bus id -> MIDI notes. Drum Rack: consecutive pads from C1 for the buses that are used (optionally
+    only those in `include`, e.g. the buses that actually have a sample); a bus that alternates its
+    layers gets one pad per active layer, in active_layers order. GM: one note per bus."""
     used = [b for b in model.DRUM_IDS if (include is None or b in include) and (any(p["buses"][b]["steps"]) or
             any(ly.get("steps") and any(ly["steps"]) for ly in p["buses"][b]["layers"]))]
     if mapping == "gm":
-        return {b: model.BUS_BY_ID[b][3] for b in used}
-    return {b: 36 + i for i, b in enumerate(used)}
+        return {b: [model.BUS_BY_ID[b][3]] for b in used}
+    out, note = {}, 36
+    for b in used:
+        bus = p["buses"][b]
+        n = len(model.active_layers(bus)) if model.alternating(bus) else 1
+        out[b] = list(range(note, note + n))
+        note += n
+    return out
+
+
+def drum_notes(p: dict, mapping: str = "drumrack", include: set | None = None) -> dict[str, int]:
+    """bus id -> its (first) MIDI note."""
+    return {b: notes[0] for b, notes in drum_layout(p, mapping, include).items()}
 
 
 def drum_events(p: dict, mapping: str = "drumrack", channel: int = 9,
                 include: set | None = None) -> list[tuple[int, bytes]]:
-    notes = drum_notes(p, mapping, include)
+    layout = drum_layout(p, mapping, include)
     ev = []
     for bid in model.audible_buses(p):
-        if bid not in notes:
+        if bid not in layout:
             continue
-        hits = set(model.drum_hits(p, bid))
-        for layer in p["buses"][bid]["layers"]:  # layers with their own steps still play this pad
-            if layer.get("steps") is not None:
-                hits |= set(model.drum_hits(p, bid, layer))
-        for tick, vel in sorted(hits):
-            ev.append((tick, bytes([0x90 | channel, notes[bid], vel])))
-            ev.append((tick + DRUM_LEN, bytes([0x80 | channel, notes[bid], 0])))
+        notes = layout[bid]
+        if len(notes) > 1:  # alternating bus: every hit goes to the pad of the layer that plays it
+            hits = {(notes[j], t, v) for j, t, v in model.bus_hits(p, bid)}
+        else:
+            hits = {(notes[0], t, v) for t, v in model.drum_hits(p, bid)}
+            for layer in p["buses"][bid]["layers"]:  # layers with their own steps still play this pad
+                if layer.get("steps") is not None:
+                    hits |= {(notes[0], t, v) for t, v in model.drum_hits(p, bid, layer)}
+        for note, tick, vel in sorted(hits, key=lambda h: (h[1], h[0])):
+            ev.append((tick, bytes([0x90 | channel, note, vel])))
+            ev.append((tick + DRUM_LEN, bytes([0x80 | channel, note, 0])))
     return ev
 
 

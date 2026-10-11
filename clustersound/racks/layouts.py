@@ -5,7 +5,7 @@ A rack is plain JSON shared with the UI:
 {
   "name", "geometry": one of GEOMETRIES, "mapping": "launchpad" | "rows",
   "pads": [64 × sample ref or null],
-  "groups": {"<geometry>:<group index>": {"family": FAMILIES id, "choke": 0..16}}
+  "groups": {"<geometry>:<group index>": {"family": FAMILIES id, "choke": 0..16, "lock": bool}}
 }
 Pads do not depend on the geometry: switching it only regroups them.
 """
@@ -113,7 +113,7 @@ def default_families(geometry: str) -> list[str]:
 
 
 def group_settings(rack: dict, geometry: str | None = None) -> list[dict]:
-    """Effective {family, choke} of every group of the rack's (or the given) geometry."""
+    """Effective {family, choke, lock} of every group of the rack's (or the given) geometry."""
     geometry = geometry or rack.get("geometry", "cols8")
     saved = rack.get("groups") or {}
     out = []
@@ -123,7 +123,7 @@ def group_settings(rack: dict, geometry: str | None = None) -> list[dict]:
         choke = s.get("choke")
         if choke is None:
             choke = 1 if fam in HAT_FAMILIES else 0
-        out.append({"family": fam, "choke": max(0, min(16, int(choke)))})
+        out.append({"family": fam, "choke": max(0, min(16, int(choke))), "lock": bool(s.get("lock"))})
     return out
 
 

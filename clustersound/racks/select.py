@@ -77,3 +77,19 @@ def trail(Xn, ids, size, ok=None, exclude=()) -> list[tuple[int, float]]:
     if len(out) < size:
         out += neighbours(Xn, stops[-1], size - len(out), ok, set(exclude) | set(stops))
     return out
+
+
+def random_group(Xn, keys, ok, count, variation=0.6, rng_seed=None) -> list[tuple[int, float]]:
+    """A random sample group and random samples from it: among the allowed items, pick one of their
+    groups (`keys`, e.g. class + sub-cluster) uniformly, a random seed inside it, then count - 1
+    similar companions drawn at random (allowed items only)."""
+    idx = np.flatnonzero(ok)
+    if not len(idx) or count <= 0:
+        return []
+    rng = np.random.default_rng(rng_seed)
+    groups = sorted(set(keys[idx].tolist()))
+    g = groups[rng.integers(len(groups))]
+    members = idx[keys[idx] == g]
+    seed = int(members[rng.integers(len(members))])
+    rest = pick(Xn, seed, count - 1, "random", ok, variation, rng_seed=int(rng.integers(1 << 31)))
+    return [(seed, 1.0)] + rest

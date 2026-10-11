@@ -69,7 +69,7 @@ export class Panel {
         <button class="btn primary" data-act="play">${playing ? '■ Stop' : '▶ Play'}</button>
         <button class="btn" data-act="reveal" title="Apre il Finder con il file selezionato">Mostra nella cartella</button>
         <button class="btn" data-act="similar">Trova simili</button>
-        <button class="btn" data-act="send" title="Aggiungi o sostituisci questo sample in un bus del Pattern">Invia al bus ▾</button>
+        <button class="btn" data-act="send" title="Aggiungi il sample a un bus del Sequencer o al Drum Rack">Invia ▾</button>
       </div>
 
       <div>

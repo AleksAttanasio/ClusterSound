@@ -203,14 +203,25 @@ def export_package(p: dict, dest_root: str, resolve, describe, title: str) -> st
         for i, layer in enumerate(layers, 1):
             info = place(label, i, layer)
             if info:
-                placed.append((layer, info))
+                placed.append((i - 1, layer, info))
         if placed:
             loaded[bid] = (label, placed)
-    notes = midi.drum_notes(p, "drumrack", include=set(loaded))
-    for bid, note in notes.items():
+    layout = midi.drum_layout(p, "drumrack", include=set(loaded))
+    for bid, notes in layout.items():
         bus = p["buses"][bid]
         label, placed = loaded[bid]
         rel = ["Samples", safe_name(label)]
+        mix = {"volume": bus.get("volume", 0.8) / 0.8, "pan": bus.get("pan", 0.0),
+               "choke": 1 if bid in ("chat", "ohat") else 0}
+        if len(notes) > 1:
+            # alternating bus: one pad per layer, the MIDI picks the layer of every hit
+            for j, layer, info in placed:
+                dev = simpler(info, rel, one_shot=True, transpose=layer.get("pitch", 0),
+                              volume_db=_db(layer.get("volume", 1.0)))
+                pads.append({"name": f"{model.BUS_BY_ID[bid][1]} {j + 1}", "note": notes[j], "devices": [dev], **mix})
+            continue
+        note = notes[0]
+        placed = [(layer, info) for _, layer, info in placed]
         if len(placed) == 1:
             layer, info = placed[0]
             devices = [simpler(info, rel, one_shot=True, transpose=layer.get("pitch", 0),
@@ -220,14 +231,12 @@ def export_package(p: dict, dest_root: str, resolve, describe, title: str) -> st
                        simpler(info, rel, one_shot=True, transpose=layer.get("pitch", 0)), layer.get("volume", 1.0))
                       for layer, info in placed]
             devices = [instrument_rack(chains)]
-        pads.append({"name": model.BUS_BY_ID[bid][1], "note": note, "devices": devices,
-                     "volume": bus.get("volume", 0.8) / 0.8, "pan": bus.get("pan", 0.0),
-                     "choke": 1 if bid in ("chat", "ohat") else 0})
+        pads.append({"name": model.BUS_BY_ID[bid][1], "note": note, "devices": devices, **mix})
     base = safe_name(title)
     if pads:
         write_adg(drum_rack_document(pads), os.path.join(folder, f"{base} Drum Rack.adg"))
-        midi.write(os.path.join(folder, "Drums.mid"), p, "drums", "drumrack", include=set(notes))
-        midi.write(os.path.join(folder, "Drums (General MIDI).mid"), p, "drums", "gm", include=set(notes))
+        midi.write(os.path.join(folder, "Drums.mid"), p, "drums", "drumrack", include=set(layout))
+        midi.write(os.path.join(folder, "Drums (General MIDI).mid"), p, "drums", "gm", include=set(layout))
 
     bass = p["buses"]["bass"]
     blayers = model.active_layers(bass)
@@ -265,6 +274,10 @@ def readme(p: dict, base: str, pads: list[dict], has_bass: bool, licences: list)
         lines += [f"1. Trascina \"{base} Drum Rack.adg\" su una traccia MIDI vuota (dal Finder o dal Browser > Places).",
                   "2. Trascina \"Drums.mid\" in uno slot clip della stessa traccia.",
                   "   Pad del Drum Rack: " + ", ".join(f"{pd['name']} = {_note_name(pd['note'])}" for pd in pads) + "."]
+        alt = [model.BUS_BY_ID[b][1] for b in model.DRUM_IDS if model.alternating(p["buses"][b])]
+        if alt:
+            lines.append("   " + ", ".join(alt) + ": i sample si alternano, quindi ognuno ha il suo pad e il MIDI suona"
+                         " quello giusto a ogni colpo (con \"casuale ogni giro\" è registrato il primo giro).")
     if has_bass:
         lines += [f"3. Trascina \"{base} Bass.adg\" su una seconda traccia MIDI e poi \"Bass.mid\" nello slot clip.",
                   "   Il Simpler del basso è monofonico, con la nota radice del sample già impostata"

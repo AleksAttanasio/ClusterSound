@@ -191,6 +191,79 @@ def test_ableton_package(tmp_path, samples):
     assert sf.info(os.path.join(folder, "Loop.wav")).duration == pytest.approx(16 * 60 / p["bpm"] / 4, abs=1e-3)
 
 
+# ---------------------------------------------------------------- layer alternation
+HASH_VECTOR = [((0, 0), 0), ((1, 0), 1667036862), ((7, 15), 1636717729), ((123456, 63), 3070290591),
+               ((4294967295, 1000), 3072357879)]  # also checked against altHash() in ui/sequencer.js
+
+
+def test_alt_hash_vector():
+    assert [model.alt_hash(*args) for args, _ in HASH_VECTOR] == [v for _, v in HASH_VECTOR]
+
+
+def _alt(p, bus, mode, seed=3):
+    p["buses"][bus]["alt"] = {"mode": mode, "seed": seed}
+    return model.validate(p)
+
+
+def test_bus_hits_alternation(samples):
+    base = with_samples(genres.build("dnb_rollers", 0), samples,
+                        {"chat": ["chat", "ohat", "clap"], "snare": ["snare", "clap"]})
+    n_hits = len(model.drum_hits(base, "chat"))
+    together = model.bus_hits(base, "chat")
+    assert len(together) == 3 * n_hits  # off: every layer on every hit
+    for mode in ("cycle", "random", "random_pass"):
+        p = _alt(base, "chat", mode)
+        hits = model.bus_hits(p, "chat")
+        assert len(hits) == n_hits and {t for _, t, _ in hits} == {t for t, _ in model.drum_hits(p, "chat")}
+        assert len({j for j, _, _ in hits}) > 1
+    cyc = _alt(base, "chat", "cycle")
+    steps = [i for i, v in enumerate(cyc["buses"]["chat"]["steps"]) if v]
+    first = [j for j, t, _ in model.bus_hits(cyc, "chat") if t in {model.tick(cyc, i) for i in steps}]
+    assert first[:3] == [0, 1, 2]
+    # random: seed decides; random_pass renders/exports its first loop, i.e. the same picks
+    assert model.bus_hits(_alt(base, "chat", "random", 1), "chat") != model.bus_hits(_alt(base, "chat", "random", 2), "chat")
+    bus = _alt(base, "chat", "random_pass")["buses"]["chat"]
+    assert [model.alt_pick(bus, 3, i, 0, 16, loop=0) for i in range(16)] != [model.alt_pick(bus, 3, i, 0, 16, loop=1) for i in range(16)]
+    # muted layers drop out; a single remaining layer means no alternation
+    p = _alt(base, "chat", "random")
+    p["buses"]["chat"]["layers"][1]["mute"] = p["buses"]["chat"]["layers"][2]["mute"] = True
+    assert not model.alternating(p["buses"]["chat"]) and {j for j, _, _ in model.bus_hits(p, "chat")} == {0}
+    # a layer with its own steps keeps them
+    p = _alt(base, "chat", "random")
+    own = [0] * 16
+    own[3] = 100
+    p["buses"]["chat"]["layers"][2]["steps"] = own
+    hits = model.bus_hits(p, "chat")
+    assert [t for j, t, _ in hits if j == 2] == [model.tick(p, 3)]
+    assert {j for j, _, _ in hits if j != 2} <= {0, 1}
+
+
+def test_alternation_render_midi_and_package(tmp_path, samples):
+    p = _alt(with_samples(genres.build("dnb_rollers", 0), samples, {"chat": ["chat", "ohat"], "snare": ["snare", "clap"]}),
+             "chat", "random")
+    layout = midi.drum_layout(p, "drumrack")
+    assert len(layout["chat"]) == 2 and len(layout["snare"]) == 1 and len(midi.drum_layout(p, "gm")["chat"]) == 1
+    flat = [n for ns in layout.values() for n in ns]
+    assert flat == list(range(36, 36 + len(flat)))
+    path = tmp_path / "a.mid"
+    midi.write(str(path), p, "drums", "drumrack")
+    got = sorted((t, n) for _, t, n, _ in midi.read_notes(str(path)) if n in layout["chat"])
+    assert got == sorted((t, layout["chat"][j]) for j, t, _ in model.bus_hits(p, "chat"))
+    # rendering alternated hats has less energy than both layers on every hit
+    off = model.validate({**p, "buses": {**p["buses"], "chat": {**p["buses"]["chat"], "alt": {"mode": "off", "seed": 0}}}})
+    e = lambda q: float(np.sum(render.render(q, lambda r: r.get("path")) ** 2))  # noqa: E731
+    assert e(p) < e(off)
+    folder = ableton.export_package(p, str(tmp_path), lambda r: r.get("path"), lambda r: None, "Alt")
+    doc = ET.fromstring(gzip.open(os.path.join(folder, "Alt Drum Rack.adg")).read())
+    names = {b.find("Name").get("Value"): 128 - int(b.find("ZoneSettings/ReceivingNote").get("Value"))
+             for b in doc.find("GroupDevicePreset/BranchPresets")}
+    filled = midi.drum_layout(p, "drumrack", include={b for b in model.DRUM_IDS if model.active_layers(p["buses"][b])})
+    assert names["Closed Hat 1"] == filled["chat"][0] and names["Closed Hat 2"] == filled["chat"][1]
+    midi_notes = {n for _, _, n, _ in midi.read_notes(os.path.join(folder, "Drums.mid"))}
+    assert midi_notes <= set(names.values())
+    assert "si alternano" in open(os.path.join(folder, "LEGGIMI.txt"), encoding="utf-8").read()
+
+
 # ---------------------------------------------------------------- user patterns + cache
 def test_user_store(tmp_path, monkeypatch):
     monkeypatch.setattr(store, "data_dir", lambda: tmp_path)

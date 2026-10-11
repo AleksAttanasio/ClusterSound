@@ -478,6 +478,7 @@ class Api:
             c["version"] = (lib.version, len(lib.items))
             c["cls"] = np.array([it["cls"] for it in lib.items], dtype=object)
             c["oneshot"] = np.array([it["feats"].get("type") == "One-shot" for it in lib.items], bool)
+            c["group"] = np.array([f'{it["cls"]}:{it.get("sub", 0)}' for it in lib.items], dtype=object)
         return c
 
     def _rack_mask(self, seed: int | None, opts: dict) -> np.ndarray | None:
@@ -550,7 +551,7 @@ class Api:
         used_subs: dict[str, set] = {}
         settings = rack_layouts.group_settings(rack)
         for g, pads in enumerate(rack_layouts.groups(rack["geometry"])):
-            if only_empty and any(rack["pads"][p] for p in pads):
+            if settings[g]["lock"] or (only_empty and any(rack["pads"][p] for p in pads)):
                 continue
             fam = settings[g]["family"]
             classes = rack_layouts.family_classes(fam)
@@ -568,6 +569,46 @@ class Api:
             for p, ref in zip(pads, self._rack_refs([(seed["id"], 1.0)] + picks)):
                 rack["pads"][p] = ref
                 used.add(ref["id"])
+        return rack
+
+    def _random_mask(self, classes: list[str], opts: dict) -> np.ndarray:
+        a = self._rack_arrays()
+        mask = np.isin(a["cls"], classes) if classes else np.ones(len(a["cls"]), bool)
+        if opts.get("oneshot", True):
+            mask &= a["oneshot"]
+        folder = (opts.get("folder") or "").lower().strip()
+        if folder:
+            mask &= np.array([folder in it["rel"].lower() for it in self._lib.items], bool)
+        mask[[int(i) for i in opts.get("exclude") or [] if 0 <= int(i) < len(mask)]] = False
+        return mask
+
+    def random_refs(self, classes: list[str], count: int, opts: dict | None = None) -> list[dict]:
+        """Random samples of the given classes: a random sample group (class + sub-cluster), a random
+        seed in it and similar companions. opts: oneshot, folder (path substring), exclude, variation."""
+        opts = opts or {}
+        if not self._lib.items:
+            return []
+        a = self._rack_arrays()
+        picks = rack_select.random_group(a["Xn"], a["group"], self._random_mask(classes or [], opts), int(count),
+                                         float(opts.get("variation", 0.6)), opts.get("rng_seed"))
+        return self._rack_refs(picks)
+
+    def rack_randomize(self, rack: dict, only_empty: bool = False, opts: dict | None = None) -> dict:
+        """Every unlocked (or every empty) group: random samples from a random group of its family."""
+        opts = dict(opts or {})
+        rack = rack_layouts.validate(rack)
+        settings = rack_layouts.group_settings(rack)
+        groups = rack_layouts.groups(rack["geometry"])
+        used = {r["id"] for g, pads in enumerate(groups) if settings[g]["lock"] or only_empty
+                for p in pads if (r := rack["pads"][p]) and r.get("kind") == "library"}
+        for g, pads in enumerate(groups):
+            if settings[g]["lock"] or (only_empty and any(rack["pads"][p] for p in pads)):
+                continue
+            refs = self.random_refs(rack_layouts.family_classes(settings[g]["family"]), len(pads),
+                                    {**opts, "exclude": list(used)})
+            for p, ref in zip(pads, refs + [None] * len(pads)):
+                rack["pads"][p] = ref
+            used |= {r["id"] for r in refs}
         return rack
 
     def list_racks(self) -> list[dict]:

@@ -71,9 +71,9 @@ mostra raggruppati **per fonte** oppure **per strumento**:
   (Big Fish Audio, Sound Ideas, Loopmasters, GarageBand…) sono marcati ⚠ e nascosti per default;
   quelli senza licenza dichiarata compaiono solo se scegli "Non dichiarata".
 
-## Scheda Pattern: prova dei sample su groove tipici
+## Scheda Sequencer: prova dei sample su groove tipici
 
-La terza scheda (**Libreria | Online | Pattern**) è un sequencer per provare i sample su pattern tipici e portarli in Ableton.
+La terza scheda (**Libreria | Online | Sequencer | Drum Rack**) è un sequencer per provare i sample su pattern tipici e portarli in Ableton.
 
 - **47 generi, 191 pattern**, con la bass music in primo piano:
   - *Bass music UK*: UK garage 2-step, speed garage, bassline, UK funky, grime, dubstep, riddim, tearout, halftime, breaks, future garage;
@@ -87,7 +87,16 @@ La terza scheda (**Libreria | Online | Pattern**) è un sequencer per provare i 
 - **Layer**: ogni bus può avere più sample che suonano insieme (es. 3 snare nel bus Snare), ciascuno con volume, pitch, offset in ms, mute/solo ed eventualmente step propri.
 - **Step**: clic per accendere/spegnere, Shift per l'accento, Alt per la ghost note, tasto destro per i roll ×2/×3/×4. Hi-hat chiuso e aperto sono in choke.
 - **Basso**: piano-roll con glide (Alt+clic su una nota); la radice del sample viene rilevata da sola, così il basso suona intonato.
-- **Invio ai bus**: dalla Libreria (tasto destro su un punto 3D o su una riga, oppure "Invia al bus" nella tendina) e dalla scheda Online (→), come nuovo layer o al posto di quello selezionato.
+- **Invio ai bus**: dalla Libreria (tasto destro su un punto 3D o su una riga, oppure "Invia ▾" nella tendina) e dalla scheda Online (→), come nuovo layer o al posto di quello selezionato.
+- **Alternanza dei layer**: quando un bus ha 2 o più layer, accanto al nome scegli come suonano:
+  - *insieme*: tutti a ogni colpo;
+  - *a giro*: uno dopo l'altro;
+  - *casuale*: un layer estratto a caso per ogni colpo, uguale a ogni giro (⚄ rifà l'estrazione);
+  - *casuale ogni giro*: un'estrazione nuova a ogni ripetizione.
+
+  L'export registra esattamente quello che senti: nel Drum Rack ogni layer alternato ha il suo pad e il MIDI suona quello giusto (con *casuale ogni giro* viene registrato il primo giro).
+- **🎲 Kit casuale**: per ogni bus che suona sceglie a caso un gruppo di sample simili (classe e sotto-gruppo) e ne prende sample a caso. Puoi chiedere 1, 2 o 4 sample per bus (alternati a caso), limitare la scelta a una cartella o pack e tenere solo i one-shot. I bus bloccati con 🔒 non cambiano, e il groove resta lo stesso.
+- **▦ Carica dal Drum Rack**: porta i sample del Drum Rack nei bus della loro classe (vedi sotto).
   - I sample online restano in una **cache temporanea limitata** (300 MB, configurabile in ⚙ insieme a "Svuota cache"); diventano file veri solo quando esporti.
 - **Export**:
   - **MIDI**, con mappatura Drum Rack (pad consecutivi da C1) o General MIDI;
@@ -121,14 +130,20 @@ La quarta scheda costruisce un Drum Rack 8×8 pensato per un controller come il 
   - *Blocchi 4×4*: 4 quadranti da 16;
   - *4×4 a colonne*: ogni quadrante è una famiglia e ogni colonna un gruppo di 4 (gruppi diversi della stessa classe prendono sotto-cluster diversi);
   - *Libero*: un pad alla volta.
-- **Seed**: è l'ultimo sample cliccato, nel browser a sinistra, su un pad o con "Drum Rack" nel menu *Invia* della Libreria e della scheda Online. **Riempi gruppo** mette il seed sul pad selezionato e i sample simili sugli altri pad del gruppo.
+- **Seed**: è l'ultimo sample cliccato, nel browser a sinistra o su un pad. **Riempi gruppo** mette il seed sul pad selezionato e i sample simili sugli altri pad del gruppo.
+- **Dalla vista 3D**: tasto destro su un punto (o "Invia ▾" nel pannello del sample) apre il menu *Invia*. In alto c'è la sezione **Drum Rack** con **+ aggiungi** (sul pad selezionato, o sul primo libero del gruppo) e **+ aggiungi e apri ▦**, che passa anche alla scheda Drum Rack. Con *con i simili* il sample riempie l'intero gruppo insieme ai suoi simili.
 - **Modalità**:
   - *Più simili*;
   - *Casuale*: pesca per somiglianza con uno slider di variazione; *Rigenera* rifà l'estrazione;
   - *Manuale*: spunti i simili da una lista ordinata per somiglianza;
   - *Percorso*: usa le tappe di "Trova simili" (anche dal pulsante ▦ Drum Rack nella barra dei simili) e, se sono poche, le completa con i simili dell'ultima tappa.
 - **Filtri**: stessa classe del seed, famiglia del gruppo o tutta la libreria; solo one-shot; evita i sample già presenti nel kit.
-- **Gruppi**: famiglia (usata da *Auto-riempi* e dal browser) e choke group, attivo di default sugli hat. Trascina i pad per scambiarli e un sample dal browser per metterlo su un pad; il tasto destro apre il menu del pad.
+- **Gruppi**: famiglia (usata da *Auto-riempi* e dal browser), choke group (attivo di default sugli hat) e **🔒 blocca gruppo**. Trascina i pad per scambiarli e un sample dal browser per metterlo su un pad; il tasto destro apre il menu del pad.
+- **🎲 Casuale**: ogni gruppo non bloccato prende un gruppo di sample simili scelto a caso tra quelli della sua famiglia, con sample a caso da lì. Puoi applicarlo a tutti i gruppi o solo a quelli vuoti, limitarlo a una cartella o pack e tenere solo i one-shot.
+- **→ Sequencer**: carica i sample nei bus del Sequencer secondo la loro classe, fino a 8 per bus. Un riquadro chiede:
+  - quali bus caricare;
+  - se *sovrascrivere* i bus scelti, *aggiungere* ai layer esistenti o *svuotare anche gli altri bus*;
+  - per ogni bus, come alternare i sample. Il default è *casuale*, tranne per kick, FX e basso, dove suona solo il primo sample e gli altri entrano muti.
 - **Esporta per Ableton**: una cartella con `Samples/<gruppo>/<nota> - <nome>.wav`, `… Drum Rack.adg` (un pad per tasto, con la nota del Launchpad e i choke group), i `.license.txt` dei sample online e `LEGGIMI.txt` con la mappa 8×8 dei pad.
 
 ## Come classifica

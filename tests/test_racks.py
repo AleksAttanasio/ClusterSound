@@ -45,9 +45,9 @@ def test_launchpad_quadrants():
 def test_group_settings_defaults_and_overrides():
     rack = layouts.new_rack()
     s = layouts.group_settings(rack)
-    assert s[3] == {"family": "chat", "choke": 1} and s[0]["choke"] == 0
-    rack["groups"] = {"cols8:0": {"family": "808", "choke": 4}}
-    assert layouts.group_settings(rack)[0] == {"family": "808", "choke": 4}
+    assert s[3] == {"family": "chat", "choke": 1, "lock": False} and s[0]["choke"] == 0
+    rack["groups"] = {"cols8:0": {"family": "808", "choke": 4, "lock": True}}
+    assert layouts.group_settings(rack)[0] == {"family": "808", "choke": 4, "lock": True}
 
 
 # ---------------------------------------------------------------- similarity picks
@@ -100,6 +100,19 @@ def test_trail_cut_and_topped_up(emb):
     assert ids[:3] == [3, 7, 9] and len(ids) == 6 and len(set(ids)) == 6
     ids = [i for i, _ in select.trail(emb, [3, 7], 4, exclude={7, 2})]
     assert ids[:2] == [3, 7] and 2 not in ids  # stops kept, exclusion only for the top-up
+
+
+def test_random_group(emb):
+    keys = np.array(["a:1"] * 10 + ["a:2"] * 10 + ["b:1"] * 21, dtype=object)
+    ok = np.ones(41, bool)
+    ok[20:] = False  # only class "a"
+    out = select.random_group(emb, keys, ok, 4, rng_seed=5)
+    assert len(out) == 4 and out[0][1] == 1.0
+    assert all(i < 20 for i, _ in out)  # inside the allowed classes
+    assert out == select.random_group(emb, keys, ok, 4, rng_seed=5)
+    seeds = {keys[select.random_group(emb, keys, ok, 1, rng_seed=s)[0][0]] for s in range(20)}
+    assert seeds == {"a:1", "a:2"}  # both groups get picked
+    assert select.random_group(emb, keys, np.zeros(41, bool), 4) == []
 
 
 # ---------------------------------------------------------------- export

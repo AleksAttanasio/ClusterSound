@@ -5,6 +5,14 @@ const TICK_MS = 25;
 const LOOKAHEAD = 0.12;
 export const velGain = (v) => Math.pow(v / 127, 1.5);
 
+// 32-bit hash for the random layer alternation: bit-identical to model.alt_hash() in Python
+export function altHash(seed, i) {
+  let x = (Math.imul(seed >>> 0, 2654435761) + Math.imul(i, 40503)) >>> 0;
+  x = (x ^ (x >>> 16)) >>> 0;
+  x = Math.imul(x, 0x45d9f3b) >>> 0;
+  return (x ^ (x >>> 16)) >>> 0;
+}
+
 export function refKey(ref) {
   if (!ref) return '';
   return ref.kind === 'online' ? `online:${ref.url}` : `${ref.kind}:${ref.path}`;
@@ -152,6 +160,7 @@ export class Sequencer {
     this.updateMix();
     this.playing = true;
     this.step = fromStep % (this.p.bars * 16);
+    this.loop = 0; // loops played since start ('random_pass' alternation re-draws on every loop)
     this.nextTime = this.ctx.currentTime + 0.06;
     this.timer = setInterval(() => this._tick(), TICK_MS);
     this._tick();
@@ -184,6 +193,7 @@ export class Sequencer {
       if (this.onStep) setTimeout(() => this.playing && this.onStep(i), delay);
       this.nextTime += this.stepDur();
       this.step = (i + 1) % n;
+      if (this.step === 0) this.loop++;
     }
   }
 
@@ -199,13 +209,32 @@ export class Sequencer {
     return (solo.length ? solo : ls).filter((l) => !l.mute);
   }
 
+  // Layers sounding on step i: all of them, or one of the shared-step layers when the bus alternates
+  // (same rules as model.bus_hits in Python).
+  _playing(bus, i) {
+    const layers = this._layers(bus);
+    const mode = bus.alt?.mode || 'off';
+    const shared = layers.filter((l) => !l.steps);
+    if (mode === 'off' || shared.length < 2 || !bus.steps[i]) return layers;
+    const n = shared.length;
+    let pick;
+    if (mode === 'cycle') {
+      let hit = 0;
+      for (let k = 0; k < i; k++) if (bus.steps[k]) hit++;
+      pick = hit % n;
+    } else {
+      pick = altHash(bus.alt.seed || 0, mode === 'random_pass' ? i + this.loop * this.p.bars * 16 : i) % n;
+    }
+    return [...layers.filter((l) => l.steps), shared[pick]];
+  }
+
   _schedule(i, t) {
     const sd = this.stepDur();
     for (const id of this._audible()) {
       const bus = this.p.buses[id];
       const dest = this._bus(id).input;
       if (id === 'bass') { this._scheduleBass(bus, i, t, dest); continue; }
-      for (const layer of this._layers(bus)) {
+      for (const layer of this._playing(bus, i)) {
         const steps = layer.steps || bus.steps;
         const v = steps[i];
         if (!v) continue;

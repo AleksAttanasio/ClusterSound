@@ -92,12 +92,19 @@ def parse_bass(text: str) -> list[dict]:
     return notes
 
 
+# How the layers of a drum bus share its hits: all together, in turn, or one picked at random per hit
+# ('random': the same pick every loop; 'random_pass': a new pick every loop, renders use the first loop).
+ALT_MODES = ("off", "cycle", "random", "random_pass")
+_M32 = 0xFFFFFFFF
+
+
 def empty_bus(bus_id: str, n_steps: int) -> dict:
-    d = {"volume": 0.8, "pan": 0.0, "mute": False, "solo": False, "hp": 0, "lp": 0, "layers": []}
+    d = {"volume": 0.8, "pan": 0.0, "mute": False, "solo": False, "hp": 0, "lp": 0, "layers": [], "lock": False}
     if bus_id == "bass":
         d["notes"] = []
         d["volume"] = 0.7
     else:
+        d["alt"] = {"mode": "off", "seed": 0}
         d["steps"] = [0] * n_steps
         d["ratchet"] = [1] * n_steps
     return d
@@ -132,6 +139,9 @@ def validate(p: dict) -> dict:
         for k, v in empty_bus(bid, n).items():
             b.setdefault(k, v)
         if bid != "bass":
+            alt = b["alt"] if isinstance(b.get("alt"), dict) else {}
+            b["alt"] = {"mode": alt.get("mode") if alt.get("mode") in ALT_MODES else "off",
+                        "seed": int(alt.get("seed") or 0) & _M32}
             b["steps"] = ([int(max(0, min(127, v))) for v in b["steps"]] + [0] * n)[:n]
             b["ratchet"] = ([int(max(1, min(4, v))) for v in b["ratchet"]] + [1] * n)[:n]
         else:
@@ -177,20 +187,67 @@ def audible_buses(p: dict) -> list[str]:
     return [b for b in (solo or list(buses)) if not buses[b].get("mute")]
 
 
+def _step_hits(p: dict, bus: dict, i: int, v: int) -> list[tuple[int, int]]:
+    t0 = tick(p, i)
+    r = bus["ratchet"][i] if i < len(bus["ratchet"]) else 1
+    # roll hits decay a little so they sound like a roll, not a machine gun
+    return [(t0 + k * TICKS_PER_STEP // r, max(1, int(v * (1 - 0.12 * k)))) for k in range(r)]
+
+
 def drum_hits(p: dict, bus_id: str, layer: dict | None = None):
     """(tick, velocity) for every hit of a drum bus (or of a layer with its own steps)."""
     bus = p["buses"][bus_id]
     steps = layer["steps"] if layer is not None and layer.get("steps") is not None else bus["steps"]
+    return [h for i, v in enumerate(steps) if v for h in _step_hits(p, bus, i, v)]
+
+
+def alt_hash(seed: int, i: int) -> int:
+    """32-bit integer hash, bit-identical to altHash() in ui/sequencer.js."""
+    x = (seed * 2654435761 + i * 40503) & _M32
+    x ^= x >> 16
+    x = (x * 0x45D9F3B) & _M32
+    x ^= x >> 16
+    return x
+
+
+def alternating(bus: dict) -> bool:
+    """True when the bus plays one of its (shared-step) layers per hit instead of all of them."""
+    alt = bus.get("alt") or {}
+    return alt.get("mode", "off") != "off" and sum(ly.get("steps") is None for ly in active_layers(bus)) >= 2
+
+
+def alt_pick(bus: dict, n: int, step: int, hit: int, n_steps: int, loop: int = 0) -> int:
+    """Index (0..n-1) of the layer playing the `hit`-th hit (on `step`) of loop number `loop`."""
+    alt = bus.get("alt") or {}
+    mode, seed = alt.get("mode", "off"), int(alt.get("seed", 0))
+    if mode == "cycle":
+        return hit % n
+    if mode == "random_pass":
+        return alt_hash(seed, step + loop * n_steps) % n
+    return alt_hash(seed, step) % n
+
+
+def bus_hits(p: dict, bus_id: str) -> list[tuple[int, int, int]]:
+    """(index in active_layers, tick, velocity) of every sound a drum bus plays, honouring
+    solo/mute, layers with their own steps and the bus alternation (first loop)."""
+    bus = p["buses"][bus_id]
+    layers = active_layers(bus)
     out = []
-    for i, v in enumerate(steps):
-        if not v:
-            continue
-        t0 = tick(p, i)
-        r = bus["ratchet"][i] if i < len(bus["ratchet"]) else 1
-        for k in range(r):
-            # roll hits decay a little so they sound like a roll, not a machine gun
-            out.append((t0 + k * TICKS_PER_STEP // r, max(1, int(v * (1 - 0.12 * k)))))
-    return out
+    shared = [j for j, ly in enumerate(layers) if ly.get("steps") is None]
+    for j, ly in enumerate(layers):
+        if ly.get("steps") is not None:
+            out += [(j, t, v) for t, v in drum_hits(p, bus_id, ly)]
+    if shared:
+        alt = alternating(bus)
+        n = n_steps(p)
+        hit = 0
+        for i, v in enumerate(bus["steps"]):
+            if not v:
+                continue
+            who = [shared[alt_pick(bus, len(shared), i, hit, n)]] if alt else shared
+            hit += 1
+            out += [(j, t, vel) for j in who for t, vel in _step_hits(p, bus, i, v)]
+    return sorted(out, key=lambda h: (h[1], h[0]))
 
 
 def bass_root_midi(p: dict) -> int:
