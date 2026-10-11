@@ -192,23 +192,38 @@ Scorciatoie: `Spazio` play/stop, `←` `→` accordo precedente/successivo, `Can
 In alto a sinistra **Armonia | Melodia** cambia vista. Ogni versione (A, B, C…) ha la sua melodia, che suona
 insieme agli accordi in entrambe le viste (♫ nella barra la silenzia).
 
+- **Layer**: la melodia è fatta di uno o più layer sovrapposti sugli stessi accordi — *Melodia*, *Basso*,
+  *Arpeggio*, *Riff*, *Pad*, *Keys* — ognuno col suo suono e colore. *＋ Layer ▾* ne aggiunge uno vuoto; clic sul
+  nome lo rende attivo (il piano roll modifica quello, gli altri si vedono in trasparenza), doppio clic lo
+  rinomina, **M** lo silenzia, ✕ lo elimina. Due cursori: volume del layer attivo e di tutti i layer.
+
 - **Piano roll** sotto la corsia degli accordi: le righe della scala sono più chiare e sotto ogni accordo sono
   evidenziate le sue note. Clic su uno spazio vuoto: nuova nota (trascina per allungarla); trascina una nota per
   spostarla, il bordo destro per allungarla, `Alt`+trascina per la velocity; doppio clic la elimina.
   `↑` `↓` traspongono (`⇧` di un'ottava), `←` `→` spostano, `⌘D` duplica, `⌘A` seleziona tutto.
-- **Importa ▾**: da un *File MIDI* (la nota più alta di ogni accordo, quantizzata), da una *Clip di Ableton*
+- **Importa ▾** (nel layer attivo): da un *File MIDI* (la nota più alta di ogni accordo, quantizzata), da una *Clip di Ableton*
   (nel device premi *Clip → Melodia* con una clip MIDI selezionata) o dalla *Tastiera MIDI*: 4 click di attacco,
   poi suoni sopra la progressione. La registrazione richiede `pip install python-rtmidi` (la WebView di macOS
   non ha Web MIDI). Se la versione non ha accordi, la tonalità viene rilevata dalla melodia.
-- **Melodia dagli accordi**: densità, contorno (arco, sale, scende, onda) ed estensione; note dell'accordo sui
-  tempi forti, note della scala in mezzo, frasi di 2–4 battute con una risposta. *Solo sugli accordi
-  selezionati* rigenera solo quelle battute. ▶ ascolta, *Usa* sostituisce la melodia.
-- **Accordi dalla melodia**: un accordo per battuta, due, o quanti ne servono alla melodia, scelto tra quelli
+- **Genera dagli accordi**: *Tipo*, densità ed estensione (si imposta da sola sul registro del tipo).
+  - *Melodia*: contorno (arco, sale, scende, onda); note dell'accordo sui tempi forti, della scala in mezzo,
+    frasi di 2–4 battute con una risposta.
+  - *Basso*: stile (fondamentali, ottave, quinte, passaggi); la fondamentale sul primo tempo di ogni accordo e
+    una nota di avvicinamento a quello dopo.
+  - *Arpeggio*: direzione (sale, scende, sale e scende, casuale) sulle note dell'accordo, a semiminime, crome o
+    semicrome secondo la densità.
+  - *Riff*: una cellula di una battuta che segue gli accordi, variata ogni 4 battute.
+  - *Pad* / *Keys*: accordi con voicing legati, tenuti o ritmati.
+
+  *Solo sugli accordi selezionati* rigenera solo quelle battute. ▶ ascolta insieme agli altri layer, *Usa*
+  sostituisce il layer attivo (se è dello stesso tipo), *＋ Layer* aggiunge la linea come nuovo layer.
+- **Accordi dalla melodia** (dal layer attivo): un accordo per battuta, due, o quanti ne servono alla melodia, scelto tra quelli
   del pack che contengono le sue note e concatenato con gli stessi criteri dei suggerimenti. La tonalità può
   essere quella della versione o rilevata dalla melodia. *Nuova versione* aggiunge una versione con accordi e
   melodia, *Sostituisci* cambia gli accordi della versione corrente.
-- **Esporta MIDI**: con una melodia scegli *Accordi + melodia* (un `.mid` tipo 1 con due tracce), *Solo accordi*
-  o *Solo melodia*. *Invia a Live* crea anche una traccia *Melodia* accanto agli *Accordi*.
+- **Esporta MIDI**: con una melodia scegli *Accordi + melodia* (un `.mid` tipo 1 con una traccia per gli accordi
+  e una per ogni layer non muto), *Solo accordi* o *Solo melodia*. *Invia a Live* crea anche una traccia per
+  ogni layer accanto agli *Accordi* (il basso con un suono da basso, pad e keys da tastiera).
 
 ## Max for Live: importare in Ableton Live
 
