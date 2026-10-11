@@ -26,6 +26,9 @@ def export_rack(rack: dict, dest_root: str, resolve, describe) -> str:
 
     resolve(ref) -> local path or None; describe(ref) -> OnlineResult for online samples (licence) or None.
     """
+    if layouts.is_spd(rack or {}):
+        from . import spdsx_export
+        return spdsx_export.export_rack(rack, dest_root, resolve, describe)
     rack = layouts.validate(rack)
     title = safe_name(rack["name"])
     folder = unique_path(os.path.join(dest_root, title))

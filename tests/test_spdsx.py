@@ -1,9 +1,15 @@
+import gzip
+import os
 import threading
+import xml.etree.ElementTree as ET
 
 import numpy as np
 import pytest
+import soundfile as sf
 
-from clustersound.racks import layouts, spdsx
+from clustersound.racks import ableton, layouts, spdsx
+
+from . import synth
 
 TRIGGERS = [{"trig1": a, "trig2": b} for a in (True, False) for b in (True, False)]
 
@@ -167,3 +173,33 @@ def test_autofill_spd(api):
     r = api.rack_autofill(_rack("spd_rows", {"trig1": True, "trig2": True}))
     assert all(r["pads"][p] for p in range(spdsx.PADS))
     assert r["pads"][spdsx.TRIG1]["cls"] == "kick" and r["pads"][spdsx.TRIG2]["cls"] in ("ride", "crash")
+
+
+# ---------------------------------------------------------------- export
+def test_export_spdsx(tmp_path):
+    rng = np.random.default_rng(3)
+    refs = []
+    for name, gen in [("kick", synth.kick), ("snare", synth.snare), ("chat", synth.closed_hat)]:
+        p = tmp_path / f"{name}.wav"
+        sf.write(p, gen(rng), 48000)
+        refs.append({"kind": "file", "path": str(p), "name": p.name})
+    kick, snare, chat = refs
+    r = _rack("spd_kit", {"trig1": True, "trig2": False})
+    r["name"] = "SPD Kit"
+    r["pads"][spdsx.TRIG1] = kick
+    r["pads"][4] = snare          # pad 5
+    r["pads"][0] = chat           # pad 1
+    r["pads"][spdsx.TRIG2] = snare  # trigger 2 is off: not exported
+    out = tmp_path / "out"
+    out.mkdir()
+    folder = ableton.export_rack(r, str(out), lambda x: x["path"], lambda x: None)
+    doc = ET.fromstring(gzip.open(os.path.join(folder, "SPD Kit SPD-SX Drum Rack.adg")).read())
+    notes = sorted(128 - int(b.find("ZoneSettings/ReceivingNote").get("Value")) for b in doc.findall(".//DrumBranchPreset"))
+    assert notes == [60, 64, 69]
+    spd = sorted(os.listdir(os.path.join(folder, "SPD-SX")))
+    assert spd == ["P1 - chat.wav", "P5 - snare.wav", "T1 Pedale - kick.wav"]
+    for f in spd:
+        info = sf.info(os.path.join(folder, "SPD-SX", f))
+        assert info.samplerate == 44100 and info.subtype == "PCM_16"
+    text = open(os.path.join(folder, "LEGGIMI.txt"), encoding="utf-8").read()
+    assert "Wave Manager" in text and "Pedale (Trig 1) · A3: kick" in text and "Trig 2 · A#3: non collegato" in text
