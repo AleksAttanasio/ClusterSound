@@ -97,6 +97,7 @@ MAX_ITEMS = 1500
 PAGE = 60           # presets per reply (one UDP packet)
 ROLE_DEFAULTS = {
     "chords": ["sounds:Piano & Keys", "sounds:Synth Keys", "sounds:Pad"],
+    "melody": ["sounds:Synth Lead", "sounds:Piano & Keys", "sounds:Synth Keys"],
     "bass": ["sounds:Bass"],
     "drums": [DRUM_KITS],
 }

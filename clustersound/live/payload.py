@@ -1,7 +1,7 @@
 """Payloads for the Max for Live device: tracks to create in Live, each with an optional rack preset and clips.
 
     payload = {"kind": "pattern"|"rack"|"compose", "name", "bpm", "folder",
-               "tracks": [{"name", "role": "drums"|"bass"|"chords", "adg": abs path | None,
+               "tracks": [{"name", "role": "drums"|"bass"|"chords"|"melody", "adg": abs path | None,
                            "adg_root": "user_library"|"places" | None, "adg_path": "dir/…/x.adg" | None,
                            "clips": [{"name", "length": beats, "notes": [[pitch, start, dur, vel], …]}]}]}
 
@@ -14,6 +14,7 @@ import glob
 import os
 from dataclasses import dataclass
 
+from ..chords import melody as chord_melody
 from ..chords import perform as chord_perform
 from ..patterns import ableton as pat_ableton
 from ..patterns import midi as pat_midi
@@ -152,25 +153,45 @@ def _compose_clip(seq: dict, name: str, pure: bool) -> dict:
     return {"name": name, "length": float(int(seq.get("bars", 4)) * 4), "notes": notes_from_spans(spans, chord_perform.PPQ)}
 
 
+LIVE_ROLE = {"bass": "bass", "pad": "chords", "keys": "chords"}  # melody layer role -> Live track role
+
+
+def _layer_clips(seq: dict, suffix: str = "") -> dict[str, tuple[str, dict]]:
+    """layer name -> (Live role, clip named "<layer> <suffix>") for every melody layer of seq that isn't muted."""
+    length = float(int(seq.get("bars", 4)) * 4)
+    return {l["name"]: (LIVE_ROLE.get(l["role"], "melody"),
+                        {"name": f"{l['name']} {suffix}".strip(),
+                         "length": length, "notes": notes_from_spans(l["events"], chord_perform.PPQ)})
+            for l in chord_melody.render_layers(seq) if not l["mute"]}
+
+
 def compose(proj: dict, pure: bool = False, versions: list[str] | None = None) -> dict:
     """A Compose project ({versions, order, modes, modeActive, bpm, name}) or a single playable seq.
 
-    Every harmony version becomes a clip of one "Accordi" track, played with the active Modalità."""
+    Every harmony version becomes a clip of one "Accordi" track, played with the active Modalità; every melody
+    layer (by name: "Melodia", "Basso"…) gets its own track, with its clip in the scene of its harmony."""
     name = proj.get("name") or "Progressione"
     bpm = float(proj.get("bpm") or 120)
     if "versions" not in proj:
         clips = [_compose_clip(proj, name, pure)]
+        mel = [_layer_clips(proj)]
     else:
         mode = (proj.get("modes") or {}).get(str(proj.get("modeActive", "1")))
         order = versions or proj.get("order") or list(proj["versions"])
         many = len(order) > 1
-        clips = []
+        clips, mel = [], []
         for v in order:
             seq = proj["versions"].get(v)
             if not seq:
                 continue
             seq = {**seq, "bpm": bpm, "name": name, **({"mode": mode} if mode else {})}
             clips.append(_compose_clip(seq, f"{name} {v}" if many else name, pure))
-    return {"kind": "compose", "name": name, "bpm": bpm, "folder": None,
-            "tracks": [_track(f"Accordi – {name}", "chords", None, None, clips)]}
+            mel.append(_layer_clips(seq, v if many else ""))
+    tracks = [_track(f"Accordi – {name}", "chords", None, None, clips)]
+    for lname in dict.fromkeys(k for m in mel for k in m):  # an empty slot keeps a clip in the scene of its harmony
+        role = next(m[lname][0] for m in mel if lname in m)
+        tracks.append(_track(f"{lname} – {name}", role, None, None,
+                             [m[lname][1] if lname in m else {"name": "", "length": c["length"], "notes": []}
+                              for m, c in zip(mel, clips)]))
+    return {"kind": "compose", "name": name, "bpm": bpm, "folder": None, "tracks": tracks}
 

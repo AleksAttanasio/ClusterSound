@@ -6,6 +6,7 @@ import mimetypes
 import os
 import subprocess
 import threading
+import time
 import urllib.parse
 import webbrowser
 
@@ -15,6 +16,8 @@ import soundfile as sf
 from . import classifier, dynamics, export, taxonomy
 from .chords import export as chord_export
 from .chords import harmony as chord_harmony
+from .chords import melody as chord_melody
+from .chords import midi_in as chord_midi_in
 from .chords import perform as chord_perform
 from .chords import variations as chord_variations
 from .chords.library import CATEGORIES as CHORD_CATEGORIES
@@ -40,6 +43,7 @@ from .racks import ableton as rack_ableton
 from .racks import dynamics_match
 from .racks import layouts as rack_layouts
 from .racks import select as rack_select
+from .racks import spdsx as rack_spdsx
 from .racks import store as rack_store
 
 PREVIEW_MAX_SECONDS = 60
@@ -74,6 +78,7 @@ class Api:
         self._rack_cache: dict = {}
         self._rack_lock = threading.Lock()  # js_api calls run on several threads
         self._chords: ChordLibrary | None = None
+        self._recorder = chord_midi_in.Recorder()
         self._live = live_server.Bridge(self._live_stage(), self._resolve, self._describe, self._title)
         threading.Thread(target=online_cache.prune, args=(self._cache_mb(),), daemon=True).start()
 
@@ -529,6 +534,8 @@ class Api:
         return {"dir": lib.root, "exists": lib.exists(), "keys": lib.available_keys() if lib.exists() else [],
                 "categories": CHORD_CATEGORIES, "styles": chord_perform.meta(),
                 "clipKinds": chord_variations.CLIP_KINDS, "progKinds": chord_variations.PROG_KINDS, "modeKinds": chord_variations.MODE_KINDS,
+                "melody": {"densities": chord_melody.DENSITIES, "contours": chord_melody.CONTOURS, "rates": chord_melody.RATES,
+                           "roles": chord_melody.roles_meta()},
                 "saved": pat_store.list_progressions()}
 
     def compose_pick_folder(self, path: str | None = None) -> dict:
@@ -581,7 +588,38 @@ class Api:
         for c in clips:
             d = chord_harmony.describe(c)
             labels.append({"id": c["id"], **chord_harmony.label(d, key)} if d["notes"] else {"id": c["id"]})
-        return {"ppq": chord_perform.PPQ, "events": chord_perform.render(seq), "labels": labels}
+        return {"ppq": chord_perform.PPQ, "events": chord_perform.render(seq), "labels": labels,
+                "layers": chord_melody.render_layers(seq)}
+
+    # ---------------------------------------------------------------- melody
+    def compose_melody_generate(self, seq: dict, opts: dict | None = None, seed: int = 1) -> list[dict]:
+        return chord_melody.generate(seq, self._seq_key(seq), opts or {}, int(seed))
+
+    def compose_harmonize(self, seq: dict, opts: dict | None = None, seed: int = 1) -> dict:
+        """Harmony versions for the melody of seq; opts.key == 'auto' detects the key from the melody."""
+        opts = opts or {}
+        key = self._seq_key(seq)
+        if opts.get("key") == "auto":
+            key = chord_melody.detect_key(chord_melody.notes_of(seq))
+            seq = {**seq, "key": key}
+        pool = self._pool(seq, related=bool(opts.get("related")))
+        items = chord_melody.harmonize(seq, pool, key, self._chord_lib().bigrams(key["mode"]), opts, int(seed))
+        return {"key": key, "items": items}
+
+    def compose_melody_import(self, grid: int = 1) -> dict | None:
+        """A melody from a .mid file (all tracks, top line)."""
+        import webview
+        res = self._window.create_file_dialog(webview.FileDialog.OPEN, file_types=("MIDI (*.mid;*.midi)",))
+        if not res:
+            return None
+        path = res[0] if isinstance(res, (list, tuple)) else res
+        try:
+            ppq, spans = pat_midi.read_note_spans(path)
+        except Exception as e:
+            return {"error": f"File MIDI non leggibile: {e}"}
+        notes = chord_melody.from_spans(spans, ppq, max(1, int(grid)))
+        return {"name": os.path.splitext(os.path.basename(path))[0], "notes": notes,
+                "key": chord_melody.detect_key(notes) if notes else None}
 
     def compose_vary_clip(self, seq: dict, clip_id: str, kinds: list, seed: int = 1) -> list[dict]:
         key = self._seq_key(seq)
@@ -600,26 +638,59 @@ class Api:
     def _prog_title(seq: dict) -> str:
         return f"{seq.get('name') or 'Accordi'} {int(round(seq.get('bpm', 120)))}bpm - {seq.get('bars', 4)} battute"
 
-    def compose_export_midi(self, seq: dict, pure: bool = False) -> str | None:
+    def compose_melody_from_live(self, grid: int = 1) -> dict:
+        """The last clip sent by the Max for Live device ("Clip → Melodia")."""
+        clip = self._live.last_clip()
+        if not clip:
+            return {"error": "Nessuna clip ricevuta: in Live seleziona una clip MIDI e premi «Clip → Melodia» nel device ClusterSound"}
+        ppq = chord_perform.PPQ
+        spans = [(round(s * ppq), round((s + d) * ppq), p, v) for p, s, d, v in clip["notes"]]
+        notes = chord_melody.from_spans(spans, ppq, max(1, int(grid)))
+        return {"name": clip["name"], "notes": notes, "key": chord_melody.detect_key(notes) if notes else None,
+                "age": round(time.time() - clip["at"])}
+
+    def compose_midi_inputs(self) -> dict:
+        if not self._recorder.available():
+            return {"available": False, "ports": [], "hint": chord_midi_in.HINT}
+        try:
+            return {"available": True, "ports": self._recorder.ports()}
+        except Exception as e:
+            return {"available": False, "ports": [], "hint": f"MIDI non disponibile: {e}"}
+
+    def compose_record_start(self, port: int = 0) -> dict:
+        try:
+            self._recorder.start(int(port))
+        except Exception as e:
+            return {"error": str(e)}
+        return {"ok": True}
+
+    def compose_record_stop(self, offset: float, bpm: float, bars: int, grid: int = 1, loop: bool = False) -> dict:
+        """The take: offset = seconds from record start to the transport's first beat."""
+        notes = self._recorder.stop()
+        ppq = chord_perform.PPQ
+        spans = chord_midi_in.to_ticks(notes, float(offset), float(bpm), ppq, int(bars) * 4 * ppq if loop else None)
+        return {"notes": chord_melody.from_spans(spans, ppq, max(1, int(grid)), keep=True)}
+
+    def compose_export_midi(self, seq: dict, pure: bool = False, parts: str = "both") -> str | None:
         path = self._save_dialog(safe_name(self._prog_title(seq)) + ".mid", ("MIDI (*.mid)",))
         if path:
-            chord_export.write(path, seq, pure)
+            chord_export.write(path, seq, pure, parts)
         return path
 
-    def compose_export_versions(self, seqs: list, pure: bool = False) -> dict:
+    def compose_export_versions(self, seqs: list, pure: bool = False, parts: str = "both") -> dict:
         import webview
         os.makedirs(EXPORT_DIR, exist_ok=True)
         res = self._window.create_file_dialog(webview.FileDialog.FOLDER, directory=EXPORT_DIR)
         if not res:
             return {"cancelled": True}
-        return self._write_versions(res[0] if isinstance(res, (list, tuple)) else res, seqs, pure)
+        return self._write_versions(res[0] if isinstance(res, (list, tuple)) else res, seqs, pure, parts)
 
-    def _write_versions(self, folder: str, seqs: list, pure: bool) -> dict:
+    def _write_versions(self, folder: str, seqs: list, pure: bool, parts: str = "both") -> dict:
         files = []
         for seq in seqs:
             name = safe_name(f"{self._prog_title(seq)} - {seq.get('version', '')}".rstrip(" -"))
             path = os.path.join(folder, name + ".mid")
-            chord_export.write(path, seq, pure)
+            chord_export.write(path, seq, pure, parts)
             files.append(path)
         subprocess.run(["open", folder], check=False)
         return {"folder": folder, "files": files}
@@ -726,7 +797,7 @@ class Api:
         used = {r["id"] for r in rack["pads"] if r and r.get("kind") == "library"}
         used_subs: dict[str, set] = {}
         settings = rack_layouts.group_settings(rack)
-        for g, pads in enumerate(rack_layouts.groups(rack["geometry"])):
+        for g, pads in enumerate(rack_layouts.groups_of(rack)):
             if settings[g]["lock"] or (only_empty and any(rack["pads"][p] for p in pads)):
                 continue
             fam = settings[g]["family"]
@@ -778,20 +849,54 @@ class Api:
         """Every unlocked (or every empty) group: random samples from a random group of its family.
         With opts["dyn_margin"] each group's envelopes stay close to the groups kept or generated before it."""
         opts = dict(opts or {})
+        distinct = bool(opts.pop("distinct_groups", False))
         rack = rack_layouts.validate(rack)
         settings = rack_layouts.group_settings(rack)
-        groups = rack_layouts.groups(rack["geometry"])
+        groups = rack_layouts.groups_of(rack)
         used = {r["id"] for g, pads in enumerate(groups) if settings[g]["lock"] or only_empty
                 for p in pads if (r := rack["pads"][p]) and r.get("kind") == "library"}
+        a = self._rack_arrays() if distinct and self._lib.items else None
+        used_groups = {a["group"][i] for i in used} if a is not None else set()
         for g, pads in enumerate(groups):
             if settings[g]["lock"] or (only_empty and any(rack["pads"][p] for p in pads)):
                 continue
-            refs = self.random_refs(rack_layouts.family_classes(settings[g]["family"]), len(pads),
-                                    {**opts, "exclude": list(used), "dyn_ref": list(used)})
+            classes = rack_layouts.family_classes(settings[g]["family"])
+            o = {**opts, "exclude": list(used), "dyn_ref": list(used)}
+            refs = []
+            if used_groups:  # a sample group (class + sub-cluster) not used by another pad group, if any is left
+                taken = np.flatnonzero(np.isin(a["group"], list(used_groups))).tolist()
+                refs = self.random_refs(classes, len(pads), {**o, "exclude": o["exclude"] + taken})
+            if len(refs) < len(pads):
+                refs = max(refs, self.random_refs(classes, len(pads), o), key=len)
             for p, ref in zip(pads, refs + [None] * len(pads)):
                 rack["pads"][p] = ref
             used |= {r["id"] for r in refs}
+            if a is not None:
+                used_groups |= {a["group"][r["id"]] for r in refs}
         return rack
+
+    def rack_generate(self, rack: dict, opts: dict | None = None) -> dict:
+        """A whole random kit. SPD-SX: a random playable configuration (kept when opts["keep_config"] or a
+        group is locked), then every unlocked group gets similar samples from a sample group no other pad
+        group uses, so the pedal kick and a pad kick, or two hat rows, sound different."""
+        opts = dict(opts or {})
+        rack = rack_layouts.validate(rack)
+        if not rack_layouts.is_spd(rack):
+            return self.rack_randomize(rack, False, opts)
+        locked = any(s["lock"] for s in rack_layouts.group_settings(rack))
+        if not (opts.pop("keep_config", False) or locked):
+            cfg = rack_spdsx.random_config(opts.get("rng_seed"), rack["triggers"])
+            rack["geometry"] = cfg["geometry"]
+            prefix = cfg["geometry"] + ":"
+            rack["groups"] = {k: v for k, v in rack["groups"].items() if not k.startswith(prefix)} | cfg["groups"]
+        return self.rack_randomize(rack, False, {**opts, "distinct_groups": True})
+
+    def rack_check(self, rack: dict) -> dict:
+        """Playability warnings and, per group, the families it can take (SPD-SX; None for the 8×8)."""
+        rack = rack_layouts.validate(rack)
+        if not rack_layouts.is_spd(rack):
+            return {"warnings": [], "allowed": None}
+        return {"warnings": rack_spdsx.playability(rack), "allowed": rack_spdsx.allowed_families(rack)}
 
     def list_racks(self) -> list[dict]:
         return rack_store.list_racks()
