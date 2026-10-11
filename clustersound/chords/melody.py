@@ -1,7 +1,10 @@
-"""Melody of a harmony version: render it, normalise imported notes, generate a melody over the chords and
-harmonise a melody with the chords of the pack.
+"""Melody layers of a harmony version: render them, normalise imported notes, generate a line over the chords
+(lead, bass, arpeggio, riff, pad, keys) and harmonise a melody with the chords of the pack.
 
-    seq["melody"] = {"notes": [{"id", "start", "len", "pitch", "vel"}]}   # start/len in sixteenths, monophonic
+    seq["melody"] = {"layers": [{"id", "name", "role", "notes", "vol", "mute"}], "active": layer id}
+    note = {"id", "start", "len", "pitch", "vel"}   # start/len in sixteenths; lead/bass/arp/riff are monophonic
+
+The old {"notes": [...]} of a single melody reads as one "lead" layer.
 
 Deterministic for a given seed, like the variations.
 """
@@ -17,6 +20,17 @@ from .variations import _fit, bake
 DENSITIES = [("low", "Rada"), ("mid", "Media"), ("high", "Fitta"), ("mixed", "Mista")]
 CONTOURS = [("arch", "Arco"), ("up", "Sale"), ("down", "Scende"), ("wave", "Onda"), ("free", "Libero")]
 RATES = [("bar", "1 accordo per battuta"), ("half", "2 per battuta"), ("auto", "Segue la melodia")]
+ARP_SHAPES = [("up", "Sale"), ("down", "Scende"), ("updown", "Sale e scende"), ("random", "Casuale")]
+BASS_SHAPES = [("root", "Fondamentali"), ("octave", "Ottave"), ("fifth", "Quinte"), ("walk", "Passaggi")]
+# role -> label, default range, shapes for the "contour" option (and their label)
+ROLES = {
+    "lead": {"label": "Melodia", "lo": 60, "hi": 81, "shapes": CONTOURS, "shapeLabel": "Contorno"},
+    "bass": {"label": "Basso", "lo": 36, "hi": 55, "shapes": BASS_SHAPES, "shapeLabel": "Stile"},
+    "arp": {"label": "Arpeggio", "lo": 55, "hi": 79, "shapes": ARP_SHAPES, "shapeLabel": "Direzione"},
+    "riff": {"label": "Riff", "lo": 55, "hi": 76, "shapes": [], "shapeLabel": ""},
+    "pad": {"label": "Pad", "lo": 52, "hi": 72, "shapes": [], "shapeLabel": ""},
+    "keys": {"label": "Keys", "lo": 52, "hi": 74, "shapes": [], "shapeLabel": ""},
+}
 # onsets of one bar (sixteenths), per density
 _RHYTHMS = {
     "low": [[0, 8], [0, 12], [0, 4, 8], [0, 6, 8], [0, 8, 12], [0]],
@@ -30,17 +44,58 @@ def _uid() -> str:
     return "m" + uuid.uuid4().hex[:7]
 
 
-def notes_of(seq: dict) -> list[dict]:
-    return sorted((seq.get("melody") or {}).get("notes") or [], key=lambda n: n["start"])
+def roles_meta() -> list[dict]:
+    return [{"id": k, **v} for k, v in ROLES.items()]
+
+
+def layers_of(seq: dict) -> list[dict]:
+    """The melody layers of seq (an old single melody -> one "lead" layer)."""
+    m = seq.get("melody") or {}
+    if "layers" in m:
+        return m["layers"] or []
+    notes = m.get("notes") or []
+    return [{"id": "L1", "name": "Melodia", "role": "lead", "notes": notes, "vol": 1, "mute": False}] if notes else []
+
+
+def active_layer(seq: dict) -> dict | None:
+    """The layer being edited: melody.active, else the first lead, else the first one."""
+    layers = layers_of(seq)
+    act = (seq.get("melody") or {}).get("active")
+    return (next((l for l in layers if l["id"] == act), None) or next((l for l in layers if l.get("role") == "lead"), None)
+            or (layers[0] if layers else None))
+
+
+def notes_of(seq: dict, layer_id: str | None = None) -> list[dict]:
+    """Notes of a layer (default: the active one), by start."""
+    layer = next((l for l in layers_of(seq) if l["id"] == layer_id), None) if layer_id else active_layer(seq)
+    return sorted((layer or {}).get("notes") or [], key=lambda n: n["start"])
 
 
 # ------------------------------------------------------------------ render
-def render(seq: dict) -> list[tuple[int, int, int, int]]:
-    """[(start tick, end tick, pitch, velocity)] with the swing of the Modalità, cut at the sequence length."""
+def render(seq: dict, layer_id: str | None = None) -> list[tuple[int, int, int, int]]:
+    """[(start tick, end tick, pitch, velocity)] of a layer (default: all the layers that aren't muted) with
+    the swing of the Modalità, cut at the sequence length."""
+    if layer_id:
+        notes = notes_of(seq, layer_id)
+    else:
+        notes = sorted((n for l in layers_of(seq) if not l.get("mute") for n in l.get("notes") or []),
+                       key=lambda n: n["start"])
+    return _render_notes(seq, notes)
+
+
+def render_layers(seq: dict) -> list[dict]:
+    """[{id, name, role, vol, mute, events}] for every layer with notes."""
+    return [{"id": l["id"], "name": l.get("name") or ROLES.get(l.get("role"), ROLES["lead"])["label"],
+             "role": l.get("role", "lead"), "vol": l.get("vol", 1), "mute": bool(l.get("mute")),
+             "events": _render_notes(seq, sorted(l["notes"], key=lambda n: n["start"]))}
+            for l in layers_of(seq) if l.get("notes")]
+
+
+def _render_notes(seq: dict, notes: list[dict]) -> list[tuple[int, int, int, int]]:
     length = int(seq.get("bars", 4)) * BAR
     swing = float(mode_of(seq).get("swing", 50))
     out = []
-    for n in notes_of(seq):
+    for n in notes:
         s = _swing(int(n["start"]) * STEP, swing)
         e = min(length, (int(n["start"]) + max(1, int(n["len"]))) * STEP)
         if s < length and e - s >= MIN_LEN:
@@ -210,30 +265,253 @@ def _one_melody(seq: dict, key: dict, cmap: list, opts: dict, rng: random.Random
     return out
 
 
+# ------------------------------------------------------------------ other roles
+_BASS_RHYTHMS = {
+    "low": [[0], [0, 8], [0, 12], [0, 10]],
+    "mid": [[0, 8], [0, 6, 8], [0, 8, 12], [0, 3, 8, 11], [0, 4, 8, 12], [0, 8, 10, 14]],
+    "high": [[0, 2, 4, 6, 8, 10, 12, 14], [0, 3, 6, 8, 11, 14], [0, 2, 4, 8, 10, 12], [0, 2, 6, 8, 10, 14]],
+}
+_COMP_RHYTHMS = {
+    "low": [[0, 8], [0], [0, 12]],
+    "mid": [[0, 4, 8, 12], [0, 6, 8, 14], [0, 3, 6, 8, 11], [0, 6, 12]],
+    "high": [[0, 2, 4, 6, 8, 10, 12, 14], [0, 3, 6, 8, 10, 14], [0, 2, 6, 8, 10, 14]],
+}
+
+
+def _density(opts: dict, rng: random.Random) -> str:
+    d = opts.get("density", "mid")
+    return rng.choice(["low", "mid", "mid", "high"]) if d == "mixed" else d if d in _RHYTHMS else "mid"
+
+
+def _chord_spans(seq: dict, key: dict, b0: int, b1: int) -> list[tuple[int, int, dict]]:
+    """(start, len, described chord) of the clips inside bars [b0, b1), cut to the range; the tonic triad
+    where there is no clip."""
+    tonic = {"root": key["tonic"], "pcs": {key["tonic"], (key["tonic"] + 4 - (key["mode"] == "minor")) % 12,
+                                          (key["tonic"] + 7) % 12}}
+    cmap = _chord_map(seq)
+    out, s = [], b0 * 16
+    while s < b1 * 16:
+        ch = cmap[s] if s < len(cmap) else None
+        e = s + 1
+        while e < b1 * 16 and e < len(cmap) and cmap[e] is ch:
+            e += 1
+        out.append((s, e - s, ch or tonic))
+        s = e
+    return out
+
+
+def _near(pc: int, ref: float, lo: int, hi: int) -> int:
+    """The pitch of pitch class pc inside [lo, hi] closest to ref (the edge of the range if there is none)."""
+    cands = [p for p in range(lo, hi + 1) if p % 12 == pc]
+    return min(cands, key=lambda p: (abs(p - ref), p)) if cands else max(lo, min(hi, int(ref)))
+
+
+def _tiled(rhythm: list[int], s: int, ln: int) -> list[int]:
+    """Onsets of a one-bar rhythm repeated over [s, s+ln), aligned to the bar."""
+    out = [b + o for b in range((s // 16) * 16, s + ln, 16) for o in rhythm if s <= b + o < s + ln]
+    return sorted(set(out) | {s})
+
+
+def _note(t: int, ln: int, p: int, vel: int, rng: random.Random) -> dict:
+    return {"id": _uid(), "start": t, "len": max(1, ln), "pitch": int(p), "vel": max(1, min(127, vel + rng.randint(-5, 5)))}
+
+
+def _one_bass(seq, key, spans, opts, rng) -> list[dict]:
+    lo, hi = opts["lo"], opts["hi"]
+    style = opts.get("contour") if opts.get("contour") in dict(BASS_SHAPES) else "root"
+    rhythm = list(rng.choice(_BASS_RHYTHMS[_density(opts, rng)]))
+    scale = sorted(_scale(key))
+    home = lo + 5
+    out, prev = [], home
+    for i, (s, ln, ch) in enumerate(spans):
+        root = _near(ch["root"], (prev + home) / 2, lo, hi)  # near the last root, pulled to the bottom of the range
+        nxt_root = _near(spans[i + 1][2]["root"], (root + home) / 2, lo, hi) if i + 1 < len(spans) else None
+        on = _tiled(rhythm, s, ln)
+        walk = []
+        if style == "walk" and len(on) > 2:  # scale steps from the root towards the next root
+            goal = nxt_root if nxt_root is not None else root
+            step = 1 if goal >= root else -1
+            p = root
+            for _ in on[1:]:
+                p += step
+                while p % 12 not in scale:
+                    p += step
+                walk.append(max(lo, min(hi, p)))
+        for j, t in enumerate(on):
+            end = on[j + 1] if j + 1 < len(on) else s + ln
+            last = j == len(on) - 1 and j > 0
+            if j == 0:
+                p = root
+            elif last and nxt_root is not None and rng.random() < .7:  # approach the next root
+                p = nxt_root + rng.choice([-1, 1, -2, 2])
+                p = p if lo <= p <= hi else nxt_root
+            elif style == "walk" and walk:
+                p = walk[j - 1]
+            elif style == "octave":
+                p = root + 12 if j % 2 and root + 12 <= hi else root
+            elif style == "fifth":
+                f = root + 7 if root + 7 <= hi else root - 5
+                p = f if j % 2 and lo <= f else root
+            else:
+                p = root
+            gap = end - t
+            dur = gap if gap <= 2 or rng.random() < .6 else gap - 1
+            out.append(_note(t, dur, p, 108 if t % 16 == 0 else 96 if t % 4 == 0 else 84, rng))
+        prev = root
+    return out
+
+
+def _arp_tones(ch: dict, lo: int, hi: int) -> list[int]:
+    return [p for p in range(lo, hi + 1) if p % 12 in ch["pcs"]] or [_near(ch["root"], (lo + hi) / 2, lo, hi)]
+
+
+def _one_arp(seq, key, spans, opts, rng) -> list[dict]:
+    lo, hi = opts["lo"], opts["hi"]
+    shape = opts.get("contour") if opts.get("contour") in dict(ARP_SHAPES) else "up"
+    dens = _density(opts, rng)
+    step = {"low": 4, "mid": 2, "high": 1}[dens]
+    out, prev = [], None
+    for s, ln, ch in spans:
+        tones = _arp_tones(ch, lo, hi)
+        if len(tones) > 7:  # about two octaves around the previous note
+            c = prev if prev is not None else (lo + hi) / 2
+            i0 = min(range(len(tones)), key=lambda i: abs(tones[i] - c))
+            a = max(0, min(len(tones) - 7, i0 - 3))
+            tones = tones[a:a + 7]
+        seq_i = list(range(len(tones)))
+        if shape == "down":
+            seq_i.reverse()
+        elif shape == "updown" and len(tones) > 2:
+            seq_i = seq_i + seq_i[-2:0:-1]
+        cur = 0 if prev is None or shape == "random" else min(range(len(seq_i)), key=lambda k: abs(tones[seq_i[k]] - prev))
+        for t in range(s, s + ln, step):
+            p = tones[rng.randrange(len(tones))] if shape == "random" else tones[seq_i[cur % len(seq_i)]]
+            cur += 1
+            dur = min(step, s + ln - t)
+            out.append(_note(t, dur if dur < 2 else dur - (rng.random() < .3), p, 100 if t % 4 == 0 else 84, rng))
+            prev = p
+    return out
+
+
+def _one_riff(seq, key, spans, opts, rng) -> list[dict]:
+    """A one-bar cell (rhythm + intervals from the chord root) repeated on every bar, moved to the chord that
+    sounds and snapped to its tones on the beats; the last bar of every 4 varies its rhythm."""
+    lo, hi = opts["lo"], opts["hi"]
+    dens = _density(opts, rng)
+    cell_on = _bar_rhythm(dens if dens != "low" else "mid", rng)
+    first = spans[0][2]
+    base = _near(first["root"], lo + (hi - lo) / 3, lo, hi)
+    cands0 = [p for p in range(lo, hi + 1) if p % 12 in (_scale(key) | first["pcs"])]
+    offs, prev, leap = [], None, 0
+    for j, o in enumerate(cell_on):
+        x = j / max(1, len(cell_on) - 1)
+        cands = [p for p in cands0 if p % 12 in first["pcs"]] if o % 4 == 0 else cands0
+        p = _pick(cands or cands0, prev, _target("wave", x, base - 2, base + 12, rng.random()), o % 4 == 0, leap, rng)
+        leap = p - prev if prev is not None else 0
+        prev = p
+        offs.append(p - base)
+    by_on = dict(zip(cell_on, offs))
+    scale = _scale(key)
+    cmap = {t: ch for s, ln, ch in spans for t in range(s, s + ln)}
+    b0, b1 = spans[0][0] // 16, -(-(spans[-1][0] + spans[-1][1]) // 16)
+    out, anchor = [], base
+    for bar in range(b0, b1):
+        on = cell_on if (bar - b0) % 4 != 3 else _mutate(cell_on, rng)
+        for j, o in enumerate(on):
+            t = bar * 16 + o
+            ch = cmap.get(t)
+            if ch is None:
+                continue
+            nxt = bar * 16 + on[j + 1] if j + 1 < len(on) else (bar + 1) * 16
+            off = by_on.get(o, by_on[max(k for k in by_on if k <= o)] if any(k <= o for k in by_on) else 0)
+            root = _near(ch["root"], (anchor + base) / 2, lo, hi)  # follows the chords without drifting away
+            pcs = ch["pcs"] if o % 4 == 0 else scale | ch["pcs"]
+            want = root + off
+            p = min((q for q in range(lo, hi + 1) if q % 12 in pcs), key=lambda q: (abs(q - want), q), default=want)
+            ln = min(nxt, max(s + l for s, l, c in spans if c is ch and s <= t < s + l)) - t
+            out.append(_note(t, ln if ln < 3 else ln - 1, p, 104 if o == 0 else 92 if o % 4 == 0 else 80, rng))
+            if j == 0:
+                anchor = root
+    return out
+
+
+def _voicing(ch: dict, lo: int, hi: int, prev: list[int] | None) -> list[int]:
+    """Close-position voicing of the chord (up to 4 notes) inside [lo, hi], nearest to the previous one."""
+    pcs = list(ch["pcs"])
+    if len(pcs) > 4:  # drop the fifth, then any colour tone
+        fifth = (ch["root"] + 7) % 12
+        pcs = [pc for pc in pcs if pc != fifth][:4] if fifth in pcs else pcs[:4]
+    best, best_d = None, None
+    for b in range(lo, hi + 1):
+        if b % 12 not in pcs:
+            continue
+        v = sorted(b + (pc - b) % 12 for pc in pcs)
+        if v[-1] > hi:
+            continue
+        d = harmony.voice_distance(prev, v) if prev else abs(sum(v) / len(v) - (lo + hi) / 2)
+        if best_d is None or d < best_d:
+            best, best_d = v, d
+    return best or sorted(_near(pc, (lo + hi) / 2, lo, hi) for pc in pcs)
+
+
+def _one_chords(seq, key, spans, opts, rng, comp: bool) -> list[dict]:
+    """Pad: the chord held (low), again every bar (mid) or every half bar (high). Keys: comping stabs."""
+    lo, hi = opts["lo"], opts["hi"]
+    dens = _density(opts, rng)
+    rhythm = rng.choice(_COMP_RHYTHMS[dens]) if comp else {"low": [], "mid": [0], "high": [0, 8]}[dens]
+    out, prev = [], None
+    for s, ln, ch in spans:
+        v = _voicing(ch, lo, hi, prev)
+        on = _tiled(rhythm, s, ln)
+        for j, t in enumerate(on):
+            end = on[j + 1] if j + 1 < len(on) else s + ln
+            gap = end - t
+            dur = gap if not comp else min(gap, 2 if dens == "high" else 3 if gap > 3 and rng.random() < .5 else gap)
+            vel = (100 if t % 16 == 0 else 90 if t % 4 == 0 else 80) if comp else 84
+            out += [_note(t, dur, p, vel - 4 * k, rng) for k, p in enumerate(v)]
+        prev = v
+    return out
+
+
 def generate(seq: dict, key: dict, opts: dict | None = None, seed: int = 1, count: int = 4) -> list[dict]:
-    """Up to `count` melodies over the chords of seq: chord tones on the beats, scale steps in between,
-    phrases of 2-4 bars answered by a variation of their rhythm. opts: density, contour, lo, hi, fromBar, toBar
-    (bars outside the range keep the current melody)."""
-    opts = opts or {}
+    """Up to `count` lines of one role over the chords of seq. opts: role (lead, bass, arp, riff, pad, keys),
+    density, contour (the role's shape), lo, hi, fromBar, toBar, layer (id of the layer whose notes outside
+    the bar range are kept; default the active one, None: nothing kept).
+    lead: chord tones on the beats, scale steps in between, phrases of 2-4 bars answered by a variation of
+    their rhythm. bass: roots on the downbeats, octaves/fifths/steps, an approach note into the next chord.
+    arp: chord tones in a pattern. riff: a one-bar cell following the chords. pad/keys: voice-led chords."""
+    opts = dict(opts or {})
+    role = opts.get("role") if opts.get("role") in ROLES else "lead"
+    meta = ROLES[role]
+    opts["lo"], opts["hi"] = int(opts.get("lo", meta["lo"])), int(opts.get("hi", meta["hi"]))
+    if opts["hi"] - opts["lo"] < 7:
+        opts["hi"] = opts["lo"] + 12
     cmap = _chord_map(seq)
     rng = random.Random(seed)
     total = int(seq.get("bars", 4))
-    b0 = max(0, int(opts.get("fromBar", 0) or 0))
-    b1 = min(total, int(opts.get("toBar", total) or total))
-    keep = [n for n in notes_of(seq) if n["start"] < b0 * 16 or n["start"] >= b1 * 16]
+    b0 = max(0, min(total - 1, int(opts.get("fromBar", 0) or 0)))
+    b1 = max(b0 + 1, min(total, int(opts.get("toBar", total) or total)))
+    layer = opts.get("layer", "active")
+    old = (notes_of(seq) if layer == "active" else notes_of(seq, layer) if layer else [])
+    keep = [n for n in old if n["start"] < b0 * 16 or n["start"] >= b1 * 16]
+    spans = _chord_spans(seq, key, b0, b1)
+    make = {"bass": _one_bass, "arp": _one_arp, "riff": _one_riff,
+            "pad": lambda *a: _one_chords(*a, comp=False), "keys": lambda *a: _one_chords(*a, comp=True)}.get(role)
     dname = dict(DENSITIES).get(opts.get("density", "mid"), "")
-    cname = dict(CONTOURS).get(opts.get("contour", "arch"), "")
+    sname = dict(meta["shapes"]).get(opts.get("contour"), "")
     out, seen = [], set()
     for attempt in range(count * 3):
         if len(out) >= count:
             break
-        notes = _one_melody(seq, key, cmap, opts, random.Random(rng.randrange(1 << 30)))
+        r = random.Random(rng.randrange(1 << 30))
+        notes = make(seq, key, spans, opts, r) if make else _one_melody(seq, key, cmap, opts, r)
         sig = tuple((n["start"], n["pitch"]) for n in notes)
         if not notes or sig in seen:
             continue
         seen.add(sig)
-        merged = sorted(keep + notes, key=lambda n: n["start"])
-        out.append({"label": f"Melodia {len(out) + 1} · {dname.lower()}, {cname.lower()}", "melody": {"notes": merged}})
+        merged = sorted(keep + notes, key=lambda n: (n["start"], n["pitch"]))
+        desc = ", ".join(x.lower() for x in (dname, sname) if x)
+        out.append({"label": f"{meta['label']} {len(out) + 1} · {desc}", "role": role, "melody": {"notes": merged}})
     return out
 
 
