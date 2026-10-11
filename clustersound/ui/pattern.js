@@ -1,6 +1,7 @@
 // "Pattern" screen: genre patterns on drum buses (with sample layers) + bass line, MIDI/Ableton export.
 import { Sequencer, refKey } from './sequencer.js';
 import { suggestBus, toast } from './sendmenu.js';
+import { Arranger } from './arranger.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -19,6 +20,7 @@ export class PatternEditor {
     this.expanded = new Set(['kick', 'snare', 'bass']);
     this.onlineRefs = [];    // online samples sent this session (chooser tab)
     this.seq = new Sequencer({ player, fetchAudio: (ref) => api.sample_audio(ref), onStep: (i) => this._playhead(i) });
+    this.playMode = 'pattern'; // 'sequence' while the Sequence panel is playing
   }
 
   // ---------------------------------------------------------------- lifecycle
@@ -55,12 +57,14 @@ export class PatternEditor {
   hide() { this.stop(); }
 
   // ---------------------------------------------------------------- pattern state
-  _persist() {
-    this.seq.setPattern(this.p);
+  _persist(fromArranger = false) {
+    if (this.playMode !== 'sequence') this.seq.setPattern(this.p);
     try { localStorage.setItem(LS_KEY, JSON.stringify({ ...this.p, _source: this.source })); } catch (e) { /* private mode */ }
     const refs = [];
     for (const b of Object.values(this.p.buses)) for (const l of b.layers) if (l.ref?.kind === 'online') refs.push(l.ref);
     this.api.protect_samples(refs);
+    if (this.arr && !fromArranger) this.arr.onPatternChanged();
+    if (this.arr) this.arr._info();
   }
 
   async loadVariant(genre, variant, keepTempo = true) {
@@ -151,7 +155,7 @@ export class PatternEditor {
 
   // ---------------------------------------------------------------- transport
   async togglePlay() {
-    if (this.seq.playing) { this.stop(); return; }
+    if (this.seq.playing) { this.stop(); return; } // stops the pattern loop or the sequence
     await this.seq.preload(this.p);
     this.seq.setPattern(this.p);
     this.seq.start();
@@ -162,11 +166,16 @@ export class PatternEditor {
 
   stop() {
     this.seq.stop();
+    const wasSequence = this.playMode === 'sequence';
+    this.playMode = 'pattern';
+    if (wasSequence) this.seq.setPattern(this.p);
     const b = $('#pt-play');
     if (b) { b.textContent = '▶ Play'; b.classList.remove('on'); }
+    if (this.arr) this.arr.onStopped();
   }
 
   _playhead(i) {
+    if (this.playMode === 'sequence' && this.arr) i = this.arr.onStep(i); // global step -> step of the shown block
     document.querySelectorAll('.pt-cell.now').forEach((c) => c.classList.remove('now'));
     const roll = $('#pt-roll-head');
     if (i < 0) { if (roll) roll.style.display = 'none'; return; }
@@ -218,9 +227,12 @@ export class PatternEditor {
       </div>
       <div class="pt-help hint">Clic: step on/off · Shift+clic: accento · Alt+clic: ghost · Tasto destro: roll ×2/×3/×4 · Spazio: play/stop.
         Invia sample ai bus dalla Libreria (tasto destro su un punto 3D o una riga) o dalla scheda Online.</div>
+      <div id="sq-panel" class="sq"></div>
       <div id="pt-empty" class="pt-empty hint" hidden></div>
       <div id="pt-grid" class="pt-grid"></div>`;
     this._bindShell();
+    this.arr = new Arranger(this);
+    this.arr.mount($('#sq-panel'));
   }
 
   _bindShell() {
@@ -328,6 +340,7 @@ export class PatternEditor {
     if (!this.p) return;
     this.renderBar();
     this.renderGrid();
+    if (this.arr) this.arr.render();
   }
 
   renderBar() {
@@ -335,8 +348,8 @@ export class PatternEditor {
     $('#pt-genre').value = p.genre;
     const g = this.meta.genres.find((x) => x.id === p.genre);
     const user = this.meta.user.filter((u) => u.genre === p.genre);
-    $('#pt-variants').innerHTML = (g?.variants || []).map((v, i) => `<button class="chip ${this.source?.variant === i && !this.source?.user ? 'on' : ''}" data-variant="${i}">${esc(v)}</button>`).join('')
-      + user.map((u) => `<button class="chip user ${this.source?.user === u.id ? 'on' : ''}" data-user="${esc(u.id)}" title="Variante personale">★ ${esc(u.name)}</button>`).join('')
+    $('#pt-variants').innerHTML = (g?.variants || []).map((v, i) => `<button class="chip ${this.source?.variant === i && !this.source?.user ? 'on' : ''}" data-variant="${i}" draggable="true" title="Clic: carica · trascina nella Sequenza (o doppio clic) per aggiungerla">${esc(v)}</button>`).join('')
+      + user.map((u) => `<button class="chip user ${this.source?.user === u.id ? 'on' : ''}" data-user="${esc(u.id)}" draggable="true" title="Variante personale · trascina nella Sequenza per aggiungerla">★ ${esc(u.name)}</button>`).join('')
       + (this.source?.variant === null && !this.source?.user ? `<span class="chip on">${esc(p.name)}</span>` : '');
     $('#pt-del').hidden = !this.source?.user;
     $('#pt-bpm').value = Math.round(p.bpm);

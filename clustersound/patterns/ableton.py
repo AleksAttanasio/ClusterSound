@@ -17,7 +17,7 @@ import soundfile as sf
 
 from ..online.downloads import license_text, safe_name, unique_path
 from ..paths import resource_path
-from . import midi, model, render
+from . import arrange, midi, model, render
 
 TEMPLATES = "patterns/templates/live10_racks.xml.gz"
 _T: ET.Element | None = None
@@ -246,7 +246,8 @@ def export_package(p: dict, dest_root: str, resolve, describe, title: str) -> st
             write_adg(instrument_rack_document(instrument_rack(chains)), os.path.join(folder, f"{base} Bass.adg"))
             midi.write(os.path.join(folder, "Bass.mid"), p, "bass")
     midi.write(os.path.join(folder, "Pattern (Drums + Bass, GM).mid"), p, "both", "gm")
-    render.write_wav(os.path.join(folder, "Loop.wav"), p, resolve)
+    loop_name = "Sequenza.wav" if p.get("sections") else "Loop.wav"
+    render.write_wav(os.path.join(folder, loop_name), p, resolve)
 
     with open(os.path.join(folder, "LEGGIMI.txt"), "w", encoding="utf-8") as f:
         f.write(readme(p, base, pads, bool(bass["notes"] and blayers), licences))
@@ -268,7 +269,11 @@ def readme(p: dict, base: str, pads: list[dict], has_bass: bool, licences: list)
         lines += [f"3. Trascina \"{base} Bass.adg\" su una seconda traccia MIDI e poi \"Bass.mid\" nello slot clip.",
                   "   Il Simpler del basso è monofonico, con la nota radice del sample già impostata"
                   " (e Glide attivo se il pattern ha note legate)."]
-    lines += ["", "Loop.wav è il pattern già renderizzato: puoi trascinarlo direttamente su una traccia audio.",
+    if p.get("sections"):
+        lines += ["", "SCALETTA DELLA SEQUENZA (Drums.mid e Bass.mid la contengono tutta, dalla battuta 1)"]
+        lines += ["   " + x for x in arrange.outline(p)]
+    loop_name = "Sequenza.wav" if p.get("sections") else "Loop.wav"
+    lines += ["", f"{loop_name} è già renderizzato: puoi trascinarlo direttamente su una traccia audio.",
               "\"Pattern (Drums + Bass, GM).mid\" usa la mappa General MIDI (per altri sampler/DAW).", "",
               "SE IL PRESET .adg NON SI APRE",
               "Crea un Drum Rack vuoto, seleziona tutti i file di Samples/ nell'ordine delle cartelle e trascinali sul pad C1:",

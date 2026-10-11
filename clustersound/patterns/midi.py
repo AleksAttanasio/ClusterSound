@@ -67,11 +67,11 @@ def bass_events(p: dict, channel: int = 0) -> list[tuple[int, bytes]]:
     notes = sorted(bus["notes"], key=lambda n: n["step"])
     ev = []
     for i, n in enumerate(notes):
-        start = model.step_tick(n["step"], p["swing"])
+        start = model.tick(p, n["step"])
         end = start + n["len"] * model.TICKS_PER_STEP
         if n.get("glide") and i + 1 < len(notes):
             # legato overlap: with Glide/Portamento on, the synth slides into the next note
-            end = max(end, model.step_tick(notes[i + 1]["step"], p["swing"]) + model.TICKS_PER_STEP // 4)
+            end = max(end, model.tick(p, notes[i + 1]["step"]) + model.TICKS_PER_STEP // 4)
         pitch = max(0, min(127, root + n["semi"]))
         ev.append((start, bytes([0x90 | channel, pitch, int(n.get("vel", 100))])))
         ev.append((end, bytes([0x80 | channel, pitch, 0])))

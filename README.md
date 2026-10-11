@@ -98,6 +98,16 @@ La terza scheda (**Libreria | Online | Pattern**) è un sequencer per provare i 
     - `… Bass.adg`: Simpler mono con nota radice e glide;
     - `Drums.mid`, `Bass.mid`, `Loop.wav` e `LEGGIMI.txt` con i 3 passi da fare in Live.
 
+- **Sequenza (arrangiamento)**: nel pannello *Sequenza* sopra la griglia componi una scaletta di pattern, anche di generi diversi:
+  - per aggiungere un pattern trascina un chip di variante (o fai doppio clic), oppure usa "+ Pattern corrente";
+  - le card si riordinano trascinandole e hanno ×N ripetizioni, duplica, rinomina ed elimina;
+  - ogni card mostra la miniatura del groove ed è larga in proporzione alle battute;
+  - clic su una card: la griglia mostra e modifica quel blocco;
+  - "Play sequenza" fa scorrere un cursore sulla timeline e, con "Segui", la griglia mostra il blocco che suona;
+  - kit e BPM sono condivisi, mentre lo swing resta quello di ogni blocco;
+  - "Esporta sequenza" crea MIDI, WAV o il pacchetto Ableton dell'intera sequenza, con `Sequenza.wav` e la scaletta in `LEGGIMI.txt`;
+  - "Salva…" e "Apri…" gestiscono le sequenze salvate.
+
   Verificato con Ableton Live 10.1: i preset si aprono con i sample al loro posto.
 
 ## Come classifica

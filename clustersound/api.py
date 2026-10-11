@@ -20,6 +20,7 @@ from .online import search as online
 from .online.base import LICENSES, OnlineResult
 from .online.downloads import DEFAULT_DIR, Downloader
 from .patterns import ableton as pat_ableton
+from .patterns import arrange as pat_arrange
 from .patterns import genres as pat_genres
 from .patterns import midi as pat_midi
 from .patterns import model as pat_model
@@ -284,7 +285,8 @@ class Api:
     # ================================================================== patterns
     def patterns_init(self) -> dict:
         return {"genres": pat_genres.catalog(), "groups": pat_genres.GROUPS, "buses": pat_model.ui_buses(),
-                "user": pat_store.list_user(), "note_names": pat_model.NOTE_NAMES}
+                "user": pat_store.list_user(), "sequences": pat_store.list_sequences(),
+                "note_names": pat_model.NOTE_NAMES}
 
     def pattern_build(self, genre_id: str, variant: int) -> dict:
         return pat_genres.build(genre_id, int(variant))
@@ -378,6 +380,21 @@ class Api:
         """Online samples used by the open pattern must survive cache pruning."""
         online_cache.protect([online_cache.path_for(r["url"]) for r in refs or [] if r and r.get("url")])
 
+    def sequence_flatten(self, kit: dict, seq: dict) -> dict:
+        try:
+            return pat_arrange.flatten(kit, seq)
+        except ValueError as e:
+            return {"error": str(e)}
+
+    def list_sequences(self) -> list[dict]:
+        return pat_store.list_sequences()
+
+    def save_sequence(self, seq: dict) -> dict:
+        return pat_store.save_sequence(seq)
+
+    def delete_sequence(self, sid: str) -> bool:
+        return pat_store.delete_sequence(sid)
+
     def save_user_pattern(self, p: dict) -> dict:
         return pat_store.save(p)
 
@@ -395,6 +412,8 @@ class Api:
 
     @staticmethod
     def _title(p: dict) -> str:
+        if p.get("sections"):
+            return f"{p.get('name') or 'Sequenza'} {int(round(p.get('bpm', 120)))}bpm - {p['bars']} battute"
         g = pat_genres.GENRE_BY_ID.get(p.get("genre"), {})
         return f"{g.get('name', 'Pattern')} - {p.get('name', 'Main')} {int(round(p.get('bpm', 120)))}bpm"
 

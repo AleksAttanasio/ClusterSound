@@ -113,7 +113,7 @@ def render(p: dict, resolve) -> np.ndarray:
                     x = cache.get(layer["ref"], bass_semitones(p, layer, nt["semi"]))
                     if x is None:
                         break
-                    start = int(model.step_tick(nt["step"], p["swing"]) * sec_per_tick * SR) + off
+                    start = int(model.tick(p, nt["step"]) * sec_per_tick * SR) + off
                     length = int(nt["len"] * model.TICKS_PER_STEP * sec_per_tick * SR)
                     _add(busbuf, x, start, layer["volume"] * vel_gain(nt.get("vel", 100)), length)
             else:

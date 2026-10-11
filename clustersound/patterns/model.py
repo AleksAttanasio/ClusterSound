@@ -117,9 +117,12 @@ def n_steps(p: dict) -> int:
 def validate(p: dict) -> dict:
     """Clamp and fill a pattern coming from the UI or from disk."""
     p = copy.deepcopy(p)
-    p["bars"] = max(1, min(8, int(p.get("bars", 1))))
+    p["bars"] = max(1, min(256, int(p.get("bars", 1))))
     p["bpm"] = max(40.0, min(250.0, float(p.get("bpm", 120))))
     p["swing"] = max(50.0, min(75.0, float(p.get("swing", 50))))
+    if p.get("swing_bars"):  # sequences: one swing value per bar
+        sb = [max(50.0, min(75.0, float(v))) for v in p["swing_bars"]]
+        p["swing_bars"] = (sb + [p["swing"]] * p["bars"])[: p["bars"]]
     p.setdefault("key", "F")
     p["octave"] = max(0, min(4, int(p.get("octave", 1))))
     n = n_steps(p)
@@ -150,6 +153,18 @@ def step_tick(step: int, swing: float) -> int:
     return t
 
 
+def swing_at(p: dict, step: int) -> float:
+    sb = p.get("swing_bars")
+    if sb:
+        return sb[min(len(sb) - 1, step // STEPS_PER_BAR)]
+    return p["swing"]
+
+
+def tick(p: dict, step: int) -> int:
+    """Tick of a step in pattern p (honours per-bar swing of sequences)."""
+    return step_tick(step, swing_at(p, step))
+
+
 def active_layers(bus: dict) -> list[dict]:
     layers = [ly for ly in bus.get("layers", []) if ly.get("ref")]
     solo = [ly for ly in layers if ly.get("solo")]
@@ -170,7 +185,7 @@ def drum_hits(p: dict, bus_id: str, layer: dict | None = None):
     for i, v in enumerate(steps):
         if not v:
             continue
-        t0 = step_tick(i, p["swing"])
+        t0 = tick(p, i)
         r = bus["ratchet"][i] if i < len(bus["ratchet"]) else 1
         for k in range(r):
             # roll hits decay a little so they sound like a roll, not a machine gun

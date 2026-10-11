@@ -14,18 +14,29 @@ def _path():
     return data_dir() / "patterns.json"
 
 
-def _load() -> list[dict]:
+def _read() -> dict:
     try:
         data = json.loads(_path().read_text())
-        return data.get("patterns", []) if isinstance(data, dict) else []
+        return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
-        return []
+        return {}
 
 
-def _save(items: list[dict]) -> None:
+def _write(data: dict) -> None:
     tmp = _path().with_suffix(".tmp")
-    tmp.write_text(json.dumps({"version": 1, "patterns": items}))
+    tmp.write_text(json.dumps({"version": 1, "patterns": data.get("patterns", []),
+                               "sequences": data.get("sequences", [])}))
     tmp.replace(_path())
+
+
+def _load(key: str = "patterns") -> list[dict]:
+    return _read().get(key, [])
+
+
+def _save(items: list[dict], key: str = "patterns") -> None:
+    data = _read()
+    data[key] = items
+    _write(data)
 
 
 def list_user() -> list[dict]:
@@ -54,4 +65,33 @@ def delete(pid: str) -> bool:
         if len(kept) == len(items):
             return False
         _save(kept)
+    return True
+
+
+# ------------------------------------------------------------------ sequences
+def list_sequences() -> list[dict]:
+    with _lock:
+        return _load("sequences")
+
+
+def save_sequence(seq: dict) -> dict:
+    seq = dict(seq)
+    with _lock:
+        items = _load("sequences")
+        if not str(seq.get("id", "")).startswith("seq:"):
+            seq["id"] = "seq:" + uuid.uuid4().hex[:10]
+            seq["created"] = time.time()
+        seq["updated"] = time.time()
+        items = [x for x in items if x.get("id") != seq["id"]] + [seq]
+        _save(items, "sequences")
+    return seq
+
+
+def delete_sequence(sid: str) -> bool:
+    with _lock:
+        items = _load("sequences")
+        kept = [x for x in items if x.get("id") != sid]
+        if len(kept) == len(items):
+            return False
+        _save(kept, "sequences")
     return True

@@ -145,13 +145,13 @@ export class Sequencer {
   // ---------------------------------------------------------------- transport
   setPattern(p) { this.p = p; this.updateMix(); }
 
-  start() {
+  start(fromStep = 0) {
     if (this.playing || !this.p) return;
     this.ctx.resume();
     this._graph();
     this.updateMix();
     this.playing = true;
-    this.step = 0;
+    this.step = fromStep % (this.p.bars * 16);
     this.nextTime = this.ctx.currentTime + 0.06;
     this.timer = setInterval(() => this._tick(), TICK_MS);
     this._tick();
@@ -167,12 +167,18 @@ export class Sequencer {
 
   stepDur() { return 60 / this.p.bpm / 4; }
 
+  // swing of a step: per bar in sequences (each block keeps its own swing)
+  swingOf(step) {
+    const sb = this.p.swing_bars;
+    return sb && sb.length ? sb[Math.min(sb.length - 1, Math.floor(step / 16))] : this.p.swing;
+  }
+
   _tick() {
     if (!this.playing) return;
     const n = this.p.bars * 16;
     while (this.nextTime < this.ctx.currentTime + LOOKAHEAD) {
       const i = this.step % n;
-      const swing = i % 2 === 1 ? (this.p.swing / 100 * 2 - 1) * this.stepDur() : 0;
+      const swing = i % 2 === 1 ? (this.swingOf(i) / 100 * 2 - 1) * this.stepDur() : 0;
       this._schedule(i, this.nextTime + swing);
       const delay = Math.max(0, (this.nextTime + swing - this.ctx.currentTime) * 1000);
       if (this.onStep) setTimeout(() => this.playing && this.onStep(i), delay);
@@ -233,7 +239,7 @@ export class Sequencer {
   _scheduleBass(bus, i, t, dest) {
     const notes = [...bus.notes].sort((a, b) => a.step - b.step);
     const sd = this.stepDur();
-    const swingAt = (s) => (s % 2 === 1 ? (this.p.swing / 100 * 2 - 1) * sd : 0);
+    const swingAt = (s) => (s % 2 === 1 ? (this.swingOf(s) / 100 * 2 - 1) * sd : 0);
     notes.forEach((nt, idx) => {
       if (nt.step !== i) return;
       const prev = notes[idx - 1];
