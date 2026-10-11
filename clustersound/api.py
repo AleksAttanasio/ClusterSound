@@ -394,9 +394,11 @@ class Api:
         return self._downloader.status()
 
     def reveal_path(self, path: str) -> bool:
-        root = os.path.realpath(self._settings().get("download_dir") or DEFAULT_DIR)
+        s = self._settings()
+        roots = [os.path.realpath(s.get("download_dir") or DEFAULT_DIR),
+                 os.path.realpath(s.get("sampler_dir") or sampler_export.DEFAULT_DIR)]
         path = os.path.realpath(path or "")
-        if not (path == root or path.startswith(root + os.sep)) or not os.path.exists(path):
+        if not any(path == r or path.startswith(r + os.sep) for r in roots) or not os.path.exists(path):
             return False
         subprocess.run(["open", "-R", path] if os.path.isfile(path) else ["open", path], check=False)
         return True

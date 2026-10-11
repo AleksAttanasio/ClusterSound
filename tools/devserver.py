@@ -28,6 +28,7 @@ SHIM = """<script>
   const api = Object.fromEntries(names.map((n) => [n, call(n)]));
   api.pick_folder = async () => prompt('Percorso della cartella da analizzare');
   api.compose_pick_folder = async () => { const p = prompt('Cartella del chord pack'); return p ? call('compose_pick_folder')(p) : call('compose_init')(); };
+  api.sampler_open_file = async () => { const p = prompt('File audio da aprire nel Sampler'); return p ? call('sampler_open_file')(p) : {cancelled: true}; };
   api.export_report = async () => { const p = prompt('Salva report in (…/report.csv)'); return p ? call('_dev_export')(p) : null; };
   window.pywebview = { api };
   setTimeout(() => window.dispatchEvent(new Event('pywebviewready')), 0);

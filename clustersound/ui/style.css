@@ -791,3 +791,52 @@ wa-button.icon-btn.active::part(button) { background: var(--sel-bg); border-colo
 .spd-tpad .spd-fam { right: 26px; top: 6px; }
 .spd-empty { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-3); font-size: 11px; border: 1.5px dashed #2b303b; }
 .spd-trig.off .rk-check { color: var(--text-3); }
+
+/* ---------- Sampler ---------- */
+.sampler-layout { grid-template-columns: 290px 1fr; }
+.sp-side .filter-block { display: flex; flex-direction: column; gap: 8px; }
+.sp-side .filter-title { margin-bottom: 0; }
+.sp-wide { width: 100%; }
+.sp-wide::part(base), .sp-wide::part(button) { width: 100%; }
+.sp-link { display: flex; gap: 6px; }
+.sp-link wa-input { flex: 1; min-width: 0; }
+.sp-files { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius); padding: 6px; }
+.sp-file { display: flex; justify-content: space-between; gap: 8px; text-align: left; background: none; border: 0; border-radius: 4px; padding: 4px 6px; cursor: pointer; }
+.sp-file:hover { background: var(--bg-3); }
+.sp-file.busy { opacity: .5; pointer-events: none; }
+.sp-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.sp-cap-row { display: flex; gap: 8px; align-items: center; }
+.sp-cap-row wa-number-input { width: 70px; flex: none; }
+.sp-meter { flex: 1; height: 8px; border-radius: 4px; background: var(--wa-color-surface-lowered); border: 1px solid var(--line); overflow: hidden; }
+#sp-meter-fill { height: 100%; width: 0; background: var(--cs-gradient-h); transition: width 80ms linear; }
+.sp-note { border-left: 2px solid var(--wa-color-warning-border-loud, #c9a227); padding-left: 8px; }
+.sp-opts { display: flex; gap: 8px; }
+.sp-opts wa-number-input { flex: 1; min-width: 0; }
+.sp-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 12px 16px; gap: 10px; }
+.sp-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 24px; }
+.sp-title { font-size: 14px; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-badge { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; padding: 2px 7px; border-radius: 4px; border: 1px solid var(--line-2); color: var(--text-2); }
+.sp-badge.ok { border-color: var(--wa-color-success-border-normal); color: var(--wa-color-success-on-quiet); }
+.sp-badge.warn { border-color: var(--wa-color-warning-border-normal); color: var(--wa-color-warning-on-quiet); }
+.sp-page { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.sp-note-inline { color: var(--wa-color-warning-on-quiet); display: inline-flex; gap: 4px; align-items: center; }
+.sp-error { color: #ef5350; display: flex; gap: 6px; align-items: flex-start; max-width: 760px; }
+.sp-toolbar { display: flex; align-items: center; gap: 8px; }
+.sp-sep { width: 1px; height: 20px; background: var(--line); }
+.sp-sens { display: inline-flex; align-items: center; gap: 8px; }
+.sp-sens wa-slider { width: 120px; }
+.sp-wave-wrap { position: relative; flex: 1 1 0; min-height: 180px; display: flex; flex-direction: column; gap: 6px; }
+.sp-wave { flex: 1; width: 100%; min-height: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--wa-color-surface-lowered); cursor: crosshair; touch-action: none; }
+.sp-overview { height: 36px; width: 100%; border: 1px solid var(--line); border-radius: var(--radius); background: var(--wa-color-surface-lowered); cursor: pointer; }
+.sp-empty { pointer-events: none; }
+.sp-regions-head { display: flex; align-items: center; gap: 8px; }
+.sp-regions-head .filter-title { margin: 0; display: inline; }
+.sp-regions { flex: 0 1 34%; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius); min-height: 70px; }
+.sp-regions-empty { padding: 14px; }
+.sp-row { display: grid; grid-template-columns: 24px 28px 1fr 90px 80px 28px 28px 28px; align-items: center; gap: 6px; padding: 3px 8px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.sp-row:hover { background: var(--bg-3); }
+.sp-row.sel { background: var(--sel-bg); }
+.sp-num { color: var(--text-3); font-family: var(--mono); font-size: 11px; text-align: right; }
+.sp-time { font-family: var(--mono); font-size: 11px; color: var(--text-2); text-align: right; }
+.sp-row wa-input::part(form-control-label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.sp-exported { margin-bottom: -4px; }

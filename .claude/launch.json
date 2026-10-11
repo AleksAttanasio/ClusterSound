@@ -12,6 +12,12 @@
       "runtimeExecutable": ".venv/bin/python",
       "runtimeArgs": ["tools/devserver.py", "--port", "8766"],
       "port": 8766
+    },
+    {
+      "name": "clustersound-sampler",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["tools/devserver.py", "--port", "8767"],
+      "port": 8767
     }
   ]
 }
