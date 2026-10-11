@@ -71,6 +71,35 @@ mostra raggruppati **per fonte** oppure **per strumento**:
   (Big Fish Audio, Sound Ideas, Loopmasters, GarageBand…) sono marcati ⚠ e nascosti per default;
   quelli senza licenza dichiarata compaiono solo se scegli "Non dichiarata".
 
+## Scheda Pattern: prova dei sample su groove tipici
+
+La terza scheda (**Libreria | Online | Pattern**) è un sequencer per provare i sample su pattern tipici e portarli in Ableton.
+
+- **47 generi, 191 pattern**, con la bass music in primo piano:
+  - *Bass music UK*: UK garage 2-step, speed garage, bassline, UK funky, grime, dubstep, riddim, tearout, halftime, breaks, future garage;
+  - *Drum & bass / jungle*: liquid, rollers, jump-up, neurofunk, dancefloor, jungle (amen), minimal, drumfunk, footwork;
+  - *Hip hop / trap*: boom bap, lo-fi, trap, UK e NY drill, phonk, memphis, jersey club, baltimore club;
+  - *House / techno*: house, deep, tech house, techno, minimal, electro, trance, hardstyle, disco;
+  - *Global*: afrobeats, amapiano, reggaeton/dembow, dancehall, moombahton, pop, funk, rock, breakbeat.
+
+  Ogni genere ha le sue varianti tipiche più *Fill* e *Breakdown* generate automaticamente, con BPM, swing e tonalità del genere. **Varia** crea una variazione; **Salva variante** la salva tra le tue (★).
+- **Bus separati**: Kick, Snare, Clap, Rim, Closed Hat, Open Hat, Ride/Crash, Perc, Tom, FX e Bass. Ogni bus ha step, volume, pan, filtro, mute/solo e meter.
+- **Layer**: ogni bus può avere più sample che suonano insieme (es. 3 snare nel bus Snare), ciascuno con volume, pitch, offset in ms, mute/solo ed eventualmente step propri.
+- **Step**: clic per accendere/spegnere, Shift per l'accento, Alt per la ghost note, tasto destro per i roll ×2/×3/×4. Hi-hat chiuso e aperto sono in choke.
+- **Basso**: piano-roll con glide (Alt+clic su una nota); la radice del sample viene rilevata da sola, così il basso suona intonato.
+- **Invio ai bus**: dalla Libreria (tasto destro su un punto 3D o su una riga, oppure "Invia al bus" nella tendina) e dalla scheda Online (→), come nuovo layer o al posto di quello selezionato.
+  - I sample online restano in una **cache temporanea limitata** (300 MB, configurabile in ⚙ insieme a "Svuota cache"); diventano file veri solo quando esporti.
+- **Export**:
+  - **MIDI**, con mappatura Drum Rack (pad consecutivi da C1) o General MIDI;
+  - **WAV** del loop;
+  - **Esporta per Ableton**: una cartella con
+    - `Samples/<Bus>/…wav`, più un `.license.txt` per i sample online;
+    - `… Drum Rack.adg`: un pad per bus, con Instrument Rack annidato quando il bus ha più layer;
+    - `… Bass.adg`: Simpler mono con nota radice e glide;
+    - `Drums.mid`, `Bass.mid`, `Loop.wav` e `LEGGIMI.txt` con i 3 passi da fare in Live.
+
+  Verificato con Ableton Live 10.1: i preset si aprono con i sample al loro posto.
+
 ## Come classifica
 
 Quattro segnali fusi in log-probabilità (`clustersound/classifier.py`):
@@ -117,6 +146,7 @@ e rumore delle etichette (es. "snare roll" dentro un fill di batteria).
 
 - `tools/build_yamnet_npz.py` — converte i pesi Keras di YAMNet nel modello numpy.
 - `tools/train_base_head.py` — riaddestra la head base su una o più librerie.
+- `tools/extract_adg_template.py` — rigenera i template (solo struttura) dei rack Live 10 dai preset installati con Live.
 - `tools/evaluate.py` — accuratezza a nomi nascosti (`--oneshots`, `--all-hidden`, `--no-base`).
 - `tools/devserver.py` — UI in un browser normale con l'API Python via HTTP.
 - `pytest` — test su segnali sintetici e pipeline end-to-end; per le fonti online usa risposte registrate

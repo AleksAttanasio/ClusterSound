@@ -49,10 +49,11 @@ const RING_VERT = `
   }`;
 
 export class Scene3D {
-  constructor(container, { onHover, onClick }) {
+  constructor(container, { onHover, onClick, onContext }) {
     this.container = container;
     this.onHover = onHover;
     this.onClick = onClick;
+    this.onContext = onContext;
     this.n = 0;
     this.visible = null;     // Uint8Array mask
     this.selected = -1;
@@ -95,6 +96,12 @@ export class Scene3D {
     el.addEventListener('pointerleave', () => { this._pointer.inside = false; this.onHover(-1); });
     el.addEventListener('pointerdown', (e) => { this._pointer.down = [e.clientX, e.clientY]; });
     el.addEventListener('pointerup', (e) => this._up(e));
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const i = this.pick(e.clientX - r.left, e.clientY - r.top);
+      if (i >= 0 && this.onContext) this.onContext(i, e.clientX, e.clientY);
+    });
     new ResizeObserver(() => this.resize()).observe(container);
     this.resize();
     this._tick = this._tick.bind(this);
@@ -230,7 +237,7 @@ export class Scene3D {
   _up(e) {
     const d = this._pointer.down;
     this._pointer.down = null;
-    if (!d || Math.hypot(e.clientX - d[0], e.clientY - d[1]) > 4) return;
+    if (!d || e.button !== 0 || Math.hypot(e.clientX - d[0], e.clientY - d[1]) > 4) return;
     const r = this.renderer.domElement.getBoundingClientRect();
     const i = this.pick(e.clientX - r.left, e.clientY - r.top);
     this.onClick(i);

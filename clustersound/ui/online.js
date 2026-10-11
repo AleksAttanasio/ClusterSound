@@ -345,6 +345,7 @@ export class Online {
       <div class="num o-dur">${fmtDur(r.duration)}</div>
       <div class="o-meta" title="${esc(meta)}">${esc(meta)}</div>
       <div class="o-actions">
+        ${playable && (r.preview_url || r.download_url) ? `<button class="o-btn" data-send="${esc(r.uid)}" title="Invia al bus del Pattern (file temporaneo, nessun download)">→</button>` : ''}
         ${r.download_url ? `<button class="o-btn" data-dl="${esc(r.uid)}" title="Scarica${r.download_note ? ' — ' + esc(r.download_note) : ''}${r.filesize ? ' (' + fmtSize(r.filesize) + ')' : ''}">⬇</button>` : ''}
         ${r.page_url ? `<button class="o-btn" data-open="${esc(r.page_url)}" title="Apri la pagina della fonte">↗</button>` : ''}
       </div>
@@ -368,6 +369,12 @@ export class Online {
     const t = e.target.closest('button, a, header');
     if (!t) return;
     if (t.dataset.play) return this.togglePlay(t.dataset.play, t);
+    if (t.dataset.send) {
+      const ref = await this.api.online_ref(t.dataset.send);
+      const r = t.getBoundingClientRect();
+      if (ref && this.onSend) this.onSend(ref, r.left - 300, r.bottom + 4);
+      return;
+    }
     if (t.dataset.dl) return this.download(t.dataset.dl);
     if (t.dataset.dlArchive) return this.download(t.dataset.pack, t.dataset.dlArchive);
     if (t.dataset.open) return this.api.open_url(t.dataset.open);
@@ -456,6 +463,13 @@ export class Online {
     $('#set-key').value = '';
     $('#set-key').placeholder = s.freesound_key_set ? `impostata (${s.freesound_key_hint}) — lascia vuoto per mantenerla` : 'incolla qui la tua API key';
     $('#set-dir').value = s.download_dir;
+    $('#set-cache').value = s.cache_mb;
+    $('#set-cache-used').textContent = `In uso: ${s.cache_used_mb} MB. I file oltre il limite vengono eliminati partendo dai meno usati; quelli del pattern aperto restano.`;
+    $('#set-cache-clear').onclick = async (e) => {
+      e.preventDefault();
+      this.meta.settings = await this.api.clear_cache();
+      $('#set-cache-used').textContent = `In uso: ${this.meta.settings.cache_used_mb} MB`;
+    };
     $('#set-cancel').onclick = () => { m.hidden = true; };
     $('#set-getkey').onclick = (e) => { e.preventDefault(); this.api.open_url('https://freesound.org/apiv2/apply'); };
     $('#set-pick').onclick = async () => { const p = await this.api.pick_folder(); if (p) $('#set-dir').value = p; };
@@ -464,6 +478,7 @@ export class Online {
       const key = $('#set-key').value.trim();
       if (key) this.meta.settings = await this.api.set_setting('freesound_key', key);
       this.meta.settings = await this.api.set_setting('download_dir', $('#set-dir').value.trim());
+      this.meta.settings = await this.api.set_setting('cache_mb', $('#set-cache').value);
       m.hidden = true;
       this._renderKeyHint();
       if (key) this.search();

@@ -2,6 +2,8 @@ import { Scene3D } from './scene3d.js';
 import { Panel } from './panel.js';
 import { Player } from './player.js';
 import { Online } from './online.js';
+import { PatternEditor } from './pattern.js';
+import { showSendMenu } from './sendmenu.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -16,7 +18,7 @@ const state = {
 };
 
 const player = new Player({ onState: onPlayState });
-window.__cs = { state, player }; // handy from the web inspector (--debug)
+window.__cs = { state, player, get pattern() { return pattern; } }; // handy from the web inspector (--debug)
 
 // ------------------------------------------------------------------ boot
 function whenApiReady() {
@@ -26,7 +28,7 @@ function whenApiReady() {
   });
 }
 
-let scene, panel, online;
+let scene, panel, online, pattern;
 
 async function main() {
   state.api = await whenApiReady();
@@ -37,15 +39,21 @@ async function main() {
   state.classOn = new Set(state.classes.map((_, i) => i));
   state.typeOn = new Set(state.types.map((_, i) => i));
 
-  scene = new Scene3D($('#view3d'), { onHover, onClick: (i) => { if (i >= 0) select(i, true); } });
+  scene = new Scene3D($('#view3d'), {
+    onHover, onClick: (i) => { if (i >= 0) select(i, true); },
+    onContext: (i, x, y) => sendLibraryItem(i, x, y),
+  });
   scene.onFrame = drawLabels;
   panel = new Panel($('#panel'), $('#panel-content'), {
     classes: state.classes, groups: state.groups,
     onRelabel: relabel, onReveal: (id) => state.api.reveal(id), onSimilar: showSimilar,
     onPlayToggle: togglePlay, onSeek: seek, onClose: closePanel,
+    onSend: (id, x, y) => sendLibraryItem(id, x, y),
   });
 
   online = new Online({ api: state.api, player, classes: state.classes, groups: state.groups, types: state.types });
+  pattern = new PatternEditor({ api: state.api, player, classes: state.classes });
+  online.onSend = (ref, x, y) => sendRef(ref, x, y);
   buildSidebar();
   bindUi();
   if (init.last_folder) setFolder(init.last_folder, false);
@@ -406,21 +414,43 @@ function setView(v) {
   if (v === 'list') { renderHead(); renderList(true); } else scene.resize();
 }
 
+// ------------------------------------------------------------------ send to pattern buses
+async function sendRef(ref, x, y) {
+  await pattern.ensure();
+  showSendMenu({ x, y, ref, buses: pattern.buses, counts: pattern.layerCounts(),
+    onPick: (bus, mode) => pattern.addSample(bus, ref, mode) });
+}
+
+async function sendLibraryItem(id, x, y) {
+  const ref = await state.api.library_ref(id);
+  sendRef(ref, x, y);
+}
+
 function setTab(tab) {
   state.tab = tab;
   player.stop();
+  if (tab !== 'pattern' && pattern) pattern.hide();
   $('#tab-library').classList.toggle('active', tab === 'library');
   $('#tab-online').classList.toggle('active', tab === 'online');
+  $('#tab-pattern').classList.toggle('active', tab === 'pattern');
   $('#library').hidden = tab !== 'library';
   $('#online').hidden = tab !== 'online';
+  $('#pattern').hidden = tab !== 'pattern';
   document.querySelectorAll('.lib-only').forEach((el) => el.classList.toggle('tab-hidden', tab !== 'library'));
   document.querySelectorAll('.online-only').forEach((el) => { el.hidden = tab !== 'online'; });
-  if (tab === 'online') { online.show(); $('#online-q').focus(); } else scene.resize();
+  if (tab === 'online') { online.show(); $('#online-q').focus(); } else if (tab === 'pattern') pattern.show(); else scene.resize();
 }
 
 function bindUi() {
   $('#tab-library').onclick = () => setTab('library');
   $('#tab-online').onclick = () => setTab('online');
+  $('#tab-pattern').onclick = () => setTab('pattern');
+  $('#list-body').addEventListener('contextmenu', (e) => {
+    const r = e.target.closest('.list-row');
+    if (!r) return;
+    e.preventDefault();
+    sendLibraryItem(+r.dataset.i, e.clientX, e.clientY);
+  });
   $('#btn-folder').onclick = async () => {
     const p = await state.api.pick_folder();
     if (p) setFolder(p);
@@ -460,6 +490,7 @@ function bindUi() {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !$('#settings').hidden) { $('#settings').hidden = true; return; }
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (state.tab === 'pattern' && e.key === ' ') { e.preventDefault(); pattern.togglePlay(); return; }
     if (state.tab !== 'library') return;
     if (e.key === 'Escape') closePanel();
     if (e.key === ' ' && state.selected >= 0) { e.preventDefault(); togglePlay(); }

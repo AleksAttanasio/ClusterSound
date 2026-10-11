@@ -16,12 +16,12 @@ function ramp(t) {
 }
 
 export class Panel {
-  constructor(root, content, { classes, groups, onRelabel, onReveal, onSimilar, onPlayToggle, onSeek, onClose }) {
+  constructor(root, content, { classes, groups, onRelabel, onReveal, onSimilar, onPlayToggle, onSeek, onClose, onSend }) {
     this.root = root;
     this.content = content;
     this.classes = classes;
     this.groups = groups;
-    this.cb = { onRelabel, onReveal, onSimilar, onPlayToggle, onSeek, onClose };
+    this.cb = { onRelabel, onReveal, onSimilar, onPlayToggle, onSeek, onClose, onSend };
     this.d = null;
     this.playhead = null;
   }
@@ -69,6 +69,7 @@ export class Panel {
         <button class="btn primary" data-act="play">${playing ? '■ Stop' : '▶ Play'}</button>
         <button class="btn" data-act="reveal" title="Apre il Finder con il file selezionato">Mostra nella cartella</button>
         <button class="btn" data-act="similar">Trova simili</button>
+        <button class="btn" data-act="send" title="Aggiungi o sostituisci questo sample in un bus del Pattern">Invia al bus ▾</button>
       </div>
 
       <div>
@@ -112,6 +113,10 @@ export class Panel {
     this.content.querySelector('[data-act=play]').onclick = () => this.cb.onPlayToggle();
     this.content.querySelector('[data-act=reveal]').onclick = () => this.cb.onReveal(d.id);
     this.content.querySelector('[data-act=similar]').onclick = () => this.cb.onSimilar(d.id);
+    this.content.querySelector('[data-act=send]').onclick = (e) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      this.cb.onSend(d.id, r.left - 120, r.bottom + 4);
+    };
     this.content.querySelector('#cls-select').onchange = (e) => this.cb.onRelabel(d.id, e.target.value);
     this.content.querySelectorAll('.alt').forEach((b) => { b.onclick = () => this.cb.onRelabel(d.id, b.dataset.cls); });
     const clr = this.content.querySelector('#clear-label');

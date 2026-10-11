@@ -9,6 +9,7 @@ datas = [
     (str(pkg / "models" / "yamnet.npz"), "clustersound/models"),
     (str(pkg / "models" / "yamnet_class_map.csv"), "clustersound/models"),
     (str(pkg / "models" / "base_head.npz"), "clustersound/models"),
+    (str(pkg / "patterns" / "templates" / "live10_racks.xml.gz"), "clustersound/patterns/templates"),
 ]
 for f in (pkg / "ui").rglob("*"):
     if f.is_file():

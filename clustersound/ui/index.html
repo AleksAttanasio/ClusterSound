@@ -12,6 +12,7 @@
     <div class="seg main-tabs" role="tablist">
       <button id="tab-library" class="seg-btn active" role="tab">Libreria</button>
       <button id="tab-online" class="seg-btn" role="tab">Online</button>
+      <button id="tab-pattern" class="seg-btn" role="tab">Pattern</button>
     </div>
     <button id="btn-folder" class="btn primary lib-only">Scegli cartella…</button>
     <div id="folder-path" class="folder-path lib-only" title="">Nessuna cartella</div>
@@ -100,6 +101,8 @@
     </main>
   </div>
 
+  <div class="pattern-layout" id="pattern" hidden></div>
+
   <div id="settings" class="modal" hidden>
     <div class="modal-box">
       <h3>Impostazioni online</h3>
@@ -111,6 +114,11 @@
       <label class="field">Cartella dei download
         <span class="o-range"><input id="set-dir" type="text"><button class="btn" id="set-pick">Scegli…</button></span>
         <span class="hint">Ogni file viene salvato in una sottocartella per fonte, con accanto un file .license.txt.</span>
+      </label>
+      <label class="field">Cache temporanea (anteprime e sample provati nel sequencer)
+        <span class="o-range"><input id="set-cache" type="number" min="50" max="10000" step="50"><span class="hint">MB</span>
+          <button class="btn" id="set-cache-clear">Svuota cache</button></span>
+        <span class="hint" id="set-cache-used"></span>
       </label>
       <div class="modal-actions"><button class="btn" id="set-cancel">Annulla</button><button class="btn primary" id="set-save">Salva</button></div>
     </div>
