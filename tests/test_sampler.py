@@ -1,6 +1,10 @@
+import os
+
 import numpy as np
 import soundfile as sf
 
+from clustersound.online.base import OnlineResult
+from clustersound.sampler import export as sampler_export
 from clustersound.sampler import session as S
 from clustersound.sampler import slicing
 
@@ -84,3 +88,34 @@ def test_clamp_and_render():
     assert y[0, 0] == 0 and y[-1, 0] == 0
     assert abs(np.abs(y).max() - 10 ** (-0.3 / 20)) < 1e-4
     assert slicing.render(s, 0, 10, max_s=0.2).shape[0] == int(0.2 * SR)
+
+
+# ---------------------------------------------------------------- export
+def test_export_file_origin(tmp_path):
+    x, _ = _hits()
+    s = S.from_array(x, SR, title="Break", origin="file")
+    paths = sampler_export.export(s, [{"start": 0.2, "end": 0.6}, {"start": 0.7, "end": 1.1, "name": "snare/1"}],
+                                  root=str(tmp_path))
+    assert [os.path.basename(p) for p in paths] == ["Break - 01.wav", "snare 1.wav"]
+    assert all(os.path.dirname(p) == str(tmp_path / "Da file" / "Break") for p in paths)
+    info = sf.info(paths[0])
+    assert info.subtype == "PCM_24" and abs(info.duration - 0.4) < 0.01
+    assert not os.path.exists(paths[0] + ".license.txt")
+    again = sampler_export.export(s, [{"start": 0.2, "end": 0.6}], root=str(tmp_path))
+    assert os.path.basename(again[0]) == "Break - 01 (2).wav"
+
+
+def test_export_link_and_capture_sidecars(tmp_path):
+    x, _ = _hits()
+    r = OnlineResult(uid="archive:x", source="archive", source_label="Internet Archive", title="Old Tape",
+                     author="Someone", license="by", page_url="https://archive.org/details/x",
+                     download_url="https://archive.org/download/x/a.flac")
+    link = S.from_array(x, SR, origin="link", title="Old Tape", result=r)
+    p = sampler_export.export(link, [{"start": 0, "end": 99}], root=str(tmp_path), max_s=1.0)[0]
+    assert sf.info(p).duration <= 1.0 + 1e-3
+    lic = open(p + ".license.txt").read()
+    assert "CC BY" in lic and "Attribuzione richiesta" in lic and "Regione: 0.000–1.000 s" in lic
+    assert "Internet Archive" in p
+    cap = S.from_array(x, SR, origin="capture", title="Cattura", meta={"captured_at": "2026-10-12 10:00"})
+    p = sampler_export.export(cap, [{"start": 0, "end": 1}], root=str(tmp_path))[0]
+    assert "uso personale" in open(p + ".source.txt").read()
