@@ -1138,6 +1138,70 @@
      "text": "Avvio…",
      "linecount": 2
     }
+   },
+   {
+    "box": {
+     "id": "bclip",
+     "maxclass": "textbutton",
+     "numinlets": 1,
+     "numoutlets": 3,
+     "patching_rect": [
+      520,
+      20,
+      80,
+      22
+     ],
+     "outlettype": [
+      "",
+      "",
+      "int"
+     ],
+     "presentation": 1,
+     "presentation_rect": [
+      134,
+      80,
+      134,
+      24
+     ],
+     "text": "Clip → Melodia",
+     "mode": 0
+    }
+   },
+   {
+    "box": {
+     "id": "bclipt",
+     "maxclass": "newobj",
+     "numinlets": 1,
+     "numoutlets": 1,
+     "patching_rect": [
+      520,
+      50,
+      30,
+      22
+     ],
+     "outlettype": [
+      "bang"
+     ],
+     "text": "t b"
+    }
+   },
+   {
+    "box": {
+     "id": "bclipm",
+     "maxclass": "message",
+     "numinlets": 2,
+     "numoutlets": 1,
+     "patching_rect": [
+      520,
+      80,
+      60,
+      22
+     ],
+     "outlettype": [
+      ""
+     ],
+     "text": "inviaclip"
+    }
    }
   ],
   "lines": [
@@ -1689,6 +1753,42 @@
      ],
      "destination": [
       "status",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "bclip",
+      0
+     ],
+     "destination": [
+      "bclipt",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "bclipt",
+      0
+     ],
+     "destination": [
+      "bclipm",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "bclipm",
+      0
+     ],
+     "destination": [
+      "js",
       0
      ]
     }

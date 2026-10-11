@@ -6,6 +6,7 @@ import mimetypes
 import os
 import subprocess
 import threading
+import time
 import urllib.parse
 import webbrowser
 
@@ -15,6 +16,8 @@ import soundfile as sf
 from . import classifier, dynamics, export, taxonomy
 from .chords import export as chord_export
 from .chords import harmony as chord_harmony
+from .chords import melody as chord_melody
+from .chords import midi_in as chord_midi_in
 from .chords import perform as chord_perform
 from .chords import variations as chord_variations
 from .chords.library import CATEGORIES as CHORD_CATEGORIES
@@ -74,6 +77,7 @@ class Api:
         self._rack_cache: dict = {}
         self._rack_lock = threading.Lock()  # js_api calls run on several threads
         self._chords: ChordLibrary | None = None
+        self._recorder = chord_midi_in.Recorder()
         self._live = live_server.Bridge(self._live_stage(), self._resolve, self._describe, self._title)
         threading.Thread(target=online_cache.prune, args=(self._cache_mb(),), daemon=True).start()
 
@@ -529,6 +533,7 @@ class Api:
         return {"dir": lib.root, "exists": lib.exists(), "keys": lib.available_keys() if lib.exists() else [],
                 "categories": CHORD_CATEGORIES, "styles": chord_perform.meta(),
                 "clipKinds": chord_variations.CLIP_KINDS, "progKinds": chord_variations.PROG_KINDS, "modeKinds": chord_variations.MODE_KINDS,
+                "melody": {"densities": chord_melody.DENSITIES, "contours": chord_melody.CONTOURS, "rates": chord_melody.RATES},
                 "saved": pat_store.list_progressions()}
 
     def compose_pick_folder(self, path: str | None = None) -> dict:
@@ -581,7 +586,38 @@ class Api:
         for c in clips:
             d = chord_harmony.describe(c)
             labels.append({"id": c["id"], **chord_harmony.label(d, key)} if d["notes"] else {"id": c["id"]})
-        return {"ppq": chord_perform.PPQ, "events": chord_perform.render(seq), "labels": labels}
+        return {"ppq": chord_perform.PPQ, "events": chord_perform.render(seq), "labels": labels,
+                "melody": chord_melody.render(seq)}
+
+    # ---------------------------------------------------------------- melody
+    def compose_melody_generate(self, seq: dict, opts: dict | None = None, seed: int = 1) -> list[dict]:
+        return chord_melody.generate(seq, self._seq_key(seq), opts or {}, int(seed))
+
+    def compose_harmonize(self, seq: dict, opts: dict | None = None, seed: int = 1) -> dict:
+        """Harmony versions for the melody of seq; opts.key == 'auto' detects the key from the melody."""
+        opts = opts or {}
+        key = self._seq_key(seq)
+        if opts.get("key") == "auto":
+            key = chord_melody.detect_key(chord_melody.notes_of(seq))
+            seq = {**seq, "key": key}
+        pool = self._pool(seq, related=bool(opts.get("related")))
+        items = chord_melody.harmonize(seq, pool, key, self._chord_lib().bigrams(key["mode"]), opts, int(seed))
+        return {"key": key, "items": items}
+
+    def compose_melody_import(self, grid: int = 1) -> dict | None:
+        """A melody from a .mid file (all tracks, top line)."""
+        import webview
+        res = self._window.create_file_dialog(webview.FileDialog.OPEN, file_types=("MIDI (*.mid;*.midi)",))
+        if not res:
+            return None
+        path = res[0] if isinstance(res, (list, tuple)) else res
+        try:
+            ppq, spans = pat_midi.read_note_spans(path)
+        except Exception as e:
+            return {"error": f"File MIDI non leggibile: {e}"}
+        notes = chord_melody.from_spans(spans, ppq, max(1, int(grid)))
+        return {"name": os.path.splitext(os.path.basename(path))[0], "notes": notes,
+                "key": chord_melody.detect_key(notes) if notes else None}
 
     def compose_vary_clip(self, seq: dict, clip_id: str, kinds: list, seed: int = 1) -> list[dict]:
         key = self._seq_key(seq)
@@ -600,26 +636,59 @@ class Api:
     def _prog_title(seq: dict) -> str:
         return f"{seq.get('name') or 'Accordi'} {int(round(seq.get('bpm', 120)))}bpm - {seq.get('bars', 4)} battute"
 
-    def compose_export_midi(self, seq: dict, pure: bool = False) -> str | None:
+    def compose_melody_from_live(self, grid: int = 1) -> dict:
+        """The last clip sent by the Max for Live device ("Clip → Melodia")."""
+        clip = self._live.last_clip()
+        if not clip:
+            return {"error": "Nessuna clip ricevuta: in Live seleziona una clip MIDI e premi «Clip → Melodia» nel device ClusterSound"}
+        ppq = chord_perform.PPQ
+        spans = [(round(s * ppq), round((s + d) * ppq), p, v) for p, s, d, v in clip["notes"]]
+        notes = chord_melody.from_spans(spans, ppq, max(1, int(grid)))
+        return {"name": clip["name"], "notes": notes, "key": chord_melody.detect_key(notes) if notes else None,
+                "age": round(time.time() - clip["at"])}
+
+    def compose_midi_inputs(self) -> dict:
+        if not self._recorder.available():
+            return {"available": False, "ports": [], "hint": chord_midi_in.HINT}
+        try:
+            return {"available": True, "ports": self._recorder.ports()}
+        except Exception as e:
+            return {"available": False, "ports": [], "hint": f"MIDI non disponibile: {e}"}
+
+    def compose_record_start(self, port: int = 0) -> dict:
+        try:
+            self._recorder.start(int(port))
+        except Exception as e:
+            return {"error": str(e)}
+        return {"ok": True}
+
+    def compose_record_stop(self, offset: float, bpm: float, bars: int, grid: int = 1, loop: bool = False) -> dict:
+        """The take: offset = seconds from record start to the transport's first beat."""
+        notes = self._recorder.stop()
+        ppq = chord_perform.PPQ
+        spans = chord_midi_in.to_ticks(notes, float(offset), float(bpm), ppq, int(bars) * 4 * ppq if loop else None)
+        return {"notes": chord_melody.from_spans(spans, ppq, max(1, int(grid)), keep=True)}
+
+    def compose_export_midi(self, seq: dict, pure: bool = False, parts: str = "both") -> str | None:
         path = self._save_dialog(safe_name(self._prog_title(seq)) + ".mid", ("MIDI (*.mid)",))
         if path:
-            chord_export.write(path, seq, pure)
+            chord_export.write(path, seq, pure, parts)
         return path
 
-    def compose_export_versions(self, seqs: list, pure: bool = False) -> dict:
+    def compose_export_versions(self, seqs: list, pure: bool = False, parts: str = "both") -> dict:
         import webview
         os.makedirs(EXPORT_DIR, exist_ok=True)
         res = self._window.create_file_dialog(webview.FileDialog.FOLDER, directory=EXPORT_DIR)
         if not res:
             return {"cancelled": True}
-        return self._write_versions(res[0] if isinstance(res, (list, tuple)) else res, seqs, pure)
+        return self._write_versions(res[0] if isinstance(res, (list, tuple)) else res, seqs, pure, parts)
 
-    def _write_versions(self, folder: str, seqs: list, pure: bool) -> dict:
+    def _write_versions(self, folder: str, seqs: list, pure: bool, parts: str = "both") -> dict:
         files = []
         for seq in seqs:
             name = safe_name(f"{self._prog_title(seq)} - {seq.get('version', '')}".rstrip(" -"))
             path = os.path.join(folder, name + ".mid")
-            chord_export.write(path, seq, pure)
+            chord_export.write(path, seq, pure, parts)
             files.append(path)
         subprocess.run(["open", folder], check=False)
         return {"folder": folder, "files": files}

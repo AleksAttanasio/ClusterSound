@@ -1,7 +1,7 @@
 """Payloads for the Max for Live device: tracks to create in Live, each with an optional rack preset and clips.
 
     payload = {"kind": "pattern"|"rack"|"compose", "name", "bpm", "folder",
-               "tracks": [{"name", "role": "drums"|"bass"|"chords", "adg": abs path | None,
+               "tracks": [{"name", "role": "drums"|"bass"|"chords"|"melody", "adg": abs path | None,
                            "adg_root": "user_library"|"places" | None, "adg_path": "dir/…/x.adg" | None,
                            "clips": [{"name", "length": beats, "notes": [[pitch, start, dur, vel], …]}]}]}
 
@@ -14,6 +14,7 @@ import glob
 import os
 from dataclasses import dataclass
 
+from ..chords import melody as chord_melody
 from ..chords import perform as chord_perform
 from ..patterns import ableton as pat_ableton
 from ..patterns import midi as pat_midi
@@ -152,25 +153,38 @@ def _compose_clip(seq: dict, name: str, pure: bool) -> dict:
     return {"name": name, "length": float(int(seq.get("bars", 4)) * 4), "notes": notes_from_spans(spans, chord_perform.PPQ)}
 
 
+def _melody_clip(seq: dict, name: str) -> dict | None:
+    if not chord_melody.notes_of(seq):
+        return None
+    return {"name": name, "length": float(int(seq.get("bars", 4)) * 4),
+            "notes": notes_from_spans(chord_melody.render(seq), chord_perform.PPQ)}
+
+
 def compose(proj: dict, pure: bool = False, versions: list[str] | None = None) -> dict:
     """A Compose project ({versions, order, modes, modeActive, bpm, name}) or a single playable seq.
 
-    Every harmony version becomes a clip of one "Accordi" track, played with the active Modalità."""
+    Every harmony version becomes a clip of one "Accordi" track, played with the active Modalità; versions
+    with a melody also get a clip on a "Melodia" track, in the same scene."""
     name = proj.get("name") or "Progressione"
     bpm = float(proj.get("bpm") or 120)
     if "versions" not in proj:
         clips = [_compose_clip(proj, name, pure)]
+        mel = [_melody_clip(proj, name)]
     else:
         mode = (proj.get("modes") or {}).get(str(proj.get("modeActive", "1")))
         order = versions or proj.get("order") or list(proj["versions"])
         many = len(order) > 1
-        clips = []
+        clips, mel = [], []
         for v in order:
             seq = proj["versions"].get(v)
             if not seq:
                 continue
             seq = {**seq, "bpm": bpm, "name": name, **({"mode": mode} if mode else {})}
             clips.append(_compose_clip(seq, f"{name} {v}" if many else name, pure))
-    return {"kind": "compose", "name": name, "bpm": bpm, "folder": None,
-            "tracks": [_track(f"Accordi – {name}", "chords", None, None, clips)]}
+            mel.append(_melody_clip(seq, f"Melodia {v}" if many else "Melodia"))
+    tracks = [_track(f"Accordi – {name}", "chords", None, None, clips)]
+    if any(mel):  # an empty slot keeps a melody in the scene of its harmony
+        tracks.append(_track(f"Melodia – {name}", "melody", None, None,
+                             [m or {"name": "", "length": c["length"], "notes": []} for m, c in zip(mel, clips)]))
+    return {"kind": "compose", "name": name, "bpm": bpm, "folder": None, "tracks": tracks}
 

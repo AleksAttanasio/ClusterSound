@@ -2,6 +2,8 @@
 // timeline and get the next chord suggested (the harmony, in versions A, B, C…); define how the progression
 // is played in a separate "Modalità" (a rhythm grid + strum / arpeggio / humanize settings, in modes 1, 2, 3…);
 // generate variations of either, play it together with the Sequencer pattern and export a .mid for Ableton.
+// Every harmony version also has a melody ("Melodia" view, a piano roll over the chords): it can be drawn,
+// imported, generated from the chords, and a melody can be harmonised into a new version.
 // Every note heard here comes from compose_render (Python), so preview and export are the same events.
 import { toast, showPopover } from './sendmenu.js';
 import { sendToLive } from './live.js';
@@ -27,10 +29,16 @@ const STYLE_BADGE = { block: '▤', strum: '⟋', arp: '⋰' };
 const VEL_CYCLE = [0, 100, 120, 65]; // click on a step: off → strike → accent → soft → off
 const LEN_CYCLE = [0, 1, 2, 4, 8];   // alt+click: until the next strike, 1/16, 1/8, 1/4, 1/2
 const SYNTHS = [['pad', 'Pad'], ['ep', 'Piano elettrico'], ['pluck', 'Pluck'], ['organ', 'Organo']];
+const SCALES = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] };
+const ROW_H = 10;     // px per semitone in the piano roll
+const MEL = -1;       // clip index of melody events in the transport
+const PARTS = [['both', 'Accordi + melodia'], ['chords', 'Solo accordi'], ['melody', 'Solo melodia']];
 
 const keyFlats = (k) => FLAT_KEYS[k.mode]?.includes(k.tonic % 12);
 const keyName = (k) => `${(keyFlats(k) ? FLATS : SHARPS)[k.tonic % 12]} ${k.mode === 'minor' ? 'minore' : 'maggiore'}`;
-const newSeq = () => ({ bars: 4, keyMode: 'locked', key: { tonic: 0, mode: 'major' }, clips: [] });
+const newSeq = () => ({ bars: 4, keyMode: 'locked', key: { tonic: 0, mode: 'major' }, clips: [], melody: { notes: [] } });
+const pitchName = (p, flats) => `${(flats ? FLATS : SHARPS)[p % 12]}${Math.floor(p / 12) - 1}`;
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const newProject = (mode) => ({
   name: 'Progressione', bpm: 100, active: 'A', order: ['A'], versions: { A: newSeq() },
   modeActive: '1', modeOrder: ['1'], modes: { 1: mode },
@@ -84,20 +92,25 @@ class ChordSynth {
 
   get ctx() { return this.player._ensure(); }
 
-  _bus() {
-    if (!this.out) {
-      const ctx = this.ctx;
-      this.out = ctx.createGain();
-      this.out.gain.value = 0.55;
-      const comp = ctx.createDynamicsCompressor();
-      comp.threshold.value = -14;
-      comp.ratio.value = 4;
-      this.out.connect(comp).connect(ctx.destination);
+  // one gain per part (chords, melody) into a shared compressor
+  _bus(part = 'chords') {
+    const ctx = this.ctx;
+    if (!this.comp) {
+      this.comp = ctx.createDynamicsCompressor();
+      this.comp.threshold.value = -14;
+      this.comp.ratio.value = 4;
+      this.comp.connect(ctx.destination);
+      this.buses = {};
     }
-    return this.out;
+    if (!this.buses[part]) {
+      this.buses[part] = ctx.createGain();
+      this.buses[part].gain.value = 0.55;
+      this.buses[part].connect(this.comp);
+    }
+    return this.buses[part];
   }
 
-  note(pitch, vel, t0, t1) {
+  note(pitch, vel, t0, t1, preset = this.preset, part = 'chords') {
     const ctx = this.ctx;
     if (ctx.state !== 'running') ctx.resume();
     const f = 440 * Math.pow(2, (pitch - 69) / 12);
@@ -106,7 +119,8 @@ class ChordSynth {
       ep: { w: ['sine', 'triangle'], det: [0, 1200], mix: [1, 0.22], a: 0.004, d: 1.1, s: 0.32, r: 0.25, cut: 3800, env: 0, q: 0.3 },
       pluck: { w: ['sawtooth', 'square'], det: [-4, 4], mix: [1, 0.5], a: 0.003, d: 0.35, s: 0.12, r: 0.14, cut: 700, env: 3200, q: 1.2 },
       organ: { w: ['sine', 'sine'], det: [0, 1200], mix: [1, 0.5], a: 0.01, d: 0.05, s: 1, r: 0.07, cut: 6000, env: 0, q: 0.2 },
-    }[this.preset] || {};
+      lead: { w: ['sawtooth', 'square'], det: [0, 7], mix: [1, 0.35], a: 0.008, d: 0.3, s: 0.6, r: 0.12, cut: 2200, env: 1800, q: 1 },
+    }[preset] || {};
     const g = ctx.createGain();
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
@@ -120,7 +134,7 @@ class ChordSynth {
     g.gain.setTargetAtTime(peak * p.s, t0 + p.a, p.d / 3);
     g.gain.cancelScheduledValues(end);
     g.gain.setTargetAtTime(0, end, p.r / 3);
-    lp.connect(g).connect(this._bus());
+    lp.connect(g).connect(this._bus(part));
     const oscs = p.w.map((w, i) => {
       const o = ctx.createOscillator();
       o.type = w;
@@ -138,7 +152,7 @@ class ChordSynth {
     oscs[0].onended = () => { this.voices.delete(voice); g.disconnect(); };
   }
 
-  setVolume(v) { this._bus().gain.value = 0.55 * v; }
+  setVolume(v, part = 'chords') { this._bus(part).gain.value = 0.55 * v; }
 
   chord(notes, dur = 1.3) {
     this.stopAll();
@@ -167,7 +181,7 @@ class Transport {
 
   get ctx() { return this.synth.ctx; }
 
-  // events: [start, end, pitch, vel, clip] ticks; plays [from, to) once or looped
+  // events: [start, end, pitch, vel, clip] ticks (clip MEL: a melody note); plays [from, to) once or looped
   // at: AudioContext time of `from` (to start in sync with the Sequencer)
   play({ events, bpm, from = 0, to, loop = false, onEnd, at = null }) {
     this.stop();
@@ -213,7 +227,11 @@ class Transport {
       const off = this.base + this.n * this.lenSec - this.from * this.spt;
       const t = off + e[0] * this.spt;
       if (t > horizon) return;
-      if (t >= now - 0.05) this.synth.note(e[2], e[3], Math.max(t, now), off + Math.min(e[1], this.to) * this.spt);
+      if (t >= now - 0.05) {
+        const end = off + Math.min(e[1], this.to) * this.spt;
+        if (e[4] === MEL) this.synth.note(e[2], e[3], Math.max(t, now), end, 'lead', 'melody');
+        else this.synth.note(e[2], e[3], Math.max(t, now), end);
+      }
       this.idx++;
     }
   }
@@ -247,10 +265,13 @@ export class ComposeEditor {
     this.project = null;
     this.sel = new Set();
     this.primary = null;
+    this.melSel = new Set();                // selected melody notes
     this.browse = { tonic: 0, mode: 'major', cats: ['triad', 'extended', 'borrowed', 'progression'], q: '' };
-    this.ui = { snap: 4, loop: true, synth: 'pad', pure: false, withPattern: false, bassFollow: true, chordVol: 0.8, patVol: 0.8 };
+    this.ui = { snap: 4, loop: true, synth: 'pad', pure: false, withPattern: false, bassFollow: true, chordVol: 0.8, patVol: 0.8,
+      view: 'harmony', melVol: 0.8, melMute: false, parts: 'both',
+      gen: { density: 'mid', contour: 'arch', lo: 60, hi: 81, sel: false }, harm: { rate: 'bar', key: 'seq', related: false } };
     this.keyData = new Map();
-    this.rendered = { events: [], byId: {}, labels: {} };
+    this.rendered = { events: [], byId: {}, labels: {}, melody: [] };
     this.undoStack = [];
     this.redoStack = [];
     this.clipKinds = null;
@@ -282,6 +303,7 @@ export class ComposeEditor {
     }
     if (!p.bpm) p.bpm = p.versions[p.active]?.bpm || 100;
     for (const v of Object.values(p.versions)) {
+      if (!v.melody?.notes) v.melody = { notes: [] };
       delete v.defaultStyle;
       delete v.bpm;
       for (const c of v.clips) if (c.style?.type && !c.style.play) c.style = legacyStyle(c.style, grids);
@@ -363,6 +385,8 @@ export class ComposeEditor {
   }
 
   _keepSelection() {
+    const nids = new Set(this.melNotes.map((n) => n.id));
+    this.melSel = new Set([...this.melSel].filter((i) => nids.has(i)));
     const ids = new Set(this.seq.clips.map((c) => c.id));
     this.sel = new Set([...this.sel].filter((i) => ids.has(i)));
     if (!ids.has(this.primary)) this.primary = [...this.sel][0] || null;
@@ -387,6 +411,8 @@ export class ComposeEditor {
       </aside>
       <main class="cp-main">
         <div class="cp-toolbar">
+          <div class="seg" id="cp-view" title="Armonia: gli accordi · Melodia: la melodia sopra gli accordi">
+            <button class="seg-btn" data-view="harmony">Armonia</button><button class="seg-btn" data-view="melody">Melodia</button></div>
           <input id="cp-name" class="cp-name" type="text" spellcheck="false" title="Nome della progressione">
           <label class="cp-field">BPM <input id="cp-bpm" type="number" min="40" max="240" step="1"></label>
           <label class="cp-field">Battute <input id="cp-bars" type="number" min="1" max="128" step="1"></label>
@@ -397,6 +423,7 @@ export class ComposeEditor {
           <select id="cp-mode" class="cp-select"><option value="major">maggiore</option><option value="minor">minore</option></select>
           <div class="spacer"></div>
           <select id="cp-synth" class="cp-select" title="Suono dell'anteprima (non viene esportato)">${SYNTHS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
+          <button class="icon-btn" id="cp-melmute" title="Melodia: on / muta">♫</button>
           <button class="btn primary cp-play" id="cp-play" title="Play / stop (Spazio)">▶</button>
           <button class="icon-btn" id="cp-loop" title="Loop">⟲</button>
           <span class="cp-pat"><button class="btn" id="cp-withpat" title="Suona insieme al pattern del Sequencer">🥁 Pattern</button><button class="btn" id="cp-patset" title="Pattern: basso, volumi, BPM">▾</button></span>
@@ -412,12 +439,14 @@ export class ComposeEditor {
             <div class="cp-ruler" id="cp-ruler"></div>
             <div class="cp-lane" id="cp-lane"></div>
             <div class="cp-rlane" id="cp-rlane" title="Ritmica della modalità · clic: colpo → accento → soft → spento · Alt+clic: durata · ⇧+clic: pennata giù/su"></div>
+            <div class="cp-proll" id="cp-proll" hidden></div>
             <div class="cp-playhead" id="cp-playhead" hidden></div>
           </div>
         </div>
         <div class="cp-modes" id="cp-modes"></div>
+        <div class="cp-modes cp-melbar" id="cp-melbar" hidden></div>
         <div class="cp-tlbar">
-          <span class="hint">Trascina gli accordi sulla timeline · trascina un blocco per spostarlo, il bordo destro per allungarlo · doppio clic: ascolta · V: varia armonia · Canc: elimina</span>
+          <span class="hint" id="cp-tlhint"></span>
           <div class="spacer"></div>
           <button class="btn small" id="cp-even" title="Stessa durata per tutti gli accordi, su tutta la lunghezza">⇔ Distribuisci</button>
           <button class="btn small" id="cp-clear">Svuota</button>
@@ -428,6 +457,8 @@ export class ComposeEditor {
             <div id="cp-sug" class="cp-sug"></div>
           </section>
           <section class="cp-inspector" id="cp-insp"></section>
+          <section class="cp-suggest cp-mpanel" id="cp-mgen" hidden></section>
+          <section class="cp-suggest cp-mpanel" id="cp-mharm" hidden></section>
         </div>
       </main>`;
     this._bindShell();
@@ -486,6 +517,13 @@ export class ComposeEditor {
     $('#cp-tonic').onchange = (e) => this.setKey(+e.target.value, this.seq.key.mode);
     $('#cp-mode').onchange = (e) => this.setKey(this.seq.key.tonic, e.target.value);
     $('#cp-synth').onchange = (e) => { this.ui.synth = this.synth.preset = e.target.value; this._persist(); };
+    $('#cp-view').onclick = (e) => { const b = e.target.closest('[data-view]'); if (b) this.setView(b.dataset.view); };
+    $('#cp-melmute').onclick = () => {
+      this.ui.melMute = !this.ui.melMute;
+      this._persist();
+      this.renderToolbar();
+      this.transport.update(this.playEvents);
+    };
     $('#cp-play').onclick = () => this.togglePlay();
     $('#cp-withpat').onclick = () => {
       this.ui.withPattern = !this.ui.withPattern;
@@ -501,12 +539,17 @@ export class ComposeEditor {
     $('#cp-open').onclick = (e) => this.openDialog(e.currentTarget);
     $('#cp-export').onclick = (e) => this.exportMenu(e.currentTarget);
     $('#cp-even').onclick = () => this.distribute();
-    $('#cp-clear').onclick = () => { if (this.seq.clips.length) this.edit(() => { this.seq.clips = []; this.sel.clear(); this.primary = null; }); };
+    $('#cp-clear').onclick = () => {
+      if (this.ui.view === 'melody') { if (this.melNotes.length) this.edit(() => { this.seq.melody.notes = []; this.melSel.clear(); }); return; }
+      if (this.seq.clips.length) this.edit(() => { this.seq.clips = []; this.sel.clear(); this.primary = null; });
+    };
+    this._bindMelody();
 
     $('#cp-versions').onclick = (e) => {
       const v = e.target.closest('[data-v]');
-      if (v) { this.project.active = v.dataset.v; this.sel.clear(); this.primary = null; this._afterChange(); this.loadBrowser(); return; }
+      if (v) { this.project.active = v.dataset.v; this.sel.clear(); this.melSel.clear(); this.primary = null; this._afterChange(); this.loadBrowser(); return; }
       const a = e.target.closest('[data-act]'); if (!a) return;
+      if (a.dataset.act === 'harm') { this.setView('melody'); this.harmonize(); return; }
       if (a.dataset.act === 'dup') this.addVersion(clone(this.seq));
       else if (a.dataset.act === 'del') this.deleteVersion();
       else if (a.dataset.act === 'vary') this.progressionVariations();
@@ -825,6 +868,7 @@ export class ComposeEditor {
       this.project.order.splice(i + 1, 0, name);
       this.project.active = name;
       this.sel.clear();
+      this.melSel.clear();
       this.primary = null;
     });
     if (label) toast(`Versione ${name}: ${label}`);
@@ -858,12 +902,12 @@ export class ComposeEditor {
     if (token !== this._renderToken || !res?.events) return;
     const byId = {};
     for (const e of res.events) (byId[ids[e[4]]] ||= []).push(e);
-    this.rendered = { events: res.events, byId, labels: Object.fromEntries(res.labels.map((l) => [l.id, l])) };
+    this.rendered = { events: res.events, byId, labels: Object.fromEntries(res.labels.map((l) => [l.id, l])), melody: res.melody || [] };
     for (const c of seq.clips) {
       const l = this.rendered.labels[c.id];
       if (l?.degree) { c.degree = l.degree; c.func = l.func; }
     }
-    this.transport.update(res.events);
+    this.transport.update(this.playEvents);
     this.renderTimeline();
   }
 
@@ -916,21 +960,24 @@ export class ComposeEditor {
     const at = this.synth.ctx.currentTime + 0.08;
     if (pe) this._startPattern(pe, at, from);
     this.synth.setVolume(this.ui.chordVol);
-    this.transport.play({ events: this.rendered.events, bpm: this.project.bpm, from, to, loop: this.ui.loop, at,
+    this.synth.setVolume(this.ui.melVol, 'melody');
+    this.transport.play({ events: this.playEvents, bpm: this.project.bpm, from, to, loop: this.ui.loop, at,
       onEnd: () => { this._stopPattern(); this.renderToolbar(); } });
     this.renderToolbar();
     this._animate();
   }
 
-  playRange(from, to, events = this.rendered.events, seqBpm = this.project.bpm) {
+  playRange(from, to, events = this.playEvents, seqBpm = this.project.bpm) {
     this.stop();
     this.synth.setVolume(this.ui.chordVol);
+    this.synth.setVolume(this.ui.melVol, 'melody');
     this.transport.play({ events, bpm: seqBpm, from, to, loop: false, onEnd: () => this.renderToolbar() });
     this.renderToolbar();
     this._animate();
   }
 
   stop() {
+    if (this._rec) { this.stopRecording(); return; }
     this.transport.stop();
     this.synth.stopAll();
     this._stopPattern();
@@ -1029,11 +1076,14 @@ export class ComposeEditor {
 
   // ---------------------------------------------------------------- draw
   renderAll() {
+    this.renderView();
     this.renderToolbar();
     this.renderVersions();
     this.renderModes();
+    this.renderMelBar();
     this.renderTimeline();
     this.renderInspector();
+    this.renderMelPanels();
   }
 
   renderToolbar() {
@@ -1047,7 +1097,11 @@ export class ComposeEditor {
     set('#cp-mode', s.key.mode);
     set('#cp-synth', this.ui.synth);
     $('#cp-keymode').querySelectorAll('[data-km]').forEach((b) => b.classList.toggle('active', b.dataset.km === s.keyMode));
-    $('#cp-play').textContent = this.transport.playing ? '■' : '▶';
+    $('#cp-play').textContent = this.transport.playing || this._rec ? '■' : '▶';
+    $('#cp-play').classList.toggle('rec', !!this._rec);
+    $('#cp-view').querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === this.ui.view));
+    $('#cp-melmute').classList.toggle('active', !this.ui.melMute && this.melNotes.length > 0);
+    $('#cp-melmute').title = this.ui.melMute ? 'Melodia muta: clic per sentirla' : 'Melodia: clic per silenziarla';
     $('#cp-loop').classList.toggle('active', this.ui.loop);
     $('#cp-withpat').classList.toggle('active', this.ui.withPattern);
     $('#cp-undo').disabled = !this.undoStack.length;
@@ -1060,6 +1114,7 @@ export class ComposeEditor {
       ${p.order.map((v) => `<button class="cp-vtab ${v === p.active ? 'active' : ''}" data-v="${v}" title="${p.versions[v].clips.length} accordi · ${p.versions[v].bars} battute">${v}</button>`).join('')}
       <button class="btn small" data-act="dup" title="Duplica la versione corrente">＋ Duplica</button>
       <button class="btn small" data-act="vary" title="Variazioni degli accordi: riarmonizzazione, ritmo armonico, voicing, finali">✦ Varia armonia…</button>
+      ${this.melNotes.length && this.ui.view === 'harmony' ? '<button class="btn small" data-act="harm" title="Nuove versioni con gli accordi ricavati dalla melodia">♫ Armonizza la melodia…</button>' : ''}
       ${p.order.length > 1 ? '<button class="btn small" data-act="del" title="Elimina la versione corrente">✕</button>' : ''}`;
   }
 
@@ -1092,8 +1147,11 @@ export class ComposeEditor {
         <div class="cp-resize" title="Trascina per cambiare la durata"></div>
       </div>`;
     }).join('') + '<div class="cp-drop" id="cp-drop" hidden></div>';
-    if (!s.clips.length) lane.insertAdjacentHTML('beforeend', '<div class="cp-lane-empty">Trascina qui un accordo o una progressione dalla colonna a sinistra, oppure usa i suggerimenti qui sotto.</div>');
+    if (!s.clips.length) lane.insertAdjacentHTML('beforeend', this.ui.view === 'melody'
+      ? '<div class="cp-lane-empty">Nessun accordo: scrivi la melodia qui sotto e usa «Armonizza», oppure aggiungi accordi dalla colonna a sinistra.</div>'
+      : '<div class="cp-lane-empty">Trascina qui un accordo o una progressione dalla colonna a sinistra, oppure usa i suggerimenti qui sotto.</div>');
     this.renderRhythm();
+    this.renderRoll();
   }
 
   // ---------------------------------------------------------------- Modalità: tabs + rhythm grid
@@ -1503,7 +1561,7 @@ export class ComposeEditor {
         seq.clips = seq.clips.map((x) => (x.id === id ? { ...p.clip, id } : x));
         const res = await this.api.compose_render(seq);
         const cur = this.clip(id);
-        this.playRange(Math.max(0, cur.start - 16) * STEP_TICKS, (cur.start + cur.len) * STEP_TICKS, res.events);
+        this.playRange(Math.max(0, cur.start - 16) * STEP_TICKS, (cur.start + cur.len) * STEP_TICKS, this._events(res));
       } else if (use) {
         const p = this._clipProposals[+use.dataset.use];
         this.edit(() => {
@@ -1550,7 +1608,7 @@ export class ComposeEditor {
       if (b.dataset.play !== undefined) {
         if (this.transport.playing) { this.stop(); return; }
         const res = await this.api.compose_render(p.seq);
-        this.playRange(0, p.seq.bars * 16 * STEP_TICKS, res.events);
+        this.playRange(0, p.seq.bars * 16 * STEP_TICKS, this._events(res));
       } else if (b.dataset.keep !== undefined) {
         this.stop();
         this.addVersion(this._freshIds(this._harmonyOf(p.seq)), p.label);
@@ -1643,6 +1701,457 @@ export class ComposeEditor {
       `<span style="left:${(c.start / total) * 100}%;width:${(c.len / total) * 100}%">${esc(c.name)}</span>`).join('')}</div>`;
   }
 
+  // ---------------------------------------------------------------- melody view
+  get melNotes() { return this.seq.melody?.notes || []; }
+
+  // chord events + melody events (clip index MEL) of a compose_render result
+  _events(res) {
+    const mel = this.ui.melMute ? [] : (res.melody || []).map((e) => [...e, MEL]);
+    return [...res.events, ...mel];
+  }
+
+  get playEvents() { return this._events(this.rendered); }
+
+  setView(v) {
+    if (v === this.ui.view) return;
+    this.ui.view = v;
+    this._persist();
+    this.renderAll();
+  }
+
+  renderView() {
+    const mel = this.ui.view === 'melody';
+    $('#cp-tl').classList.toggle('mel', mel);
+    $('#cp-proll').hidden = !mel;
+    $('#cp-modes').hidden = mel;
+    $('#cp-melbar').hidden = !mel;
+    $('.cp-bottom').classList.toggle('mel', mel);
+    for (const id of ['#cp-sug', '#cp-insp']) $(id).closest('section').hidden = mel;
+    $('#cp-mgen').hidden = $('#cp-mharm').hidden = !mel;
+    $('#cp-even').hidden = mel;
+    $('#cp-tlhint').textContent = mel
+      ? 'Clic su uno spazio vuoto: nuova nota (trascina per allungarla) · trascina una nota per spostarla, il bordo destro per allungarla · Alt+trascina: velocity · doppio clic: elimina · ↑↓ trasponi (⇧ ottava) · ←→ sposta · ⌘A tutte'
+      : 'Trascina gli accordi sulla timeline · trascina un blocco per spostarlo, il bordo destro per allungarlo · doppio clic: ascolta · V: varia armonia · Canc: elimina';
+  }
+
+  renderMelBar() {
+    const box = $('#cp-melbar');
+    if (!box || this.ui.view !== 'melody') return;
+    const n = this.melNotes.length;
+    box.innerHTML = `<span class="cp-barlabel">Melodia</span>
+      <span class="hint">${n ? `${n} note` : 'vuota'}${this.melSel.size ? ` · ${this.melSel.size} selezionate` : ''}</span>
+      <button class="btn small" data-mel="import" title="Da file MIDI, da una clip di Ableton o dalla tastiera MIDI">⤓ Importa ▾</button>
+      <span class="cp-sep"></span>
+      <button class="btn small" data-mel="down" title="Un'ottava sotto (selezione o tutta la melodia)" ${n ? '' : 'disabled'}>−8va</button>
+      <button class="btn small" data-mel="up" title="Un'ottava sopra (selezione o tutta la melodia)" ${n ? '' : 'disabled'}>+8va</button>
+      <label class="cp-field">Volume <input type="range" min="0" max="1.2" step="0.05" value="${this.ui.melVol}" data-mvol></label>`;
+  }
+
+  _melRange() {
+    const ps = this.melNotes.map((n) => n.pitch);
+    const lo = Math.min(this.ui.gen.lo - 3, ...ps.map((p) => p - 2));
+    const hi = Math.max(this.ui.gen.hi + 3, ...ps.map((p) => p + 2));
+    return { lo: clamp(lo, 0, 127), hi: clamp(hi, 0, 127) };
+  }
+
+  renderRoll() {
+    const box = $('#cp-proll');
+    if (!box || this.ui.view !== 'melody') return;
+    const { lo, hi } = (this._mr = this._melRange());
+    const px = this.pxStep;
+    const bar = 16 * px;
+    box.style.height = `${(hi - lo + 1) * ROW_H}px`;
+    box.style.backgroundSize = `${bar}px 100%, ${bar / 4}px 100%`;
+    const k = this.seq.key;
+    const flats = keyFlats(k);
+    const scale = new Set(SCALES[k.mode].map((s) => (k.tonic + s) % 12));
+    const y = (p) => (hi - p) * ROW_H;
+    const html = [];
+    for (let p = hi; p >= lo; p--) {
+      html.push(`<div class="cp-prow ${scale.has(p % 12) ? 'in' : 'out'} ${p % 12 === k.tonic ? 'tonic' : ''}" style="top:${y(p)}px;height:${ROW_H}px">${p % 12 === 0 ? `<span>C${Math.floor(p / 12) - 1}</span>` : ''}</div>`);
+    }
+    for (const c of this.seq.clips) { // the notes of the chord under each clip
+      const pcs = new Set(this._voiced(c).map(([p]) => ((p % 12) + 12) % 12));
+      for (let p = hi; p >= lo; p--) {
+        if (pcs.has(p % 12)) html.push(`<div class="cp-ptone" style="left:${c.start * px}px;width:${c.len * px}px;top:${y(p)}px;height:${ROW_H}px;--fc:${FUNC_COLOR[c.func] || '#888'}"></div>`);
+      }
+    }
+    for (const n of this.melNotes) {
+      html.push(`<div class="cp-mnote ${this.melSel.has(n.id) ? 'sel' : ''}" data-n="${n.id}" title="${pitchName(n.pitch, flats)} · vel ${n.vel}"
+        style="left:${n.start * px}px;width:${Math.max(3, n.len * px - 1)}px;top:${y(n.pitch)}px;height:${ROW_H}px;opacity:${(0.45 + 0.55 * n.vel / 127).toFixed(2)}"><i class="cp-mresize"></i></div>`);
+    }
+    if (!this.melNotes.length) html.push('<div class="cp-roll-empty">Clicca per scrivere note · oppure «Importa» o «Genera melodia» qui sotto</div>');
+    box.innerHTML = html.join('');
+  }
+
+  _rollPos(e) {
+    const r = $('#cp-proll').getBoundingClientRect();
+    return { x: (e.clientX - r.left) / this.pxStep, pitch: this._mr.hi - Math.floor((e.clientY - r.top) / ROW_H) };
+  }
+
+  _noteSound(n) {
+    const t = this.synth.ctx.currentTime + 0.01;
+    this.synth.setVolume(this.ui.melVol, 'melody');
+    this.synth.note(n.pitch, n.vel, t, t + Math.min(0.6, Math.max(0.2, n.len * 15 / this.project.bpm)), 'lead', 'melody');
+  }
+
+  // an edit already applied (a drag): push the snapshot taken before it
+  _commit(before) {
+    this.undoStack.push(before);
+    if (this.undoStack.length > 120) this.undoStack.shift();
+    this.redoStack = [];
+    this._afterChange();
+  }
+
+  _fitMelodyBars() {
+    const end = this.melNotes.reduce((m, n) => Math.max(m, n.start + n.len), 0);
+    this.seq.bars = Math.max(this.seq.bars, Math.ceil(end / 16));
+  }
+
+  _onRollDown(e) {
+    if (e.button !== 0) return;
+    const box = $('#cp-proll');
+    const before = JSON.stringify(this.project);
+    const snap = this.ui.snap;
+    const p0 = this._rollPos(e);
+    const el = e.target.closest('.cp-mnote');
+    let mode, n;
+    if (el) {
+      n = this.melNotes.find((x) => x.id === el.dataset.n);
+      if (!n) return;
+      if (e.shiftKey && this.melSel.has(n.id)) { this.melSel.delete(n.id); this.renderRoll(); this.renderMelBar(); return; }
+      if (!this.melSel.has(n.id)) { if (!e.shiftKey) this.melSel.clear(); this.melSel.add(n.id); }
+      mode = e.target.closest('.cp-mresize') ? 'resize' : e.altKey ? 'vel' : 'move';
+    } else {
+      if (p0.pitch < 0 || p0.pitch > 127 || p0.x < 0 || p0.x >= this.seq.bars * 16) return;
+      n = { id: uid(), start: Math.floor(p0.x / snap) * snap, len: snap, pitch: p0.pitch, vel: 100 };
+      (this.seq.melody ||= { notes: [] }).notes.push(n);
+      this.melSel = new Set([n.id]);
+      mode = 'resize';
+    }
+    this.renderRoll();
+    this._noteSound(n);
+    const sel = this.melNotes.filter((x) => this.melSel.has(x.id));
+    const orig = new Map(sel.map((x) => [x.id, { ...x }]));
+    const minStart = Math.min(...sel.map((x) => x.start));
+    let changed = !el;
+    let lastPitch = n.pitch;
+    box.setPointerCapture(e.pointerId);
+    const onMove = (ev) => {
+      if (!changed && Math.abs(ev.clientX - e.clientX) < 3 && Math.abs(ev.clientY - e.clientY) < 3) return;
+      changed = true;
+      const p = this._rollPos(ev);
+      const dx = p.x - p0.x;
+      for (const x of sel) {
+        const o = orig.get(x.id);
+        if (mode === 'resize') {
+          x.len = Math.max(1, Math.round((o.start + o.len + dx) / snap) * snap - o.start);
+        } else if (mode === 'move') {
+          x.start = o.start + Math.max(-minStart, Math.round(dx / snap) * snap);
+          x.pitch = clamp(o.pitch + p.pitch - p0.pitch, 0, 127);
+        } else {
+          x.vel = clamp(o.vel + Math.round((e.clientY - ev.clientY) / 2), 1, 127);
+        }
+      }
+      if (n.pitch !== lastPitch) { lastPitch = n.pitch; this._noteSound(n); }
+      this.renderRoll();
+    };
+    const onUp = () => {
+      box.removeEventListener('pointermove', onMove);
+      box.removeEventListener('pointerup', onUp);
+      if (changed) { this._fitMelodyBars(); this._commit(before); } else this.renderMelBar();
+    };
+    box.addEventListener('pointermove', onMove);
+    box.addEventListener('pointerup', onUp);
+  }
+
+  _editNotes(fn) {
+    const sel = this.melNotes.filter((n) => this.melSel.has(n.id));
+    const notes = sel.length ? sel : this.melNotes;
+    if (!notes.length) return;
+    this.edit(() => { fn(notes); this._fitMelodyBars(); });
+  }
+
+  _melKey(e, mod) {
+    const k = e.key;
+    if (mod && k.toLowerCase() === 'a') { this.melSel = new Set(this.melNotes.map((n) => n.id)); this.renderRoll(); this.renderMelBar(); return true; }
+    if (k === 'Escape' && this.melSel.size) { this.melSel.clear(); this.renderRoll(); this.renderMelBar(); return true; }
+    if (!this.melSel.size) return false;
+    if (k === 'Backspace' || k === 'Delete') {
+      this.edit(() => { this.seq.melody.notes = this.melNotes.filter((n) => !this.melSel.has(n.id)); this.melSel.clear(); });
+      return true;
+    }
+    if (mod && k.toLowerCase() === 'd') {
+      const sel = this.melNotes.filter((n) => this.melSel.has(n.id));
+      const from = Math.min(...sel.map((n) => n.start));
+      const end = Math.max(...sel.map((n) => n.start + n.len));
+      this.edit(() => {
+        const copies = sel.map((n) => ({ ...n, id: uid(), start: end + n.start - from }));
+        this.seq.melody.notes.push(...copies);
+        this.melSel = new Set(copies.map((n) => n.id));
+        this._fitMelodyBars();
+      });
+      return true;
+    }
+    if (k === 'ArrowUp' || k === 'ArrowDown') {
+      const d = (k === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 12 : 1);
+      this._editNotes((ns) => ns.forEach((n) => { n.pitch = clamp(n.pitch + d, 0, 127); }));
+      const first = this.melNotes.find((n) => this.melSel.has(n.id));
+      if (first) this._noteSound(first);
+      return true;
+    }
+    if (k === 'ArrowLeft' || k === 'ArrowRight') {
+      const sel = this.melNotes.filter((n) => this.melSel.has(n.id));
+      const d = (k === 'ArrowRight' ? 1 : -1) * this.ui.snap;
+      if (Math.min(...sel.map((n) => n.start)) + d < 0) return true;
+      this._editNotes((ns) => ns.forEach((n) => { n.start += d; }));
+      return true;
+    }
+    return false;
+  }
+
+  _bindMelody() {
+    const roll = $('#cp-proll');
+    roll.addEventListener('pointerdown', (e) => this._onRollDown(e));
+    roll.addEventListener('dblclick', (e) => {
+      const el = e.target.closest('.cp-mnote'); if (!el) return;
+      this.edit(() => { this.seq.melody.notes = this.melNotes.filter((n) => n.id !== el.dataset.n); this.melSel.delete(el.dataset.n); });
+    });
+    const bar = $('#cp-melbar');
+    bar.onclick = (e) => {
+      const b = e.target.closest('[data-mel]'); if (!b) return;
+      if (b.dataset.mel === 'import') this.importMenu(b);
+      else this._editNotes((ns) => ns.forEach((n) => { n.pitch = clamp(n.pitch + (b.dataset.mel === 'up' ? 12 : -12), 0, 127); }));
+    };
+    bar.oninput = (e) => {
+      if (!e.target.matches('[data-mvol]')) return;
+      this.ui.melVol = +e.target.value;
+      this.synth.setVolume(this.ui.melVol, 'melody');
+      this._persist();
+    };
+    const gen = $('#cp-mgen');
+    gen.onchange = (e) => {
+      const f = e.target.dataset.g; if (!f) return;
+      this.ui.gen[f] = e.target.type === 'checkbox' ? e.target.checked : ['lo', 'hi'].includes(f) ? +e.target.value : e.target.value;
+      if (this.ui.gen.hi - this.ui.gen.lo < 7) this.ui.gen.hi = this.ui.gen.lo + 12;
+      this._persist();
+      if (['lo', 'hi'].includes(f)) { this.renderRoll(); this.renderMelPanels(); }
+    };
+    gen.onclick = async (e) => {
+      if (e.target.closest('[data-gen]')) { this.generateMelody(); return; }
+      const b = e.target.closest('[data-play],[data-use]'); if (!b) return;
+      const item = this._genItems?.[+(b.dataset.play ?? b.dataset.use)];
+      if (!item) return;
+      if (b.dataset.play !== undefined) this._previewSeq({ ...this.playSeq, melody: item.melody });
+      else {
+        this.stop();
+        this.edit(() => { this.seq.melody = { notes: clone(item.melody.notes).map((n) => ({ ...n, id: uid() })) }; this.melSel.clear(); });
+        toast(`Melodia sostituita: ${item.label}`);
+      }
+    };
+    const harm = $('#cp-mharm');
+    harm.onchange = (e) => {
+      const f = e.target.dataset.h; if (!f) return;
+      this.ui.harm[f] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+      this._persist();
+    };
+    harm.onclick = (e) => {
+      if (e.target.closest('[data-harm]')) { this.harmonize(); return; }
+      const b = e.target.closest('[data-play],[data-keep],[data-replace]'); if (!b) return;
+      const item = this._harmItems?.[+(b.dataset.play ?? b.dataset.keep ?? b.dataset.replace)];
+      if (!item) return;
+      if (b.dataset.play !== undefined) { this._previewSeq(item.seq); return; }
+      this.stop();
+      const h = this._freshIds(this._harmonyOf(item.seq));
+      if (b.dataset.keep !== undefined) this.addVersion(h, item.label);
+      else {
+        this.edit(() => { Object.assign(this.seq, { clips: h.clips, bars: h.bars, key: h.key }); this.sel.clear(); this.primary = null; });
+        toast(`Accordi sostituiti: ${item.label}`);
+      }
+      this.loadBrowser();
+    };
+  }
+
+  renderMelPanels() {
+    if (this.ui.view !== 'melody' || !this.meta.melody) return;
+    const g = this.ui.gen, h = this.ui.harm, M = this.meta.melody;
+    const opts = (list, v) => list.map(([k, l]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${esc(l)}</option>`).join('');
+    const pitches = (v) => Array.from({ length: 49 }, (_, i) => 36 + i).map((p) => `<option value="${p}" ${p === v ? 'selected' : ''}>${pitchName(p, keyFlats(this.seq.key))}</option>`).join('');
+    $('#cp-mgen').innerHTML = `
+      <div class="cp-sec-title"><span>Melodia dagli accordi</span><span class="hint">note dell'accordo sui tempi forti, la scala in mezzo</span></div>
+      <div class="cp-mform">
+        <label class="cp-field">Densità <select class="cp-select" data-g="density">${opts(M.densities, g.density)}</select></label>
+        <label class="cp-field">Contorno <select class="cp-select" data-g="contour">${opts(M.contours, g.contour)}</select></label>
+        <label class="cp-field">Da <select class="cp-select" data-g="lo">${pitches(g.lo)}</select> a <select class="cp-select" data-g="hi">${pitches(g.hi)}</select></label>
+        <label class="cp-own" title="Seleziona uno o più accordi sulla corsia: il resto della melodia resta com'è"><input type="checkbox" data-g="sel" ${g.sel ? 'checked' : ''}> solo sugli accordi selezionati</label>
+        <button class="btn small primary" data-gen>🎲 Genera melodia</button>
+      </div>
+      <div class="cp-vlist" data-glist>${this._genList()}</div>`;
+    const keyLabel = `Tonalità della versione (${keyName(this.seq.key)})`;
+    $('#cp-mharm').innerHTML = `
+      <div class="cp-sec-title"><span>Accordi dalla melodia</span><span class="hint">ogni accordo contiene le note della melodia, concatenati come i suggerimenti</span></div>
+      <div class="cp-mform">
+        <label class="cp-field">Ritmo armonico <select class="cp-select" data-h="rate">${opts(M.rates, h.rate)}</select></label>
+        <label class="cp-field">Tonalità <select class="cp-select" data-h="key">${opts([['seq', keyLabel], ['auto', 'Rileva dalla melodia']], h.key)}</select></label>
+        <label class="cp-own"><input type="checkbox" data-h="related" ${h.related ? 'checked' : ''}> anche accordi in prestito (tonalità vicine)</label>
+        <button class="btn small primary" data-harm>♫ Armonizza</button>
+      </div>
+      <div class="cp-vlist" data-hlist>${this._harmList()}</div>`;
+  }
+
+  _miniMelody(notes, bars) {
+    if (!notes.length) return '';
+    const total = bars * 16;
+    const ps = notes.map((n) => n.pitch);
+    const lo = Math.min(...ps) - 1, hi = Math.max(...ps) + 1;
+    const h = 100 / (hi - lo + 1);
+    return `<svg class="cp-minimel" viewBox="0 0 100 100" preserveAspectRatio="none">${notes.map((n) =>
+      `<rect x="${(n.start / total * 100).toFixed(2)}" y="${((hi - n.pitch) * h).toFixed(2)}" width="${Math.max(0.5, n.len / total * 100 - 0.3).toFixed(2)}" height="${Math.max(2, h * 0.8).toFixed(2)}"/>`).join('')}</svg>`;
+  }
+
+  _genList() {
+    if (this._genBusy) return '<div class="hint">Genero…</div>';
+    if (!this._genItems) return `<div class="hint">${this.seq.clips.length ? 'Scegli le opzioni e premi «Genera melodia»: ▶ ascolta con gli accordi · Usa: sostituisce la melodia (⌘Z per tornare indietro).' : 'Servono prima degli accordi (vista Armonia).'}</div>`;
+    return this._genItems.map((m, i) => `
+      <div class="cp-vrow cp-vprog"><div class="cp-vmain"><span class="cp-vlabel">${esc(m.label)}</span>${this._miniMelody(m.melody.notes, this.seq.bars)}</div>
+        <button class="icon-btn small" data-play="${i}" title="Ascolta con gli accordi">▶</button>
+        <button class="btn small primary" data-use="${i}">Usa</button></div>`).join('') || '<div class="hint">Nessuna melodia: servono degli accordi.</div>';
+  }
+
+  _harmList() {
+    if (this._harmBusy) return '<div class="hint">Cerco gli accordi…</div>';
+    if (!this._harmItems) return `<div class="hint">${this.melNotes.length ? 'Premi «Armonizza»: Nuova versione la aggiunge accanto (A, B, C…), Sostituisci cambia gli accordi di questa.' : 'Scrivi, importa o genera prima una melodia.'}</div>`;
+    const key = this._harmKey && this.ui.harm.key === 'auto' ? `<div class="hint">Tonalità rilevata: ${keyName(this._harmKey)}</div>` : '';
+    return key + (this._harmItems.map((it, i) => `
+      <div class="cp-vrow cp-vprog"><div class="cp-vmain"><span class="cp-vlabel">${esc(it.label)}</span>${this._miniTimeline(it.seq)}</div>
+        <button class="icon-btn small" data-play="${i}" title="Ascolta con la melodia">▶</button>
+        <button class="btn small primary" data-keep="${i}">Nuova versione</button>
+        <button class="btn small" data-replace="${i}">Sostituisci</button></div>`).join('') || '<div class="hint">Nessun accordo del pack per questa melodia.</div>');
+  }
+
+  async generateMelody() {
+    if (!this.seq.clips.length) { toast('Servono prima degli accordi (vista Armonia)'); return; }
+    const g = this.ui.gen;
+    const opts = { density: g.density, contour: g.contour, lo: g.lo, hi: g.hi };
+    const sel = this.sorted().filter((c) => this.sel.has(c.id));
+    if (g.sel && sel.length) {
+      opts.fromBar = Math.floor(sel[0].start / 16);
+      opts.toBar = Math.ceil((sel.at(-1).start + sel.at(-1).len) / 16);
+    }
+    this._genSeed = (this._genSeed || Math.floor(Math.random() * 1e6)) + 1;
+    this._genBusy = true;
+    $('[data-glist]').innerHTML = this._genList();
+    try { this._genItems = (await this.api.compose_melody_generate(this.playSeq, opts, this._genSeed)) || []; } finally { this._genBusy = false; }
+    $('[data-glist]').innerHTML = this._genList();
+  }
+
+  async harmonize() {
+    if (!this.melNotes.length) { toast('Scrivi o importa prima una melodia'); return; }
+    const h = this.ui.harm;
+    this._harmSeed = (this._harmSeed || Math.floor(Math.random() * 1e6)) + 1;
+    this._harmBusy = true;
+    $('[data-hlist]').innerHTML = this._harmList();
+    try {
+      const res = await this.api.compose_harmonize(this.playSeq, { rate: h.rate, key: h.key, related: h.related }, this._harmSeed);
+      this._harmItems = res?.items || [];
+      this._harmKey = res?.key;
+    } finally { this._harmBusy = false; }
+    $('[data-hlist]').innerHTML = this._harmList();
+  }
+
+  async _previewSeq(seq) {
+    if (this.transport.playing) { this.stop(); return; }
+    const res = await this.api.compose_render(seq);
+    this.playRange(0, seq.bars * 16 * STEP_TICKS, this._events(res));
+  }
+
+  importMenu(anchor) {
+    const pop = showPopover(anchor, `
+      <div class="cp-sec-title"><span>Importa melodia</span></div>
+      <button class="btn" data-file>File MIDI…</button>
+      <button class="btn" data-live title="In Live: seleziona una clip MIDI e premi «Clip → Melodia» nel device ClusterSound">Clip da Ableton</button>
+      <div class="cp-sec-title"><span>Tastiera MIDI</span></div>
+      <div data-rec><span class="hint">Cerco le tastiere…</span></div>
+      <div class="hint">Sostituisce la melodia della versione ${this.project.active} (⌘Z per tornare indietro). Da una parte con accordi viene presa la nota più alta.</div>`);
+    this.api.compose_midi_inputs().then((r) => {
+      const box = pop.querySelector('[data-rec]');
+      if (!box) return;
+      if (!r?.available || !r.ports.length) { box.innerHTML = `<span class="hint">${esc(r?.hint || 'Nessuna tastiera MIDI collegata')}</span>`; return; }
+      box.innerHTML = `<div class="cp-mform"><select class="cp-select" data-port>${r.ports.map((p, i) => `<option value="${i}" ${i === this.ui.midiPort ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
+        <button class="btn small primary" data-record title="4 click di attacco, poi suona sopra gli accordi · Spazio o ■ per fermare">● Registra</button></div>`;
+      box.querySelector('[data-record]').onclick = () => {
+        this.ui.midiPort = +box.querySelector('[data-port]').value;
+        this._persist();
+        pop.close();
+        this.startRecording(this.ui.midiPort);
+      };
+    });
+    pop.querySelector('[data-file]').onclick = async () => {
+      pop.close();
+      this._applyImport(await this.api.compose_melody_import(1));
+    };
+    pop.querySelector('[data-live]').onclick = async () => {
+      pop.close();
+      this._applyImport(await this.api.compose_melody_from_live(1));
+    };
+    return pop;
+  }
+
+  // ---------------------------------------------------------------- recording from a MIDI keyboard (python-rtmidi)
+  async startRecording(port) {
+    this.stop();
+    const bpm = this.project.bpm;
+    const beat = 60 / bpm;
+    const tA = performance.now();
+    const r = await this.api.compose_record_start(port);
+    const tB = performance.now();
+    if (r?.error) { toast(r.error); return; }
+    const ctx = this.synth.ctx;
+    if (ctx.state !== 'running') await ctx.resume();
+    this.synth.setVolume(this.ui.chordVol);
+    this.synth.setVolume(this.ui.melVol, 'melody');
+    const t0 = ctx.currentTime + 0.1;
+    for (let i = 0; i < 4; i++) this.synth.note(i ? 84 : 96, 110, t0 + i * beat, t0 + i * beat + 0.05, 'pluck', 'melody');
+    const at = t0 + 4 * beat;
+    // seconds from the recorder start (midway through the call) to the first beat of the progression
+    const offset = (performance.now() + (at - ctx.currentTime) * 1000 - (tA + tB) / 2) / 1000;
+    this._rec = { offset, loop: this.ui.loop };
+    this.transport.play({ events: this.rendered.events, bpm, from: 0, to: this.seq.bars * 16 * STEP_TICKS, loop: this.ui.loop, at,
+      onEnd: () => this.stopRecording() });
+    this.renderToolbar();
+    this._animate();
+    toast('● Registrazione: 4 click di attacco, poi suona · Spazio o ■ per fermare');
+  }
+
+  async stopRecording() {
+    const rec = this._rec;
+    if (!rec) return;
+    this._rec = null;
+    this.transport.stop();
+    this.synth.stopAll();
+    this.renderToolbar();
+    const res = await this.api.compose_record_stop(rec.offset, this.project.bpm, this.seq.bars, 1, rec.loop);
+    if (res?.error) { toast(res.error); return; }
+    if (!res?.notes?.length) { toast('Nessuna nota registrata'); return; }
+    this.edit(() => { this.seq.melody = { notes: res.notes }; this.melSel.clear(); this._fitMelodyBars(); });
+    toast(`Registrate ${res.notes.length} note (⌘Z per tornare alla melodia di prima)`);
+  }
+
+  _applyImport(res) {
+    if (!res) return;
+    if (res.error) { toast(res.error); return; }
+    if (!res.notes?.length) { toast('Nessuna nota da importare'); return; }
+    const setKey = !this.seq.clips.length && res.key;
+    this.edit(() => {
+      this.seq.melody = { notes: res.notes };
+      this.melSel.clear();
+      this._fitMelodyBars();
+      if (setKey) this.seq.key = res.key;
+    });
+    toast(`Melodia importata: ${res.notes.length} note${res.name ? ` da «${res.name}»` : ''}${setKey ? ` · tonalità ${keyName(res.key)}` : ''}`);
+    if (setKey) this.loadBrowser();
+  }
+
   // ---------------------------------------------------------------- save / open / export
   async save() {
     const name = prompt('Nome della progressione', this.project.name);
@@ -1694,18 +2203,29 @@ export class ComposeEditor {
     const many = p.order.length > 1;
     const manyModes = p.modeOrder.length > 1;
     const label = (v, mk) => `${p.name}${many ? ` ${v}` : ''}${manyModes ? ` - ${p.modes[mk].name}` : ''}`;
+    const hasMel = Object.values(p.versions).some((v) => v.melody?.notes?.length);
+    const parts = hasMel ? this.ui.parts : 'chords';
     const pop = showPopover(anchor, `
       <button class="btn primary" data-one>Versione ${p.active} · ${esc(this.mode.name)} → .mid</button>
       ${many ? `<button class="btn" data-all>Tutte le versioni (${p.order.join(', ')}) con ${esc(this.mode.name)} → cartella</button>` : ''}
       ${manyModes ? `<button class="btn" data-modes>Versione ${p.active} con tutte le modalità → cartella</button>` : ''}
       <label class="cp-own"><input type="checkbox" data-pure ${this.ui.pure ? 'checked' : ''}> solo accordi (senza ritmica, strum, arpeggi e humanize)</label>
+      ${hasMel ? `<div class="seg cp-seg" data-parts>${PARTS.map(([k, l]) => `<button class="seg-btn ${k === this.ui.parts ? 'active' : ''}" data-part="${k}">${l}</button>`).join('')}</div>
+        <div class="hint">Accordi + melodia: un .mid con due tracce (Accordi, Melodia).</div>` : ''}
       <button class="btn" data-live>Versione ${p.active} → Live</button>
       ${many ? `<button class="btn" data-live-all>Tutte le versioni → Live (una clip ciascuna)</button>` : ''}
       <div class="hint">In Ableton: trascina il file su una traccia MIDI. Il tempo del file è ${p.bpm} BPM. «→ Live» crea la traccia con le clip tramite il device ClusterSound.</div>`);
     pop.querySelector('[data-pure]').onchange = (e) => { this.ui.pure = e.target.checked; this._persist(); };
+    pop.querySelector('[data-parts]')?.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-part]'); if (!b) return;
+      this.ui.parts = b.dataset.part;
+      this._persist();
+      pop.close();
+      this.exportMenu(anchor);
+    });
     pop.querySelector('[data-one]').onclick = async () => {
       pop.close();
-      const r = await this.api.compose_export_midi({ ...this.playSeq, name: label(p.active, p.modeActive) }, this.ui.pure);
+      const r = await this.api.compose_export_midi({ ...this.playSeq, name: label(p.active, p.modeActive) }, this.ui.pure, parts);
       if (r) toast(`MIDI salvato: ${r.split('/').pop()}`);
     };
     pop.querySelector('[data-live]').onclick = () => {
@@ -1718,7 +2238,7 @@ export class ComposeEditor {
     });
     const many_ = async (seqs) => {
       pop.close();
-      const r = await this.api.compose_export_versions(seqs, this.ui.pure);
+      const r = await this.api.compose_export_versions(seqs, this.ui.pure, parts);
       if (r?.files) toast(`${r.files.length} file MIDI salvati`);
       else if (r?.error) toast(r.error);
     };
@@ -1734,6 +2254,7 @@ export class ComposeEditor {
     const mod = e.metaKey || e.ctrlKey;
     if (e.key === ' ') { this.togglePlay(); return true; }
     if (mod && e.key.toLowerCase() === 'z') { e.shiftKey ? this.redo() : this.undo(); return true; }
+    if (this.ui.view === 'melody' && this._melKey(e, mod)) return true;
     if (mod && e.key.toLowerCase() === 'd') { this.duplicateSelected(); return true; }
     if (e.key === 'Backspace' || e.key === 'Delete') { this.deleteSelected(); return true; }
     if (!mod && e.key.toLowerCase() === 'v' && this.primary) { this.clipVariations(this.primary); return true; }
