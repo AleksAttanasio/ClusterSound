@@ -36,28 +36,42 @@ def export_dir(tmp_path):
     return str(d)
 
 
+@pytest.fixture()
+def stage(tmp_path):
+    lib = tmp_path / "User Library"
+    lib.mkdir()
+    return payload.Stage.user_library(str(lib))
+
+
 # ---------------------------------------------------------------- payload
 def test_notes_from_events_beats():
     ev = [(0, bytes([0x90, 36, 100])), (12, bytes([0x80, 36, 0])), (96, bytes([0x90, 38, 90])), (120, bytes([0x80, 38, 0]))]
     assert payload.notes_from_events(ev, 96) == [[36, 0.0, 0.125, 100], [38, 1.0, 0.25, 90]]
 
 
-def test_place_path(export_dir):
-    p = os.path.join(export_dir, "_Live", "rack", "Kit", "Kit Drum Rack.adg")
-    assert payload.place_path(export_dir, p) == "ClusterSound Patterns/_Live/rack/Kit/Kit Drum Rack.adg"
-    assert payload.place_path(export_dir, None) is None
+def test_stage_paths(tmp_path, export_dir):
+    lib = payload.Stage.user_library(str(tmp_path / "User Library"))
+    p = os.path.join(lib.folder("rack"), "Kit", "Kit Drum Rack.adg")
+    assert lib.browser_path(p) == "ClusterSound/rack/Kit/Kit Drum Rack.adg"
+    places = payload.Stage.places(export_dir)
+    p = os.path.join(places.folder("rack"), "Kit", "Kit Drum Rack.adg")
+    assert places.browser_path(p) == "ClusterSound Patterns/Live Import/rack/Kit/Kit Drum Rack.adg"
+    assert places.browser_path(None) is None
+    assert payload.Stage.default(export_dir, str(tmp_path / "missing")).root == "places"
+    assert payload.Stage.default(export_dir, str(tmp_path / "User Library")).root == "user_library"
 
 
-def test_pattern_payload_matches_drum_rack(export_dir, samples):
+def test_pattern_payload_matches_drum_rack(stage, samples):
     p = genres.build("house", 0)
     p["buses"]["kick"]["layers"] = [model.new_layer(samples["kick"], "kick")]
     p["buses"]["snare"]["layers"] = [model.new_layer(samples["snare"], "snare")]
     p["buses"]["chat"]["layers"] = [model.new_layer(samples["chat"], "chat")]
     p["buses"]["bass"]["layers"] = [model.new_layer(samples["sub"], "sub")]
-    out = payload.pattern(p, export_dir, _resolve, lambda r: None, "House Test")
+    out = payload.pattern(p, stage, _resolve, lambda r: None, "House Test")
     assert out["kind"] == "pattern" and out["bpm"] == p["bpm"]
     drums, bass = out["tracks"]
-    assert os.path.isfile(drums["adg"]) and drums["adg_place"].startswith("ClusterSound Patterns/_Live/pattern/")
+    assert os.path.isfile(drums["adg"]) and drums["adg_root"] == "user_library"
+    assert drums["adg_path"].startswith("ClusterSound/pattern/") and (drums["role"], bass["role"]) == ("drums", "bass")
     clip = drums["clips"][0]
     assert clip["length"] == p["bars"] * 4
     loaded = {b for b in ("kick", "snare", "chat") if any(p["buses"][b]["steps"])}
@@ -68,17 +82,17 @@ def test_pattern_payload_matches_drum_rack(export_dir, samples):
         assert bass["name"] == "Bass" and os.path.isfile(bass["adg"]) and bass["clips"][0]["notes"]
 
 
-def test_pattern_without_samples_has_clip_only(export_dir):
+def test_pattern_without_samples_has_clip_only(stage):
     p = genres.build("house", 0)
-    out = payload.pattern(p, export_dir, _resolve, lambda r: None, "No Kit")
+    out = payload.pattern(p, stage, _resolve, lambda r: None, "No Kit")
     drums = out["tracks"][0]
-    assert drums["adg"] is None and drums["clips"][0]["notes"]
+    assert drums["adg"] is None and drums["adg_path"] is None and drums["clips"][0]["notes"]
 
 
-def test_rack_payload(export_dir, samples):
+def test_rack_payload(stage, samples):
     r = layouts.new_rack("Kit")
     r["pads"][0] = samples["kick"]
-    out = payload.rack(r, export_dir, _resolve, lambda r: None)
+    out = payload.rack(r, stage, _resolve, lambda r: None)
     (track,) = out["tracks"]
     assert track["name"] == "Kit" and os.path.isfile(track["adg"]) and track["clips"] == []
 
@@ -92,6 +106,7 @@ def test_compose_payload_matches_render():
     assert out["bpm"] == 90
     a, b = out["tracks"][0]["clips"]
     assert (a["name"], a["length"], b["length"]) == ("Prog A", 8.0, 4.0)
+    assert out["tracks"][0]["role"] == "chords"
     ev = perform.render({**seq, "bpm": 90, "mode": perform.DEFAULT_MODE})
     assert len(a["notes"]) == len(ev)
     assert sorted(n[1] for n in a["notes"]) == sorted(round(s / perform.PPQ, 6) for s, *_ in ev)
@@ -101,13 +116,13 @@ def test_compose_payload_matches_render():
 
 # ---------------------------------------------------------------- HTTP bridge
 @pytest.fixture()
-def bridge(tmp_path, export_dir, monkeypatch):
+def bridge(tmp_path, stage, monkeypatch):
     from clustersound.patterns import store as pat_store
     from clustersound.racks import store as rack_store
     monkeypatch.setattr(pat_store, "data_dir", lambda: tmp_path)
     monkeypatch.setattr(rack_store, "data_dir", lambda: tmp_path)
     from clustersound.live import server
-    b = server.Bridge(export_dir, _resolve, lambda r: None)
+    b = server.Bridge(stage, _resolve, lambda r: None)
     assert b.start(0)
     yield b
     b.stop()
@@ -218,6 +233,9 @@ def test_find_item_in_places():
     adg.name = "Kit Drum Rack"  # the browser may hide the extension
     assert proto.find_item(places, "ClusterSound Patterns/_Live/rack/Kit/Kit Drum Rack.adg") is adg
     assert proto.find_item(places, "ClusterSound Patterns/_Live/rack/Other/x.adg") is None
+    lib_adg = Item("Kit Drum Rack.adg")
+    library = [Item("Presets"), Item("ClusterSound", Item("rack", Item("Kit", lib_adg)))]  # User Library top folders
+    assert proto.find_item(library + places, "ClusterSound/rack/Kit/Kit Drum Rack.adg") is lib_adg
     assert proto.find_item(places, "") is None
 
 

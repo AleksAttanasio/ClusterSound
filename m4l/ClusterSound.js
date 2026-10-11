@@ -14,7 +14,7 @@ outlets = 4;
 
 var KINDS = [["pattern", "Pattern salvati"], ["sequence", "Sequenze"], ["rack", "Drum rack"], ["compose", "Progressioni"]];
 var OUT_MENU_KINDS = 0, OUT_MENU_ITEMS = 1, OUT_STATUS = 2, OUT_UDP = 3;
-var ACK_TIMEOUT = 6000;
+var ACK_TIMEOUT = 12000;  // the Remote Script retries for ~8 s while a new preset is indexed
 
 var port = 8770;
 var opts = { newtracks: 1, tempo: 0, receive: 1 };
@@ -181,10 +181,10 @@ function importPayload(p) {
                 if (insertAt >= 0) insertAt++;
                 new LiveAPI("live_set tracks " + ref.index).set("name", t.name);
             });
-            if (t.adg_place) {
+            if (t.adg_path) {
                 steps.push(function () {
-                    if (!bridgeOk) { notes.push(t.name + ": trascina il rack da Places → " + t.adg_place); return; }
-                    var id = sendOsc({ cmd: "load", track: ref.index, place: t.adg_place });
+                    if (!bridgeOk) { notes.push(t.name + ": Remote Script non attiva, trascina il rack dal browser → " + t.adg_path); return; }
+                    var id = sendOsc({ cmd: "load", track: ref.index, root: t.adg_root, path: t.adg_path });
                     wait(id, function (msg) { if (!msg.ok) notes.push(t.name + ": " + msg.error); });
                 });
             }

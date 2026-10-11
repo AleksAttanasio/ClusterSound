@@ -26,8 +26,8 @@ VERSION = 1
 class Bridge:
     """Builds payloads and keeps the queue of pushed items. resolve/describe: as for the Ableton exports."""
 
-    def __init__(self, export_dir: str, resolve, describe, title=lambda p: p.get("name") or "Pattern"):
-        self.export_dir = export_dir
+    def __init__(self, stage: payload.Stage, resolve, describe, title=lambda p: p.get("name") or "Pattern"):
+        self.stage = stage
         self.resolve, self.describe, self.title = resolve, describe, title
         self._queue: deque = deque()
         self._lock = threading.Lock()
@@ -37,9 +37,9 @@ class Bridge:
     # ------------------------------------------------------------ payloads
     def build(self, kind: str, data: dict, **opts) -> dict:
         if kind in ("pattern", "sequence"):
-            return payload.pattern(data, self.export_dir, self.resolve, self.describe, self.title(data))
+            return payload.pattern(data, self.stage, self.resolve, self.describe, self.title(data))
         if kind == "rack":
-            return payload.rack(data, self.export_dir, self.resolve, self.describe)
+            return payload.rack(data, self.stage, self.resolve, self.describe)
         if kind == "compose":
             return payload.compose(data, pure=bool(opts.get("pure")), versions=opts.get("versions"))
         raise ValueError(f"tipo sconosciuto: {kind}")

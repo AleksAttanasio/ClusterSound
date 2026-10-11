@@ -500,7 +500,7 @@ export class Online {
     $('#set-live-status').textContent = '';
     this.api.live_status().then((st) => {
       $('#set-live-status').textContent = st.running
-        ? `Attivo su 127.0.0.1:${st.port}. In Live aggiungi ai Places: ${st.place}`
+        ? `Attivo su 127.0.0.1:${st.port}. Preset per Live in ${st.stage}${st.stage_root === 'places' ? ' (aggiungi la cartella ai Places di Live)' : ''}`
         : `Non attivo: ${st.error || 'riavvia l\'app'}`;
     });
     $('#set-cancel').onclick = () => { m.hidden = true; };

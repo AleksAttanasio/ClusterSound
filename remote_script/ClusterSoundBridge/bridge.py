@@ -3,14 +3,15 @@
 from __future__ import absolute_import
 
 import socket
+import traceback
 
 import Live
 from _Framework.ControlSurface import ControlSurface
 
 from . import protocol
 
-RETRY_TICKS = 3     # schedule_message ticks are ~100 ms
-MAX_TRIES = 15      # a freshly written preset can take a moment to show up in the browser
+RETRY_TICKS = 2     # schedule_message ticks are ~100 ms
+MAX_TRIES = 40      # a freshly written preset can take a few seconds to show up in the browser
 
 
 class ClusterSoundBridge(ControlSurface):
@@ -44,11 +45,22 @@ class ClusterSoundBridge(ControlSurface):
             except socket.error:
                 return
             msg = protocol.parse(data)
-            if msg is not None:
+            if msg is None:
+                self._log("ignored packet (%d bytes)" % len(data))
+                continue
+            try:
                 self._handle(msg)
+            except Exception as e:
+                self._log("error on %r:\n%s" % (msg, traceback.format_exc()))
+                self._reply(msg, False, error="%s: %s" % (type(e).__name__, e))
 
     # ------------------------------------------------------------------ commands
+    def _log(self, text):
+        self.log_message("ClusterSoundBridge: %s" % text)
+
     def _reply(self, msg, ok, **kw):
+        if msg.get("cmd") != "ping":
+            self._log("-> %s %s %s" % (msg.get("cmd"), "ok" if ok else "ERR", kw))
         out = dict(kw, id=msg.get("id"), cmd=msg.get("cmd"), ok=ok)
         try:
             self._sock.sendto(protocol.osc_encode(out), ("127.0.0.1", protocol.OUT_PORT))
@@ -57,6 +69,8 @@ class ClusterSoundBridge(ControlSurface):
 
     def _handle(self, msg):
         cmd = msg.get("cmd")
+        if cmd != "ping":
+            self._log("<- %r" % (msg,))
         if cmd == "ping":
             self._reply(msg, True, version=1)
         elif cmd == "load":
@@ -72,14 +86,25 @@ class ClusterSoundBridge(ControlSurface):
             self._reply(msg, False, error="traccia %d inesistente" % idx)
             return
         browser = Live.Application.get_application().browser
-        item = protocol.find_item(browser.user_folders, msg.get("place", ""))
+        path = msg.get("path") or msg.get("place", "")
+        item = protocol.find_item(self._roots(browser, msg.get("root")), path)
         if item is None or not item.is_loadable:
             if tries < MAX_TRIES:
                 self.schedule_message(RETRY_TICKS, lambda: self._load(msg, tries + 1))
             else:
-                self._reply(msg, False, error="preset non trovato nei Places: %s" % msg.get("place"))
+                where = "User Library" if msg.get("root") == "user_library" else "Places"
+                self._reply(msg, False, error="preset non trovato in %s: %s" % (where, path))
             return
+        if tries:
+            self._log("found %s after %d retries" % (path, tries))
         track = tracks[idx]
         song.view.selected_track = track
         browser.load_item(item)
         self._reply(msg, True, track=tracks.index(track))
+
+    @staticmethod
+    def _roots(browser, root):
+        """Browser items to search: the User Library's top folders and/or the Places, preferred one first."""
+        library = list(browser.user_library.children)
+        places = list(browser.user_folders)
+        return library + places if root != "places" else places + library

@@ -1,15 +1,18 @@
 """Payloads for the Max for Live device: tracks to create in Live, each with an optional rack preset and clips.
 
     payload = {"kind": "pattern"|"rack"|"compose", "name", "bpm", "folder",
-               "tracks": [{"name", "adg": abs path | None, "adg_place": "<Place>/…/x.adg" | None,
+               "tracks": [{"name", "role": "drums"|"bass"|"chords", "adg": abs path | None,
+                           "adg_root": "user_library"|"places" | None, "adg_path": "dir/…/x.adg" | None,
                            "clips": [{"name", "length": beats, "notes": [[pitch, start, dur, vel], …]}]}]}
 
 Times are in beats (quarter notes), which is what Live's clip API takes. Presets are written by the regular
-Ableton exporters into a staging folder inside EXPORT_DIR; "adg_place" is the same file as a path that
-starts with the name of that folder, so the Remote Script can find it among Live's browser Places.
+Ableton exporters into a Stage: by default a "ClusterSound" folder of Live's User Library, which Live always
+indexes, so the Remote Script finds the preset under browser.user_library by adg_path. Without a User Library
+the stage is a folder of EXPORT_DIR that the user adds to the browser Places (adg_path starts with its name).
 """
 import glob
 import os
+from dataclasses import dataclass
 
 from ..chords import perform as chord_perform
 from ..patterns import ableton as pat_ableton
@@ -17,21 +20,46 @@ from ..patterns import midi as pat_midi
 from ..patterns import model as pat_model
 from ..racks import ableton as rack_ableton
 
-STAGING = "_Live"
+USER_LIBRARY = os.path.expanduser("~/Music/Ableton/User Library")
+LIBRARY_FOLDER = "ClusterSound"
+PLACES_FOLDER = "Live Import"
 
 
-def staging_dir(export_dir: str, kind: str) -> str:
-    path = os.path.join(export_dir, STAGING, kind)
-    os.makedirs(path, exist_ok=True)
-    return path
+@dataclass
+class Stage:
+    """Where presets are written, and how the Remote Script finds them in Live's browser."""
+    base: str   # the browser root on disk: the User Library, or the folder added to Places
+    root: str   # "user_library" | "places"
+    sub: str    # folder inside base for our files
 
+    @classmethod
+    def user_library(cls, library: str = USER_LIBRARY) -> "Stage":
+        return cls(library, "user_library", LIBRARY_FOLDER)
 
-def place_path(export_dir: str, path: str | None) -> str | None:
-    """'ClusterSound Patterns/_Live/…/x.adg' for a file inside export_dir (the folder added to Places)."""
-    if not path:
-        return None
-    root = os.path.normpath(export_dir)
-    return os.path.join(os.path.basename(root), os.path.relpath(path, root)).replace(os.sep, "/")
+    @classmethod
+    def places(cls, export_dir: str) -> "Stage":
+        return cls(export_dir, "places", PLACES_FOLDER)
+
+    @classmethod
+    def default(cls, export_dir: str, library: str | None = None) -> "Stage":
+        library = library or USER_LIBRARY
+        return cls.user_library(library) if os.path.isdir(library) else cls.places(export_dir)
+
+    def folder(self, kind: str) -> str:
+        path = os.path.join(self.base, self.sub, kind)
+        os.makedirs(path, exist_ok=True)
+        return path
+
+    def browser_path(self, path: str | None) -> str | None:
+        """Path of a staged file as seen from the browser root: inside the User Library, or starting with
+        the name of the Places folder."""
+        if not path:
+            return None
+        base = os.path.normpath(self.base)
+        rel = os.path.relpath(path, base)
+        if self.root == "places":
+            rel = os.path.join(os.path.basename(base), rel)
+        return rel.replace(os.sep, "/")
 
 
 def _round(x: float) -> float:
@@ -59,8 +87,9 @@ def notes_from_events(events: list[tuple[int, bytes]], ppq: int) -> list[list]:
     return notes_from_spans(spans, ppq)
 
 
-def _track(name: str, adg: str | None, export_dir: str, clips: list[dict]) -> dict:
-    return {"name": name, "adg": adg, "adg_place": place_path(export_dir, adg), "clips": clips}
+def _track(name: str, role: str, adg: str | None, stage: Stage | None, clips: list[dict]) -> dict:
+    return {"name": name, "role": role, "adg": adg, "adg_root": stage.root if adg and stage else None,
+            "adg_path": stage.browser_path(adg) if adg and stage else None, "clips": clips}
 
 
 def _first(folder: str, pattern: str) -> str | None:
@@ -68,13 +97,13 @@ def _first(folder: str, pattern: str) -> str | None:
     return hits[0] if hits else None
 
 
-def pattern(p: dict, export_dir: str, resolve, describe, title: str) -> dict:
+def pattern(p: dict, stage: Stage, resolve, describe, title: str) -> dict:
     """A pattern (or a flattened sequence): Drums and Bass tracks with their racks and clips.
 
     The presets and MIDI come from patterns/ableton.export_package, so the clip notes hit the pads of the
     exported Drum Rack exactly as in the package. Without samples there is no rack, only the clip."""
     p = pat_model.validate(p)
-    folder = pat_ableton.export_package(p, staging_dir(export_dir, "pattern"), resolve, describe, title)
+    folder = pat_ableton.export_package(p, stage.folder("pattern"), resolve, describe, title)
     length = pat_model.n_steps(p) / pat_model.STEPS_PER_BAR * 4
     name = p.get("name") or "Pattern"
     tracks = []
@@ -87,22 +116,22 @@ def pattern(p: dict, export_dir: str, resolve, describe, title: str) -> dict:
     else:
         notes = notes_from_events(pat_midi.drum_events(p, "drumrack"), pat_model.PPQ)
     if notes:
-        tracks.append(_track("Drums", drum_adg, export_dir, [{"name": f"{name} – Drums", "length": length, "notes": notes}]))
+        tracks.append(_track("Drums", "drums", drum_adg, stage, [{"name": f"{name} – Drums", "length": length, "notes": notes}]))
 
     bass_adg = _first(folder, "* Bass.adg")
     notes = notes_from_events(pat_midi.bass_events(p), pat_model.PPQ)
     if notes:
-        tracks.append(_track("Bass", bass_adg, export_dir, [{"name": f"{name} – Bass", "length": length, "notes": notes}]))
+        tracks.append(_track("Bass", "bass", bass_adg, stage, [{"name": f"{name} – Bass", "length": length, "notes": notes}]))
     return {"kind": "pattern", "name": title, "bpm": float(p["bpm"]), "folder": folder, "tracks": tracks}
 
 
-def rack(r: dict, export_dir: str, resolve, describe) -> dict:
+def rack(r: dict, stage: Stage, resolve, describe) -> dict:
     """A 64-pad rack: one track with its Drum Rack, no clips."""
-    folder = rack_ableton.export_rack(r, staging_dir(export_dir, "rack"), resolve, describe)
+    folder = rack_ableton.export_rack(r, stage.folder("rack"), resolve, describe)
     name = r.get("name") or "Rack"
     adg = _first(folder, "* Drum Rack.adg")
     return {"kind": "rack", "name": name, "bpm": None, "folder": folder,
-            "tracks": [_track(name, adg, export_dir, [])]}
+            "tracks": [_track(name, "drums", adg, stage, [])]}
 
 
 def _compose_clip(seq: dict, name: str, pure: bool) -> dict:
@@ -130,5 +159,5 @@ def compose(proj: dict, pure: bool = False, versions: list[str] | None = None) -
             seq = {**seq, "bpm": bpm, "name": name, **({"mode": mode} if mode else {})}
             clips.append(_compose_clip(seq, f"{name} {v}" if many else name, pure))
     return {"kind": "compose", "name": name, "bpm": bpm, "folder": None,
-            "tracks": [{"name": f"Accordi – {name}", "adg": None, "adg_place": None, "clips": clips}]}
+            "tracks": [_track(f"Accordi – {name}", "chords", None, None, clips)]}
 
