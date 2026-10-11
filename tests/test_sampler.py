@@ -1,14 +1,21 @@
+import json
 import os
+from pathlib import Path
 
 import numpy as np
+import pytest
 import soundfile as sf
 
-from clustersound.online.base import OnlineResult
+from clustersound.online import archive, downloads
+from clustersound.online.base import OnlineResult, SourceError
 from clustersound.sampler import export as sampler_export
+from clustersound.sampler import links
 from clustersound.sampler import session as S
 from clustersound.sampler import slicing
 
 from .synth import SR
+
+FIX = Path(__file__).parent / "fixtures" / "online"
 
 
 # ---------------------------------------------------------------- session
@@ -119,3 +126,70 @@ def test_export_link_and_capture_sidecars(tmp_path):
     cap = S.from_array(x, SR, origin="capture", title="Cattura", meta={"captured_at": "2026-10-12 10:00"})
     p = sampler_export.export(cap, [{"start": 0, "end": 1}], root=str(tmp_path))[0]
     assert "uso personale" in open(p + ".source.txt").read()
+
+
+# ---------------------------------------------------------------- links
+@pytest.mark.parametrize("url,expected", [
+    ("https://freesound.org/people/producer/sounds/2086/", ("freesound", "2086")),
+    ("freesound.org/s/2086", ("freesound", "2086")),
+    ("https://archive.org/details/DR660Samples", ("archive", "DR660Samples")),
+    ("https://archive.org/download/DR660Samples/Kick%2001.wav", ("archive", "DR660Samples/Kick 01.wav")),
+    ("https://ccmixter.org/files/bblohowiak/71265", ("ccmixter", "71265")),
+    ("https://openverse.org/audio/e43d1972-6c6c-44be-a6f7-1eea6cda842f",
+     ("openverse", "e43d1972-6c6c-44be-a6f7-1eea6cda842f")),
+    ("https://commons.wikimedia.org/wiki/File:Snare_drum.ogg", ("commons", "File:Snare_drum.ogg")),
+    ("https://upload.wikimedia.org/wikipedia/commons/a/ab/Snare_drum.ogg", ("commons", "File:Snare_drum.ogg")),
+])
+def test_classify_supported(url, expected):
+    assert links.classify(url) == expected
+
+
+@pytest.mark.parametrize("url,name", [
+    ("https://www.youtube.com/watch?v=abc", "YouTube"), ("https://youtu.be/abc", "YouTube"),
+    ("https://m.youtube.com/watch?v=abc", "YouTube"), ("https://open.spotify.com/track/x", "Spotify"),
+    ("https://listen.tidal.com/track/1", "Tidal"), ("https://music.apple.com/it/album/x", "Apple Music"),
+    ("https://soundcloud.com/a/b", "SoundCloud"),
+])
+def test_classify_refuses_streaming(url, name):
+    with pytest.raises(SourceError, match=name + " non consente"):
+        links.classify(url)
+
+
+def test_classify_unknown():
+    with pytest.raises(SourceError, match="non riconosciuto"):
+        links.classify("https://example.com/a.wav")
+    with pytest.raises(SourceError):
+        links.classify("https://freesound.org/browse/")
+
+
+def test_resolve_archive_item_and_file(monkeypatch):
+    meta = json.loads((FIX / "archive_metadata.json").read_text())
+    listing = (FIX / "archive_zip_listing.html").read_text()
+    monkeypatch.setattr(archive, "http_get", lambda url, *a, **k: listing if url.endswith("/") else meta)
+    monkeypatch.setattr(links, "http_get", lambda url, *a, **k: meta)
+    files = links.resolve("https://archive.org/details/DR660Samples", {})
+    assert len(files) > 1 and all(f.license == "by" and f.author == "Shpitz Audio" for f in files)
+    one = links.resolve(f"https://archive.org/download/DR660Samples/{files[0].path}", {})
+    assert [f.path for f in one] == [files[0].path]
+
+
+def test_resolve_openverse_and_ccmixter(monkeypatch):
+    ov = json.loads((FIX / "openverse_snare.json").read_text())["results"][0]
+    cc = json.loads((FIX / "ccmixter_drums.json").read_text())
+    monkeypatch.setattr(links, "http_get", lambda url, *a, **k: ov if "openverse" in url else cc[:1])
+    r = links.resolve(f"https://openverse.org/audio/{ov['id']}", {})[0]
+    assert r.download_url == ov["url"] and r.license != "unknown"
+    r = links.resolve(cc[0]["file_page_url"], {})[0]
+    assert r.download_url and not r.download_url.endswith(".zip")
+
+
+def test_parse_commons():
+    data = {"query": {"pages": {"1": {"pageid": 1, "title": "File:Snare drum.ogg", "imageinfo": [{
+        "url": "https://upload.wikimedia.org/wikipedia/commons/a/ab/Snare_drum.ogg", "mediatype": "AUDIO",
+        "descriptionurl": "https://commons.wikimedia.org/wiki/File:Snare_drum.ogg", "size": 1234,
+        "extmetadata": {"Artist": {"value": '<a href="x">Jane &amp; Co</a>'},
+                        "LicenseUrl": {"value": "https://creativecommons.org/licenses/by-sa/4.0"},
+                        "LicenseShortName": {"value": "CC BY-SA 4.0"}, "Duration": {"value": 1.5}}}]}}}}
+    r = links.parse_commons(data)[0]
+    assert (r.title, r.author, r.license, r.format) == ("Snare drum", "Jane & Co", "by-sa", "ogg")
+    assert downloads.host_allowed(r.download_url)
