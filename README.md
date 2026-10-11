@@ -236,8 +236,12 @@ Uso, con l'app ClusterSound aperta:
   - per il basso, i preset *Bass* di Sounds;
   - per gli accordi, *Piano & Keys*, *Pad*, *Synth Keys*, *Strings* e *Mallets*;
   - per la batteria, i kit di Drums.
+- Per la traccia *Drums* di un pattern o di una sequenza c'è anche una voce per ogni bus che suona (*Drums ›
+  Kick*, *› Snare*, *› Closed Hat*…). Le sue proposte sono colpi singoli presi dai Drums di Live, cioè sample
+  e preset di Simpler. *Prova* li carica solo sul pad di quel bus nel Drum Rack, mentre la sequenza suona.
 - **Prova ▶** carica lo strumento sulla traccia e fa partire la clip importata in loop. Lo strumento che lasci
   caricato è la tua scelta.
+- **★ Sample ClusterSound** (o *Kit ClusterSound* per i bus) rimette i sample dell'app.
 - **Altri** propone 6 strumenti nuovi, **Stop** ferma la traccia.
 - Le tracce che arrivano senza strumento ricevono subito la prima proposta, così ogni import suona già. Sono
   le progressioni, le sequenze senza sample e i rack che non si sono caricati.
