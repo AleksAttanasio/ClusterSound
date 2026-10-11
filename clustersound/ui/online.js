@@ -1,4 +1,7 @@
-// "Online" screen: search free samples on Freesound, Openverse, Internet Archive and ccMixter.
+// "Store" mode of the Library: browse free samples and packs (Freesound, Openverse, Internet Archive,
+// ccMixter) plus a curated showcase of royalty-free packs from sites without an API.
+// Views: home (provider strip, categories, featured rows) · results (sounds or packs, grid or list)
+// · pack page · provider page.
 import { svg } from './icons.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -8,7 +11,7 @@ const fmtSize = (b) => (!b ? '' : b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1
 
 const SRC_ABBR = { freesound: 'FS', openverse: 'OV', archive: 'IA', ccmixter: 'CC' };
 const LICENSE_FILTERS = [['cc0', 'CC0 / PD'], ['by', 'BY'], ['by-sa', 'BY-SA'], ['nc', 'Non commerciale'], ['nd', 'No derivate'], ['unknown', 'Non dichiarata']];
-const LIC_CLASS = { cc0: 'free', pd: 'free', by: 'attr', 'by-sa': 'attr', 'by-nd': 'restr', 'by-nc': 'restr', 'by-nc-sa': 'restr', 'by-nc-nd': 'restr', 'sampling+': 'restr', unknown: 'unk' };
+const LIC_CLASS = { cc0: 'free', pd: 'free', by: 'attr', 'by-sa': 'attr', 'by-nd': 'restr', 'by-nc': 'restr', 'by-nc-sa': 'restr', 'by-nc-nd': 'restr', 'sampling+': 'restr', rf: 'free', unknown: 'unk' };
 const PRESETS = [
   ['Kick', ['kick']], ['Snare', ['snare']], ['Hat', ['closed_hat', 'open_hat']], ['Clap', ['clap']],
   ['808', ['sub808']], ['Cymbal', ['ride', 'crash', 'cymbal_other']], ['Perc', ['perc_other', 'shaker', 'tambourine', 'hand_drum', 'cowbell']],
@@ -19,6 +22,10 @@ const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const ANY_KEY = 'any'; // wa-option values cannot be empty
 const chip = (attrs, label) => `<wa-button size="xs" pill class="chip" ${attrs}>${label}</wa-button>`;
 const SPIN = '<wa-spinner class="spin"></wa-spinner>';
+const KIND_LABEL = { api: 'Ricerca live', curated: 'Vetrina' };
+const hue = (text) => { let h = 0; for (const c of String(text)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+const nSounds = (n) => `${n} suon${n === 1 ? 'o' : 'i'}`;
+const fmtNum = (n) => (n === null || n === undefined ? '' : n >= 1e6 ? `${(n / 1e6).toFixed(1)} M` : n >= 1e4 ? `${Math.round(n / 1e3)} k` : n.toLocaleString('it-IT'));
 
 export class Online {
   constructor({ api, player, classes, groups, types }) {
@@ -40,19 +47,42 @@ export class Online {
     this.loading = new Set();
     this.searchSeq = 0;
     this.started = false;
-    player.subscribe((playing, id) => this._syncPlayButtons(playing, id));
+    this.view = { name: 'home' }; // home | results | pack | provider
+    this.history = [];
+    this.kind = 'sounds';         // results: sounds | packs
+    this.layout = (() => { try { return localStorage.getItem('cs.storeLayout') === 'list' ? 'list' : 'grid'; } catch { return 'grid'; } })();
+    this.packData = {};           // source -> pack search response
+    this.packPage = null;         // open pack page response
+    this.provData = null;         // open provider page: {sounds, packs}
+    this.featured = null;
+    this.queue = null;            // "listen to all" on a pack page: {uids, i}
+    player.subscribe((playing, id, ended) => { this._syncPlayButtons(playing, id); if (ended) this._queueNext(id); });
   }
 
   async show() {
-    if (this.started) return;
+    if (this.started) return this._ready;
     this.started = true;
-    this.meta = await this.api.online_init();
-    this.p.sources = new Set(this.meta.sources.map((s) => s.id));
-    this._buildSidebar();
-    this._bind();
-    this._renderKeyHint();
+    this._ready = (async () => {
+      this.meta = await this.api.online_init();
+      this.prov = Object.fromEntries(this.meta.providers.map((p) => [p.id, p]));
+      this.p.sources = new Set(this.meta.sources.map((s) => s.id));
+      this._buildSidebar();
+      this._bind();
+      this._renderKeyHint();
+      this.render();
+      this._loadFeatured();
+      this._pollDownloads();
+    })();
+    return this._ready;
+  }
+
+  /** Open the results with some parameters (e.g. from the library: same instrument as a sample). */
+  async browse(over = {}) {
+    await this.show();
+    if (over.instruments) this.p.instruments = new Set(over.instruments);
+    if (over.q !== undefined) { this.p.q = over.q; $('#online-q').value = over.q; }
+    this._refreshSrvHints();
     this.search();
-    this._pollDownloads();
   }
 
   // ---------------------------------------------------------------- params
@@ -239,8 +269,11 @@ export class Online {
       this.render();
     });
     $('#online-results').onclick = (e) => this._onResultsClick(e);
+    $('#store-view').onclick = (e) => this._onResultsClick(e);
+    $('#store-nav').onclick = (e) => this._onResultsClick(e);
     $('#btn-settings').onclick = () => this.openSettings();
     $('#dl-open').onclick = () => this.api.open_download_dir();
+    $('#dl-library').onclick = () => this.onLibrary?.(this.meta.settings.download_dir);
     $('#dl-toggle').onclick = () => $('#downloads').classList.toggle('collapsed');
     $('#downloads-list').onclick = (e) => {
       const r = e.target.closest('[data-path]');
@@ -254,29 +287,39 @@ export class Online {
   }
 
   // ---------------------------------------------------------------- search
+  _activeSources() {
+    const all = [...this.p.sources];
+    return this.kind === 'packs' ? all.filter((s) => this.meta.pack_sources.includes(s)) : all;
+  }
+
   async search() {
+    if (this.view.name !== 'results') this._go({ name: 'results' });
     const seq = ++this.searchSeq;
-    this.data = {};
+    const store = this.kind === 'packs' ? (this.packData = {}) : (this.data = {});
     this.expanded = {};
-    for (const s of this.p.sources) this.loading.add(s);
+    this.loading.clear();
+    const sources = this._activeSources();
+    for (const s of sources) this.loading.add(s);
     this.render();
     // one call per source so fast sources show up first
     const params = this.params();
-    await Promise.all([...this.p.sources].map(async (s) => {
-      const res = await this.api.online_more(s, params, 1);
+    const call = this.kind === 'packs' ? 'online_packs' : 'online_more';
+    await Promise.all(sources.map(async (s) => {
+      const res = await this.api[call](s, params, 1);
       if (seq !== this.searchSeq) return;
       this.loading.delete(s);
-      this.data[s] = res;
+      store[s] = res;
       this.render();
     }));
   }
 
   async more(source) {
-    const cur = this.data[source];
+    const packs = this.kind === 'packs';
+    const cur = (packs ? this.packData : this.data)[source];
     if (!cur) return;
     this.loading.add(source);
     this.render();
-    const res = await this.api.online_more(source, this.params(), cur.page + 1);
+    const res = await this.api[packs ? 'online_packs' : 'online_more'](source, this.params(), cur.page + 1);
     this.loading.delete(source);
     if (!res.error) {
       cur.results = cur.results.concat(res.results.filter((r) => !cur.results.some((x) => x.uid === r.uid)));
@@ -297,15 +340,32 @@ export class Online {
   }
 
   render() {
-    const box = $('#online-results');
+    if (!this.meta) return;
+    const results = this.view.name === 'results';
+    const list = results && this.layout === 'list' && this.kind === 'sounds';
     for (const s of this.meta.sources) {
       const el = document.querySelector(`[data-src-status="${s.id}"]`);
       if (el) {
-        const d = this.data[s.id];
-        el.innerHTML = !this.p.sources.has(s.id) ? '' : this.loading.has(s.id) ? SPIN
+        const d = (this.kind === 'packs' ? this.packData : this.data)[s.id];
+        el.innerHTML = !results || !this.p.sources.has(s.id) ? '' : this.loading.has(s.id) ? SPIN
           : d?.error ? (d.needs_key ? '<span class="error">chiave</span>' : '<span class="error">errore</span>') : d ? d.results.length : '';
       }
     }
+    $('#online-results').hidden = !list;
+    $('#store-view').hidden = list;
+    $('#online-presets-bar').hidden = !(this.view.name === 'home' || results);
+    $('#online-group').classList.toggle('tab-hidden', !list);
+    this._renderNav();
+    if (list) this._renderList();
+    else if (this.view.name === 'home') this._renderHome();
+    else if (results) this._renderGrid();
+    else if (this.view.name === 'pack') this._renderPack();
+    else if (this.view.name === 'provider') this._renderProvider();
+    this._syncPlayButtons(this.player.playing, this.player.id);
+  }
+
+  _renderList() {
+    const box = $('#online-results');
     const active = this.meta.sources.filter((s) => this.p.sources.has(s.id));
     if (!active.length) { box.innerHTML = '<div class="o-empty">Seleziona almeno una fonte.</div>'; return; }
     const html = [];
@@ -345,7 +405,6 @@ export class Online {
       if (moreSrc.length && !loadingAny) html.push('<wa-button size="s" appearance="filled-outlined" class="o-more" data-more-all="1">Carica altri da tutte le fonti</wa-button>');
     }
     box.innerHTML = html.join('');
-    this._syncPlayButtons(this.player.playing, this.player.id);
   }
 
   _licBadge(r) {
@@ -395,9 +454,27 @@ export class Online {
   }
 
   async _onResultsClick(e) {
-    const t = e.target.closest('button, wa-button, a, header');
+    const t = e.target.closest('button, wa-button, a, header, [data-pack], [data-provider], [data-cat]');
     if (!t) return;
-    if (t.dataset.play) return this.togglePlay(t.dataset.play, t);
+    if (t.tagName === 'A' && (t.dataset.nav || t.dataset.provider || t.dataset.home !== undefined)) e.preventDefault();
+    if (t.dataset.play) { this.queue = null; return this.togglePlay(t.dataset.play, t); }
+    if (t.dataset.dlArchive) return this.download(t.dataset.pack, t.dataset.dlArchive);
+    if (t.dataset.home !== undefined) return this._home();
+    if (t.dataset.back !== undefined) return this._back();
+    if (t.dataset.nav !== undefined) return this._jump(+t.dataset.nav);
+    if (t.dataset.pack) return this.openPack(t.dataset.pack);
+    if (t.dataset.provider) return this.openProvider(t.dataset.provider);
+    if (t.dataset.cat) { this.p.instruments = new Set(JSON.parse(t.dataset.cat)); this._refreshSrvHints(); return this.search(); }
+    if (t.dataset.kind) { this.kind = t.dataset.kind; return this.search(); }
+    if (t.dataset.layout) {
+      this.layout = t.dataset.layout;
+      try { localStorage.setItem('cs.storeLayout', this.layout); } catch { /* private mode */ }
+      return this.render();
+    }
+    if (t.dataset.dlPack) return this.downloadPack(t.dataset.dlPack);
+    if (t.dataset.playAll !== undefined) return this.playAll();
+    if (t.dataset.packMore !== undefined) return this._packMore();
+    if (t.dataset.toLibrary !== undefined) return this.onLibrary?.(this.meta.settings.download_dir);
     if (t.dataset.send) {
       const ref = await this.api.online_ref(t.dataset.send);
       const r = t.getBoundingClientRect();
@@ -410,7 +487,7 @@ export class Online {
     if (t.dataset.more) return this.more(t.dataset.more);
     if (t.dataset.moreAll) return Promise.all([...this.p.sources].filter((s) => this.data[s]?.more).map((s) => this.more(s)));
     if (t.dataset.settings) return this.openSettings();
-    if (t.dataset.tag) { $('#online-q').value = t.dataset.tag; this.p.q = t.dataset.tag; return this.search(); }
+    if (t.dataset.tag) { $('#online-q').value = t.dataset.tag; this.p.q = t.dataset.tag; this.kind = 'sounds'; return this.search(); }
     if (t.dataset.expand) return this.toggleExpand(t.dataset.expand);
     if (t.dataset.expandAll) { e.preventDefault(); return this.toggleExpand(t.dataset.expandAll, true); }
     if (t.dataset.collapse) {
@@ -429,6 +506,342 @@ export class Online {
     this.render();
   }
 
+  // ---------------------------------------------------------------- store navigation
+  _go(view, replace = false) {
+    if (!replace) this.history.push(this.view);
+    this.view = view;
+    $('#store-view').scrollTop = 0;
+  }
+
+  _home() { this.history = []; this.view = { name: 'home' }; this.searchSeq++; this.render(); }
+
+  _back() {
+    if (!this.history.length) return this._home();
+    this.view = this.history.pop();
+    this.render();
+  }
+
+  _jump(i) { // breadcrumb: go back to the i-th view of the trail
+    if (i >= this.history.length) return;
+    this.view = this.history[i];
+    this.history = this.history.slice(0, i);
+    this.render();
+  }
+
+  _viewLabel(v) {
+    if (v.name === 'home') return 'Store';
+    if (v.name === 'results') return this.p.q ? `«${esc(this.p.q)}»` : 'Risultati';
+    if (v.name === 'pack') return esc(v.title || 'Pack');
+    if (v.name === 'provider') return esc(this.prov[v.id]?.name || v.id);
+    return '';
+  }
+
+  _renderNav() {
+    const trail = [...this.history, this.view];
+    const crumbs = trail.map((v, i) => (i === trail.length - 1
+      ? `<span class="sn-cur">${this._viewLabel(v)}</span>`
+      : v.name === 'home' ? '<a href="#" data-home>Store</a>' : `<a href="#" data-nav="${i}">${this._viewLabel(v)}</a>`));
+    const results = this.view.name === 'results';
+    const seg = (attr, items, cur) => `<span class="sn-seg">${items.map(([v, l, ic]) => `<button class="${v === cur ? 'on' : ''}" data-${attr}="${v}">${ic ? svg(ic, 13) : ''}${l}</button>`).join('')}</span>`;
+    $('#store-nav').innerHTML = `
+      ${this.view.name !== 'home' ? `<button class="o-btn sn-back" data-back title="Indietro">${svg('arrow-left', 14)}</button>` : `<span class="sn-icon">${svg('store', 16)}</span>`}
+      <span class="sn-crumbs">${crumbs.join('<span class="sn-sep">›</span>')}</span>
+      <span class="spacer"></span>
+      ${results ? seg('kind', [['sounds', 'Suoni', 'music'], ['packs', 'Pack', 'package']], this.kind) : ''}
+      ${results && this.kind === 'sounds' ? seg('layout', [['grid', '', 'layout-grid'], ['list', '', 'list']], this.layout) : ''}`;
+  }
+
+  // ---------------------------------------------------------------- store: building blocks
+  _logo(id, size = 'm') {
+    const p = this.prov[id];
+    if (!p) return '';
+    return p.logo ? `<span class="pv-logo pv-${size}" title="${esc(p.name)}"><img src="${esc(p.logo)}" alt="${esc(p.name)}"></span>`
+      : `<span class="pv-logo pv-${size} pv-mono" style="--pc:${p.color}" title="${esc(p.name)}">${esc(p.name.slice(0, 2))}</span>`;
+  }
+
+  _cover(r, { icon = null, big = false } = {}) {
+    const c = r.instrument ? this.byId[r.instrument] : null;
+    const h = hue(r.title + r.author);
+    const bg = c ? `linear-gradient(135deg, ${c.color}55, hsl(${h} 45% 16%))` : `linear-gradient(135deg, hsl(${h} 55% 34%), hsl(${(h + 60) % 360} 45% 14%))`;
+    return `<div class="sc-cover ${big ? 'big' : ''}" style="background:${bg}">
+      ${r.waveform_img ? `<img class="sc-wave" src="${esc(r.waveform_img)}" alt="" loading="lazy">` : ''}
+      ${icon ? `<span class="sc-icon">${svg(icon, big ? 40 : 26)}</span>` : ''}
+      ${r.preview_url ? `<button class="sc-play" data-play="${esc(r.uid)}" title="Ascolta">${svg('play', 16)}</button>` : ''}
+    </div>`;
+  }
+
+  _soundCard(r) {
+    const meta = [fmtDur(r.duration), r.bpm ? `${Math.round(r.bpm)} BPM` : '', r.key || ''].filter(Boolean).join(' · ');
+    const c = r.instrument ? this.byId[r.instrument] : null;
+    return `<div class="sc-card" data-uid="${esc(r.uid)}">
+      ${this._cover(r)}
+      <div class="sc-body">
+        <div class="sc-title" title="${esc(r.title)}">${esc(r.title)}</div>
+        <div class="sc-sub">${this._logo(r.source, 's')}<span>${esc(r.author || r.source_label)}</span></div>
+        <div class="sc-meta">${this._licBadge(r)}${c ? `<span class="sc-cls"><span class="dot" style="background:${c.color}"></span>${esc(c.label)}</span>` : ''}<span class="num">${esc(meta)}</span></div>
+        <div class="sc-actions">
+          ${r.preview_url || r.download_url ? `<button class="o-btn" data-send="${esc(r.uid)}" title="Invia al Sequencer o al Drum Rack (file temporaneo)">${svg('arrow-right')}</button>` : ''}
+          ${r.download_url ? `<button class="o-btn" data-dl="${esc(r.uid)}" title="Scarica${r.download_note ? ' — ' + esc(r.download_note) : ''}">${svg('download')}</button>` : ''}
+          ${r.page_url ? `<button class="o-btn" data-open="${esc(r.page_url)}" title="Apri la pagina della fonte">${svg('external-link')}</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  _packCard(r) {
+    const i = r.info || {};
+    // grouped search cards only know how many sounds match; the pack page has the full count
+    const count = i.num_sounds ? nSounds(i.num_sounds) : i.matching ? `${nSounds(i.matching)} corrispondent${i.matching === 1 ? 'e' : 'i'}` : r.filesize ? fmtSize(r.filesize) : '';
+    const matching = i.matching && i.num_sounds && i.matching < i.num_sounds ? ` · ${i.matching} corrispondono` : '';
+    const dls = i.downloads ? `${svg('download', 11)} ${fmtNum(i.downloads)}` : '';
+    return `<div class="sc-card pack ${r.suspect ? 'suspect' : ''}" data-pack="${esc(r.uid)}" data-title="${esc(r.title)}" title="Apri il pack">
+      ${this._cover(r, { icon: 'package' })}
+      <div class="sc-body">
+        <div class="sc-title" title="${esc(r.title)}">${esc(r.title)}</div>
+        <div class="sc-sub">${this._logo(r.source, 's')}<span>${esc(r.author || r.source_label)}</span></div>
+        <div class="sc-meta">${r.license !== 'unknown' ? this._licBadge(r) : ''}<span>${esc(count)}${matching}</span><span class="sc-dl">${dls}</span></div>
+        ${r.suspect ? `<div class="warn">${svg('triangle-alert', 11)} probabile materiale commerciale</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  _curatedCard(c) {
+    const p = this.prov[c.provider];
+    const lic = { license: c.license, license_label: this.meta.licenses[c.license], commercial_ok: true };
+    return `<div class="sc-card curated">
+      <div class="sc-cover" style="background:linear-gradient(135deg, ${p.color}66, hsl(${hue(c.title)} 35% 13%))">${this._logo(c.provider, 'l')}</div>
+      <div class="sc-body">
+        <div class="sc-title" title="${esc(c.title)}">${esc(c.title)}</div>
+        <div class="sc-sub"><span>${esc(p.name)}</span>${c.count ? `<span>· ${c.count} file</span>` : ''}</div>
+        <div class="sc-desc">${esc(c.description)}</div>
+        <div class="sc-meta">${this._licBadge(lic)}${c.note ? `<span class="sc-note" title="${esc(c.note)}">condizioni</span>` : ''}</div>
+        <div class="sc-actions"><wa-button size="xs" appearance="filled-outlined" data-open="${esc(c.url)}"><wa-icon slot="start" name="external-link"></wa-icon>Scarica dal sito</wa-button></div>
+      </div>
+    </div>`;
+  }
+
+  _shelf(title, body, { link = '', note = '' } = {}) {
+    return `<section class="shelf"><header class="shelf-head"><h3>${title}</h3>${note ? `<span class="hint">${note}</span>` : ''}<span class="spacer"></span>${link}</header>${body}</section>`;
+  }
+
+  _rowOf(cards, empty = '') { return cards.length ? `<div class="sc-row">${cards.join('')}</div>` : `<div class="o-none">${empty}</div>`; }
+
+  // ---------------------------------------------------------------- store: home
+  async _loadFeatured() {
+    this.featured = null;
+    if (this.view.name === 'home') this.render();
+    const f = await this.api.online_featured();
+    this.featured = f;
+    for (const k of Object.keys(f)) {
+      if (f[k].results) f[k].results = f[k].results.filter((r) => r.is_pack || k === 'cc0_new');
+    }
+    if (this.view.name === 'home') this.render();
+  }
+
+  _featuredRow(key, card, empty) {
+    const f = this.featured?.[key];
+    if (!f) return `<div class="o-none">${SPIN} caricamento…</div>`;
+    if (f.needs_key) return `<div class="sc-keycta">${this._logo('freesound', 'm')}<div><b>Sblocca i pack di Freesound</b><br><span class="hint">Serve una API key gratuita: oltre 600.000 suoni, organizzati in pack.</span></div><wa-button size="s" variant="brand" data-settings="1"><wa-icon slot="start" name="settings"></wa-icon>Inserisci API key</wa-button></div>`;
+    if (f.error) return `<div class="o-none error">${esc(f.error)}</div>`;
+    return this._rowOf(f.results.slice(0, 16).map(card), empty);
+  }
+
+  _renderHome() {
+    const providers = this.meta.providers.map((p) => `
+      <div class="pv-card" data-provider="${p.id}" title="${esc(p.description)}">
+        ${this._logo(p.id, 'l')}
+        <div class="pv-name">${esc(p.name)}</div>
+        <div class="pv-kind ${p.kind}">${KIND_LABEL[p.kind]}</div>
+      </div>`).join('');
+    const cats = PRESETS.map(([label, ids]) => {
+      const c = this.byId[ids[0]];
+      return `<div class="cat-tile" data-cat='${JSON.stringify(ids)}' style="--cc:${c?.color || '#888'}"><span>${esc(label)}</span></div>`;
+    }).join('');
+    const fsLink = '<a href="#" data-provider="freesound">Tutti →</a>';
+    $('#store-view').innerHTML = `
+      <div class="store-hero">
+        <div><h2>Sample gratuiti, pronti per la libreria</h2>
+          <div class="hint">Solo fonti libere: pubblico dominio, Creative Commons e pack royalty-free. Ogni download arriva con il suo .license.txt.</div></div>
+      </div>
+      ${this._shelf('Provider', `<div class="pv-strip">${providers}</div>`)}
+      ${this._shelf('Categorie', `<div class="cat-grid">${cats}</div>`)}
+      ${this._shelf('Pack in evidenza su Freesound', this._featuredRow('freesound_packs', (r) => this._packCard(r), 'Nessun pack'), { link: fsLink })}
+      ${this._shelf('Pack da Internet Archive', this._featuredRow('archive_packs', (r) => this._packCard(r), 'Nessun pack'), { link: '<a href="#" data-provider="archive">Tutti →</a>' })}
+      ${this._shelf('Nuovi suoni CC0', this._featuredRow('cc0_new', (r) => this._soundCard(r), 'Nessun suono'), { note: 'pubblico dominio, nessuna attribuzione' })}
+      ${this._shelf('Vetrina gratuita', `<div class="sc-grid">${this.meta.curated.map((c) => this._curatedCard(c)).join('')}</div>`,
+    { note: 'pack royalty-free da siti senza API: si scaricano dalla pagina ufficiale' })}`;
+  }
+
+  // ---------------------------------------------------------------- store: results grid
+  _renderGrid() {
+    const packs = this.kind === 'packs';
+    const store = packs ? this.packData : this.data;
+    const active = this.meta.sources.filter((s) => this._activeSources().includes(s.id));
+    const html = [];
+    if (!active.length) html.push(`<div class="o-empty">${packs ? 'Nessuna fonte selezionata offre pack (Freesound, Internet Archive, ccMixter).' : 'Seleziona almeno una fonte.'}</div>`);
+    for (const s of active) {
+      const d = store[s.id];
+      const rows = d?.results || [];
+      const status = this.loading.has(s.id) && !rows.length ? `${SPIN} ricerca…` : !d ? '' : d.error ? `<span class="error">${esc(d.error)}</span>`
+        : `${rows.length}${d.total ? ` di ${d.total.toLocaleString('it-IT')}` : ''}`;
+      html.push(`<section class="shelf"><header class="shelf-head">${this._logo(s.id, 's')}<h3>${esc(s.label)}</h3><span class="hint">${status}</span><span class="spacer"></span>
+        ${d?.needs_key ? '<wa-button size="xs" variant="brand" data-settings="1"><wa-icon slot="start" name="settings"></wa-icon>Inserisci API key</wa-button>' : ''}</header>
+        ${rows.length ? `<div class="sc-grid">${rows.map((r) => (r.is_pack ? this._packCard(r) : this._soundCard(r))).join('')}</div>` : ''}
+        ${d && !d.error && !rows.length && !this.loading.has(s.id) ? `<div class="o-none">Nessun risultato con questi filtri${d.fetched ? ` (${d.fetched} scartati dai filtri)` : ''}.</div>` : ''}
+        ${d?.more ? `<wa-button size="s" appearance="filled-outlined" class="o-more" data-more="${s.id}" ${this.loading.has(s.id) ? 'loading disabled' : ''}>Carica altri</wa-button>` : ''}
+      </section>`);
+    }
+    $('#store-view').innerHTML = html.join('');
+  }
+
+  // ---------------------------------------------------------------- store: pack page
+  async openPack(uid) {
+    const card = document.querySelector(`[data-pack="${CSS.escape(uid)}"]`);
+    this._go({ name: 'pack', uid, title: card?.dataset.title || '' });
+    this.packPage = { loading: true };
+    this.queue = null;
+    this.render();
+    const res = await this.api.online_pack(uid, 1);
+    if (this.view.uid !== uid) return;
+    this.packPage = res;
+    if (res.pack) this.view.title = res.pack.title;
+    this.render();
+  }
+
+  async _packMore() {
+    const pg = this.packPage;
+    if (!pg?.more || pg.loadingMore) return;
+    pg.loadingMore = true;
+    this.render();
+    const res = await this.api.online_pack(this.view.uid, pg.page + 1);
+    pg.loadingMore = false;
+    if (!res.error) { pg.files = pg.files.concat(res.files); pg.page = res.page; pg.more = res.more; }
+    this.render();
+  }
+
+  _renderPack() {
+    const pg = this.packPage;
+    const box = $('#store-view');
+    if (!pg || pg.loading) { box.innerHTML = `<div class="o-none">${SPIN} apertura del pack…</div>`; return; }
+    if (pg.error) { box.innerHTML = `<div class="o-none error">${esc(pg.error)}</div>`; return; }
+    const r = pg.pack;
+    const i = r.info || {};
+    const p = this.prov[r.source];
+    const facts = [i.num_sounds ? nSounds(i.num_sounds) : `${pg.total} file`, i.downloads ? `${fmtNum(i.downloads)} download` : '',
+      r.filesize ? fmtSize(r.filesize) : '', i.created ? new Date(i.created).getFullYear() : ''].filter(Boolean).join(' · ');
+    const playable = pg.files.some((f) => f.preview_url);
+    const archives = (pg.archives || []).map((a) => `<wa-button size="s" appearance="filled-outlined" data-dl-archive="${esc(a.url)}" data-pack="${esc(r.uid)}" title="Scarica l'archivio intero"><wa-icon slot="start" name="download"></wa-icon>${esc(a.name)} ${a.size ? '(' + fmtSize(a.size) + ')' : ''}</wa-button>`).join(' ');
+    const fsNote = r.source === 'freesound' ? '<div class="hint">Da qui si scaricano le anteprime MP3 HQ; gli originali (WAV/AIFF) si scaricano dalla pagina Freesound.</div>' : '';
+    box.innerHTML = `
+      <div class="pk-head">
+        ${this._cover(r, { icon: 'package', big: true })}
+        <div class="pk-info">
+          <div class="pk-kicker">${this._logo(r.source, 's')} Pack · ${esc(p?.name || r.source_label)}</div>
+          <h2>${esc(r.title)}</h2>
+          <div class="pk-author">di <b>${esc(r.author || 'autore sconosciuto')}</b></div>
+          <div class="sc-meta">${r.license !== 'unknown' ? this._licBadge(r) : ''}<span>${esc(facts)}</span></div>
+          ${i.description ? `<div class="pk-desc">${esc(i.description)}</div>` : ''}
+          <div class="pk-actions">
+            ${playable ? `<wa-button size="s" variant="brand" data-play-all><wa-icon slot="start" name="play"></wa-icon>Ascolta tutto</wa-button>` : ''}
+            ${pg.files.length ? `<wa-button size="s" appearance="filled-outlined" data-dl-pack="${esc(r.uid)}"><wa-icon slot="start" name="download"></wa-icon>Scarica pack</wa-button>` : ''}
+            ${archives}
+            ${r.page_url ? `<wa-button size="s" appearance="filled-outlined" data-open="${esc(r.page_url)}"><wa-icon slot="start" name="external-link"></wa-icon>Apri su ${esc(p?.name || 'sito')}</wa-button>` : ''}
+          </div>
+          ${fsNote}
+          ${r.suspect ? `<div class="warn">${svg('triangle-alert', 11)} Probabile libreria commerciale ricaricata: verifica i diritti prima dell'uso.</div>` : ''}
+        </div>
+      </div>
+      ${this._shelf('Tracce', `<div class="o-rows pk-tracks">${pg.files.slice(0, 600).map((f) => this._row(f, false, true)).join('')}</div>
+        ${pg.more ? `<wa-button size="s" appearance="filled-outlined" class="o-more" data-pack-more ${pg.loadingMore ? 'loading disabled' : ''}>Carica altre tracce</wa-button>` : ''}
+        ${!pg.files.length ? '<div class="o-none">Nessun file audio consultabile: usa gli archivi o apri la pagina della fonte.</div>' : ''}`,
+    { note: pg.total ? `${pg.files.length} di ${pg.total}` : '' })}
+      ${pg.others?.length ? this._shelf(`Altri pack di ${esc(r.author)}`, this._rowOf(pg.others.map((o) => this._packCard(o)))) : ''}`;
+  }
+
+  async downloadPack(uid) {
+    const res = await this.api.online_download_pack(uid);
+    if (res.error) { alert(res.error); return; }
+    this.inLibrary = res.in_library;
+    $('#downloads').hidden = false;
+    $('#downloads').classList.remove('collapsed');
+    this._pollDownloads(true);
+  }
+
+  playAll() {
+    const uids = (this.packPage?.files || []).filter((f) => f.preview_url).map((f) => f.uid);
+    if (!uids.length) return;
+    this.queue = { uids, i: 0 };
+    this._playQueued();
+  }
+
+  _playQueued() {
+    const uid = this.queue.uids[this.queue.i];
+    const btn = document.querySelector(`#store-view [data-play="${CSS.escape(uid)}"]`);
+    if (!btn) { this.queue = null; return; }
+    this.togglePlay(uid, btn); // only a click on a play button clears the queue
+    btn.scrollIntoView({ block: 'nearest' });
+  }
+
+  _queueNext(id) {
+    const q = this.queue;
+    if (!q || q.uids[q.i] !== id || this.view.name !== 'pack' || $('#online').hidden) return;
+    q.i += 1;
+    if (q.i >= q.uids.length) { this.queue = null; return; }
+    this._playQueued();
+  }
+
+  // ---------------------------------------------------------------- store: provider page
+  async openProvider(id) {
+    const p = this.prov[id];
+    if (!p) return;
+    this._go({ name: 'provider', id });
+    this.provData = { id, loading: p.kind === 'api' };
+    this.render();
+    if (p.kind !== 'api') return;
+    const params = { ...this.params(), q: this.p.q.trim() };
+    const [sounds, packs] = await Promise.all([
+      this.api.online_more(id, params, 1),
+      this.meta.pack_sources.includes(id) ? this.api.online_packs(id, params, 1) : null,
+    ]);
+    if (this.view.id !== id) return;
+    this.provData = { id, sounds, packs };
+    this.render();
+  }
+
+  _renderProvider() {
+    const p = this.prov[this.view.id];
+    const d = this.provData || {};
+    const curated = this.meta.curated.filter((c) => c.provider === p.id);
+    const lic = (p.licenses || []).map((k) => `<span class="lic lic-${LIC_CLASS[k] || (k === 'nc' ? 'restr' : 'free')}">${esc(this.meta.licenses[k] || (k === 'nc' ? 'Non commerciale' : k))}</span>`).join(' ');
+    const section = (res, title, card) => {
+      if (!res) return '';
+      if (res.needs_key) return this._shelf(title, `<div class="sc-keycta">${this._logo('freesound', 'm')}<div><b>Serve una API key gratuita</b></div><wa-button size="s" variant="brand" data-settings="1">Inserisci API key</wa-button></div>`);
+      if (res.error) return this._shelf(title, `<div class="o-none error">${esc(res.error)}</div>`);
+      return this._shelf(title, res.results.length ? `<div class="sc-grid">${res.results.map(card).join('')}</div>` : '<div class="o-none">Nessun risultato.</div>');
+    };
+    let body = '';
+    if (p.kind === 'curated') body = this._shelf('Pack in vetrina', `<div class="sc-grid">${curated.map((c) => this._curatedCard(c)).join('')}</div>`);
+    else if (d.loading) body = `<div class="o-none">${SPIN} caricamento…</div>`;
+    else {
+      // packs already have their own shelf (Internet Archive only returns packs)
+      const sounds = d.sounds && !d.sounds.error && !d.sounds.needs_key ? { ...d.sounds, results: d.sounds.results.filter((r) => !r.is_pack) } : d.sounds;
+      body = section(d.packs, 'Pack', (r) => this._packCard(r))
+        + (d.packs && sounds && !sounds.error && !sounds.results.length ? '' : section(sounds, 'Suoni', (r) => this._soundCard(r)));
+    }
+    $('#store-view').innerHTML = `
+      <div class="pv-head" style="--pc:${p.color}">
+        ${this._logo(p.id, 'xl')}
+        <div class="pk-info">
+          <div class="pk-kicker">${KIND_LABEL[p.kind]}</div>
+          <h2>${esc(p.name)}</h2>
+          <div class="pk-desc">${esc(p.description)}</div>
+          <div class="sc-meta">${lic}</div>
+          <div class="pk-actions"><wa-button size="s" appearance="filled-outlined" data-open="${esc(p.url)}"><wa-icon slot="start" name="external-link"></wa-icon>Visita il sito</wa-button>
+          ${p.kind === 'api' && this.p.q.trim() ? `<span class="hint">filtrato per «${esc(this.p.q.trim())}» e i filtri attivi</span>` : ''}</div>
+        </div>
+      </div>${body}`;
+  }
+
   // ---------------------------------------------------------------- audio
   async togglePlay(uid, btn) {
     if (this.player.playing && this.player.id === uid) { this.player.stop(); return; }
@@ -439,17 +852,17 @@ export class Online {
     let buf = null;
     try { buf = await this.player.load(uid, (id) => this.api.online_preview(id)); } catch (err) { console.warn(err); }
     btn.classList.remove('busy');
-    btn.innerHTML = svg('play', 12);
+    btn.innerHTML = svg('play', btn.classList.contains('sc-play') ? 16 : 12);
     if (!buf) { btn.innerHTML = svg('x', 12); btn.dataset.failed = '1'; btn.title = 'Anteprima non disponibile'; return; }
     if (this.pending === uid) this.player.play(uid, buf);
   }
 
   _syncPlayButtons(playing, id) {
-    document.querySelectorAll('#online-results [data-play]').forEach((b) => {
+    document.querySelectorAll('#online [data-play]').forEach((b) => {
       if (b.classList.contains('busy')) return;
       const on = playing && b.dataset.play === id;
-      if (!b.dataset.failed) b.innerHTML = svg(on ? 'square' : 'play', 12);
-      b.closest('.o-row')?.classList.toggle('playing', on);
+      if (!b.dataset.failed) b.innerHTML = svg(on ? 'square' : 'play', b.classList.contains('sc-play') ? 16 : 12);
+      b.closest('.o-row, .sc-card')?.classList.toggle('playing', on);
     });
   }
 
@@ -457,6 +870,7 @@ export class Online {
   async download(uid, url = null) {
     const res = await this.api.online_download(uid, url);
     if (res.error) { alert(res.error); return; }
+    this.inLibrary = res.in_library;
     $('#downloads').hidden = false;
     $('#downloads').classList.remove('collapsed');
     this._pollDownloads(true);
@@ -469,6 +883,8 @@ export class Online {
     if (jobs.length) box.hidden = false;
     const active = jobs.filter((j) => j.status === 'queued' || j.status === 'downloading').length;
     $('#dl-count').textContent = active ? `${active} in corso` : `${jobs.length} completati`;
+    $('#dl-library').hidden = !jobs.length || this.inLibrary !== false;
+    $('#dl-in-library').hidden = !jobs.length || this.inLibrary !== true;
     $('#downloads-list').innerHTML = jobs.slice().reverse().map((j) => {
       const pct = j.total ? Math.min(100, (100 * j.bytes) / j.total) : (j.status === 'done' ? 100 : 0);
       return `<div class="dl-row ${j.status}" ${j.path ? `data-path="${esc(j.path)}" title="Mostra nel Finder"` : ''}>
@@ -480,6 +896,12 @@ export class Online {
   }
 
   // ---------------------------------------------------------------- settings
+  _refreshAfterKey() {
+    this._loadFeatured();
+    if (this.view.name === 'results') this.search();
+    else if (this.view.name === 'provider') { const id = this.view.id; this._back(); this.openProvider(id); }
+  }
+
   _renderKeyHint() {
     const s = this.meta.settings;
     $('#btn-settings').classList.toggle('attention', !s.freesound_key_set);
@@ -509,7 +931,7 @@ export class Online {
     $('#set-cancel').onclick = () => { m.open = false; };
     $('#set-getkey').onclick = (e) => { e.preventDefault(); this.api.open_url('https://freesound.org/apiv2/apply'); };
     $('#set-pick').onclick = async () => { const p = await this.api.pick_folder(); if (p) $('#set-dir').value = p; };
-    $('#set-clear').onclick = async (e) => { e.preventDefault(); this.meta.settings = await this.api.set_setting('freesound_key', ''); m.open = false; this._renderKeyHint(); this.search(); };
+    $('#set-clear').onclick = async (e) => { e.preventDefault(); this.meta.settings = await this.api.set_setting('freesound_key', ''); m.open = false; this._renderKeyHint(); this._refreshAfterKey(); };
     $('#set-save').onclick = async () => {
       const key = ($('#set-key').value || '').trim();
       if (key) this.meta.settings = await this.api.set_setting('freesound_key', key);
@@ -518,7 +940,7 @@ export class Online {
       this.meta.settings = await this.api.set_setting('live_port', $('#set-live-port').value);
       m.open = false;
       this._renderKeyHint();
-      if (key) this.search();
+      if (key) this._refreshAfterKey();
     };
   }
 }

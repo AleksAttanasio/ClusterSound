@@ -328,12 +328,6 @@ class Api:
         if self._lib.root and self._lib.progress.get("phase") not in ("scanning", "analysing", "classifying", "layout"):
             self._lib.start_scan(self._lib.root)  # unchanged files come from the feature cache
 
-    def library_add_downloads(self) -> str | None:
-        """Open the download folder as the library (when it is not already inside it)."""
-        root = self._settings().get("download_dir") or DEFAULT_DIR
-        os.makedirs(root, exist_ok=True)
-        return root if self.start_scan(root) else None
-
     def online_expand(self, uid: str, params: dict) -> dict:
         return online.expand(uid, params or {})
 

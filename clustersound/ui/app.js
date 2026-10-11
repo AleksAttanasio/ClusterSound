@@ -21,10 +21,11 @@ const state = {
   focus: null, // {center, items: [{id, sim}], trail: [id…]} while the similar-samples view is open
   lastTrail: [], // trail of the last similar-samples view (kept after closing it, for the Drum Rack)
   simK: (() => { try { return Math.min(60, Math.max(5, +localStorage.getItem('cs.simK') || 12)); } catch { return 12; } })(),
+  libMode: (() => { try { return localStorage.getItem('cs.libMode') === 'store' ? 'store' : 'local'; } catch { return 'local'; } })(),
 };
 
 const player = new Player({ onState: onPlayState });
-window.__cs = { state, player, get pattern() { return pattern; }, get rack() { return rack; }, get compose() { return compose; }, get scene() { return scene; } }; // handy from the web inspector (--debug)
+window.__cs = { state, player, get pattern() { return pattern; }, get rack() { return rack; }, get compose() { return compose; }, get scene() { return scene; }, get online() { return online; } }; // handy from the web inspector (--debug)
 
 // ------------------------------------------------------------------ boot
 function whenApiReady() {
@@ -56,6 +57,7 @@ async function main() {
     onRelabel: relabel, onReveal: (id) => state.api.reveal(id), onSimilar: showSimilar,
     onPlayToggle: togglePlay, onSeek: seek, onClose: closePanel,
     onSend: (id, x, y) => sendLibraryItem(id, x, y),
+    onStore: (cls) => openStore([cls]),
   });
 
   online = new Online({ api: state.api, player, classes: state.classes, groups: state.groups, types: state.types });
@@ -64,12 +66,14 @@ async function main() {
     getSequencer: () => pattern, onOpenSequencer: () => setTab('pattern') });
   compose = new ComposeEditor({ api: state.api, player, getPattern: () => pattern, onOpenSequencer: () => setTab('pattern') });
   online.onSend = (ref, x, y) => sendRef(ref, x, y);
+  online.onLibrary = (path) => { setTab('library'); setFolder(path); };
   buildSidebar();
   bindUi();
   if (init.last_folder) {
     setFolder(init.last_folder, false);
     state.api.restore(init.last_folder);
   }
+  if (state.libMode === 'store') setTab('online');
   poll();
 }
 
@@ -571,26 +575,47 @@ async function sendLibraryItem(id, x, y) {
   sendRef(ref, x, y);
 }
 
+// The Library section has two modes: the local folder ('library') and the free online store ('online').
 function setTab(tab) {
+  if (tab === 'library' && state.libMode === 'store') tab = 'online';
+  if (tab === 'library' || tab === 'online') {
+    state.libMode = tab === 'online' ? 'store' : 'local';
+    try { localStorage.setItem('cs.libMode', state.libMode); } catch { /* private mode */ }
+  }
   state.tab = tab;
   player.stop();
   if (tab !== 'pattern' && pattern) pattern.hide();
   if (tab !== 'rack' && rack) rack.hide();
   if (tab !== 'compose' && compose) compose.hide();
-  $('#main-tabs').value = tab;
+  const inLibrary = tab === 'library' || tab === 'online';
+  $('#main-tabs').value = inLibrary ? 'library' : tab;
+  $('#lib-mode').value = state.libMode;
   $('#library').hidden = tab !== 'library';
   $('#online').hidden = tab !== 'online';
   $('#pattern').hidden = tab !== 'pattern';
   $('#rack').hidden = tab !== 'rack';
   $('#compose').hidden = tab !== 'compose';
+  document.querySelectorAll('.lib-section').forEach((el) => el.classList.toggle('tab-hidden', !inLibrary));
   document.querySelectorAll('.lib-only').forEach((el) => el.classList.toggle('tab-hidden', tab !== 'library'));
   document.querySelectorAll('.online-only').forEach((el) => { el.hidden = tab !== 'online'; });
-  if (tab === 'online') { online.show(); $('#online-q').focus(); } else if (tab === 'pattern') pattern.show();
+  if (tab === 'online') online.show(); else if (tab === 'pattern') pattern.show();
   else if (tab === 'rack') rack.show(); else if (tab === 'compose') compose.show(); else scene.resize();
+}
+
+// From the library: open the store on one instrument (the class of a sample)
+function openStore(instruments = null) {
+  setTab('online');
+  if (instruments) online.browse({ instruments });
 }
 
 function bindUi() {
   $('#main-tabs').addEventListener('change', (e) => { if (e.target.id === 'main-tabs') setTab(e.target.value); });
+  $('#lib-mode').addEventListener('change', (e) => {
+    if (e.target.id !== 'lib-mode') return;
+    state.libMode = e.target.value === 'store' ? 'store' : 'local'; // explicit choice: no "last mode" redirect
+    setTab(state.libMode === 'store' ? 'online' : 'library');
+  });
+  $('#btn-empty-store').onclick = () => openStore();
   $('#list-body').addEventListener('contextmenu', (e) => {
     const r = e.target.closest('.list-row');
     if (!r) return;
