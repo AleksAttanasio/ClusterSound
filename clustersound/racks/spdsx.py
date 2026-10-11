@@ -43,7 +43,9 @@ ROLES = {
 }
 ROLE_CAPS = {"kick": 2, "snare": 3, "cymbal": 5}
 ROLE_LABELS = {"kick": "kick", "snare": "snare / clap", "cymbal": "hat / piatti"}
-_CLASS_ROLE = {c: role for role, fams in ROLES.items() for f in fams for c in layouts.family_classes(f)}
+# role of a sample by its class, for groups of a generic family (a rimshot is not a snare to play)
+_CLASS_ROLE = {"kick": "kick", "sub808": "kick", "snare": "snare", "clap": "snare", "snap": "snare",
+               "closed_hat": "cymbal", "open_hat": "cymbal", "ride": "cymbal", "crash": "cymbal", "cymbal_other": "cymbal"}
 
 # random_config: families a group may switch to while keeping its role
 _VARIANTS = {
@@ -155,16 +157,17 @@ def playability(rack: dict) -> list[str]:
 
 
 def allowed_families(rack: dict) -> list[list[str]]:
-    """For every group, the families it can switch to without breaking a role's cap (other groups as they are)."""
+    """For every group, the families it can switch to without breaking a role's cap (other groups as they
+    are); on a kit that is already over a cap, the ones that do not make it worse."""
     rack = validate(rack)
     fams = _families(rack)
+    now = _role_counts(rack, fams)
     out = []
     for g in range(len(fams)):
         ok = []
         for f, _, _ in layouts.FAMILIES:
-            trial = fams[:g] + [f] + fams[g + 1:]
-            counts = _role_counts(rack, trial)
-            if all(counts[r] <= ROLE_CAPS[r] for r in ROLES) or f == fams[g]:
+            counts = _role_counts(rack, fams[:g] + [f] + fams[g + 1:])
+            if all(counts[r] <= max(ROLE_CAPS[r], now[r]) for r in ROLES):
                 ok.append(f)
         out.append(ok)
     return out
@@ -199,4 +202,9 @@ def ui_layout() -> dict:
         "notes": NOTES, "labels": PAD_LABELS,
         "configs": [{"id": g, "label": CONFIGS[g][0]} for g in GEOMETRIES],
         "caps": ROLE_CAPS,
+        # effective groups per configuration and trigger state, keyed "<geometry>|<trig1><trig2>" (e.g. "spd_kit|10")
+        "layouts": {f"{g}|{int(t1)}{int(t2)}": {"id": g, "groups": groups(g, t), "keys": group_keys(g, t),
+                                               "families": default_families(g, t)}
+                    for g in GEOMETRIES for t1 in (True, False) for t2 in (True, False)
+                    for t in [{"trig1": t1, "trig2": t2}]},
     }

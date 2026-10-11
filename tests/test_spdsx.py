@@ -203,3 +203,19 @@ def test_export_spdsx(tmp_path):
         assert info.samplerate == 44100 and info.subtype == "PCM_16"
     text = open(os.path.join(folder, "LEGGIMI.txt"), encoding="utf-8").read()
     assert "Wave Manager" in text and "Pedale (Trig 1) · A3: kick" in text and "Trig 2 · A#3: non collegato" in text
+
+
+def test_rimshots_in_a_rim_group_are_not_snares():
+    rim = {"kind": "file", "path": "/r.wav", "name": "r", "cls": "rimshot"}
+    r = _rack("spd_cross", groups={"spd_cross:1": {"family": "rim"}})
+    for p in spdsx.groups("spd_cross")[1]:
+        r["pads"][p] = rim
+    assert spdsx.playability(r) == []
+
+
+def test_allowed_families_on_a_kit_over_the_caps():
+    snare = {"kind": "file", "path": "/s.wav", "name": "s", "cls": "snare"}
+    r = _rack("spd_free", pads=[snare] * 4 + [None] * 7)   # 4 snares: over the cap
+    allowed = spdsx.allowed_families(r)
+    assert "tom" in allowed[5] and "snare" not in allowed[5]   # an empty pad may not add a 5th snare
+    assert "snare" in allowed[0]                              # a snare pad may stay a snare
