@@ -271,6 +271,35 @@ insieme agli accordi in entrambe le viste (♫ nella barra la silenzia).
   e una per ogni layer non muto), *Solo accordi* o *Solo melodia*. *Invia a Live* crea anche una traccia per
   ogni layer accanto agli *Accordi* (il basso con un suono da basso, pad e keys da tastiera).
 
+## Scheda Sampler: estrarre sample da brani più lunghi
+
+Apri un brano, segna le regioni sulla forma d'onda ed esportale come sample: finiscono nella libreria e vengono
+classificati come gli altri.
+
+- **Sorgenti**
+  - *Apri file audio…*: un file tuo (wav, aif, flac, mp3, ogg; i primi 20 minuti).
+  - *Incolla un link* da fonti con licenza aperta: Freesound (serve la API key), Internet Archive (elemento o
+    singolo file, anche dentro gli ZIP), ccMixter, Openverse, Wikimedia Commons. Licenza e autore restano
+    associati al sample.
+  - *Cattura audio*: registra ciò che il Mac sta suonando (ScreenCaptureKit, macOS 13+) o un ingresso audio, e
+    tiene sempre gli ultimi 60 s; *Prendi ultimi secondi* li apre nel Sampler. Richiede l'extra
+    `pip install -e ".[capture]"` e il permesso *Registrazione schermo e audio di sistema*.
+- **Regioni**: trascina sulla forma d'onda per crearne una, trascina i bordi per ridimensionarla, clic per
+  ascoltarla. *Taglia sui transienti* crea una regione per colpo nella parte visibile (sensibilità regolabile).
+  Rotella: zoom · Maiusc+rotella: scorri · la striscia sotto sposta la vista. `Spazio` play/stop, `↑↓` regione
+  precedente/successiva, `Canc` elimina.
+- **Esportazione**: WAV 24 bit in `~/Music/ClusterSound Samples/<origine>/<brano>/`, con fade in/out e
+  normalizzazione opzionale. Ogni sample dura al massimo 30 s (impostazione `sampler_max_seconds`). Accanto a
+  ogni file c'è un `.license.txt` (link: licenza e attribuzione) o un `.source.txt` (cattura: data e
+  dispositivo). Se la cartella sta dentro la libreria aperta, la riscansione parte da sola.
+
+**Nota legale.** YouTube, Spotify, Tidal, Apple Music, SoundCloud e gli altri servizi di streaming non sono
+accettati come link: i loro termini vietano di scaricare l'audio e spesso il flusso è protetto da DRM. Il
+limite di durata non cambia le cose: non esiste una soglia di secondi sotto la quale un sample è libero. La
+cattura dell'audio di sistema non aggira alcuna protezione (le app che proteggono il flusso registrano
+silenzio) ed è pensata per l'uso personale; per pubblicare un brano che contiene il sample servono i diritti
+sull'originale, oppure un sample con licenza libera.
+
 ## Max for Live: importare in Ableton Live
 
 Il device **ClusterSound** (effetto MIDI, Live 10.1 Suite o successivo) importa direttamente nel set i pattern,
