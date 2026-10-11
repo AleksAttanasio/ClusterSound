@@ -1,12 +1,19 @@
 """Freesound APIv2 (needs a free API key: https://freesound.org/apiv2/apply)."""
+import re
+from concurrent.futures import ThreadPoolExecutor
+
 from . import instruments as inst
 from .base import OnlineResult, SourceError, clean_tags, http_get, normalize_license
 
 API = "https://freesound.org/apiv2/search/"
+PACK_API = "https://freesound.org/apiv2/packs/{id}/"
+USER_PACKS_API = "https://freesound.org/apiv2/users/{user}/packs/"
 LABEL = "Freesound"
 PAGE_SIZE = 30
 FIELDS = ("id,name,username,license,duration,tags,previews,images,type,samplerate,filesize,url,"
-          "bpm,tonality,single_event,loopable")
+          "bpm,tonality,single_event,loopable,pack,num_downloads,avg_rating")
+PACKS_PAGE_SIZE = 12  # every pack card needs one extra request for its name (60 requests/minute limit)
+PACK_TTL = 3600
 SORT = {"relevance": "score", "downloads": "downloads_desc", "rating": "rating_desc",
         "newest": "created_desc", "duration": "duration_asc"}
 # Freesound licence names per filter group
@@ -69,18 +76,85 @@ def parse(data: dict) -> list[OnlineResult]:
             download_note="anteprima HQ mp3 · l'originale si scarica dalla pagina Freesound",
             page_url=s.get("url") or f"https://freesound.org/s/{s['id']}/",
             waveform_img=(s.get("images") or {}).get("waveform_m"), format=s.get("type", ""),
-            samplerate=s.get("samplerate"), filesize=s.get("filesize"), type=typ))
+            samplerate=s.get("samplerate"), filesize=s.get("filesize"), type=typ,
+            extra={"pack_id": pack_id(s.get("pack")), "downloads": s.get("num_downloads"),
+                   "rating": s.get("avg_rating")}))
     return out
 
 
-def search(p: dict, page: int, settings: dict):
+def pack_id(uri: str | None) -> str | None:
+    m = re.search(r"/packs/(\d+)", uri or "")
+    return m.group(1) if m else None
+
+
+def _auth(settings: dict) -> dict:
     key = (settings or {}).get("freesound_key")
     if not key:
         raise SourceError("API key mancante: aggiungila nelle impostazioni (⚙)")
-    data = http_get(API, build_params(p, page), headers={"Authorization": f"Token {key}"})
+    return {"Authorization": f"Token {key}"}
+
+
+def search(p: dict, page: int, settings: dict):
+    data = http_get(API, build_params(p, page), headers=_auth(settings))
     results = parse(data)
     if p.get("instruments"):
         for r in results:
             r.matched = True  # came from the exact tag filter
     return results, data.get("count"), bool(data.get("next"))
 
+
+
+# ------------------------------------------------------------------ packs
+def parse_pack(d: dict, sample: OnlineResult | None = None) -> OnlineResult:
+    """A Freesound pack (Pack Instance response) as a pack result."""
+    pid = str(d["id"])
+    r = OnlineResult(
+        uid=f"freesound:pack:{pid}", source="freesound", source_label=LABEL,
+        title=d.get("name") or f"Pack {pid}", author=d.get("username", ""),
+        page_url=f"https://freesound.org/people/{d.get('username', '')}/packs/{pid}/",
+        is_pack=True,
+        extra={"pack_id": pid, "num_sounds": d.get("num_sounds"), "downloads": d.get("num_downloads"),
+               "description": d.get("description") or "", "created": d.get("created")})
+    if sample is not None:  # the search hit that stands for the pack
+        r.license, r.license_url, r.tags = sample.license, sample.license_url, sample.tags
+        r.instrument = sample.instrument
+        r.waveform_img, r.preview_url = sample.waveform_img, sample.preview_url
+    return r
+
+
+def pack_info(pid: str, settings: dict) -> dict:
+    return http_get(PACK_API.format(id=pid), headers=_auth(settings), ttl=PACK_TTL)
+
+
+def packs(p: dict, page: int, settings: dict):
+    """Search grouped by pack: one card per pack (sounds without a pack are skipped)."""
+    headers = _auth(settings)
+    params = dict(build_params(p, page), group_by_pack=1, page_size=PACKS_PAGE_SIZE)
+    data = http_get(API, params, headers=headers)
+    hits = [(s, r) for s, r in zip(data.get("results", []), parse(data)) if r.extra.get("pack_id")]
+
+    def card(hit):
+        s, r = hit
+        try:
+            info = pack_info(r.extra["pack_id"], settings)
+        except SourceError:
+            return None
+        out = parse_pack(info, r)
+        out.extra["matching"] = (s.get("n_from_same_pack") or 0) + 1
+        return out
+
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        cards = [c for c in ex.map(card, hits) if c]
+    return cards, data.get("count"), bool(data.get("next"))
+
+
+def pack_sounds(pid: str, page: int, settings: dict):
+    data = http_get(PACK_API.format(id=pid) + "sounds/", {"fields": FIELDS, "page": page, "page_size": 50},
+                    headers=_auth(settings), ttl=PACK_TTL)
+    return parse(data), data.get("count"), bool(data.get("next"))
+
+
+def user_packs(username: str, settings: dict, limit: int = 12) -> list[OnlineResult]:
+    data = http_get(USER_PACKS_API.format(user=username), {"page_size": limit},
+                    headers=_auth(settings), ttl=PACK_TTL)
+    return [parse_pack(d) for d in data.get("results", [])]

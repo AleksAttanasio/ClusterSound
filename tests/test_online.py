@@ -107,6 +107,30 @@ def test_freesound_filters():
     assert "type:(wav OR aiff OR flac)" in f["filter"] and f["sort"] == "downloads_desc"
 
 
+def test_freesound_packs(monkeypatch):
+    calls = []
+
+    def fake_get(url, params=None, headers=None, as_json=True, ttl=None):
+        calls.append((url, params))
+        if "/packs/" in url:
+            info = load("freesound_pack.json")
+            return dict(info, id=int(url.rstrip("/").rsplit("/", 1)[-1]))
+        return load("freesound_packs_grouped.json")
+
+    monkeypatch.setattr(freesound, "http_get", fake_get)
+    cards, total, more = freesound.packs({"q": "kick", "sort": "downloads"}, 1, {"freesound_key": "k"})
+    assert calls[0][1]["group_by_pack"] == 1 and calls[0][1]["sort"] == "downloads_desc"
+    assert [c.uid for c in cards] == ["freesound:pack:41", "freesound:pack:77"]  # the loose sound is skipped
+    c = cards[0]
+    assert c.is_pack and c.title == "808 Kicks Vol. 1" and c.author == "beatsmith"
+    assert c.license == "cc0" and c.waveform_img and c.preview_url.endswith("-hq.mp3")
+    assert c.extra["matching"] == 8 and c.extra["num_sounds"] == 20 and c.extra["downloads"] == 5400
+    assert c.page_url == "https://freesound.org/people/beatsmith/packs/41/"
+    assert freesound.parse(load("freesound_packs_grouped.json"))[0].extra["pack_id"] == "41"
+    with pytest.raises(SourceError, match="API key"):
+        freesound.packs({}, 1, {})
+
+
 def test_parse_openverse():
     rs = openverse.parse(load("openverse_snare.json"))
     assert rs and all(r.uid.startswith("openverse:") for r in rs)
