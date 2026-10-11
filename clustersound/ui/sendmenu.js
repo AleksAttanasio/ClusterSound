@@ -36,16 +36,16 @@ export function showSendMenu({ x, y, ref, buses, counts = {}, onPick, rack }) {
   el.innerHTML = `<div class="send-title" title="${esc(ref.name)}">Invia · <b>${esc(ref.name)}</b></div>
     ${rack ? `<div class="send-sec">Drum Rack <span>${esc(rack.target)}</span></div>
     <div class="send-rack">
-      <button class="btn small" data-rack="add" title="Mette il sample sul pad selezionato (o sul primo libero del gruppo)">+ aggiungi</button>
-      <button class="btn small" data-rack="open" title="Aggiunge e passa alla scheda Drum Rack">+ aggiungi e apri ▦</button>
-      ${canSimilar ? `<label class="send-sim" title="Riempie tutto il gruppo con questo sample e i suoi simili"><input type="checkbox" data-sim ${similar ? 'checked' : ''}> con i simili</label>` : ''}
+      <wa-button size="xs" appearance="filled-outlined" data-rack="add" title="Mette il sample sul pad selezionato (o sul primo libero del gruppo)"><wa-icon slot="start" name="plus"></wa-icon>aggiungi</wa-button>
+      <wa-button size="xs" appearance="filled-outlined" data-rack="open" title="Aggiunge e passa alla scheda Drum Rack"><wa-icon slot="start" name="layout-grid"></wa-icon>aggiungi e apri</wa-button>
+      ${canSimilar ? `<wa-checkbox size="xs" class="send-sim" data-sim ${similar ? 'checked' : ''} title="Riempie tutto il gruppo con questo sample e i suoi simili">con i simili</wa-checkbox>` : ''}
     </div>` : ''}
     <div class="send-sec">Sequencer</div>
     ${ordered.map((b) => `<div class="send-row ${b.id === sug ? 'sug' : ''}" data-bus="${b.id}">
       <span class="dot" style="background:${b.color}"></span><span class="send-bus">${esc(b.label)}${b.id === sug ? ' <i>consigliato</i>' : ''}</span>
       <span class="send-count">${counts[b.id] ? counts[b.id] + ' layer' : 'vuoto'}</span>
-      <button class="btn small" data-mode="add" title="Aggiungi come nuovo layer del bus">+ layer</button>
-      <button class="btn small" data-mode="replace" title="Sostituisci il layer selezionato (o il primo)" ${counts[b.id] ? '' : 'disabled'}>sostituisci</button>
+      <wa-button size="xs" appearance="filled-outlined" data-mode="add" title="Aggiungi come nuovo layer del bus"><wa-icon slot="start" name="plus"></wa-icon>layer</wa-button>
+      <wa-button size="xs" appearance="filled-outlined" data-mode="replace" title="Sostituisci il layer selezionato (o il primo)" ${counts[b.id] ? '' : 'disabled'}>sostituisci</wa-button>
     </div>`).join('')}`;
   document.body.appendChild(el);
   const W = window.innerWidth, H = window.innerHeight;
@@ -57,14 +57,14 @@ export function showSendMenu({ x, y, ref, buses, counts = {}, onPick, rack }) {
     try { localStorage.setItem(LS_SIMILAR, e.target.checked ? '1' : '0'); } catch { /* private mode */ }
   };
   el.onclick = (e) => {
-    const rb = e.target.closest('button[data-rack]');
+    const rb = e.target.closest('[data-rack]');
     if (rb) {
       const sim = canSimilar && !!el.querySelector('[data-sim]')?.checked;
       closeSendMenu();
       rack.onAdd(sim, rb.dataset.rack === 'open');
       return;
     }
-    const btn = e.target.closest('button[data-mode]');
+    const btn = e.target.closest('[data-mode]');
     if (!btn) return;
     closeSendMenu();
     onPick(btn.closest('[data-bus]').dataset.bus, btn.dataset.mode);
