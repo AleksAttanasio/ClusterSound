@@ -52,6 +52,14 @@ export const num = (value, { size = 's', cls = '', ...rest } = {}) =>
 export const text = (value, { size = 's', cls = '', ...rest } = {}) =>
   `<wa-input size="${size}"${cls ? ` class="${cls}"` : ''} value="${esc(value)}"${attrs(rest)}></wa-input>`;
 
+// Transport button: brand "▶ Play" when idle, danger "■ Stop" while playing.
+export function setPlayButton(b, on, idle = 'Play', busy = 'Stop') {
+  if (!b) return;
+  b.innerHTML = `<wa-icon slot="start" name="${on ? 'square' : 'play'}"></wa-icon>${on ? busy : idle}`;
+  b.variant = on ? 'danger' : 'brand';
+  b.classList.toggle('on', on);
+}
+
 // A reusable <wa-dialog id=…> appended to <body>. Content is replaced on every call; returns the dialog.
 // `close()` hides it; `onHide` runs once when it is closed for any reason (Esc, ✕, backdrop, close()).
 export function openDialog(id, { label = '', body = '', footer = '', cls = '', width, onHide } = {}) {

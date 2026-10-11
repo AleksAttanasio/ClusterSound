@@ -231,8 +231,8 @@ export class Online {
     bindVal('#o-packs', 'packs');
     bindVal('#o-sort', 'sort');
 
-    $('#online-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { this.p.q = e.target.value; this.search(); } });
-    $('#online-go').onclick = () => { this.p.q = $('#online-q').value; this.search(); };
+    $('#online-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { this.p.q = $('#online-q').value || ''; this.search(); } });
+    $('#online-go').onclick = () => { this.p.q = $('#online-q').value || ''; this.search(); };
     $('#online-group').addEventListener('change', (e) => {
       if (e.target.id !== 'online-group') return;
       this.groupBy = e.target.value;
@@ -511,9 +511,9 @@ export class Online {
     $('#set-pick').onclick = async () => { const p = await this.api.pick_folder(); if (p) $('#set-dir').value = p; };
     $('#set-clear').onclick = async (e) => { e.preventDefault(); this.meta.settings = await this.api.set_setting('freesound_key', ''); m.open = false; this._renderKeyHint(); this.search(); };
     $('#set-save').onclick = async () => {
-      const key = $('#set-key').value.trim();
+      const key = ($('#set-key').value || '').trim();
       if (key) this.meta.settings = await this.api.set_setting('freesound_key', key);
-      this.meta.settings = await this.api.set_setting('download_dir', $('#set-dir').value.trim());
+      this.meta.settings = await this.api.set_setting('download_dir', ($('#set-dir').value || '').trim());
       this.meta.settings = await this.api.set_setting('cache_mb', $('#set-cache').value);
       this.meta.settings = await this.api.set_setting('live_port', $('#set-live-port').value);
       m.open = false;

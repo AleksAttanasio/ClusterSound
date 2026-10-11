@@ -607,7 +607,7 @@ function bindUi() {
     if (p) { $('#progress-wrap').hidden = false; $('#progress-text').textContent = `Report salvato: ${p}`; }
   };
   $('#view-toggle').addEventListener('change', (e) => { if (e.target.id === 'view-toggle') setView(e.target.value); });
-  $('#search').oninput = (e) => { state.search = e.target.value; applyFilters(); };
+  $('#search').oninput = (e) => { state.search = e.target.value || ''; applyFilters(); };
   $('#search').addEventListener('wa-clear', () => { state.search = ''; applyFilters(); });
   $('#conf').oninput = (e) => {
     state.minConf = +e.target.value / 100;
