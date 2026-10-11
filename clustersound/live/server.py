@@ -4,12 +4,15 @@
     GET /live/catalog                  -> saved user patterns, sequences, racks and progressions
     GET /live/payload?kind=…&id=…      -> payload.py output for a saved item (kind: pattern|sequence|rack|compose)
     GET /live/next                     -> the oldest item pushed from the app ("Invia a Live"), or 204
+    POST /live/clip {name, length, notes: [[pitch, start, dur, vel]] in beats}
+                                       -> keeps the clip selected in Live for Compose (melody import)
 
 Only these routes exist (no generic RPC) and the server binds to 127.0.0.1.
 """
 import json
 import os
 import threading
+import time
 import urllib.parse
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -56,6 +59,7 @@ class Bridge:
         self._lock = threading.Lock()
         self.server: ThreadingHTTPServer | None = None
         self.error: str | None = None
+        self.clip: dict | None = None  # last clip sent by the device ("Clip → Melodia")
 
     # ------------------------------------------------------------ payloads
     def build(self, kind: str, data: dict, **opts) -> dict:
@@ -127,6 +131,23 @@ class Bridge:
         with self._lock:
             return len(self._queue)
 
+    def receive_clip(self, data: dict) -> dict:
+        notes = []
+        for n in data.get("notes") or []:
+            p, s, d, v = (float(x) for x in n[:4])
+            if 0 <= p <= 127 and d > 0:
+                notes.append([int(p), s, d, int(max(1, min(127, v)))])
+        if not notes:
+            raise ValueError("la clip non ha note")
+        with self._lock:
+            self.clip = {"name": str(data.get("name") or "Clip")[:120], "length": float(data.get("length") or 0),
+                         "notes": notes, "at": time.time()}
+            return {"ok": True, "notes": len(notes)}
+
+    def last_clip(self) -> dict | None:
+        with self._lock:
+            return self.clip
+
     # ------------------------------------------------------------ server
     def start(self, port: int = DEFAULT_PORT) -> bool:
         """Serve in a daemon thread; False (and self.error) if the port is taken."""
@@ -187,5 +208,17 @@ def _handler(bridge: Bridge):
             except Exception as e:
                 return self._json({"error": f"{type(e).__name__}: {e}"}, 500)
             self._json({"error": "not found"}, 404)
+
+        def do_POST(self):
+            url = urllib.parse.urlparse(self.path)
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                if url.path != "/live/clip" or not 0 < n <= 4_000_000:
+                    return self._json({"error": "not found"}, 404)
+                return self._json(bridge.receive_clip(json.loads(self.rfile.read(n))))
+            except (ValueError, TypeError, IndexError) as e:
+                return self._json({"error": str(e)}, 400)
+            except Exception as e:
+                return self._json({"error": f"{type(e).__name__}: {e}"}, 500)
 
     return Handler

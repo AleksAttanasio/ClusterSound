@@ -2067,10 +2067,15 @@ export class ComposeEditor {
     const pop = showPopover(anchor, `
       <div class="cp-sec-title"><span>Importa melodia</span></div>
       <button class="btn" data-file>File MIDI…</button>
+      <button class="btn" data-live title="In Live: seleziona una clip MIDI e premi «Clip → Melodia» nel device ClusterSound">Clip da Ableton</button>
       <div class="hint">Sostituisce la melodia della versione ${this.project.active} (⌘Z per tornare indietro). Da una parte con accordi viene presa la nota più alta.</div>`);
     pop.querySelector('[data-file]').onclick = async () => {
       pop.close();
       this._applyImport(await this.api.compose_melody_import(1));
+    };
+    pop.querySelector('[data-live]').onclick = async () => {
+      pop.close();
+      this._applyImport(await this.api.compose_melody_from_live(1));
     };
     return pop;
   }

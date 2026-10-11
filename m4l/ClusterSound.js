@@ -9,7 +9,10 @@
 // type. Picking one (or ◀ ▶) loads it on the imported track and plays its clip in loop. Tracks that arrive
 // without an instrument get the first preset of their type right away, so every import plays.
 //
-// inlet: bang (from live.thisdevice), refresh, kind <i>, item <i>, importa, newtracks/tempo/receive <0|1>,
+// "Clip → Melodia" sends the notes of the clip selected in Live (Detail view) to ClusterSound, where Compose
+// imports it as the melody of the current version.
+//
+// inlet: bang (from live.thisdevice), refresh, kind <i>, item <i>, importa, inviaclip, newtracks/tempo/receive <0|1>,
 //        port <n>, sndtrack <i>, sndtype <i>, sndpick <i>, prova, prev, next, ferma,
 //        /clustersound <json> (Remote Script replies)
 // outlets: 0 kinds umenu, 1 items umenu, 2 status comment, 3 udpsend, 4 sound tracks umenu, 5 sounds umenu,
@@ -82,6 +85,38 @@ function importa() {
     });
 }
 
+function inviaclip() {
+    var clip = new LiveAPI("live_set view detail_clip");
+    if (!clip || Number(clip.id) === 0) return status("Seleziona una clip MIDI in Live (vista Detail)");
+    if (!clip.get("is_midi_clip")[0]) return status("La clip selezionata è audio: serve una clip MIDI");
+    var len = Number(clip.get("length")[0]);
+    var notes = clipNotes(clip, len);
+    if (!notes.length) return status("La clip selezionata non ha note");
+    var name = String(clip.get("name")[0] || "Clip");
+    httpPost("/live/clip", { name: name, length: len, notes: notes }, function (err) {
+        if (err) return status(err);
+        status("«" + name + "» inviata: in ClusterSound → Compose → Melodia → Importa → Clip da Ableton");
+    });
+}
+
+function clipNotes(clip, len) {  // [[pitch, start, duration, velocity]] in beats, muted notes left out
+    var out = [], i;
+    try {  // Live 11+
+        var res = JSON.parse(clip.call("get_notes_extended", 0, 128, 0, len));
+        for (i = 0; i < res.notes.length; i++) {
+            var n = res.notes[i];
+            if (!n.mute) out.push([n.pitch, n.start_time, n.duration, n.velocity]);
+        }
+        return out;
+    } catch (e) { /* Live 10: flat list "notes N note p t d v m … done" */ }
+    var a = clip.call("get_notes", 0, 0, len, 128);
+    for (i = 0; i < a.length; i++) {
+        if (a[i] === "note" && !Number(a[i + 5])) out.push([Number(a[i + 1]), Number(a[i + 2]), Number(a[i + 3]), Number(a[i + 4])]);
+    }
+    return out;
+}
+clipNotes.local = 1;
+
 function anything() {
     var a = arrayfromargs(messagename, arguments);
     if (messagename === "port") return port_(a[1]);
@@ -133,6 +168,20 @@ function http(path, cb) {
     req.send();
 }
 http.local = 1;
+
+function httpPost(path, body, cb) {
+    var req = new XMLHttpRequest();
+    req.open("POST", "http://127.0.0.1:" + port + path);
+    req.setRequestHeader("Content-Type", "application/json");
+    req.onreadystatechange = function () {
+        if (this.readyState !== 4) return;
+        if (!this.status) return cb("ClusterSound non raggiungibile (porta " + port + "): apri l'app");
+        if (this.status !== 200) return cb("ClusterSound: errore " + this.status);
+        cb(null);
+    };
+    req.send(JSON.stringify(body));
+}
+httpPost.local = 1;
 
 // ------------------------------------------------------------------ Remote Script (OSC)
 function dlog(text) {  // to the Max console and, through the Remote Script, to Live's Log.txt

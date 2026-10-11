@@ -6,6 +6,7 @@ import mimetypes
 import os
 import subprocess
 import threading
+import time
 import urllib.parse
 import webbrowser
 
@@ -632,6 +633,17 @@ class Api:
     @staticmethod
     def _prog_title(seq: dict) -> str:
         return f"{seq.get('name') or 'Accordi'} {int(round(seq.get('bpm', 120)))}bpm - {seq.get('bars', 4)} battute"
+
+    def compose_melody_from_live(self, grid: int = 1) -> dict:
+        """The last clip sent by the Max for Live device ("Clip → Melodia")."""
+        clip = self._live.last_clip()
+        if not clip:
+            return {"error": "Nessuna clip ricevuta: in Live seleziona una clip MIDI e premi «Clip → Melodia» nel device ClusterSound"}
+        ppq = chord_perform.PPQ
+        spans = [(round(s * ppq), round((s + d) * ppq), p, v) for p, s, d, v in clip["notes"]]
+        notes = chord_melody.from_spans(spans, ppq, max(1, int(grid)))
+        return {"name": clip["name"], "notes": notes, "key": chord_melody.detect_key(notes) if notes else None,
+                "age": round(time.time() - clip["at"])}
 
     def compose_export_midi(self, seq: dict, pure: bool = False, parts: str = "both") -> str | None:
         path = self._save_dialog(safe_name(self._prog_title(seq)) + ".mid", ("MIDI (*.mid)",))

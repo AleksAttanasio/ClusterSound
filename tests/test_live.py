@@ -322,3 +322,27 @@ def test_bus_suggestions():
     assert names("snare") == ["Snare Tight.wav"]
     assert "Open Hat 2.wav" in names("ohat") and names("tom") == []
     assert proto.bus_of("bus:kick") == "kick" and proto.bus_of("bass") is None and proto.bus_of("bus:nope") is None
+
+
+def _post(b, path, body):
+    import json
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(f"http://127.0.0.1:{b.port}{path}", data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req) as r:
+            return r.status, json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read())
+
+
+def test_bridge_receives_a_clip(bridge):
+    assert bridge.last_clip() is None
+    status, out = _post(bridge, "/live/clip", {"name": "Lead", "length": 4,
+                                               "notes": [[72, 0, 1, 100], [74, 1, .5, 90], [300, 0, 1, 1], [60, 2, 0, 1]]})
+    assert status == 200 and out == {"ok": True, "notes": 2}
+    clip = bridge.last_clip()
+    assert clip["name"] == "Lead" and clip["notes"] == [[72, 0.0, 1.0, 100], [74, 1.0, 0.5, 90]]
+    assert _post(bridge, "/live/clip", {"notes": []})[0] == 400
+    assert _post(bridge, "/live/nope", {})[0] == 404
