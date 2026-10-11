@@ -6,6 +6,7 @@ import { PatternEditor } from './pattern.js';
 import { DrumRackEditor } from './drumrack.js';
 import { ComposeEditor } from './compose.js';
 import { showSendMenu } from './sendmenu.js';
+import { isTypingTarget } from './kit.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -74,7 +75,7 @@ async function main() {
 
 // ------------------------------------------------------------------ sidebar
 function buildSidebar() {
-  $('#type-filters').innerHTML = state.types.map((t, i) => `<button class="chip on" data-type="${i}">${esc(t)}</button>`).join('');
+  $('#type-filters').innerHTML = state.types.map((t, i) => `<wa-button size="xs" pill class="chip on" data-type="${i}">${esc(t)}</wa-button>`).join('');
   $('#type-filters').onclick = (e) => {
     const b = e.target.closest('.chip'); if (!b) return;
     const i = +b.dataset.type;
@@ -169,8 +170,8 @@ function showProgress(p) {
   $('#progress-wrap').hidden = !busy && p.phase !== 'error' && p.phase !== 'stale';
   const wrap = $('#progress-wrap');
   const pct = p.total ? (100 * p.done) / p.total : 0;
-  wrap.classList.toggle('indeterminate', busy && !p.total);
-  $('#progress-bar').style.width = `${pct}%`;
+  $('#progress-bar').indeterminate = busy && !p.total;
+  $('#progress-bar').value = pct;
   const label = { scanning: 'Ricerca file', analysing: 'Analisi', classifying: 'Classificazione', layout: 'Layout 3D', error: 'Errore', stale: 'Snapshot' }[p.phase] || '';
   $('#progress-text').textContent = p.phase === 'analysing'
     ? `${label} ${p.done}/${p.total} · ${p.message}` : `${label} ${p.message && p.phase !== 'analysing' ? '· ' + p.message : ''}`;
@@ -546,8 +547,7 @@ async function startScan(path) {
 
 function setView(v) {
   state.view = v;
-  $('#view-3d').classList.toggle('active', v === '3d');
-  $('#view-list').classList.toggle('active', v === 'list');
+  $('#view-toggle').value = v;
   $('#view3d').hidden = v !== '3d';
   $('#viewlist').hidden = v !== 'list';
   if (v === 'list') { renderHead(); renderList(true); } else scene.resize();
@@ -577,11 +577,7 @@ function setTab(tab) {
   if (tab !== 'pattern' && pattern) pattern.hide();
   if (tab !== 'rack' && rack) rack.hide();
   if (tab !== 'compose' && compose) compose.hide();
-  $('#tab-library').classList.toggle('active', tab === 'library');
-  $('#tab-online').classList.toggle('active', tab === 'online');
-  $('#tab-pattern').classList.toggle('active', tab === 'pattern');
-  $('#tab-rack').classList.toggle('active', tab === 'rack');
-  $('#tab-compose').classList.toggle('active', tab === 'compose');
+  $('#main-tabs').value = tab;
   $('#library').hidden = tab !== 'library';
   $('#online').hidden = tab !== 'online';
   $('#pattern').hidden = tab !== 'pattern';
@@ -594,11 +590,7 @@ function setTab(tab) {
 }
 
 function bindUi() {
-  $('#tab-library').onclick = () => setTab('library');
-  $('#tab-online').onclick = () => setTab('online');
-  $('#tab-pattern').onclick = () => setTab('pattern');
-  $('#tab-rack').onclick = () => setTab('rack');
-  $('#tab-compose').onclick = () => setTab('compose');
+  $('#main-tabs').addEventListener('change', (e) => { if (e.target.id === 'main-tabs') setTab(e.target.value); });
   $('#list-body').addEventListener('contextmenu', (e) => {
     const r = e.target.closest('.list-row');
     if (!r) return;
@@ -614,9 +606,9 @@ function bindUi() {
     const p = await state.api.export_report();
     if (p) { $('#progress-wrap').hidden = false; $('#progress-text').textContent = `Report salvato: ${p}`; }
   };
-  $('#view-3d').onclick = () => setView('3d');
-  $('#view-list').onclick = () => setView('list');
+  $('#view-toggle').addEventListener('change', (e) => { if (e.target.id === 'view-toggle') setView(e.target.value); });
   $('#search').oninput = (e) => { state.search = e.target.value; applyFilters(); };
+  $('#search').addEventListener('wa-clear', () => { state.search = ''; applyFilters(); });
   $('#conf').oninput = (e) => {
     state.minConf = +e.target.value / 100;
     $('#conf-value').textContent = `${e.target.value}%`;
@@ -659,8 +651,7 @@ function bindUi() {
     buildRows();
   };
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !$('#settings').hidden) { $('#settings').hidden = true; return; }
-    if ((e.target.tagName === 'INPUT' && e.target.type !== 'range') || e.target.tagName === 'SELECT') return;
+    if (document.querySelector('wa-dialog[open]') || isTypingTarget(e)) return; // dialogs handle their own Esc
     if (state.tab === 'pattern' && e.key === ' ') { e.preventDefault(); pattern.togglePlay(); return; }
     if (state.tab === 'compose') { if (!document.querySelector('.cp-modal, .popover') && compose.onKey(e)) e.preventDefault(); return; }
     if (state.tab !== 'library') return;

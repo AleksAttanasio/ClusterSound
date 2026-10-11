@@ -229,12 +229,11 @@ export class Online {
 
     $('#online-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { this.p.q = e.target.value; this.search(); } });
     $('#online-go').onclick = () => { this.p.q = $('#online-q').value; this.search(); };
-    $('#online-group').onclick = (e) => {
-      const b = e.target.closest('[data-group]'); if (!b) return;
-      this.groupBy = b.dataset.group;
-      document.querySelectorAll('#online-group .seg-btn').forEach((x) => x.classList.toggle('active', x === b));
+    $('#online-group').addEventListener('change', (e) => {
+      if (e.target.id !== 'online-group') return;
+      this.groupBy = e.target.value;
       this.render();
-    };
+    });
     $('#online-results').onclick = (e) => this._onResultsClick(e);
     $('#btn-settings').onclick = () => this.openSettings();
     $('#dl-open').onclick = () => this.api.open_download_dir();
@@ -485,7 +484,7 @@ export class Online {
   openSettings() {
     const s = this.meta.settings;
     const m = $('#settings');
-    m.hidden = false;
+    m.open = true;
     $('#set-key').value = '';
     $('#set-key').placeholder = s.freesound_key_set ? `impostata (${s.freesound_key_hint}) — lascia vuoto per mantenerla` : 'incolla qui la tua API key';
     $('#set-dir').value = s.download_dir;
@@ -503,17 +502,17 @@ export class Online {
         ? `Attivo su 127.0.0.1:${st.port}. Preset per Live in ${st.stage}${st.stage_root === 'places' ? ' (aggiungi la cartella ai Places di Live)' : ''}`
         : `Non attivo: ${st.error || 'riavvia l\'app'}`;
     });
-    $('#set-cancel').onclick = () => { m.hidden = true; };
+    $('#set-cancel').onclick = () => { m.open = false; };
     $('#set-getkey').onclick = (e) => { e.preventDefault(); this.api.open_url('https://freesound.org/apiv2/apply'); };
     $('#set-pick').onclick = async () => { const p = await this.api.pick_folder(); if (p) $('#set-dir').value = p; };
-    $('#set-clear').onclick = async (e) => { e.preventDefault(); this.meta.settings = await this.api.set_setting('freesound_key', ''); m.hidden = true; this._renderKeyHint(); this.search(); };
+    $('#set-clear').onclick = async (e) => { e.preventDefault(); this.meta.settings = await this.api.set_setting('freesound_key', ''); m.open = false; this._renderKeyHint(); this.search(); };
     $('#set-save').onclick = async () => {
       const key = $('#set-key').value.trim();
       if (key) this.meta.settings = await this.api.set_setting('freesound_key', key);
       this.meta.settings = await this.api.set_setting('download_dir', $('#set-dir').value.trim());
       this.meta.settings = await this.api.set_setting('cache_mb', $('#set-cache').value);
       this.meta.settings = await this.api.set_setting('live_port', $('#set-live-port').value);
-      m.hidden = true;
+      m.open = false;
       this._renderKeyHint();
       if (key) this.search();
     };

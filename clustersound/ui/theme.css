@@ -9,8 +9,10 @@
   --wa-font-family-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   --wa-font-family-heading: var(--wa-font-family-body);
   --wa-font-family-code: ui-monospace, "SF Mono", Menlo, monospace;
-  --wa-font-size-scale: 0.8125;   /* 13px body, as before: this is a dense desktop tool */
   --wa-space-scale: 0.875;
+  /* dense desktop tool: size="s" controls are 12px text and ~28px tall, like the 0.1.0 buttons */
+  --wa-form-control-padding-block: 0.55em;
+  --wa-form-control-padding-inline: 0.9em;
   --wa-border-radius-scale: 1.15;
   --wa-transition-normal: 180ms;
   --wa-transition-fast: 110ms;

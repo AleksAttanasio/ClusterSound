@@ -15,47 +15,47 @@
 <body>
   <header class="topbar">
     <div class="brand"><img class="brand-mark" src="assets/logo-mark.png" alt=""><img class="brand-word" src="assets/logo-wordmark.png" alt="ClusterSound"></div>
-    <div class="seg main-tabs" role="tablist">
-      <button id="tab-library" class="seg-btn active" role="tab">Libreria</button>
-      <button id="tab-online" class="seg-btn" role="tab">Online</button>
-      <button id="tab-pattern" class="seg-btn" role="tab">Sequencer</button>
-      <button id="tab-rack" class="seg-btn" role="tab">Drum Rack</button>
-      <button id="tab-compose" class="seg-btn" role="tab">Compose</button>
-    </div>
-    <button id="btn-folder" class="btn primary lib-only">Scegli cartella…</button>
+    <wa-radio-group id="main-tabs" class="seg main-tabs" orientation="horizontal" size="s" value="library" label="Sezione">
+      <wa-radio appearance="button" value="library">Libreria</wa-radio>
+      <wa-radio appearance="button" value="online">Online</wa-radio>
+      <wa-radio appearance="button" value="pattern">Sequencer</wa-radio>
+      <wa-radio appearance="button" value="rack">Drum Rack</wa-radio>
+      <wa-radio appearance="button" value="compose">Compose</wa-radio>
+    </wa-radio-group>
+    <wa-button id="btn-folder" class="lib-only" variant="brand" size="s"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli cartella…</wa-button>
     <div id="folder-path" class="folder-path lib-only" title="">Nessuna cartella</div>
-    <button id="btn-rescan" class="btn lib-only" disabled title="Rianalizza la cartella (i file invariati vengono letti dalla cache)">Riscansiona</button>
+    <wa-button id="btn-rescan" class="lib-only" appearance="filled-outlined" size="s" disabled title="Rianalizza la cartella (i file invariati vengono letti dalla cache)"><wa-icon slot="start" name="refresh-cw"></wa-icon>Riscansiona</wa-button>
     <div class="online-only online-search" hidden>
-      <input id="online-q" class="search" type="search" placeholder="Cerca sample gratuiti (es. dusty, 909, vinyl)…" autocomplete="off">
-      <button id="online-go" class="btn primary">Cerca</button>
+      <wa-input id="online-q" class="search" type="search" size="s" placeholder="Cerca sample gratuiti (es. dusty, 909, vinyl)…" autocomplete="off"><wa-icon slot="start" name="search"></wa-icon></wa-input>
+      <wa-button id="online-go" variant="brand" size="s">Cerca</wa-button>
     </div>
     <div class="progress-wrap lib-only" id="progress-wrap" hidden>
-      <div class="progress"><div id="progress-bar"></div></div>
+      <wa-progress-bar id="progress-bar" class="progress" value="0" label="Avanzamento analisi"></wa-progress-bar>
       <div id="progress-text" class="progress-text"></div>
     </div>
     <div class="spacer"></div>
-    <div class="seg lib-only" role="tablist">
-      <button id="view-3d" class="seg-btn active" role="tab">3D</button>
-      <button id="view-list" class="seg-btn" role="tab">Lista</button>
-    </div>
-    <button id="btn-export" class="btn lib-only" disabled>Esporta report</button>
-    <div class="seg online-only" id="online-group" hidden title="Raggruppa i risultati">
-      <button class="seg-btn active" data-group="source">Per fonte</button>
-      <button class="seg-btn" data-group="instrument">Per strumento</button>
-    </div>
-    <button id="btn-settings" class="icon-btn online-only" hidden title="Impostazioni: API key Freesound, cartella download">⚙</button>
+    <wa-radio-group id="view-toggle" class="seg lib-only" orientation="horizontal" size="s" value="3d" label="Vista">
+      <wa-radio appearance="button" value="3d"><wa-icon slot="start" name="box"></wa-icon>3D</wa-radio>
+      <wa-radio appearance="button" value="list"><wa-icon slot="start" name="list"></wa-icon>Lista</wa-radio>
+    </wa-radio-group>
+    <wa-button id="btn-export" class="lib-only" appearance="filled-outlined" size="s" disabled><wa-icon slot="start" name="file-down"></wa-icon>Esporta report</wa-button>
+    <wa-radio-group id="online-group" class="seg online-only" orientation="horizontal" size="s" value="source" label="Raggruppa i risultati" hidden>
+      <wa-radio appearance="button" value="source">Per fonte</wa-radio>
+      <wa-radio appearance="button" value="instrument">Per strumento</wa-radio>
+    </wa-radio-group>
+    <wa-button id="btn-settings" class="icon-btn online-only" appearance="plain" size="s" hidden title="Impostazioni: API key Freesound, cartella download"><wa-icon name="settings" label="Impostazioni"></wa-icon></wa-button>
   </header>
 
   <div class="layout" id="library">
     <aside class="sidebar">
-      <input id="search" class="search" type="search" placeholder="Cerca per nome o cartella…" autocomplete="off">
+      <wa-input id="search" class="search" type="search" size="s" placeholder="Cerca per nome o cartella…" autocomplete="off" with-clear><wa-icon slot="start" name="search"></wa-icon></wa-input>
       <div class="filter-block">
         <div class="filter-title">Tipo</div>
         <div id="type-filters" class="chips"></div>
       </div>
       <div class="filter-block">
         <div class="filter-title">Confidenza minima <span id="conf-value">0%</span></div>
-        <input id="conf" type="range" min="0" max="95" step="5" value="0">
+        <wa-slider id="conf" size="s" min="0" max="95" step="5" value="0" label="Confidenza minima"></wa-slider>
       </div>
       <div class="filter-block classes-block">
         <div class="filter-title">
@@ -74,21 +74,21 @@
         <div id="focus-bar" class="focus-bar" hidden>
           <div class="fb-row">
             <span class="fb-title">Simili a <b id="fb-name"></b></span>
-            <label class="fb-k" title="Quanti sample simili mostrare">
-              <input type="range" id="fb-k" min="5" max="60" step="1"><span id="fb-k-val"></span>
-            </label>
-            <button id="fb-trail" class="btn small" title="Inquadra tutto il percorso">⤢ Percorso</button>
-            <button id="fb-rack" class="btn small" title="Carica il percorso sul gruppo selezionato del Drum Rack">▦ Drum Rack</button>
-            <button id="fb-exit" class="btn small" title="Torna alla mappa (Esc)">✕ Esci</button>
+            <span class="fb-k" title="Quanti sample simili mostrare">
+              <wa-slider id="fb-k" size="s" min="5" max="60" step="1" label="Quanti sample simili mostrare"></wa-slider><span id="fb-k-val"></span>
+            </span>
+            <wa-button id="fb-trail" size="xs" appearance="filled-outlined" title="Inquadra tutto il percorso"><wa-icon slot="start" name="maximize-2"></wa-icon>Percorso</wa-button>
+            <wa-button id="fb-rack" size="xs" appearance="filled-outlined" title="Carica il percorso sul gruppo selezionato del Drum Rack"><wa-icon slot="start" name="layout-grid"></wa-icon>Drum Rack</wa-button>
+            <wa-button id="fb-exit" size="xs" appearance="filled-outlined" title="Torna alla mappa (Esc)"><wa-icon slot="start" name="x"></wa-icon>Esci</wa-button>
           </div>
           <div id="fb-crumbs" class="fb-crumbs" hidden></div>
           <div class="fb-hint">Clic: ascolta · doppio clic: ricentra sul sample</div>
         </div>
         <div id="tooltip" class="tooltip" hidden></div>
         <div class="scene-tools">
-          <button id="btn-rotate" class="icon-btn" title="Rotazione automatica">⟳</button>
-          <button id="btn-reset" class="icon-btn" title="Reimposta vista">⌂</button>
-          <button id="btn-labels" class="icon-btn active" title="Etichette delle classi">Aa</button>
+          <wa-button id="btn-rotate" class="icon-btn" appearance="filled-outlined" size="s" title="Rotazione automatica"><wa-icon name="rotate-cw" label="Rotazione automatica"></wa-icon></wa-button>
+          <wa-button id="btn-reset" class="icon-btn" appearance="filled-outlined" size="s" title="Reimposta vista"><wa-icon name="house" label="Reimposta vista"></wa-icon></wa-button>
+          <wa-button id="btn-labels" class="icon-btn active" appearance="filled-outlined" size="s" title="Etichette delle classi"><wa-icon name="type" label="Etichette delle classi"></wa-icon></wa-button>
         </div>
         <div id="layout-badge" class="layout-badge" hidden></div>
         <div id="empty" class="empty">
@@ -105,7 +105,7 @@
       </div>
 
       <aside id="panel" class="panel" aria-hidden="true">
-        <button id="panel-close" class="panel-close" title="Chiudi (Esc)">×</button>
+        <wa-button id="panel-close" class="panel-close" appearance="plain" size="s" title="Chiudi (Esc)"><wa-icon name="x" label="Chiudi"></wa-icon></wa-button>
         <div id="panel-content"></div>
       </aside>
     </main>
@@ -130,30 +130,27 @@
 
   <div class="layout compose-layout" id="compose" hidden></div>
 
-  <div id="settings" class="modal" hidden>
-    <div class="modal-box">
-      <h3>Impostazioni online</h3>
-      <label class="field">API key Freesound
-        <input id="set-key" type="password" autocomplete="off">
-        <span class="hint">Gratuita: crea un account e <a href="#" id="set-getkey">richiedi una chiave</a>, poi incolla il valore "Client secret/Api key".
+  <wa-dialog id="settings" label="Impostazioni online" light-dismiss style="--width: 540px">
+    <div class="settings-body">
+      <wa-input id="set-key" type="password" password-toggle size="s" autocomplete="off" label="API key Freesound">
+        <span slot="hint">Gratuita: crea un account e <a href="#" id="set-getkey">richiedi una chiave</a>, poi incolla il valore "Client secret/Api key".
           Resta salvata solo su questo Mac. <a href="#" id="set-clear">Rimuovi chiave</a></span>
-      </label>
-      <label class="field">Cartella dei download
-        <span class="o-range"><input id="set-dir" type="text"><button class="btn" id="set-pick">Scegli…</button></span>
-        <span class="hint">Ogni file viene salvato in una sottocartella per fonte, con accanto un file .license.txt.</span>
-      </label>
-      <label class="field">Cache temporanea (anteprime e sample provati nel sequencer)
-        <span class="o-range"><input id="set-cache" type="number" min="50" max="10000" step="50"><span class="hint">MB</span>
-          <button class="btn" id="set-cache-clear">Svuota cache</button></span>
-        <span class="hint" id="set-cache-used"></span>
-      </label>
-      <label class="field">Bridge per Ableton Live (device Max for Live ClusterSound)
-        <span class="o-range"><input id="set-live-port" type="number" min="1024" max="65535" step="1"><span class="hint">porta</span></span>
-        <span class="hint" id="set-live-status"></span>
-      </label>
-      <div class="modal-actions"><button class="btn" id="set-cancel">Annulla</button><button class="btn primary" id="set-save">Salva</button></div>
+      </wa-input>
+      <div class="field-row">
+        <wa-input id="set-dir" size="s" label="Cartella dei download"></wa-input>
+        <wa-button id="set-pick" size="s" appearance="filled-outlined"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli…</wa-button>
+      </div>
+      <span class="hint">Ogni file viene salvato in una sottocartella per fonte, con accanto un file .license.txt.</span>
+      <div class="field-row">
+        <wa-number-input id="set-cache" size="s" min="50" max="10000" step="50" label="Cache temporanea (anteprime e sample provati nel sequencer)"><span slot="end" class="hint">MB</span></wa-number-input>
+        <wa-button id="set-cache-clear" size="s" appearance="filled-outlined"><wa-icon slot="start" name="trash-2"></wa-icon>Svuota cache</wa-button>
+      </div>
+      <span class="hint" id="set-cache-used"></span>
+      <wa-number-input id="set-live-port" size="s" min="1024" max="65535" step="1" label="Bridge per Ableton Live (device Max for Live ClusterSound)" without-steppers><span slot="end" class="hint">porta</span></wa-number-input>
+      <span class="hint" id="set-live-status"></span>
     </div>
-  </div>
+    <div slot="footer" class="modal-actions"><wa-button id="set-cancel" size="s" appearance="filled-outlined">Annulla</wa-button><wa-button id="set-save" size="s" variant="brand">Salva</wa-button></div>
+  </wa-dialog>
 
   <script type="module" src="app.js"></script>
 </body>
