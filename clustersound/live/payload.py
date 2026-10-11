@@ -153,23 +153,28 @@ def _compose_clip(seq: dict, name: str, pure: bool) -> dict:
     return {"name": name, "length": float(int(seq.get("bars", 4)) * 4), "notes": notes_from_spans(spans, chord_perform.PPQ)}
 
 
-def _melody_clip(seq: dict, name: str) -> dict | None:
-    if not chord_melody.notes_of(seq):
-        return None
-    return {"name": name, "length": float(int(seq.get("bars", 4)) * 4),
-            "notes": notes_from_spans(chord_melody.render(seq), chord_perform.PPQ)}
+LIVE_ROLE = {"bass": "bass", "pad": "chords", "keys": "chords"}  # melody layer role -> Live track role
+
+
+def _layer_clips(seq: dict, suffix: str = "") -> dict[str, tuple[str, dict]]:
+    """layer name -> (Live role, clip named "<layer> <suffix>") for every melody layer of seq that isn't muted."""
+    length = float(int(seq.get("bars", 4)) * 4)
+    return {l["name"]: (LIVE_ROLE.get(l["role"], "melody"),
+                        {"name": f"{l['name']} {suffix}".strip(),
+                         "length": length, "notes": notes_from_spans(l["events"], chord_perform.PPQ)})
+            for l in chord_melody.render_layers(seq) if not l["mute"]}
 
 
 def compose(proj: dict, pure: bool = False, versions: list[str] | None = None) -> dict:
     """A Compose project ({versions, order, modes, modeActive, bpm, name}) or a single playable seq.
 
-    Every harmony version becomes a clip of one "Accordi" track, played with the active Modalità; versions
-    with a melody also get a clip on a "Melodia" track, in the same scene."""
+    Every harmony version becomes a clip of one "Accordi" track, played with the active Modalità; every melody
+    layer (by name: "Melodia", "Basso"…) gets its own track, with its clip in the scene of its harmony."""
     name = proj.get("name") or "Progressione"
     bpm = float(proj.get("bpm") or 120)
     if "versions" not in proj:
         clips = [_compose_clip(proj, name, pure)]
-        mel = [_melody_clip(proj, name)]
+        mel = [_layer_clips(proj)]
     else:
         mode = (proj.get("modes") or {}).get(str(proj.get("modeActive", "1")))
         order = versions or proj.get("order") or list(proj["versions"])
@@ -181,10 +186,12 @@ def compose(proj: dict, pure: bool = False, versions: list[str] | None = None) -
                 continue
             seq = {**seq, "bpm": bpm, "name": name, **({"mode": mode} if mode else {})}
             clips.append(_compose_clip(seq, f"{name} {v}" if many else name, pure))
-            mel.append(_melody_clip(seq, f"Melodia {v}" if many else "Melodia"))
+            mel.append(_layer_clips(seq, v if many else ""))
     tracks = [_track(f"Accordi – {name}", "chords", None, None, clips)]
-    if any(mel):  # an empty slot keeps a melody in the scene of its harmony
-        tracks.append(_track(f"Melodia – {name}", "melody", None, None,
-                             [m or {"name": "", "length": c["length"], "notes": []} for m, c in zip(mel, clips)]))
+    for lname in dict.fromkeys(k for m in mel for k in m):  # an empty slot keeps a clip in the scene of its harmony
+        role = next(m[lname][0] for m in mel if lname in m)
+        tracks.append(_track(f"{lname} – {name}", role, None, None,
+                             [m[lname][1] if lname in m else {"name": "", "length": c["length"], "notes": []}
+                              for m, c in zip(mel, clips)]))
     return {"kind": "compose", "name": name, "bpm": bpm, "folder": None, "tracks": tracks}
 

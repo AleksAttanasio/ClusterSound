@@ -128,6 +128,23 @@ def test_live_payload_melody_track():
     assert len(out["tracks"]) == 1
 
 
+def test_layers_become_tracks_and_midi_tracks(tmp_path):
+    clips = [{"id": "a", "notes": [[60, 100]], "root": 0, "start": 0, "len": 16}]
+    bass = {"id": "b", "name": "Basso", "role": "bass", "notes": _mel((0, 16, 36))["notes"], "vol": 1, "mute": False}
+    lead = {"id": "l", "name": "Melodia", "role": "lead", "notes": _mel((0, 4, 72))["notes"], "vol": 1, "mute": False}
+    pad = {"id": "p", "name": "Pad", "role": "pad", "notes": _mel((0, 16, 64))["notes"], "vol": 1, "mute": True}
+    a = {"bars": 1, "clips": clips, "melody": {"layers": [lead, bass, pad], "active": "l"}}
+    b = {"bars": 1, "clips": clips, "melody": {"layers": [bass]}}
+    out = payload.compose({"name": "P", "bpm": 90, "order": ["A", "B"], "versions": {"A": a, "B": b}})
+    assert [(t["name"], t["role"]) for t in out["tracks"]] == [("Accordi – P", "chords"), ("Melodia – P", "melody"),
+                                                               ("Basso – P", "bass")]
+    assert [c["name"] for c in out["tracks"][1]["clips"]] == ["Melodia A", ""]
+    assert [c["name"] for c in out["tracks"][2]["clips"]] == ["Basso A", "Basso B"]
+    path = tmp_path / "x.mid"
+    export.write(str(path), a)
+    assert path.read_bytes().count(b"MTrk") == 3 and b"Basso" in path.read_bytes()
+
+
 def test_recorder_feed_and_ticks():
     from clustersound.chords import midi_in
     r = midi_in.Recorder()
