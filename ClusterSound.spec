@@ -19,7 +19,7 @@ a = Analysis(
     [str(root / "launcher.py")],
     pathex=[str(root)],
     datas=datas,
-    hiddenimports=["webview.platforms.cocoa"],
+    hiddenimports=["webview.platforms.cocoa", "ScreenCaptureKit", "CoreMedia", "sounddevice"],  # capture extra, if installed
     excludes=[
         "tkinter", "_tkinter", "onnx", "onnxruntime", "h5py", "pytest", "IPython", "matplotlib", "scipy",
         "pandas", "PIL", "numpy.f2py", "numpy.distutils", "numpy.testing", "unittest",
@@ -42,5 +42,6 @@ app = BUNDLE(
         "CFBundleShortVersionString": "0.3.0",
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "12.0",
+        "NSMicrophoneUsageDescription": "Il Sampler registra da un ingresso audio solo quando avvii la cattura.",
     },
 )

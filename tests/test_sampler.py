@@ -8,6 +8,7 @@ import soundfile as sf
 
 from clustersound.online import archive, downloads
 from clustersound.online.base import OnlineResult, SourceError
+from clustersound.sampler import capture
 from clustersound.sampler import export as sampler_export
 from clustersound.sampler import links
 from clustersound.sampler import session as S
@@ -193,3 +194,42 @@ def test_parse_commons():
     r = links.parse_commons(data)[0]
     assert (r.title, r.author, r.license, r.format) == ("Snare drum", "Jane & Co", "by-sa", "ogg")
     assert downloads.host_allowed(r.download_url)
+
+
+# ---------------------------------------------------------------- capture
+def test_ring_buffer_wraps_and_keeps_latest():
+    rb = capture.RingBuffer(seconds=1.0, sr=10, channels=2)
+    rb.write(np.arange(7, dtype=np.float32))  # mono -> both channels
+    rb.write(np.arange(7, 14, dtype=np.float32))
+    assert rb.filled == 10 and rb.seconds == 1.0
+    assert rb.latest()[:, 0].tolist() == list(range(4, 14))
+    assert rb.latest(0.3)[:, 1].tolist() == [11, 12, 13]
+    rb.write(np.arange(100, 125, dtype=np.float32))  # bigger than the buffer
+    assert rb.latest()[:, 0].tolist() == list(range(115, 125))
+
+
+def test_capture_grab_uses_ring(monkeypatch):
+    class Fake:
+        sr, channels = 100, 2
+
+        def __init__(self, on_block):
+            self.on_block = on_block
+
+        def start(self):
+            self.on_block(np.full((250, 2), 0.5, dtype=np.float32))
+
+        def stop(self):
+            pass
+
+    monkeypatch.setattr(capture, "SystemAudioBackend", Fake)
+    c = capture.SystemCapture(seconds=2)
+    st = c.start()
+    assert st["running"] and st["seconds"] == 2.0 and st["level"] == 0.5
+    s = c.grab(0.5)
+    assert s.origin == "capture" and s.audio.shape == (50, 2) and s.meta["device"] == "audio di sistema"
+    assert not c.stop()["running"]
+
+
+def test_capture_grab_empty():
+    with pytest.raises(capture.CaptureError):
+        capture.SystemCapture().grab()

@@ -13,6 +13,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest", "pyinstaller>=6.0", "h5py"]
 midi = ["python-rtmidi>=1.5"]  # Compose: record a melody from a MIDI keyboard
+# Sampler: record system audio (ScreenCaptureKit, macOS 13+) or an audio input
+capture = ["pyobjc-framework-ScreenCaptureKit>=10", "pyobjc-framework-CoreMedia>=10", "sounddevice>=0.4"]
 
 [project.scripts]
 clustersound = "clustersound.__main__:main"
