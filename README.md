@@ -197,7 +197,12 @@ i drum rack e le progressioni di Compose, senza trascinare file. È fatto di tre
 - **il device** `m4l/ClusterSound.maxpat` + `ClusterSound.js`, che crea tracce MIDI e clip con le note via
   Live API;
 - **la Remote Script** `remote_script/ClusterSoundBridge` (Python 2.7 in Live 10), che carica i preset `.adg`
-  dei rack: la Live API di Max non può farlo.
+  dei rack e gli strumenti della libreria di Live: la Live API di Max non può farlo.
+
+I rack per Live vengono scritti in `User Library/ClusterSound`, che il browser di Live indicizza sempre: non
+serve aggiungere cartelle ai Places. Se la User Library è altrove, impostala nelle Impostazioni dell'app
+(`live_library`). Senza User Library l'app usa `~/Music/ClusterSound Patterns/Live Import`, da aggiungere ai
+Places.
 
 Installazione (una volta):
 
@@ -205,9 +210,7 @@ Installazione (una volta):
    (`~/Music/Ableton/User Library`, oppure passa il percorso come argomento).
 2. Riavvia Live. In *Preferenze → Link/MIDI* scegli **ClusterSoundBridge** come Control Surface, con Input e
    Output su *Nessuno*.
-3. Nel browser di Live aggiungi `~/Music/ClusterSound Patterns` ai **Places** (*Add Folder…*): è lì che l'app
-   scrive i rack (sottocartella `_Live`) e la Remote Script li cerca.
-4. Trascina il device *ClusterSound* (in *Max MIDI Effect*) su una traccia MIDI qualsiasi. Per avere un unico
+3. Trascina il device *ClusterSound* (in *Max MIDI Effect*) su una traccia MIDI qualsiasi. Per avere un unico
    file autonomo, aprilo in Max e usa *Freeze Device*, poi salva.
 
 Uso, con l'app ClusterSound aperta:
@@ -224,12 +227,32 @@ Uso, con l'app ClusterSound aperta:
   importata va su quella selezionata. *Tempo* imposta il BPM del set.
 - Le clip partono dalla scena selezionata e vanno sempre in uno slot vuoto: non sovrascrivono mai le clip
   esistenti.
-- Senza la Remote Script le clip vengono create comunque, e il device indica il rack da trascinare dai Places.
+- Senza la Remote Script le clip vengono create comunque, e il device indica il rack da trascinare dal browser.
+
+**Suoni da provare** (colonna destra del device):
+
+- Dopo un import, *Traccia* elenca le tracce create. Per quella scelta il device propone 6 strumenti presi dalla
+  libreria di Live e dai pack installati:
+  - per il basso, i preset *Bass* di Sounds;
+  - per gli accordi, *Piano & Keys*, *Pad*, *Synth Keys*, *Strings* e *Mallets*;
+  - per la batteria, i kit di Drums.
+- **Prova ▶** carica lo strumento sulla traccia e fa partire la clip importata in loop. Lo strumento che lasci
+  caricato è la tua scelta.
+- **Altri** propone 6 strumenti nuovi, **Stop** ferma la traccia.
+- Le tracce che arrivano senza strumento ricevono subito la prima proposta, così ogni import suona già. Sono
+  le progressioni, le sequenze senza sample e i rack che non si sono caricati.
+- Le tracce con i sample dell'app li tengono, ma puoi provare comunque altri suoni.
+
+Se un rack o uno strumento non si carica, il motivo è nello stato del device e in `Log.txt` di Live
+(`~/Library/Preferences/Ableton/Live 10.x/Log.txt`, righe `ClusterSoundBridge`), dove la Remote Script registra
+ogni comando.
 
 Quando salvi una sequenza, con lei si salva anche il kit aperto nel Sequencer (sample, layer e mix), e il device
 la importa con quello. Le sequenze salvate prima di questa versione non hanno il kit. Il device usa allora il
 pattern utente da cui viene il primo blocco. Se il blocco viene da un preset di genere, importa solo il MIDI e
 lo segnala con *(solo MIDI)*: per avere anche il kit, apri la sequenza e salvala di nuovo.
+
+In mancanza di questi, il device usa il kit aperto ora nel Sequencer e lo segnala con *(kit attuale)*.
 
 ## Come classifica
 

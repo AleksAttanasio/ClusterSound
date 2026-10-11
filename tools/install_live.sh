@@ -3,8 +3,8 @@
 #
 #     tools/install_live.sh ["/path/to/User Library"]
 #
-# Then restart Live, pick "ClusterSoundBridge" in Preferences > Link/MIDI > Control Surface (Input/Output:
-# None), and add ~/Music/ClusterSound Patterns to the browser Places.
+# Then restart Live and pick "ClusterSoundBridge" in Preferences > Link/MIDI > Control Surface (Input/Output:
+# None). Racks for Live are staged in "<User Library>/ClusterSound", which Live's browser always indexes.
 set -e
 cd "$(dirname "$0")/.."
 LIB="${1:-$HOME/Music/Ableton/User Library}"
@@ -24,5 +24,6 @@ mkdir -p "$RS"
 cp remote_script/ClusterSoundBridge/*.py "$RS/"
 echo "Remote Script: $RS"
 
-mkdir -p "$HOME/Music/ClusterSound Patterns"
-echo "Aggiungi ai Places del browser di Live: $HOME/Music/ClusterSound Patterns"
+mkdir -p "$LIB/ClusterSound"
+echo "Rack per Live:  $LIB/ClusterSound"
+echo "Riavvia Live se la Remote Script è cambiata."
