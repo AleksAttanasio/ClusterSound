@@ -1,8 +1,8 @@
 // "Recorder" screen: record what the Mac sends to one or more output devices (one file each, several formats),
 // then open a recording below to mark regions on its waveform (by hand or on transients) and export them as
 // samples. Opening own files and openly licensed links is still here, hidden while show_sources is false.
-import { btn, iconBtn, slider, check, num, select, setPlayButton, icon } from './kit.js';
-import { toast } from './sendmenu.js';
+import { btn, iconBtn, slider, check, num, select, seg, setPlayButton, icon } from './kit.js';
+import { toast, showPopover } from './sendmenu.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -42,6 +42,7 @@ export class SamplerEditor {
     this.recDir = '';
     this.showSources = false;
     this.linkFiles = [];
+    this.stems = null;        // stems_status(): extra installed, model ready, last job
     this.opts = { fade_in_ms: 1, fade_out_ms: 10, normalize: false, sensitivity: 0.5, devices: null };
     try { Object.assign(this.opts, JSON.parse(localStorage.getItem(LS_KEY) || '{}')); } catch { /* private mode */ }
     this.player.subscribe((on) => { if (!on) { this.playing = null; this._syncPlay(); } });
@@ -62,6 +63,9 @@ export class SamplerEditor {
     this.recDir = init.settings.recorder_dir;
     this._buildShell();
     if (this.rec.running) this._pollRec();
+    this.stems = await this.api.stems_status();
+    this._renderStems();
+    if (this._stemsBusy()) this._pollStems();
     if (init.session) await this._opened(init);
   }
 
@@ -113,6 +117,10 @@ export class SamplerEditor {
           <div id="rc-list" class="rc-list"></div>
         </div>
         <div class="filter-block">
+          <div class="filter-title">Stem</div>
+          <div id="st-box" class="rc-list"></div>
+        </div>
+        <div class="filter-block">
           <div class="filter-title">Sample estratti</div>
           <div class="sp-opts">
             ${num(o.fade_in_ms, { id: 'sp-fi', min: 0, max: 200, step: 1, label: 'Fade in (ms)' })}
@@ -132,6 +140,8 @@ export class SamplerEditor {
           <span class="sp-sens" title="Sensibilità: più alta = più tagli">
             <span class="hint">Sensibilità</span>${slider(0, 1, 0.05, o.sensitivity, { id: 'sp-sens', label: 'Sensibilità' })}
           </span>
+          <span class="sp-sep"></span>
+          ${btn('Estrai stem', { icon: 'audio-lines', id: 'sp-stems', title: 'Separa batteria, basso, chitarra, voce e resto, sul Mac' })}
           <span class="spacer"></span>
           <span class="hint" id="sp-view-info"></span>
         </div>
@@ -207,6 +217,8 @@ export class SamplerEditor {
     $('#sp-clear').onclick = () => { this.regions = []; this.sel = -1; this.renderRegions(); this.draw(); };
     $('#sp-export').onclick = () => this.export();
     $('#sp-rack').onclick = () => this.sendToRack();
+    $('#sp-stems').onclick = (e) => this._stemsMenu(e.currentTarget);
+    $('#st-box').addEventListener('click', (e) => this._stemsClick(e));
     $('#sp-regions').addEventListener('click', (e) => this._regionClick(e));
     $('#sp-regions').addEventListener('change', (e) => {
       const row = e.target.closest('[data-i]');
@@ -366,6 +378,118 @@ export class SamplerEditor {
       if (act === 'reveal') return this.api.reveal_path(row.dataset.path);
       this._opened(await this.api.recorder_open(row.dataset.path));
     });
+  }
+
+  // ---------------------------------------------------------------- stems
+  _stemsBusy() { return ['running', 'downloading'].includes(this.stems?.job?.state); }
+
+  _stemsMenu(anchor) {
+    const st = this.stems;
+    if (!this.session) return this._error('Apri prima una registrazione');
+    const r = this.regions[this.sel];
+    let body;
+    if (!st?.installed) {
+      body = `<div class="hint">La separazione gira sul Mac con Demucs (PyTorch), un'estensione da installare una volta:</div>
+        <code class="st-code">${esc(st?.install_hint || '')}</code>`;
+    } else if (!st.model_ready) {
+      body = `<div class="hint">Serve il modello Demucs (~${st.model_mb} MB), da scaricare una sola volta. Dopo la separazione
+        funziona offline: l'audio non lascia mai il Mac.</div>
+        <div class="pop-actions">${btn('Scarica il modello', { variant: 'brand', icon: 'download', 'data-go': 'download' })}</div>`;
+    } else {
+      const choosable = st.stems.filter((x) => x.choosable);
+      const keys = new Set(this.opts.stemKeys || choosable.map((x) => x.key));
+      const scope = r && this.opts.stemScope === 'region' ? 'region' : 'all';
+      body = `<div class="hint">Un file WAV per stem, sul Mac, senza servizi esterni.</div>
+        <div class="st-keys">${choosable.map((x) => check(esc(x.label), keys.has(x.key), { 'data-key': x.key })).join('')}</div>
+        <div class="hint">+ <b>Altro</b>: tutto ciò che non hai scelto, così non si perde nulla.</div>
+        ${seg([['all', 'Registrazione intera'], ['region', 'Regione selezionata', { disabled: !r, title: r ? `${fmt(r.start)} – ${fmt(r.end)}` : 'Seleziona una regione' }]],
+          scope, { 'data-o': 'scope', cls: 'st-scope' })}
+        <div class="pop-actions">${btn('Estrai', { variant: 'brand', icon: 'audio-lines', 'data-go': 'extract', disabled: !keys.size })}</div>`;
+    }
+    const pop = showPopover(anchor, `<div class="pop-title">${icon('audio-lines')} Estrai stem</div>${body}`);
+    const picked = () => [...pop.querySelectorAll('[data-key]')].filter((c) => c.checked).map((c) => c.dataset.key);
+    pop.querySelector('.st-keys')?.addEventListener('change', () => {
+      pop.querySelector('[data-go=extract]').disabled = !picked().length;
+    });
+    pop.querySelectorAll('[data-go]').forEach((b) => {
+      b.onclick = async () => {
+        if (b.disabled) return;
+        const go = b.dataset.go;
+        let out;
+        if (go === 'download') {
+          pop.close();
+          out = await this.api.stems_download_model();
+        } else {
+          const keys = picked(), scope = pop.querySelector('[data-o=scope]').value === 'region' && r ? 'region' : 'all';
+          Object.assign(this.opts, { stemKeys: keys, stemScope: scope });
+          this._persist();
+          pop.close();
+          out = await this.api.stems_start(scope, scope === 'region' ? r.start : null, scope === 'region' ? r.end : null, keys);
+        }
+        this.stems = out;
+        if (out.error) this._error(out.error);
+        this._renderStems();
+        if (this._stemsBusy()) this._pollStems();
+      };
+    });
+  }
+
+  _pollStems() {
+    clearTimeout(this.stemsTimer);
+    this.stemsTimer = setTimeout(async () => {
+      const prev = this.stems?.job?.state;
+      this.stems = await this.api.stems_status();
+      this._renderStems();
+      const j = this.stems.job;
+      if (this._stemsBusy()) return this._pollStems();
+      if (prev === 'downloading' && j.state === 'idle') toast('Modello scaricato: ora puoi estrarre gli stem');
+      if (j.state === 'done') toast(`Stem pronti: ${j.stems.length} file`);
+      if (j.state === 'error') this._error(j.error);
+    }, 500);
+  }
+
+  _renderStems() {
+    const box = $('#st-box');
+    if (!box) return;
+    const j = this.stems?.job || {};
+    const tab = document.querySelector('#main-tabs wa-radio[value="sampler"]');
+    if (j.state === 'downloading' || j.state === 'running') {
+      const pct = Math.round((j.progress || 0) * 100);
+      box.innerHTML = `<div class="rc-item">
+        <div class="rc-item-name">${j.state === 'downloading' ? 'Download del modello…' : `${esc(j.title)} · ${j.scope === 'region' ? 'regione' : 'intera'}`}</div>
+        ${j.state === 'running' ? `<div class="sp-meter st-meter"><div style="width:${pct}%"></div></div>
+          <div class="rc-item-act"><span class="hint">${pct}%</span><span class="spacer"></span>
+          ${btn('Annulla', { size: 'xs', 'data-act': 'cancel' })}</div>` : ''}
+      </div>`;
+    } else if (j.state === 'done' && j.stems?.length) {
+      box.innerHTML = `<div class="hint">${esc(j.title)} · ${j.scope === 'region' ? 'regione' : 'intera'}
+          <a href="#" data-act="folder">${icon('folder-open')}</a></div>`
+        + j.stems.map((r) => `
+        <div class="rc-item st-item" data-path="${esc(r.path)}" title="${esc(r.path)}">
+          <div class="rc-item-act"><span class="rc-item-name">${esc(r.label)}</span><span class="spacer"></span>
+            ${btn('Apri nell\'editor', { size: 'xs', 'data-act': 'open', icon: 'pencil' })}
+            ${iconBtn('folder-open', 'Mostra nel Finder', { size: 'xs', 'data-act': 'reveal' })}
+          </div>
+        </div>`).join('');
+    } else {
+      const msg = j.state === 'cancelled' ? 'Separazione annullata.' : j.state === 'error' ? `<span class="error">${esc(j.error)}</span>`
+        : !this.stems?.installed ? 'Per separare gli stem installa l\'estensione: vedi «Estrai stem».'
+          : 'Apri una registrazione e usa «Estrai stem»: gli stem compaiono qui.';
+      box.innerHTML = `<div class="hint">${msg}</div>`;
+    }
+    tab?.classList.toggle('stems-busy', j.state === 'running');
+  }
+
+  async _stemsClick(e) {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (!act) return;
+    e.preventDefault();
+    if (act === 'cancel') { this.stems = await this.api.stems_cancel(); return; }
+    if (act === 'folder') return this.api.reveal_path(this.stems.job.folder);
+    const path = e.target.closest('[data-path]')?.dataset.path;
+    if (!path) return;
+    if (act === 'reveal') return this.api.reveal_path(path);
+    this._opened(await this.api.stems_open(path));
   }
 
   _selectedDevices() {
