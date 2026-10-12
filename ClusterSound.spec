@@ -15,11 +15,15 @@ for f in (pkg / "ui").rglob("*"):
     if f.is_file():
         datas.append((str(f), str(Path("clustersound") / f.parent.relative_to(pkg))))
 
+# Recorder helper, built by tools/build_tap.sh (build_app.sh runs it first)
+binaries = [(str(pkg / "bin" / "cs-tap"), "clustersound/bin")] if (pkg / "bin" / "cs-tap").exists() else []
+
 a = Analysis(
     [str(root / "launcher.py")],
     pathex=[str(root)],
     datas=datas,
-    hiddenimports=["webview.platforms.cocoa"],
+    binaries=binaries,
+    hiddenimports=["webview.platforms.cocoa", "ScreenCaptureKit", "CoreMedia"],  # capture extra, if installed
     excludes=[
         "tkinter", "_tkinter", "onnx", "onnxruntime", "h5py", "pytest", "IPython", "matplotlib", "scipy",
         "pandas", "PIL", "numpy.f2py", "numpy.distutils", "numpy.testing", "unittest",
@@ -42,5 +46,6 @@ app = BUNDLE(
         "CFBundleShortVersionString": "0.3.0",
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "12.0",
+        "NSAudioCaptureUsageDescription": "Il Recorder registra l'audio in uscita dal Mac solo quando premi Registra.",
     },
 )

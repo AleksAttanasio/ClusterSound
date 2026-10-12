@@ -5,6 +5,7 @@ import { Online } from './online.js';
 import { PatternEditor } from './pattern.js';
 import { DrumRackEditor } from './drumrack.js';
 import { ComposeEditor } from './compose.js';
+import { SamplerEditor } from './sampler.js';
 import { showSendMenu } from './sendmenu.js';
 import { isTypingTarget } from './kit.js';
 
@@ -25,7 +26,7 @@ const state = {
 };
 
 const player = new Player({ onState: onPlayState });
-window.__cs = { state, player, get pattern() { return pattern; }, get rack() { return rack; }, get compose() { return compose; }, get scene() { return scene; }, get online() { return online; } }; // handy from the web inspector (--debug)
+window.__cs = { state, player, get pattern() { return pattern; }, get rack() { return rack; }, get compose() { return compose; }, get sampler() { return sampler; }, get scene() { return scene; }, get online() { return online; } }; // handy from the web inspector (--debug)
 
 // ------------------------------------------------------------------ boot
 function whenApiReady() {
@@ -35,7 +36,7 @@ function whenApiReady() {
   });
 }
 
-let scene, panel, online, pattern, rack, compose;
+let scene, panel, online, pattern, rack, compose, sampler;
 
 async function main() {
   state.api = await whenApiReady();
@@ -65,6 +66,9 @@ async function main() {
   rack = new DrumRackEditor({ api: state.api, player, classes: state.classes, getTrail,
     getSequencer: () => pattern, onOpenSequencer: () => setTab('pattern') });
   compose = new ComposeEditor({ api: state.api, player, getPattern: () => pattern, onOpenSequencer: () => setTab('pattern') });
+  sampler = new SamplerEditor({ api: state.api, player, onSendToRack: async (refs) => {
+    if (await rack.addSamples(refs)) setTab('rack');
+  } });
   online.onSend = (ref, x, y) => sendRef(ref, x, y);
   online.onLibrary = (path) => { setTab('library'); setFolder(path); };
   buildSidebar();
@@ -587,6 +591,7 @@ function setTab(tab) {
   if (tab !== 'pattern' && pattern) pattern.hide();
   if (tab !== 'rack' && rack) rack.hide();
   if (tab !== 'compose' && compose) compose.hide();
+  if (tab !== 'sampler' && sampler) sampler.hide();
   const inLibrary = tab === 'library' || tab === 'online';
   $('#main-tabs').value = inLibrary ? 'library' : tab;
   $('#lib-mode').value = state.libMode;
@@ -595,11 +600,13 @@ function setTab(tab) {
   $('#pattern').hidden = tab !== 'pattern';
   $('#rack').hidden = tab !== 'rack';
   $('#compose').hidden = tab !== 'compose';
+  $('#sampler').hidden = tab !== 'sampler';
   document.querySelectorAll('.lib-section').forEach((el) => el.classList.toggle('tab-hidden', !inLibrary));
   document.querySelectorAll('.lib-only').forEach((el) => el.classList.toggle('tab-hidden', tab !== 'library'));
   document.querySelectorAll('.online-only').forEach((el) => { el.hidden = tab !== 'online'; });
   if (tab === 'online') online.show(); else if (tab === 'pattern') pattern.show();
-  else if (tab === 'rack') rack.show(); else if (tab === 'compose') compose.show(); else scene.resize();
+  else if (tab === 'rack') rack.show(); else if (tab === 'compose') compose.show();
+  else if (tab === 'sampler') sampler.show(); else scene.resize();
 }
 
 // From the library: open the store on one instrument (the class of a sample)
@@ -679,6 +686,7 @@ function bindUi() {
     if (document.querySelector('wa-dialog[open]') || isTypingTarget(e)) return; // dialogs handle their own Esc
     if (state.tab === 'pattern' && e.key === ' ') { e.preventDefault(); pattern.togglePlay(); return; }
     if (state.tab === 'compose') { if (!document.querySelector('.popover') && compose.onKey(e)) e.preventDefault(); return; }
+    if (state.tab === 'sampler') { if (sampler.onKey(e)) e.preventDefault(); return; }
     if (state.tab !== 'library') return;
     if (e.key === 'Escape') { if (state.focus) exitFocus(); else closePanel(); }
     if (e.key === ' ' && state.selected >= 0) { e.preventDefault(); togglePlay(); }

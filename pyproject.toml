@@ -13,6 +13,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest", "pyinstaller>=6.0", "h5py"]
 midi = ["python-rtmidi>=1.5"]  # Compose: record a melody from a MIDI keyboard
+# Recorder: "all outputs" through ScreenCaptureKit when the cs-tap helper (macOS 14.2+) is missing
+capture = ["pyobjc-framework-ScreenCaptureKit>=10", "pyobjc-framework-CoreMedia>=10"]
 
 [project.scripts]
 clustersound = "clustersound.__main__:main"
