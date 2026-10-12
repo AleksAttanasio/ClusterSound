@@ -16,6 +16,8 @@ midi = ["python-rtmidi>=1.5"]  # Compose: record a melody from a MIDI keyboard
 # Recorder: "all outputs" through ScreenCaptureKit when the cs-tap helper (macOS 14.2+) is missing
 # Recorder: stem separation (drums, bass, guitar, vocals) with Demucs, on the Mac only
 stems = ["demucs>=4.0.1", "torch>=2.1"]
+# Recorder: "Migliora" (AI restoration of samples) with Apollo, on the Mac only
+enhance = ["torch>=2.1", "huggingface_hub>=0.20"]
 capture = ["pyobjc-framework-ScreenCaptureKit>=10", "pyobjc-framework-CoreMedia>=10"]
 
 [project.scripts]
