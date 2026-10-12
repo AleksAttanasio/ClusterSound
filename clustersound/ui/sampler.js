@@ -21,8 +21,9 @@ const fmt = (t) => {
 };
 
 export class SamplerEditor {
-  constructor({ api, player }) {
+  constructor({ api, player, onSendToRack }) {
     this.api = api;
+    this.onSendToRack = onSendToRack; // (refs) -> loads them on the Drum Rack
     this.player = player;
     this.ready = null;
     this.session = null;      // describe() of the open audio
@@ -32,7 +33,7 @@ export class SamplerEditor {
     this.view = { start: 0, end: 1 };
     this.overview = null;     // peaks of the whole source
     this.detail = null;       // peaks of the current view
-    this.regions = [];        // {start, end, name, on}
+    this.regions = [];        // {start, end, name, on, file?: {key, path} of its last export}
     this.sel = -1;
     this.drag = null;
     this.playing = null;      // {start, end} being played
@@ -148,6 +149,7 @@ export class SamplerEditor {
           <span class="filter-title">Regioni <span id="sp-count"></span></span>
           <span class="spacer"></span>
           ${btn('Svuota', { icon: 'trash-2', id: 'sp-clear' })}
+          ${btn('Al Drum Rack', { icon: 'layout-grid', id: 'sp-rack', title: 'Esporta le regioni selezionate e le carica sui pad liberi del Drum Rack, per suonarle' })}
           ${btn('Esporta selezionate', { variant: 'brand', icon: 'file-down', id: 'sp-export' })}
         </div>
         <div class="sp-regions" id="sp-regions"></div>
@@ -204,6 +206,7 @@ export class SamplerEditor {
     $('#sp-slice').onclick = () => this.autoSlice();
     $('#sp-clear').onclick = () => { this.regions = []; this.sel = -1; this.renderRegions(); this.draw(); };
     $('#sp-export').onclick = () => this.export();
+    $('#sp-rack').onclick = () => this.sendToRack();
     $('#sp-regions').addEventListener('click', (e) => this._regionClick(e));
     $('#sp-regions').addEventListener('change', (e) => {
       const row = e.target.closest('[data-i]');
@@ -701,6 +704,7 @@ export class SamplerEditor {
     const on = this.regions.filter((r) => r.on).length;
     $('#sp-count').textContent = this.regions.length ? `(${on} di ${this.regions.length} selezionate)` : '';
     $('#sp-export').disabled = !on;
+    $('#sp-rack').disabled = !on;
     $('#sp-clear').disabled = !this.regions.length;
   }
 
@@ -720,6 +724,7 @@ export class SamplerEditor {
         <span class="sp-time ${r.end - r.start >= this.maxS - 1e-3 ? 'error' : ''}">${fmt(r.end - r.start)}</span>
         ${iconBtn('play', 'Ascolta', { 'data-act': 'play' })}
         ${iconBtn('search', 'Mostra sulla forma d\'onda', { 'data-act': 'zoom' })}
+        ${iconBtn('layout-grid', 'Al Drum Rack', { 'data-act': 'rack' })}
         ${iconBtn('x', 'Elimina', { 'data-act': 'del' })}
       </div>`).join('');
   }
@@ -738,6 +743,7 @@ export class SamplerEditor {
       return this.setView(r.start - pad, r.end + pad);
     }
     if (act === 'play') return this.playRegion(i);
+    if (act === 'rack') return this.sendToRack([i]);
     if (e.target.closest('wa-input, wa-checkbox')) return;
     this.playRegion(i);
   }
@@ -778,21 +784,53 @@ export class SamplerEditor {
   }
 
   // ---------------------------------------------------------------- export
-  async export() {
-    // empty names get the placeholder shown in the list, so numbers match the region numbers
-    const regions = this.regions.map((r, i) => ({ start: r.start, end: r.end, on: r.on, name: r.name || this._defaultName(i) }))
-      .filter((r) => r.on).map(({ start, end, name }) => ({ start, end, name }));
-    if (!regions.length) return;
-    const b = $('#sp-export');
-    b.loading = true;
-    const r = await this.api.sampler_export(regions, this.opts);
-    b.loading = false;
-    if (r.error) return this._error(r.error);
-    const n = r.paths.length;
-    toast(`${n} sample esportat${n === 1 ? 'o' : 'i'}${r.in_library ? ': li analizzo nella libreria' : ''}`);
+  // Regions as WAV files, aligned with `idx`. A region already exported with the same bounds, name and
+  // fades/normalisation reuses its file (sending to the Drum Rack twice doesn't duplicate it).
+  async _files(idx, button) {
+    const key = (r, i) => JSON.stringify([r.start, r.end, r.name || this._defaultName(i), this.opts.fade_in_ms,
+      this.opts.fade_out_ms, this.opts.normalize]);
+    const todo = idx.filter((i) => this.regions[i].file?.key !== key(this.regions[i], i));
+    if (todo.length) {
+      // empty names get the placeholder shown in the list, so numbers match the region numbers
+      const regions = todo.map((i) => ({ start: this.regions[i].start, end: this.regions[i].end, name: this.regions[i].name || this._defaultName(i) }));
+      if (button) button.loading = true;
+      const r = await this.api.sampler_export(regions, this.opts);
+      if (button) button.loading = false;
+      if (r.error) { this._error(r.error); return null; }
+      todo.forEach((i, k) => { if (r.files[k]) this.regions[i].file = { key: key(this.regions[i], i), path: r.files[k] }; });
+      this._showExported(r.folder, r.paths[0]);
+      if (r.in_library) toast('I sample sono nella libreria: li analizzo');
+    }
+    return idx.map((i) => this.regions[i].file?.path || null);
+  }
+
+  _showExported(folder, first) {
+    if (!first) return;
     const head = $('#sp-regions-head-msg') || Object.assign(document.createElement('div'), { id: 'sp-regions-head-msg', className: 'hint sp-exported' });
-    head.innerHTML = `Esportati in <a href="#">${esc(r.folder)}</a>`;
-    head.querySelector('a').onclick = (e) => { e.preventDefault(); this.api.reveal_path(r.paths[0]); };
+    head.innerHTML = `Esportati in <a href="#">${esc(folder)}</a>`;
+    head.querySelector('a').onclick = (e) => { e.preventDefault(); this.api.reveal_path(first); };
     $('#sp-regions').before(head);
+  }
+
+  _checked() { return this.regions.map((r, i) => (r.on ? i : -1)).filter((i) => i >= 0); }
+
+  async export() {
+    const idx = this._checked();
+    if (!idx.length) return;
+    const files = await this._files(idx, $('#sp-export'));
+    if (!files) return;
+    const n = files.filter(Boolean).length;
+    toast(`${n} sample esportat${n === 1 ? 'o' : 'i'}`);
+  }
+
+  // Selected regions (or one) onto free Drum Rack pads, from the rack's selected pad on, to play them there.
+  async sendToRack(idx = this._checked()) {
+    if (!idx.length || !this.onSendToRack) return;
+    const files = await this._files(idx, $('#sp-rack'));
+    if (!files) return;
+    const refs = idx.map((i, k) => files[k] && {
+      kind: 'file', path: files[k], name: files[k].split('/').pop(), cls: null, root: null,
+      dur: +(this.regions[i].end - this.regions[i].start).toFixed(3) }).filter(Boolean);
+    if (refs.length) this.onSendToRack(refs);
   }
 }

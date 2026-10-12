@@ -290,6 +290,9 @@ registrazione: finiscono nella libreria e vengono classificati come gli altri.
   `↑↓` regione precedente/successiva, `Canc` elimina.
 - **Sample estratti**: WAV 24 bit in `~/Music/ClusterSound Samples/`, con fade e normalizzazione opzionali,
   massimo 30 s ciascuno (impostazione `sampler_max_seconds`).
+- **Al Drum Rack**: carica le regioni selezionate (o una sola, dall'icona sulla sua riga) sui pad liberi del Drum
+  Rack, a partire dal pad selezionato e in ordine di nota (C1, C#1, D1…), e apre la scheda per suonarle. Le
+  regioni vengono esportate come sopra; una regione già esportata e non modificata riusa il suo file.
 
 **Come funziona.** Ogni uscita è letta da `cs-tap` (`clustersound/native/cs_tap.swift`), un piccolo helper
 basato sui Core Audio process tap (macOS 14.2+): riceve lo stesso audio che il dispositivo riproduce. Lo
