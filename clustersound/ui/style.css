@@ -861,6 +861,8 @@ wa-button.icon-btn.active::part(button) { background: var(--sel-bg); border-colo
 .rc-item { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; gap: 3px; }
 .rc-item-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rc-item-act { display: flex; align-items: center; gap: 6px; }
+.st-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+wa-radio-group.seg.st-scope::part(form-control-input) { flex-wrap: wrap; }
 .st-meter { height: 6px; flex: none; }
 .st-meter > div { height: 100%; background: var(--cs-gradient-h); transition: width 200ms linear; }
 .st-item { padding: 4px 8px; }

@@ -293,8 +293,9 @@ registrazione: finiscono nella libreria e vengono classificati come gli altri.
 - **Al Drum Rack**: carica le regioni selezionate (o una sola, dall'icona sulla sua riga) sui pad liberi del Drum
   Rack, a partire dal pad selezionato e in ordine di nota (C1, C#1, D1…), e apre la scheda per suonarle. Le
   regioni vengono esportate come sopra; una regione già esportata e non modificata riusa il suo file.
-- **Estrai stem**: separa la registrazione intera, o la regione selezionata, in **Batteria, Basso, Chitarra,
-  Voce e Altro** (il resto, piano compreso), un WAV 24 bit ciascuno. Gli stem della registrazione intera vanno
+- **Estrai stem**: separa la registrazione intera, o la regione selezionata, negli stem che spunti tra
+  **Batteria, Basso, Chitarra, Piano e Voce**, più sempre **Altro** con tutto ciò che non hai scelto (così la
+  somma dei file ridà l'originale), un WAV 24 bit ciascuno. Scelta e ambito vengono ricordati. Gli stem della registrazione intera vanno
   in `<registrazione> - stem/` accanto al file, quelli di una regione in `ClusterSound Samples/…/stem/`; il
   blocco *Stem* li elenca e ognuno si apre nell'editor (regioni, export e *Al Drum Rack* come sempre),
   mantenendo la nota di provenienza della sorgente.

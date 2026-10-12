@@ -1,7 +1,7 @@
 // "Recorder" screen: record what the Mac sends to one or more output devices (one file each, several formats),
 // then open a recording below to mark regions on its waveform (by hand or on transients) and export them as
 // samples. Opening own files and openly licensed links is still here, hidden while show_sources is false.
-import { btn, iconBtn, slider, check, num, select, setPlayButton, icon } from './kit.js';
+import { btn, iconBtn, slider, check, num, select, seg, setPlayButton, icon } from './kit.js';
 import { toast, showPopover } from './sendmenu.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -396,19 +396,36 @@ export class SamplerEditor {
         funziona offline: l'audio non lascia mai il Mac.</div>
         <div class="pop-actions">${btn('Scarica il modello', { variant: 'brand', icon: 'download', 'data-go': 'download' })}</div>`;
     } else {
-      body = `<div class="hint">Batteria, basso, chitarra, voce e resto, un file WAV ciascuno. Sul Mac, senza servizi esterni.</div>
-        <div class="pop-actions">
-          ${btn('Regione selezionata', { 'data-go': 'region', disabled: !r, title: r ? `${fmt(r.start)} – ${fmt(r.end)}` : 'Seleziona una regione' })}
-          ${btn('Registrazione intera', { variant: 'brand', icon: 'audio-lines', 'data-go': 'all' })}
-        </div>`;
+      const choosable = st.stems.filter((x) => x.choosable);
+      const keys = new Set(this.opts.stemKeys || choosable.map((x) => x.key));
+      const scope = r && this.opts.stemScope === 'region' ? 'region' : 'all';
+      body = `<div class="hint">Un file WAV per stem, sul Mac, senza servizi esterni.</div>
+        <div class="st-keys">${choosable.map((x) => check(esc(x.label), keys.has(x.key), { 'data-key': x.key })).join('')}</div>
+        <div class="hint">+ <b>Altro</b>: tutto ciò che non hai scelto, così non si perde nulla.</div>
+        ${seg([['all', 'Registrazione intera'], ['region', 'Regione selezionata', { disabled: !r, title: r ? `${fmt(r.start)} – ${fmt(r.end)}` : 'Seleziona una regione' }]],
+          scope, { 'data-o': 'scope', cls: 'st-scope' })}
+        <div class="pop-actions">${btn('Estrai', { variant: 'brand', icon: 'audio-lines', 'data-go': 'extract', disabled: !keys.size })}</div>`;
     }
     const pop = showPopover(anchor, `<div class="pop-title">${icon('audio-lines')} Estrai stem</div>${body}`);
+    const picked = () => [...pop.querySelectorAll('[data-key]')].filter((c) => c.checked).map((c) => c.dataset.key);
+    pop.querySelector('.st-keys')?.addEventListener('change', () => {
+      pop.querySelector('[data-go=extract]').disabled = !picked().length;
+    });
     pop.querySelectorAll('[data-go]').forEach((b) => {
       b.onclick = async () => {
-        pop.close();
+        if (b.disabled) return;
         const go = b.dataset.go;
-        const out = go === 'download' ? await this.api.stems_download_model()
-          : await this.api.stems_start(go, go === 'region' ? r.start : null, go === 'region' ? r.end : null);
+        let out;
+        if (go === 'download') {
+          pop.close();
+          out = await this.api.stems_download_model();
+        } else {
+          const keys = picked(), scope = pop.querySelector('[data-o=scope]').value === 'region' && r ? 'region' : 'all';
+          Object.assign(this.opts, { stemKeys: keys, stemScope: scope });
+          this._persist();
+          pop.close();
+          out = await this.api.stems_start(scope, scope === 'region' ? r.start : null, scope === 'region' ? r.end : null, keys);
+        }
         this.stems = out;
         if (out.error) this._error(out.error);
         this._renderStems();
