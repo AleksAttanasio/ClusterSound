@@ -32,9 +32,10 @@ const NO_PRESET = '_'; // wa-option values cannot be empty
 const xs = (label, o = {}) => btn(label, { size: 'xs', ...o });
 // Tools living inside the active tab: vary (with an explanatory tooltip), duplicate, delete.
 // `attr` is the action attribute the bar's click handler reads (data-act / data-mact).
-const tabTools = (attr, id, tip, { dupTitle, delTitle, canDel }) =>
+const tabTools = (attr, id, tip, { dupTitle, addTitle, delTitle, canDel }) =>
   `<button class="cp-vtab-ib" id="${id}" ${attr}="vary" aria-label="Varia">${svg('sparkles', 12)}</button>
   <button class="cp-vtab-ib" ${attr}="dup" title="${dupTitle}">${svg('copy', 12)}</button>
+  ${addTitle ? `<button class="cp-vtab-ib" ${attr}="new" title="${addTitle}">${svg('plus', 12)}</button>` : ''}
   ${canDel ? `<button class="cp-vtab-ib danger" ${attr}="del" title="${delTitle}">${svg('x', 12)}</button>` : ''}
   <wa-tooltip for="${id}" placement="bottom" class="cp-vtip">${tip}</wa-tooltip>`;
 const VARY_VER_TIP = `<b>Varia armonia</b> · Genera proposte a partire da questa versione: scegli cosa cambiare
@@ -596,6 +597,7 @@ export class ComposeEditor {
       }
       if (a.dataset.act === 'harm') { this.setView('melody'); this.harmonize(); return; }
       if (a.dataset.act === 'dup') this.addVersion(clone(this.seq));
+      else if (a.dataset.act === 'new') this.addVersion({ ...newSeq(), bars: this.seq.bars, keyMode: this.seq.keyMode, key: clone(this.seq.key) });
       else if (a.dataset.act === 'del') this.deleteVersion();
       else if (a.dataset.act === 'vary') this.progressionVariations();
     };
@@ -1170,7 +1172,7 @@ export class ComposeEditor {
         const title = `${p.versions[v].clips.length} accordi · ${p.versions[v].bars} battute`;
         if (v !== p.active) return `<button class="cp-vtab" data-v="${v}" title="${title}">${v}</button>`;
         return `<div class="cp-vtab active" data-v="${v}"><span title="${title}">${v}</span>
-          ${tabTools('data-act', 'cp-vary-ver', VARY_VER_TIP, { dupTitle: 'Duplica la versione', delTitle: 'Elimina la versione', canDel: p.order.length > 1 })}</div>`;
+          ${tabTools('data-act', 'cp-vary-ver', VARY_VER_TIP, { dupTitle: 'Duplica la versione', addTitle: 'Nuova armonia vuota', delTitle: 'Elimina la versione', canDel: p.order.length > 1 })}</div>`;
       }).join('')}
       ${this.melNotes.length && this.ui.view === 'harmony' ? xs('Armonizza la melodia…', { icon: 'music', 'data-act': 'harm', title: 'Nuove versioni con gli accordi ricavati dalla melodia' }) : ''}`;
   }
