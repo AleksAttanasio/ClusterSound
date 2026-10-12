@@ -19,7 +19,7 @@ a = Analysis(
     [str(root / "launcher.py")],
     pathex=[str(root)],
     datas=datas,
-    hiddenimports=["webview.platforms.cocoa", "ScreenCaptureKit", "CoreMedia", "sounddevice"],  # capture extra, if installed
+    hiddenimports=["webview.platforms.cocoa", "ScreenCaptureKit", "CoreMedia"],  # capture extra, if installed
     excludes=[
         "tkinter", "_tkinter", "onnx", "onnxruntime", "h5py", "pytest", "IPython", "matplotlib", "scipy",
         "pandas", "PIL", "numpy.f2py", "numpy.distutils", "numpy.testing", "unittest",
