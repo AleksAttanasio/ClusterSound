@@ -284,6 +284,9 @@ registrazione: finiscono nella libreria e vengono classificati come gli altri.
   44,1/48/96 kHz; stereo, mono o tutti i canali (solo nei formati non compressi).
 - **Cartella**: `~/Music/ClusterSound Recordings/<data ora> - <uscita>.<ext>`, con accanto un `.source.txt`
   di provenienza. La registrazione continua anche se cambi scheda (pallino rosso sulla tab).
+- **Apri audio**: oltre alle registrazioni, l'editor apre qualsiasi file audio del Mac (*Apri file…*, oppure
+  trascinalo dal Finder sulla forma d'onda) e i sample o i loop della libreria (*Dalla libreria…*: navighi per
+  cartelle e pack, o cerchi per nome in tutta la libreria). Valgono tagli, stem, *Invia a Live* e Drum Rack.
 - **Editor**: allo stop la registrazione si apre sotto. Trascina sulla forma d'onda per creare una regione, i
   bordi la ridimensionano, clic per ascoltarla. *Taglia sui transienti* crea una regione per colpo nella parte
   visibile. Rotella: zoom · Maiusc+rotella: scorri · la striscia sotto sposta la vista. `Spazio` play/stop,
