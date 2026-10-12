@@ -20,6 +20,7 @@
       <wa-radio appearance="button" value="pattern">Sequencer</wa-radio>
       <wa-radio appearance="button" value="rack">Drum Rack</wa-radio>
       <wa-radio appearance="button" value="compose">Compose</wa-radio>
+      <wa-radio appearance="button" value="sampler">Recorder</wa-radio>
     </wa-radio-group>
     <wa-radio-group id="lib-mode" class="seg lib-mode lib-section" orientation="horizontal" size="s" value="local" label="Libreria">
       <wa-radio appearance="button" value="local" title="La mia libreria: la cartella di sample sul Mac"><wa-icon name="folder-open" label="La mia libreria"></wa-icon><span class="lbl">La mia libreria</span></wa-radio>
@@ -138,6 +139,8 @@
   <div class="layout rack-layout" id="rack" hidden></div>
 
   <div class="layout compose-layout" id="compose" hidden></div>
+
+  <div class="layout sampler-layout" id="sampler" hidden></div>
 
   <wa-dialog id="settings" label="Impostazioni online" light-dismiss style="--width: 540px">
     <div class="settings-body">

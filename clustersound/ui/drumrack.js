@@ -752,6 +752,25 @@ export class DrumRackEditor {
     toast(`Drum Rack · pad ${this.padName(p)} (gruppo ${this.groupOf(p) + 1})${replaced ? ', kit pieno: sostituito' : ''}: ${ref.name}`);
   }
 
+  // From the Recorder: several samples at once on the free pads, from the selected pad on: in note order on
+  // the 8×8 grid (C1, C#1, D1… to play them from a keyboard), in pad order on the SPD-SX.
+  async addSamples(refs) {
+    await this.ensure();
+    const pads = this.rack.pads;
+    const order = this.isSpd ? this.groups.flat() : [...pads.keys()].sort((a, b) => this.note(a) - this.note(b));
+    const k = Math.max(0, order.indexOf(this.pad));
+    const free = [...order.slice(k), ...order.slice(0, k)].filter((p) => !pads[p]);
+    const placed = free.slice(0, refs.length);
+    placed.forEach((p, i) => { pads[p] = refs[i]; });
+    if (placed.length) { this.pad = placed[0]; this.seed = refs[0]; }
+    this._persist();
+    if (!$('#rack').hidden) this.renderAll();
+    const left = refs.length - placed.length;
+    toast(placed.length ? `Drum Rack: ${placed.length} sample da ${this.padName(placed[0])}${left ? `, ${left} non caricat${left === 1 ? 'o' : 'i'} (kit pieno)` : ''}`
+      : 'Drum Rack pieno: svuota qualche pad');
+    return placed.length;
+  }
+
   openRandomize(anchor) {
     let o = { scope: 'all', folder: '', oneshot: true, dyn: false, margin: 0.3 };
     try { o = { ...o, ...JSON.parse(localStorage.getItem(LS_RANDOM) || '{}') }; } catch { /* private mode */ }
