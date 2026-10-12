@@ -18,19 +18,26 @@ for f in (pkg / "ui").rglob("*"):
 # Recorder helper, built by tools/build_tap.sh (build_app.sh runs it first)
 binaries = [(str(pkg / "bin" / "cs-tap"), "clustersound/bin")] if (pkg / "bin" / "cs-tap").exists() else []
 
+# Stem separation (extra `stems`): bundled only when Demucs is installed, otherwise the Recorder disables it
+import importlib.util
+stems_imports = []
+if importlib.util.find_spec("demucs") is not None:
+    from PyInstaller.utils.hooks import collect_submodules
+    stems_imports = collect_submodules("demucs")
+
 a = Analysis(
     [str(root / "launcher.py")],
     pathex=[str(root)],
     datas=datas,
     binaries=binaries,
-    hiddenimports=["webview.platforms.cocoa", "ScreenCaptureKit", "CoreMedia"],  # capture extra, if installed
-    excludes=[
+    hiddenimports=["webview.platforms.cocoa", "ScreenCaptureKit", "CoreMedia"] + stems_imports,  # extras, if installed
+    excludes=[m for m in [
         "tkinter", "_tkinter", "onnx", "onnxruntime", "h5py", "pytest", "IPython", "matplotlib", "scipy",
         "pandas", "PIL", "numpy.f2py", "numpy.distutils", "numpy.testing", "unittest",
         "pydoc", "webview.platforms.qt", "webview.platforms.gtk", "webview.platforms.cef",
         "webview.platforms.winforms", "webview.platforms.edgechromium", "PyQt5", "PyQt6",
         "PySide2", "PySide6", "gi",
-    ],
+    ] if not (stems_imports and m == "unittest")],  # PyTorch imports unittest
     noarchive=False,
 )
 pyz = PYZ(a.pure)

@@ -502,7 +502,7 @@ wa-select.pop-field, wa-input.pop-field { display: block; }
 .pop-check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); cursor: pointer; }
 .pop-row { display: flex; justify-content: space-between; }
 .pop-scale { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-3); }
-.pop-actions { display: flex; justify-content: flex-end; }
+.pop-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .pt-lock { opacity: .45; background: transparent; border-color: transparent; }
 .pt-lock:hover, .pt-lock.on { opacity: 1; }
 .pt-lock.on { background: var(--wa-color-warning-fill-quiet); border-color: var(--wa-color-warning-border-normal); color: var(--wa-color-warning-on-quiet); }
@@ -861,5 +861,12 @@ wa-button.icon-btn.active::part(button) { background: var(--sel-bg); border-colo
 .rc-item { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; gap: 3px; }
 .rc-item-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rc-item-act { display: flex; align-items: center; gap: 6px; }
+.st-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+wa-radio-group.seg.st-scope::part(form-control-input) { flex-wrap: wrap; }
+.st-meter { height: 6px; flex: none; }
+.st-meter > div { height: 100%; background: var(--cs-gradient-h); transition: width 200ms linear; }
+.st-item { padding: 4px 8px; }
+.st-code { font-size: 11px; padding: 6px 8px; border-radius: var(--radius); background: var(--wa-color-surface-lowered); user-select: all; }
+.main-tabs wa-radio.stems-busy:not(.recording)::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--wa-color-brand-fill-loud, #7c4dff); margin-right: 6px; vertical-align: 1px; animation: rc-blink 1s steps(2) infinite; }
 .main-tabs wa-radio.recording::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #ef5350; margin-right: 6px; vertical-align: 1px; animation: rc-blink 1s steps(2) infinite; }
 @keyframes rc-blink { 50% { opacity: .25; } }
