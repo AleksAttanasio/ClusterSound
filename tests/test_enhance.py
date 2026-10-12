@@ -139,3 +139,73 @@ def test_status_lists_models_without_importing_torch(monkeypatch, tmp_path):
     assert st["default"] == "apollo" and apollo["mb"] > 0 and apollo["model_ready"] is False
     with pytest.raises(ValueError):
         models.get("nope")
+
+
+# ---------------------------------------------------------------- api job
+COPY_WORKER = """import json, sys, soundfile as sf
+src, dst = sys.argv[-2], sys.argv[-1]
+x, sr = sf.read(src, dtype="float32")
+print(json.dumps({"progress": 0.5}), flush=True)
+sf.write(dst, x * 0.5, sr, subtype="PCM_24")
+print(json.dumps({"done": dst, "sr": sr}), flush=True)
+"""
+
+
+@pytest.fixture
+def api(tmp_path, monkeypatch):
+    import threading
+    import time
+
+    from clustersound.api import Api
+    script = tmp_path / "copy_worker.py"
+    script.write_text(COPY_WORKER)
+    monkeypatch.setattr(runner, "command", lambda model, src, dst: [sys.executable, str(script), src, dst])
+    monkeypatch.setattr(models, "installed", lambda key="apollo": True)
+    monkeypatch.setattr(models, "ready", lambda key: True)
+    a = object.__new__(Api)
+    a._enh_lock = threading.Lock()
+    a._enh_job = {"state": "idle", "progress": 0.0, "model": None, "result": None, "error": None}
+    a._enh_source = None
+    a._enh_cancel = threading.Event()
+    a._sampler = None
+    monkeypatch.setattr(Api, "_settings", lambda self: {"sampler_dir": str(tmp_path / "samples")})
+    monkeypatch.setattr(Api, "_inside_library", lambda self, folder: False)
+
+    def wait():
+        for _ in range(500):
+            if a.enhance_status()["job"]["state"] not in ("running", "downloading"):
+                return a.enhance_status()["job"]
+            time.sleep(0.01)
+        raise TimeoutError
+    a.wait = wait
+    return a
+
+
+def test_api_region_job_and_open(api, tmp_path):
+    from clustersound.sampler import session as S
+    assert api.enhance_start()["error"] == "nessun audio aperto"
+    api._sampler = S.from_array(_tones(2.0, sr=22050), 22050, origin="capture", title="Rec", meta={"device": "Cuffie"})
+    assert api.enhance_start("region")["error"] == "nessuna regione selezionata"
+    assert api.enhance_start("region", 0.5, 1.5, "nope")["error"] == "modello sconosciuto: nope"
+    assert api.enhance_start("region", 0.5, 1.5)["error"] is None
+    job = api.wait()
+    assert job["state"] == "done" and job["model"] == "apollo", job
+    path = job["result"]["path"]
+    assert path.startswith(str(tmp_path / "samples")) and path.endswith("(migliorato).wav")
+    assert os.path.isfile(path + ".source.txt")  # the capture's provenance follows the file
+    y, sr = sf.read(path)
+    assert job["result"]["sr"] == sr and abs(len(y) / sr - 1.0) < 1e-3  # just the region
+    r = api.enhance_open()
+    assert r["error"] is None and r["session"]["title"] == "Rec · migliorato" and r["session"]["origin"] == "capture"
+    assert api._sampler.meta["device"] == "Cuffie"
+    # a second run never overwrites the first result
+    api._sampler = S.from_array(_tones(2.0, sr=22050), 22050, origin="capture", title="Rec")
+    api.enhance_start("region", 0.5, 1.5)
+    assert api.wait()["result"]["path"] != path
+
+
+def test_api_reports_missing_model(api, monkeypatch):
+    from clustersound.sampler import session as S
+    monkeypatch.setattr(models, "ready", lambda key: False)
+    api._sampler = S.from_array(_tones(1.0), SR, title="x")
+    assert "non scaricato" in api.enhance_start("all")["error"]
