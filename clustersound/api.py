@@ -1279,6 +1279,18 @@ class Api:
         """The Sequencer reports its kit, used for saved sequences that do not carry one."""
         live_server.save_current_kit(p)
 
+    def sampler_send_to_live(self, start: float | None = None, end: float | None = None, opts: dict | None = None) -> dict:
+        """The audio open in the Recorder (or one region of it) onto a new audio track in Live, via the device."""
+        if not self._sampler:
+            return {"error": "nessun audio aperto"}
+        try:
+            item = live_payload.audio(self._sampler, self._live.stage, None if start is None else float(start),
+                                      None if end is None else float(end), opts)
+        except (OSError, ValueError) as e:
+            return {"error": str(e)}
+        return {"queued": self._live.push(item), "name": item["name"], "file": item["tracks"][0]["audio_file"],
+                "tracks": [t["name"] for t in item["tracks"]], **self.live_status()}
+
     def live_send(self, kind: str, data: dict, opts: dict | None = None) -> dict:
         """Build the payload of what is open in the UI and queue it for the device in Live ("Invia a Live")."""
         try:

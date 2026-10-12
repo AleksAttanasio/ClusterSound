@@ -7,6 +7,8 @@ string argument holding a JSON object:
 
     device -> script  {"id": n, "cmd": "ping"}
                       {"id": n, "cmd": "load", "track": <track index>, "place": "<Place>/<dir>/…/<file>.adg"}
+                      {"id": n, "cmd": "load_audio", "track": <audio track index>, "slot": <empty clip slot>,
+                       "root": "user_library"|"places", "path": "ClusterSound/Audio/<file>.wav"}
     script -> device  {"id": n, "ok": true, ...} | {"id": n, "ok": false, "error": "..."}
 """
 from __future__ import absolute_import, unicode_literals
