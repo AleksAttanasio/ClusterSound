@@ -293,6 +293,10 @@ registrazione: finiscono nella libreria e vengono classificati come gli altri.
 - **Al Drum Rack**: carica le regioni selezionate (o una sola, dall'icona sulla sua riga) sui pad liberi del Drum
   Rack, a partire dal pad selezionato e in ordine di nota (C1, C#1, D1…), e apre la scheda per suonarle. Le
   regioni vengono esportate come sopra; una regione già esportata e non modificata riusa il suo file.
+- **Invia a Live**: mette in Ableton, su una nuova traccia audio dopo quella selezionata, la regione
+  selezionata o, senza selezione, tutto l'audio aperto (registrazione o stem), nel primo slot vuoto della scena
+  selezionata. Serve il device ClusterSound nel set con *Ricevi* attivo (vedi *Max for Live*). Il WAV resta in
+  `User Library/ClusterSound/Audio`, quindi lo trovi anche nel browser di Live da trascinare su qualsiasi traccia.
 - **Estrai stem**: separa la registrazione intera, o la regione selezionata, negli stem che spunti tra
   **Batteria, Basso, Chitarra, Piano e Voce**, più sempre **Altro** con tutto ciò che non hai scelto (così la
   somma dei file ridà l'originale), un WAV 24 bit ciascuno. Scelta e ambito vengono ricordati. Gli stem della registrazione intera vanno
@@ -355,6 +359,9 @@ Uso, con l'app ClusterSound aperta:
     una traccia *Melodia* se c'è una melodia.
 - **Clip → Melodia**: manda all'app le note della clip MIDI selezionata in Live; in Compose → Melodia →
   *Importa ▾ → Clip da Ableton* diventa la melodia della versione corrente.
+- **Audio dal Recorder**: *Invia a Live* nell'editor del Recorder crea una traccia audio con la clip. Da Live 12
+  la clip la crea il device; nelle versioni precedenti serve la Remote Script (aggiornala rieseguendo
+  `tools/install_live.sh` e riavviando Live). Senza, il device indica il file da trascinare dal browser.
 - **Dall'app**: *Invia a Live* nel Sequencer, nella barra della sequenza (*Live*), nel Drum Rack e nel menu
   *Esporta* di Compose. Con *Ricevi* attivo, il device importa subito quello che arriva, anche se non è salvato.
 - *Nuove tracce* (attivo di default) crea le tracce dopo quella selezionata; se lo spegni, la prima traccia
