@@ -45,6 +45,7 @@ export class SamplerEditor {
     this.showSources = false;
     this.linkFiles = [];
     this.stems = null;        // stems_status(): extra installed, model ready, last job
+    this.enh = null;          // enhance_status(): models (installed, downloaded), last "Migliora" job
     this.opts = { fade_in_ms: 1, fade_out_ms: 10, normalize: false, sensitivity: 0.5, devices: null };
     try { Object.assign(this.opts, JSON.parse(localStorage.getItem(LS_KEY) || '{}')); } catch { /* private mode */ }
     this.player.subscribe((on) => { if (!on) { this.playing = null; this._syncPlay(); } });
@@ -68,6 +69,9 @@ export class SamplerEditor {
     this.stems = await this.api.stems_status();
     this._renderStems();
     if (this._stemsBusy()) this._pollStems();
+    this.enh = await this.api.enhance_status();
+    this._renderEnh();
+    if (this._enhBusy()) this._pollEnh();
     if (init.session) await this._opened(init);
   }
 
@@ -131,6 +135,10 @@ export class SamplerEditor {
           <div id="st-box" class="rc-list"></div>
         </div>
         <div class="filter-block">
+          <div class="filter-title en-title">${icon('sparkles')} Migliora</div>
+          <div id="en-box" class="rc-list"></div>
+        </div>
+        <div class="filter-block">
           <div class="filter-title">Sample estratti</div>
           <div class="sp-opts">
             ${num(o.fade_in_ms, { id: 'sp-fi', min: 0, max: 200, step: 1, label: 'Fade in (ms)' })}
@@ -152,6 +160,7 @@ export class SamplerEditor {
           </span>
           <span class="sp-sep"></span>
           ${btn('Estrai stem', { icon: 'audio-lines', id: 'sp-stems', title: 'Separa batteria, basso, chitarra, voce e resto, sul Mac' })}
+          ${btn('Migliora', { icon: 'sparkles', id: 'sp-enh', cls: 'cs-ai', title: 'Restauro AI della regione selezionata (o di tutto l\'audio): alte frequenze e artefatti di compressione, sul Mac' })}
           <span class="spacer"></span>
           <span class="hint" id="sp-view-info"></span>
         </div>
@@ -301,6 +310,8 @@ export class SamplerEditor {
     $('#sp-live').onclick = () => this.sendToLive();
     $('#sp-stems').onclick = (e) => this._stemsMenu(e.currentTarget);
     $('#st-box').addEventListener('click', (e) => this._stemsClick(e));
+    $('#sp-enh').onclick = (e) => this._enhMenu(e.currentTarget);
+    $('#en-box').addEventListener('click', (e) => this._enhClick(e));
     $('#sp-regions').addEventListener('click', (e) => this._regionClick(e));
     $('#sp-regions').addEventListener('change', (e) => {
       const row = e.target.closest('[data-i]');
@@ -585,6 +596,123 @@ export class SamplerEditor {
     if (!path) return;
     if (act === 'reveal') return this.api.reveal_path(path);
     this._opened(await this.api.stems_open(path));
+  }
+
+  // ---------------------------------------------------------------- enhance ("Migliora")
+  _enhBusy() { return ['running', 'downloading'].includes(this.enh?.job?.state); }
+
+  _enhModel() {
+    const ms = this.enh?.models || [];
+    return ms.find((m) => m.key === this.opts.enhModel) || ms.find((m) => m.key === this.enh.default) || ms[0];
+  }
+
+  _enhMenu(anchor, forceScope) {
+    const st = this.enh;
+    if (!this.session) return this._error('Apri prima una registrazione');
+    if (!st?.models?.length) return;
+    const r = this.regions[this.sel];
+    const m = this._enhModel();
+    const scope = forceScope || (r ? 'region' : 'all');
+    const models = st.models.length > 1
+      ? seg(st.models.map((x) => [x.key, esc(x.label)]), m.key, { 'data-o': 'model', cls: 'en-models' }) : '';
+    const facts = `<div class="en-facts">
+        <span>${icon('download')} ${m.mb} MB</span><span title="Memoria usata solo durante il lavoro">RAM ${esc(m.ram)}</span>
+        <span title="Per 30 s di audio su Apple Silicon">${esc(m.speed)}</span></div>`;
+    let body, go;
+    if (!m.installed) {
+      body = `<div class="hint">Il miglioramento gira sul Mac con PyTorch, un'estensione da installare una volta:</div>
+        <code class="st-code">${esc(st.install_hint)}</code>`;
+    } else if (!m.model_ready) {
+      body = `<div class="hint">Serve il modello <b>${esc(m.label)}</b> (~${m.mb} MB), da scaricare una sola volta. Dopo funziona
+        offline: l'audio non lascia mai il Mac.</div>`;
+      go = btn('Scarica il modello', { variant: 'brand', icon: 'download', 'data-go': 'download' });
+    } else {
+      body = `${seg([['region', 'Regione selezionata', { disabled: !r, title: r ? `${fmt(r.start)} – ${fmt(r.end)}` : 'Seleziona una regione' }],
+        ['all', 'Audio intero']], scope, { 'data-o': 'scope', cls: 'st-scope' })}
+        <div class="hint">Crea un nuovo file «… (migliorato).wav» accanto ai sample: l'originale resta com'è.</div>`;
+      go = btn('Migliora', { icon: 'sparkles', cls: 'cs-ai', 'data-go': 'run' });
+    }
+    const pop = showPopover(anchor, `<div class="pop-title">${icon('sparkles')} Migliora con l'AI</div>
+      ${models}<div class="hint en-detail">${esc(m.detail)}</div>${facts}${body}
+      <div class="hint en-license">Modello ${esc(m.label.split(' · ')[0])}, licenza ${esc(m.license)}. Il modello si carica solo
+        mentre lavora, in un processo a parte: finito il lavoro la memoria torna libera.</div>
+      ${go ? `<div class="pop-actions">${go}</div>` : ''}`);
+    pop.querySelector('[data-o=model]')?.addEventListener('change', (e) => {
+      this.opts.enhModel = e.target.value;
+      this._persist();
+      pop.close();
+      this._enhMenu(anchor, forceScope);
+    });
+    pop.querySelectorAll('[data-go]').forEach((b) => {
+      b.onclick = async () => {
+        let out;
+        pop.close();
+        if (b.dataset.go === 'download') {
+          out = await this.api.enhance_download_model(m.key);
+        } else {
+          const sc = pop.querySelector('[data-o=scope]')?.value === 'region' && r ? 'region' : 'all';
+          out = await this.api.enhance_start(sc, sc === 'region' ? r.start : null, sc === 'region' ? r.end : null, m.key);
+        }
+        this.enh = out;
+        if (out.error) this._error(out.error);
+        this._renderEnh();
+        if (this._enhBusy()) this._pollEnh();
+      };
+    });
+  }
+
+  _pollEnh() {
+    clearTimeout(this.enhTimer);
+    this.enhTimer = setTimeout(async () => {
+      const prev = this.enh?.job?.state;
+      this.enh = await this.api.enhance_status();
+      this._renderEnh();
+      const j = this.enh.job;
+      if (this._enhBusy()) return this._pollEnh();
+      if (prev === 'downloading' && j.state === 'idle') toast('Modello scaricato: ora puoi usare «Migliora»');
+      if (j.state === 'done') toast('Sample migliorato: aprilo nell\'editor per ascoltarlo');
+      if (j.state === 'error') this._error(j.error);
+    }, 500);
+  }
+
+  _renderEnh() {
+    const box = $('#en-box');
+    if (!box) return;
+    const j = this.enh?.job || {};
+    const what = `${esc(j.title)} · ${j.scope === 'region' ? `regione, ${j.seconds} s` : 'intero'}`;
+    if (j.state === 'downloading') {
+      box.innerHTML = '<div class="rc-item"><div class="rc-item-name">Download del modello…</div></div>';
+    } else if (j.state === 'running') {
+      const pct = Math.round((j.progress || 0) * 100);
+      box.innerHTML = `<div class="rc-item en-item">
+        <div class="rc-item-name">${what}</div>
+        <div class="sp-meter st-meter en-meter"><div style="width:${pct}%"></div></div>
+        <div class="rc-item-act"><span class="hint">${pct ? `${pct}%` : 'Carico il modello…'}</span><span class="spacer"></span>
+          ${btn('Annulla', { size: 'xs', 'data-act': 'cancel' })}</div>
+      </div>`;
+    } else if (j.state === 'done' && j.result) {
+      box.innerHTML = `<div class="rc-item en-item" title="${esc(j.result.path)}">
+        <div class="rc-item-name">${what}</div>
+        <div class="rc-item-act"><span class="hint">${(j.result.sr / 1000).toFixed(1)} kHz</span><span class="spacer"></span>
+          ${btn('Apri nell\'editor', { size: 'xs', 'data-act': 'open', icon: 'pencil' })}
+          ${iconBtn('folder-open', 'Mostra nel Finder', { size: 'xs', 'data-act': 'reveal' })}
+        </div>
+      </div>`;
+    } else {
+      const msg = j.state === 'cancelled' ? 'Miglioramento annullato.' : j.state === 'error' ? `<span class="error">${esc(j.error)}</span>`
+        : 'Seleziona una regione e premi «Migliora»: il restauro AI ricostruisce le alte frequenze e ripulisce la compressione.';
+      box.innerHTML = `<div class="hint">${msg}</div>`;
+    }
+    $('#sp-enh')?.toggleAttribute('loading', j.state === 'running');
+  }
+
+  async _enhClick(e) {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (!act) return;
+    e.preventDefault();
+    if (act === 'cancel') { this.enh = await this.api.enhance_cancel(); return; }
+    if (act === 'reveal') return this.api.reveal_path(this.enh.job.result.path);
+    if (act === 'open') this._opened(await this.api.enhance_open());
   }
 
   _selectedDevices() {
@@ -943,6 +1071,7 @@ export class SamplerEditor {
         <span class="sp-time ${r.end - r.start >= this.maxS - 1e-3 ? 'error' : ''}">${fmt(r.end - r.start)}</span>
         ${iconBtn('play', 'Ascolta', { 'data-act': 'play' })}
         ${iconBtn('search', 'Mostra sulla forma d\'onda', { 'data-act': 'zoom' })}
+        ${iconBtn('sparkles', 'Migliora con l\'AI', { 'data-act': 'enhance', cls: 'cs-ai-icon' })}
         ${iconBtn('layout-grid', 'Al Drum Rack', { 'data-act': 'rack' })}
         ${iconBtn('x', 'Elimina', { 'data-act': 'del' })}
       </div>`).join('');
@@ -963,6 +1092,12 @@ export class SamplerEditor {
     }
     if (act === 'play') return this.playRegion(i);
     if (act === 'rack') return this.sendToRack([i]);
+    if (act === 'enhance') {
+      this.sel = i;
+      this.renderRegions();
+      this.draw();
+      return this._enhMenu($(`#sp-regions [data-i="${i}"] [data-act=enhance]`), 'region'); // the row was re-rendered
+    }
     if (e.target.closest('wa-input, wa-checkbox')) return;
     this.playRegion(i);
   }
