@@ -30,6 +30,18 @@ const VERSION_NAMES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const STYLE_BADGE = { block: '▤', strum: '⟋', arp: '⋰' };
 const NO_PRESET = '_'; // wa-option values cannot be empty
 const xs = (label, o = {}) => btn(label, { size: 'xs', ...o });
+// Tools living inside the active tab: vary (with an explanatory tooltip), duplicate, delete.
+// `attr` is the action attribute the bar's click handler reads (data-act / data-mact).
+const tabTools = (attr, id, tip, { dupTitle, delTitle, canDel }) =>
+  `<button class="cp-vtab-ib" id="${id}" ${attr}="vary" aria-label="Varia">${svg('sparkles', 12)}</button>
+  <button class="cp-vtab-ib" ${attr}="dup" title="${dupTitle}">${svg('copy', 12)}</button>
+  ${canDel ? `<button class="cp-vtab-ib danger" ${attr}="del" title="${delTitle}">${svg('x', 12)}</button>` : ''}
+  <wa-tooltip for="${id}" placement="bottom" class="cp-vtip">${tip}</wa-tooltip>`;
+const VARY_VER_TIP = `<b>Varia armonia</b> · Genera proposte a partire da questa versione: scegli cosa cambiare
+  (riarmonizzazione, ritmo armonico, voice leading, più ricca o scarna, finale) e quanto.
+  Ascoltale, poi <i>Tieni</i> per farne una nuova versione o <i>Accoda</i> per aggiungerla in fondo.`;
+const VARY_MODE_TIP = `<b>Varia modalità</b> · Propone nuove ritmiche e modi di suonare, lasciando gli accordi invariati.
+  Ascoltale, poi <i>Usa</i> per sostituire la modalità corrente o <i>Tieni</i> per aggiungerla come nuova.`;
 const playIco = (i, title = 'Ascolta') => `<button class="cp-ib" data-play="${i}" title="${title}">${svg('play', 11)}</button>`;
 const chipBtn = (attrs, label, on) => `<wa-button size="xs" pill class="chip ${on ? 'on' : ''}" ${attrs}>${label}</wa-button>`;
 const VEL_CYCLE = [0, 100, 120, 65]; // click on a step: off → strike → accent → soft → off
@@ -576,9 +588,12 @@ export class ComposeEditor {
     this._bindMelody();
 
     $('#cp-versions').onclick = (e) => {
-      const v = e.target.closest('[data-v]');
-      if (v) { this.project.active = v.dataset.v; this.sel.clear(); this.melSel.clear(); this.primary = null; this._afterChange(); this.loadBrowser(); return; }
-      const a = e.target.closest('[data-act]'); if (!a) return;
+      const a = e.target.closest('[data-act]');
+      if (!a) {
+        const v = e.target.closest('[data-v]');
+        if (v && v.dataset.v !== this.project.active) { this.project.active = v.dataset.v; this.sel.clear(); this.melSel.clear(); this.primary = null; this._afterChange(); this.loadBrowser(); }
+        return;
+      }
       if (a.dataset.act === 'harm') { this.setView('melody'); this.harmonize(); return; }
       if (a.dataset.act === 'dup') this.addVersion(clone(this.seq));
       else if (a.dataset.act === 'del') this.deleteVersion();
@@ -587,9 +602,12 @@ export class ComposeEditor {
 
     const modes = $('#cp-modes');
     modes.onclick = (e) => {
-      const t = e.target.closest('[data-m]');
-      if (t) { this.project.modeActive = t.dataset.m; this._afterChange(); return; }
-      const a = e.target.closest('[data-mact]'); if (!a) return;
+      const a = e.target.closest('[data-mact]');
+      if (!a) {
+        const t = e.target.closest('[data-m]');
+        if (t && t.dataset.m !== this.project.modeActive) { this.project.modeActive = t.dataset.m; this._afterChange(); }
+        return;
+      }
       const act = a.dataset.mact;
       if (act === 'dup') this.addMode({ ...clone(this.mode), name: `${this.mode.name} (copia)` });
       else if (act === 'del') this.deleteMode();
@@ -598,7 +616,7 @@ export class ComposeEditor {
       else if (act === 'rclear') this.edit(() => { const g = this.mode.rhythm; g.vel = g.vel.map(() => 0); g.len = g.len.map(() => 0); g.dir = g.dir.map(() => ''); g.preset = null; });
     };
     modes.ondblclick = (e) => {
-      const t = e.target.closest('[data-m]'); if (!t) return;
+      const t = e.target.closest('[data-m]'); if (!t || e.target.closest('.cp-vtab-ib')) return;
       const name = prompt('Nome della modalità', this.project.modes[t.dataset.m].name);
       if (name) this.edit(() => { this.project.modes[t.dataset.m].name = name.trim(); });
     };
@@ -1148,11 +1166,13 @@ export class ComposeEditor {
   renderVersions() {
     const p = this.project;
     $('#cp-versions').innerHTML = `<span class="cp-barlabel">Armonia</span>
-      ${p.order.map((v) => `<button class="cp-vtab ${v === p.active ? 'active' : ''}" data-v="${v}" title="${p.versions[v].clips.length} accordi · ${p.versions[v].bars} battute">${v}</button>`).join('')}
-      ${xs('Duplica', { icon: 'copy', 'data-act': 'dup', title: 'Duplica la versione corrente' })}
-      ${xs('Varia armonia…', { icon: 'sparkles', 'data-act': 'vary', title: 'Variazioni degli accordi: riarmonizzazione, ritmo armonico, voicing, finali' })}
-      ${this.melNotes.length && this.ui.view === 'harmony' ? xs('Armonizza la melodia…', { icon: 'music', 'data-act': 'harm', title: 'Nuove versioni con gli accordi ricavati dalla melodia' }) : ''}
-      ${p.order.length > 1 ? xs('<wa-icon name="x" label="Elimina"></wa-icon>', { 'data-act': 'del', title: 'Elimina la versione corrente' }) : ''}`;
+      ${p.order.map((v) => {
+        const title = `${p.versions[v].clips.length} accordi · ${p.versions[v].bars} battute`;
+        if (v !== p.active) return `<button class="cp-vtab" data-v="${v}" title="${title}">${v}</button>`;
+        return `<div class="cp-vtab active" data-v="${v}"><span title="${title}">${v}</span>
+          ${tabTools('data-act', 'cp-vary-ver', VARY_VER_TIP, { dupTitle: 'Duplica la versione', delTitle: 'Elimina la versione', canDel: p.order.length > 1 })}</div>`;
+      }).join('')}
+      ${this.melNotes.length && this.ui.view === 'harmony' ? xs('Armonizza la melodia…', { icon: 'music', 'data-act': 'harm', title: 'Nuove versioni con gli accordi ricavati dalla melodia' }) : ''}`;
   }
 
   get pxStep() { return this._pxStep || 10; }
@@ -1197,10 +1217,12 @@ export class ComposeEditor {
     const g = this.mode.rhythm;
     const presets = this.meta.styles.presets;
     $('#cp-modes').innerHTML = `<span class="cp-barlabel">Modalità</span>
-      ${p.modeOrder.map((k) => `<button class="cp-vtab cp-mtab ${k === p.modeActive ? 'active' : ''}" data-m="${k}" title="Doppio clic: rinomina">${esc(p.modes[k].name || k)}</button>`).join('')}
-      ${xs('Duplica', { icon: 'copy', 'data-mact': 'dup', title: 'Duplica la modalità corrente' })}
-      ${xs('Varia modalità…', { icon: 'sparkles', 'data-mact': 'vary', title: 'Variazioni della ritmica e del modo di suonare' })}
-      ${p.modeOrder.length > 1 ? xs('<wa-icon name="x" label="Elimina"></wa-icon>', { 'data-mact': 'del', title: 'Elimina la modalità corrente' }) : ''}
+      ${p.modeOrder.map((k) => {
+        const name = esc(p.modes[k].name || k);
+        if (k !== p.modeActive) return `<button class="cp-vtab cp-mtab" data-m="${k}">${name}</button>`;
+        return `<div class="cp-vtab cp-mtab active" data-m="${k}"><span title="Doppio clic: rinomina">${name}</span>
+          ${tabTools('data-mact', 'cp-vary-mode', VARY_MODE_TIP, { dupTitle: 'Duplica la modalità', delTitle: 'Elimina la modalità', canDel: p.modeOrder.length > 1 })}</div>`;
+      }).join('')}
       <span class="cp-sep"></span>
       <span class="cp-barlabel">Ritmica</span>
       <wa-select id="cp-preset" size="xs" class="cp-select cp-preset" value="${g.preset || NO_PRESET}" title="Parti da un preset e modificalo sulla griglia">

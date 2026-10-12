@@ -628,7 +628,12 @@ wa-select.rk-select { max-width: 100%; }
 
 .cp-versions { display: flex; align-items: center; gap: 6px; padding: 8px 14px 0; }
 .cp-vtab { min-width: 30px; height: 26px; border-radius: 6px 6px 0 0; border: 1px solid var(--line); border-bottom: 0; background: var(--bg-2); color: var(--text-2); cursor: pointer; font-weight: 700; }
-.cp-vtab.active { background: var(--bg-3); color: var(--text); border-color: var(--line-2); box-shadow: inset 0 2px 0 var(--accent); }
+.cp-vtab.active { background: var(--bg-3); color: var(--text); border-color: var(--line-2); box-shadow: inset 0 2px 0 var(--accent); display: inline-flex; align-items: center; gap: 2px; padding: 0 3px 0 10px; cursor: default; }
+.cp-vtab.active > span { margin-right: 4px; }
+.cp-vtab-ib { width: 20px; height: 20px; border: 0; border-radius: 4px; background: transparent; color: var(--text-3); cursor: pointer; padding: 0; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.cp-vtab-ib:hover { background: var(--bg-2); color: var(--text); }
+.cp-vtab-ib.danger:hover { color: var(--wa-color-danger-on-normal); }
+.cp-vtip { --max-width: 300px; font-weight: 400; }
 .cp-versions .hint { margin-right: 4px; }
 
 .cp-tlwrap { margin: 0 14px; border: 1px solid var(--line); border-radius: 0 8px 8px 8px; background: var(--bg-2); overflow-x: auto; overflow-y: hidden; flex: none; padding: 0 12px 0 0; }
