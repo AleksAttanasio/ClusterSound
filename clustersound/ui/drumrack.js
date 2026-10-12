@@ -195,9 +195,9 @@ export class DrumRackEditor {
         </div>
         <div class="rk-stage">
           <div id="rk-grid" class="rk-grid"></div>
-          <aside id="rk-insp" class="rk-insp"></aside>
         </div>
-      </main>`;
+      </main>
+      <aside id="rk-insp" class="sidebar rk-insp"></aside>`;
 
     this._buildBar();
     $('#rk-bfam').innerHTML = this.meta.families.map((f) => `<wa-option value="${f.id}"><span slot="start" class="dot" style="background:${f.color}"></span>${esc(f.label)}</wa-option>`).join('');
