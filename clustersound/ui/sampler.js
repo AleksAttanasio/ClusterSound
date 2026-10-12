@@ -617,7 +617,7 @@ export class SamplerEditor {
       ? seg(st.models.map((x) => [x.key, esc(x.label)]), m.key, { 'data-o': 'model', cls: 'en-models' }) : '';
     const facts = `<div class="en-facts">
         <span>${icon('download')} ${m.mb} MB</span><span title="Memoria usata solo durante il lavoro">RAM ${esc(m.ram)}</span>
-        <span title="Per 30 s di audio su Apple Silicon">${esc(m.speed)}</span></div>`;
+        <span title="Su Apple Silicon (GPU)">${esc(m.speed)}</span></div>`;
     let body, go;
     if (!m.installed) {
       body = `<div class="hint">Il miglioramento gira sul Mac con PyTorch, un'estensione da installare una volta:</div>

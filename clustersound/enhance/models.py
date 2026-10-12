@@ -29,7 +29,7 @@ class Model:
 MODELS = {m.key: m for m in [
     Model("apollo", "Apollo · veloce",
           "Ripara l'audio compresso (MP3, streaming) e ricostruisce le alte frequenze tagliate. Pensato per la musica.",
-          "JusperLee/Apollo", "pytorch_model.bin", 44100, 66, "~1–2 GB", "da pochi secondi a ~1 minuto",
+          "JusperLee/Apollo", "pytorch_model.bin", 44100, 66, "~1,6 GB", "~15 s ogni 30 s di audio",
           "CC BY-SA 4.0"),
 ]}
 DEFAULT = "apollo"
