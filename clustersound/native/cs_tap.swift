@@ -159,7 +159,11 @@ final class Recording {
               fmt.mBitsPerChannel == 32 else { fail("formato del tap non supportato") }
         channels = Int(fmt.mChannelsPerFrame)
         interleaved = fmt.mFormatFlags & kAudioFormatFlagIsNonInterleaved == 0
-        let header = "{\"sample_rate\": \(fmt.mSampleRate), \"channels\": \(channels)}\n"
+        // The IOProc runs at the aggregate's rate (its main device): a global tap reports 48 kHz even when the
+        // hardware runs at 44.1 kHz, and Core Audio resamples it, so the aggregate's rate is the real one.
+        let aggRate = getValue(aggregateID, kAudioDevicePropertyNominalSampleRate, Float64(0)) ?? 0
+        let rate = aggRate > 0 ? aggRate : fmt.mSampleRate
+        let header = "{\"sample_rate\": \(rate), \"channels\": \(channels)}\n"
         writeOut(Array(header.utf8))
 
         let queue = DispatchQueue(label: "cs-tap.io", qos: .userInteractive)
@@ -190,11 +194,16 @@ final class Recording {
         scratch.withUnsafeBytes { writeOut(UnsafeRawBufferPointer(rebasing: $0[0..<(frames * n * 4)])) }
     }
 
+    // The IOProc must never block: it copies the bytes and a serial queue writes them to stdout.
+    let out = DispatchQueue(label: "cs-tap.out")
+
     func writeOut<C: Collection>(_ bytes: C) where C.Element == UInt8 {
         let data = Data(bytes)
-        let ok = data.withUnsafeBytes { fwrite($0.baseAddress, 1, data.count, stdout) == data.count }
-        fflush(stdout)
-        if !ok { stop(); exit(0) }  // the reader went away
+        out.async {
+            let ok = data.withUnsafeBytes { fwrite($0.baseAddress, 1, data.count, stdout) == data.count }
+            fflush(stdout)
+            if !ok { self.stop(); exit(0) }  // the reader went away
+        }
     }
 
     func stop() {

@@ -175,3 +175,21 @@ def test_real_helper_lists_outputs():
     assert binary
     devices = json.loads(subprocess.run([binary, "list"], capture_output=True, text=True, timeout=30).stdout)
     assert isinstance(devices, list) and all({"uid", "name", "channels"} <= set(d) for d in devices)
+
+
+@pytest.mark.skipif(sys.platform != "darwin" or not shutil.which("swiftc"), reason="needs macOS and swiftc")
+def test_real_helper_mix_reports_the_hardware_rate():
+    """The global tap says 48 kHz even on 44.1 kHz hardware: the header must give the rate buffers arrive at."""
+    binary = R.tap_binary()
+    default = next((d for d in R.output_devices() if d.get("default")), None)
+    if not default:
+        pytest.skip("no default output device")
+    p = subprocess.Popen([binary, "record", "--device", "all"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        line = p.stdout.readline()
+    finally:
+        p.terminate()
+        p.wait(5)
+    if not line:
+        pytest.skip("audio capture not permitted here")
+    assert json.loads(line)["sample_rate"] == default["sample_rate"]
