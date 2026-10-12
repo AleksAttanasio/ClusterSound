@@ -234,6 +234,14 @@ function trackIndex(trackId) {  // current index of a track in live_set tracks, 
 trackIndex.local = 1;
 
 function importPayload(p) {
+    if (p.kind === "audio" && liveMajor() < 12 && !bridgeOk) {
+        // Live 10/11 can't create an audio clip from Max: without the Remote Script an empty track is all we'd get
+        var file = p.tracks.length ? p.tracks[0].audio_path : "";
+        status("Audio: serve la Remote Script ClusterSoundBridge (Preferenze → Link/MIDI → Control Surface), "
+               + "oppure trascina dal browser → User Library/" + file);
+        busy = false;
+        return;
+    }
     var set = new LiveAPI("live_set");
     var selTrack = pathIndex(new LiveAPI("live_set view selected_track"), "tracks");
     var scene = Math.max(0, pathIndex(new LiveAPI("live_set view selected_scene"), "scenes"));

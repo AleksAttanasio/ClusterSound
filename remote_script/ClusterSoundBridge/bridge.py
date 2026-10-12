@@ -60,6 +60,9 @@ class ClusterSoundBridge(ControlSurface):
 
     # ------------------------------------------------------------------ commands
     def _log(self, text):
+        # Live 10's Python 2 log only takes ASCII: escape the rest (names with "·", "–", accents…)
+        if not isinstance(text, str):
+            text = text.encode("ascii", "backslashreplace")
         self.log_message("ClusterSoundBridge: %s" % text)
 
     def _reply(self, msg, ok, **kw):
@@ -134,7 +137,7 @@ class ClusterSoundBridge(ControlSurface):
             self._reply(msg, False, error="traccia %s inesistente" % msg.get("track"))
             return
         if track.has_midi_input:
-            self._reply(msg, False, error="«%s» non è una traccia audio" % track.name)
+            self._reply(msg, False, error=u"«%s» non è una traccia audio" % track.name)
             return
         slots = list(track.clip_slots)
         slot = int(msg.get("slot", 0))
@@ -145,6 +148,9 @@ class ClusterSoundBridge(ControlSurface):
         if item is None:
             return
         view = self.song().view
+        app_view = Live.Application.get_application().view
+        if not app_view.is_view_visible("Session"):  # in Arrangement the sample would go to the timeline
+            app_view.show_view("Session")
         with self._selected(track, msg):
             view.highlighted_clip_slot = slots[slot]  # the browser loads a sample into the highlighted slot
             Live.Application.get_application().browser.load_item(item)
@@ -159,7 +165,7 @@ class ClusterSoundBridge(ControlSurface):
         """Loading an instrument on an audio track makes Live create a new MIDI track: refuse instead."""
         if track.has_midi_input:
             return True
-        self._reply(msg, False, error="«%s» non è una traccia MIDI" % track.name)
+        self._reply(msg, False, error=u"«%s» non è una traccia MIDI" % track.name)
         return False
 
     def _categories(self, msg):
