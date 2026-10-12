@@ -204,3 +204,11 @@ def test_system_backend_can_be_created_twice():
     a = capture.SystemAudioBackend(lambda b: None)
     b = capture.SystemAudioBackend(lambda b: None)
     assert type(a._output) is type(b._output)
+
+
+def test_export_keeps_regions_aligned(tmp_path):
+    x, _ = _hits()
+    s = S.from_array(x, SR, title="Break")
+    out = sampler_export.export(s, [{"start": 0.2, "end": 0.6}, {"start": 99, "end": 100}, {"start": 1, "end": 1.2}],
+                                root=str(tmp_path))
+    assert out[1] is None and os.path.basename(out[2]) == "Break - 03.wav"

@@ -833,7 +833,7 @@ wa-button.icon-btn.active::part(button) { background: var(--sel-bg); border-colo
 .sp-regions-head .filter-title { margin: 0; display: inline; }
 .sp-regions { flex: 0 1 34%; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius); min-height: 70px; }
 .sp-regions-empty { padding: 14px; }
-.sp-row { display: grid; grid-template-columns: 24px 28px 1fr 90px 80px 28px 28px 28px; align-items: center; gap: 6px; padding: 3px 8px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.sp-row { display: grid; grid-template-columns: 24px 28px 1fr 90px 80px 28px 28px 28px 28px; align-items: center; gap: 6px; padding: 3px 8px; border-bottom: 1px solid var(--line); cursor: pointer; }
 .sp-row:hover { background: var(--bg-3); }
 .sp-row.sel { background: var(--sel-bg); }
 .sp-num { color: var(--text-3); font-family: var(--mono); font-size: 11px; text-align: right; }

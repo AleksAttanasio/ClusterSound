@@ -36,8 +36,9 @@ def source_text(s: SamplerSession, start: float, end: float) -> str:
 
 def export(s: SamplerSession, regions: list[dict], root: str = DEFAULT_DIR,
            max_s: float = DEFAULT_MAX_SAMPLE_SECONDS, fade_in_ms: float = 1.0, fade_out_ms: float = 10.0,
-           normalize: bool = False) -> list[str]:
-    """One WAV per region ({start, end, name?}); returns the written paths."""
+           normalize: bool = False) -> list[str | None]:
+    """One WAV per region ({start, end, name?}); returns the written paths, aligned with the regions
+    (None for a region outside the audio)."""
     folder = folder_for(s, root)
     os.makedirs(folder, exist_ok=True)
     out = []
@@ -45,6 +46,7 @@ def export(s: SamplerSession, regions: list[dict], root: str = DEFAULT_DIR,
         start, end = slicing.clamp(r["start"], r["end"], max_s, s.duration)
         y = slicing.render(s, start, end, max_s, fade_in_ms, fade_out_ms, normalize)
         if y.shape[0] == 0:
+            out.append(None)
             continue
         name = safe_name(r.get("name") or f"{s.title or 'sample'} - {i:02d}")
         path = unique_path(os.path.join(folder, name + ".wav"))
