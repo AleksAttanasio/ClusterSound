@@ -293,12 +293,24 @@ registrazione: finiscono nella libreria e vengono classificati come gli altri.
 - **Al Drum Rack**: carica le regioni selezionate (o una sola, dall'icona sulla sua riga) sui pad liberi del Drum
   Rack, a partire dal pad selezionato e in ordine di nota (C1, C#1, D1…), e apre la scheda per suonarle. Le
   regioni vengono esportate come sopra; una regione già esportata e non modificata riusa il suo file.
+- **Estrai stem**: separa la registrazione intera, o la regione selezionata, in **Batteria, Basso, Chitarra,
+  Voce e Altro** (il resto, piano compreso), un WAV 24 bit ciascuno. Gli stem della registrazione intera vanno
+  in `<registrazione> - stem/` accanto al file, quelli di una regione in `ClusterSound Samples/…/stem/`; il
+  blocco *Stem* li elenca e ognuno si apre nell'editor (regioni, export e *Al Drum Rack* come sempre),
+  mantenendo la nota di provenienza della sorgente.
 
 **Come funziona.** Ogni uscita è letta da `cs-tap` (`clustersound/native/cs_tap.swift`), un piccolo helper
 basato sui Core Audio process tap (macOS 14.2+): riceve lo stesso audio che il dispositivo riproduce. Lo
 compila `tools/build_tap.sh` (lo lancia anche `build_app.sh`); da sorgente, con `swiftc` installato, si
 compila da solo al primo uso. Al primo avvio macOS chiede il permesso *Registrazione audio di sistema*. Senza
 helper resta solo *Tutte le uscite* tramite ScreenCaptureKit (extra `pip install -e ".[capture]"`).
+
+**Stem.** La separazione usa [Demucs](https://github.com/adefossez/demucs) (`htdemucs_6s`) e gira tutta sul
+Mac, su GPU Apple (MPS) se c'è, altrimenti su CPU: l'audio non lascia mai il computer. PyTorch è pesante, quindi
+è un extra: `pip install -e ".[stems]"`. Al primo uso *Estrai stem* chiede di scaricare il modello (~55 MB, una
+sola volta) in `~/Library/Application Support/ClusterSound/models/demucs`; da lì in poi viene caricato solo da
+quella cartella, senza rete. Le sorgenti lunghe sono separate a blocchi di 60 s con dissolvenza incrociata
+(memoria contenuta, avanzamento e *Annulla*); su un Mac con chip Apple servono pochi secondi per minuto di audio.
 
 **Nota legale.** Nulla viene decifrato o aggirato: le app che proteggono il flusso registrano silenzio. Le
 registrazioni sono per uso personale (copia privata); per pubblicare un brano che contiene un sample servono i
