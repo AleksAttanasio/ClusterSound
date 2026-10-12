@@ -612,6 +612,7 @@ export class ComposeEditor {
       }
       const act = a.dataset.mact;
       if (act === 'dup') this.addMode({ ...clone(this.mode), name: `${this.mode.name} (copia)` });
+      else if (act === 'new') this.addMode({ ...clone(this.meta.styles.defaultMode), name: '' });
       else if (act === 'del') this.deleteMode();
       else if (act === 'vary') this.modeVariations();
       else if (act === 'toggle') this.edit(() => { const g = this.mode.rhythm; g.on = !g.on; if (g.on && !g.vel.some(Boolean)) Object.assign(g, fixGrid(this.meta.styles.presetGrids.quarters)); });
@@ -1223,7 +1224,7 @@ export class ComposeEditor {
         const name = esc(p.modes[k].name || k);
         if (k !== p.modeActive) return `<button class="cp-vtab cp-mtab" data-m="${k}">${name}</button>`;
         return `<div class="cp-vtab cp-mtab active" data-m="${k}"><span title="Doppio clic: rinomina">${name}</span>
-          ${tabTools('data-mact', 'cp-vary-mode', VARY_MODE_TIP, { dupTitle: 'Duplica la modalità', delTitle: 'Elimina la modalità', canDel: p.modeOrder.length > 1 })}</div>`;
+          ${tabTools('data-mact', 'cp-vary-mode', VARY_MODE_TIP, { dupTitle: 'Duplica la modalità', addTitle: 'Nuova modalità di base', delTitle: 'Elimina la modalità', canDel: p.modeOrder.length > 1 })}</div>`;
       }).join('')}
       <span class="cp-sep"></span>
       <span class="cp-barlabel">Ritmica</span>
