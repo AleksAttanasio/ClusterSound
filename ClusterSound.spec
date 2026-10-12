@@ -53,7 +53,7 @@ app = BUNDLE(
     icon=str(root / "brand" / "ClusterSound.icns"),
     bundle_identifier="com.clustersound.app",
     info_plist={
-        "CFBundleShortVersionString": "0.5.0",
+        "CFBundleShortVersionString": "0.6.0",
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "12.0",
         "NSAudioCaptureUsageDescription": "Il Recorder registra l'audio in uscita dal Mac solo quando premi Registra.",
