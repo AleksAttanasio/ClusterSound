@@ -587,9 +587,15 @@ class Api:
         threading.Thread(target=work, daemon=True).start()
         return {**self.stems_status(), "error": None}
 
-    def stems_start(self, scope: str = "all", start: float | None = None, end: float | None = None) -> dict:
-        """Separate the open audio (scope "all") or one region of it ("region") in the background."""
+    def stems_start(self, scope: str = "all", start: float | None = None, end: float | None = None,
+                    keys: list | None = None) -> dict:
+        """Separate the open audio (scope "all") or one region of it ("region") in the background,
+        into the chosen stems (all when keys is None) plus "other" with the rest."""
         s = self._sampler
+        try:
+            keys = sampler_stems.chosen(None if keys is None else [str(k) for k in keys])
+        except ValueError as e:
+            return {**self.stems_status(), "error": str(e)}
         st = sampler_stems.status()
         if not s:
             return {**self.stems_status(), "error": "nessun audio aperto"}
@@ -612,13 +618,13 @@ class Api:
             if self._stems_busy():
                 return {**sampler_stems.status(), "job": dict(self._stems_job), "error": "separazione già in corso"}
             self._stems_job = {"state": "running", "progress": 0.0, "scope": scope, "stems": [], "error": None,
-                               "title": s.title, "folder": folder}
+                               "title": s.title, "folder": folder, "keys": keys}
         self._stems_cancel.clear()
 
         def work():  # keeps its own reference to s: opening other audio meanwhile doesn't affect it
             try:
                 res = sampler_stems.separate(s, a, b, folder, base, lambda p: self._stems_set(progress=round(p, 3)),
-                                             self._stems_cancel.is_set)
+                                             self._stems_cancel.is_set, keys[:-1])
             except sampler_stems.Cancelled:
                 self._stems_set(state="cancelled")
                 return

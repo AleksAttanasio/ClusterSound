@@ -59,7 +59,8 @@ def test_stems_sum_to_source_across_blocks(tmp_path, fake, monkeypatch):
     total = sum(y.values())
     inner = slice(int(0.01 * SR), -int(0.01 * SR))  # resampling edges
     assert np.abs(total[inner] - x[inner]).max() < 2e-3
-    assert np.allclose(y["other"][inner], 0.2 * x[inner], atol=2e-3)  # other + piano
+    assert np.allclose(y["other"][inner], 0.1 * x[inner], atol=2e-3)
+    assert np.allclose(y["piano"][inner], 0.1 * x[inner], atol=2e-3)
     assert os.path.basename(res[0]["path"]) == "Brano - Batteria.wav"
 
 
@@ -70,6 +71,24 @@ def test_mono_region_same_rate(tmp_path, fake, monkeypatch):
     y = _read(res)
     assert y["drums"].shape == (SR, 1)
     assert np.allclose(y["drums"], 0.3 * x[int(0.5 * SR):int(1.5 * SR)], atol=1e-4)
+
+
+def test_chosen_stems_rest_in_other(tmp_path, fake):
+    x = _noise(1.0)
+    s = S.from_array(x, SR)
+    res = stems.separate(s, 0, 1, str(tmp_path), "c", keys=["piano", "drums"])
+    assert [r["key"] for r in res] == ["drums", "piano", "other"]
+    assert [r["label"] for r in res] == ["Batteria", "Piano", "Altro"]
+    assert sorted(os.listdir(tmp_path)) == ["c - Altro.wav", "c - Batteria.wav", "c - Piano.wav"]
+    y = _read(res)
+    assert np.allclose(y["other"], (1 - .3 - .1) * x, atol=1e-4)  # bass, guitar, vocals, other
+    assert np.allclose(sum(y.values()), x, atol=1e-4)
+
+
+@pytest.mark.parametrize("keys", [[], ["other"], ["brass"]])
+def test_chosen_rejects(keys):
+    with pytest.raises(ValueError):
+        stems.chosen(keys)
 
 
 def test_cancel_leaves_no_files(tmp_path, fake, monkeypatch):
@@ -139,6 +158,7 @@ def test_api_region_job_and_open(api, tmp_path):
     assert api.stems_start()["error"] == "nessun audio aperto"
     api._sampler = S.from_array(_noise(2.0), SR, origin="capture", title="Rec", meta={"device": "Cuffie"})
     assert api.stems_start("region")["error"] == "nessuna regione selezionata"
+    assert api.stems_start("region", 0.5, 1.5, [])["error"] == "scegli almeno uno stem"
     assert api.stems_start("region", 0.5, 1.5)["error"] is None
     job = api.wait()
     assert job["state"] == "done" and job["scope"] == "region" and len(job["stems"]) == len(stems.STEMS)
@@ -147,3 +167,5 @@ def test_api_region_job_and_open(api, tmp_path):
     r = api.stems_open(job["stems"][0]["path"])
     assert r["error"] is None and r["session"]["title"] == "Rec · Batteria" and r["session"]["origin"] == "capture"
     assert api._sampler.meta["device"] == "Cuffie" and abs(api._sampler.duration - 1.0) < 1e-3
+    assert api.stems_start("all", keys=["vocals"])["error"] is None
+    assert [r["label"] for r in api.wait()["stems"]] == ["Voce", "Altro"]

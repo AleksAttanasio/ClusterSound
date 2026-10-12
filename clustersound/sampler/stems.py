@@ -1,4 +1,4 @@
-"""Stem separation (drums, bass, guitar, vocals, rest) with Demucs, on this Mac only.
+"""Stem separation (drums, bass, guitar, piano, vocals, rest) with Demucs, on this Mac only.
 
 Demucs and PyTorch are the optional extra `stems`: nothing is imported until a separation starts. The model
 weights are downloaded once, when the user confirms, into the app's support folder; after that everything
@@ -20,7 +20,9 @@ from .session import SamplerSession
 MODEL = "htdemucs_6s"  # 6 sources: drums, bass, other, vocals, guitar, piano
 MODEL_DIR = os.path.expanduser("~/Library/Application Support/ClusterSound/models/demucs")
 MODEL_MB = 55
-STEMS = [("drums", "Batteria"), ("bass", "Basso"), ("guitar", "Chitarra"), ("vocals", "Voce"), ("other", "Altro")]
+STEMS = [("drums", "Batteria"), ("bass", "Basso"), ("guitar", "Chitarra"), ("piano", "Piano"), ("vocals", "Voce"),
+         ("other", "Altro")]
+CHOOSABLE = [k for k, _ in STEMS if k != "other"]  # "other" is always written: whatever wasn't chosen
 INSTALL_HINT = 'pip install -e ".[stems]"'
 BLOCK_S = 60.0   # separated per block: a 20-minute source at once would need several GB
 OVERLAP_S = 2.0  # blocks overlap and are crossfaded, so the seams don't click
@@ -44,7 +46,7 @@ def installed() -> bool:
 def status() -> dict:
     ok = installed()
     return {"installed": ok, "model_ready": ok and os.path.isfile(_marker()), "model_mb": MODEL_MB,
-            "install_hint": INSTALL_HINT, "stems": [{"key": k, "label": l} for k, l in STEMS]}
+            "install_hint": INSTALL_HINT, "stems": [{"key": k, "label": l, "choosable": k in CHOOSABLE} for k, l in STEMS]}
 
 
 def _local_bag():
@@ -127,17 +129,17 @@ def _load_model():
         return _model
 
 
-def _split(model, x: np.ndarray, sr: int) -> np.ndarray:
-    """One block (frames, channels) at sr -> (len(STEMS), frames, channels), stems summing to x."""
+def _split(model, x: np.ndarray, sr: int, keys: list[str]) -> np.ndarray:
+    """One block (frames, channels) at sr -> (len(keys), frames, channels), stems summing to x.
+    keys ends with "other", which gets every source that isn't in keys."""
     n, ch = x.shape
     st = np.repeat(x, 2, axis=1) if ch == 1 else x
     msr = model.samplerate
     if msr != sr:
         st = soxr.resample(st, sr, msr)
     src = model.separate(st.T)
-    keys = [k for k, _ in STEMS]
     out = np.zeros((len(keys), st.shape[0], 2), dtype=np.float32)
-    for name, y in src.items():  # sources outside the named stems (piano, other) go to "other"
+    for name, y in src.items():
         out[keys.index(name) if name in keys else keys.index("other")] += y.T[: st.shape[0]]
     if msr != sr:
         out = np.stack([soxr.resample(o, msr, sr) for o in out])
@@ -154,18 +156,30 @@ def out_folder(s: SamplerSession, scope: str, sampler_root: str) -> str:
     return os.path.join(sampler_export.folder_for(s, sampler_root), "stem")
 
 
+def chosen(keys: list[str] | None) -> list[str]:
+    """The stems to write, in STEMS order, "other" last; all of them when keys is None."""
+    if keys is None:
+        return [k for k, _ in STEMS]
+    bad = set(keys) - set(CHOOSABLE)
+    if bad or not keys:
+        raise ValueError(f"stem sconosciuti: {', '.join(sorted(bad))}" if bad else "scegli almeno uno stem")
+    return [k for k in CHOOSABLE if k in keys] + ["other"]
+
+
 def separate(s: SamplerSession, start: float, end: float, folder: str, base_name: str,
              on_progress: Callable[[float], None] | None = None,
-             cancelled: Callable[[], bool] | None = None) -> list[dict]:
-    """Separate [start, end) s of the session into one 24-bit WAV per stem in folder.
+             cancelled: Callable[[], bool] | None = None, keys: list[str] | None = None) -> list[dict]:
+    """Separate [start, end) s of the session into one 24-bit WAV per chosen stem (+ "other") in folder.
     Returns [{key, label, path}]; on cancel or error no partial file is left."""
+    keys = chosen(keys)
+    labels = dict(STEMS)
     a, b = s._span(start, end)
     x = s.audio[a:b]
     if x.shape[0] == 0:
         raise ValueError("regione vuota")
     model = _load_model()
     os.makedirs(folder, exist_ok=True)
-    paths = [unique_path(os.path.join(folder, safe_name(f"{base_name} - {label}") + ".wav")) for _, label in STEMS]
+    paths = [unique_path(os.path.join(folder, safe_name(f"{base_name} - {labels[k]}") + ".wav")) for k in keys]
     files = [sf.SoundFile(p, "w", s.sr, x.shape[1], subtype="PCM_24") for p in paths]
     hop, ov, n = int(BLOCK_S * s.sr), int(OVERLAP_S * s.sr), x.shape[0]
     try:
@@ -173,7 +187,7 @@ def separate(s: SamplerSession, start: float, end: float, folder: str, base_name
         for i in range(0, n, hop):
             if cancelled and cancelled():
                 raise Cancelled()
-            y = _split(model, x[i:i + hop + ov], s.sr)
+            y = _split(model, x[i:i + hop + ov], s.sr, keys)
             if tail is not None:  # crossfade the previous block's overlap into this one's head
                 k = tail.shape[1]
                 fade = np.linspace(0, 1, k, dtype=np.float32)[None, :, None]
@@ -196,4 +210,4 @@ def separate(s: SamplerSession, start: float, end: float, folder: str, base_name
     t0, t1 = a / s.sr, b / s.sr
     for p in paths:
         sampler_export.write_note(s, p, t0, t1)
-    return [{"key": k, "label": l, "path": p} for (k, l), p in zip(STEMS, paths)]
+    return [{"key": k, "label": labels[k], "path": p} for k, p in zip(keys, paths)]
