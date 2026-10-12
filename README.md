@@ -306,6 +306,11 @@ registrazione: finiscono nella libreria e vengono classificati come gli altri.
   in `<registrazione> - stem/` accanto al file, quelli di una regione in `ClusterSound Samples/…/stem/`; il
   blocco *Stem* li elenca e ognuno si apre nell'editor (regioni, export e *Al Drum Rack* come sempre),
   mantenendo la nota di provenienza della sorgente.
+- **Migliora** (pulsante viola con le stelline, anche su ogni regione): restauro AI della regione selezionata o
+  di tutto l'audio. Ricostruisce le alte frequenze tagliate e ripulisce gli artefatti della compressione (MP3,
+  streaming). Il risultato è un nuovo file `… (migliorato).wav` accanto ai sample, con la stessa nota di licenza
+  o provenienza; l'originale resta com'è. Una sorgente sotto i 44,1 kHz esce a 44,1 kHz, una sopra mantiene la
+  sua frequenza. Il blocco *Migliora* mostra avanzamento, *Annulla* e *Apri nell'editor*.
 
 **Come funziona.** Ogni uscita è letta da `cs-tap` (`clustersound/native/cs_tap.swift`), un piccolo helper
 basato sui Core Audio process tap (macOS 14.2+): riceve lo stesso audio che il dispositivo riproduce. Lo
@@ -319,6 +324,21 @@ Mac, su GPU Apple (MPS) se c'è, altrimenti su CPU: l'audio non lascia mai il co
 sola volta) in `~/Library/Application Support/ClusterSound/models/demucs`; da lì in poi viene caricato solo da
 quella cartella, senza rete. Le sorgenti lunghe sono separate a blocchi di 60 s con dissolvenza incrociata
 (memoria contenuta, avanzamento e *Annulla*); su un Mac con chip Apple servono pochi secondi per minuto di audio.
+
+**Migliora.** Usa [Apollo](https://github.com/JusperLee/Apollo) (Kai Li, Yi Luo, 2024; licenza CC BY-SA 4.0),
+una rete da 16,6 M parametri per il restauro di musica compressa. Gira tutta sul Mac, senza servizi esterni.
+Extra: `pip install -e ".[enhance]"`. Al primo uso chiede di scaricare i pesi (66 MB, una sola volta) in
+`~/Library/Application Support/ClusterSound/models/apollo`. Il modello non resta in memoria: ogni lavoro gira
+in un processo a parte che carica solo il modello, elabora l'audio a blocchi di 2 s, un canale alla volta, e poi
+esce, restituendo tutta la memoria al sistema. Quando non lo usi, l'app non importa nemmeno PyTorch.
+
+Costi misurati su Apple Silicon (MPS), 30 s di audio stereo:
+
+| | |
+|---|---|
+| Disco | 66 MB di pesi |
+| RAM, solo durante il lavoro | ~1,6 GB di picco |
+| Tempo | ~13 s, di cui ~2 s per caricare il modello |
 
 **Nota legale.** Nulla viene decifrato o aggirato: le app che proteggono il flusso registrano silenzio. Le
 registrazioni sono per uso personale (copia privata); per pubblicare un brano che contiene un sample servono i
