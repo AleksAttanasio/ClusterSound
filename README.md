@@ -271,34 +271,39 @@ insieme agli accordi in entrambe le viste (♫ nella barra la silenzia).
   e una per ogni layer non muto), *Solo accordi* o *Solo melodia*. *Invia a Live* crea anche una traccia per
   ogni layer accanto agli *Accordi* (il basso con un suono da basso, pad e keys da tastiera).
 
-## Scheda Sampler: estrarre sample da brani più lunghi
+## Scheda Recorder: registrare l'uscita audio del Mac
 
-Apri un brano, segna le regioni sulla forma d'onda ed esportale come sample: finiscono nella libreria e vengono
-classificati come gli altri.
+Registra ciò che il Mac manda a una o più uscite audio, ognuna nel suo file, poi ritaglia i sample dalla
+registrazione: finiscono nella libreria e vengono classificati come gli altri.
 
-- **Sorgenti**
-  - *Apri file audio…*: un file tuo (wav, aif, flac, mp3, ogg; i primi 20 minuti).
-  - *Incolla un link* da fonti con licenza aperta: Freesound (serve la API key), Internet Archive (elemento o
-    singolo file, anche dentro gli ZIP), ccMixter, Openverse, Wikimedia Commons. Licenza e autore restano
-    associati al sample.
-  - *Cattura audio*: registra ciò che il Mac sta suonando (ScreenCaptureKit, macOS 13+) o un ingresso audio, e
-    tiene sempre gli ultimi 60 s; *Prendi ultimi secondi* li apre nel Sampler. Richiede l'extra
-    `pip install -e ".[capture]"` e il permesso *Registrazione schermo e audio di sistema*.
-- **Regioni**: trascina sulla forma d'onda per crearne una, trascina i bordi per ridimensionarla, clic per
-  ascoltarla. *Taglia sui transienti* crea una regione per colpo nella parte visibile (sensibilità regolabile).
-  Rotella: zoom · Maiusc+rotella: scorri · la striscia sotto sposta la vista. `Spazio` play/stop, `↑↓` regione
-  precedente/successiva, `Canc` elimina.
-- **Esportazione**: WAV 24 bit in `~/Music/ClusterSound Samples/<origine>/<brano>/`, con fade in/out e
-  normalizzazione opzionale. Ogni sample dura al massimo 30 s (impostazione `sampler_max_seconds`). Accanto a
-  ogni file c'è un `.license.txt` (link: licenza e attribuzione) o un `.source.txt` (cattura: data e
-  dispositivo). Se la cartella sta dentro la libreria aperta, la riscansione parte da sola.
+- **Uscite da registrare**: casse, cuffie, interfacce audio, AirPlay… più *Tutte le uscite (mix)*. Se ne
+  selezioni più di una, partono insieme e ognuna ha il suo file, il suo meter e la sua dimensione.
+  *aggiorna* rilegge i dispositivi collegati.
+- **Formato**: WAV (16/24 bit, 32 float), AIFF, FLAC (16/24 bit), CAF, MP3 (128–320 kbps), OGG Vorbis,
+  Opus (48 kHz) e M4A/AAC (128–256 kbps, convertito con `afconvert`). Frequenza del dispositivo oppure
+  44,1/48/96 kHz; stereo, mono o tutti i canali (solo nei formati non compressi).
+- **Cartella**: `~/Music/ClusterSound Recordings/<data ora> - <uscita>.<ext>`, con accanto un `.source.txt`
+  di provenienza. La registrazione continua anche se cambi scheda (pallino rosso sulla tab).
+- **Editor**: allo stop la registrazione si apre sotto. Trascina sulla forma d'onda per creare una regione, i
+  bordi la ridimensionano, clic per ascoltarla. *Taglia sui transienti* crea una regione per colpo nella parte
+  visibile. Rotella: zoom · Maiusc+rotella: scorri · la striscia sotto sposta la vista. `Spazio` play/stop,
+  `↑↓` regione precedente/successiva, `Canc` elimina.
+- **Sample estratti**: WAV 24 bit in `~/Music/ClusterSound Samples/`, con fade e normalizzazione opzionali,
+  massimo 30 s ciascuno (impostazione `sampler_max_seconds`).
+- **Al Drum Rack**: carica le regioni selezionate (o una sola, dall'icona sulla sua riga) sui pad liberi del Drum
+  Rack, a partire dal pad selezionato e in ordine di nota (C1, C#1, D1…), e apre la scheda per suonarle. Le
+  regioni vengono esportate come sopra; una regione già esportata e non modificata riusa il suo file.
 
-**Nota legale.** YouTube, Spotify, Tidal, Apple Music, SoundCloud e gli altri servizi di streaming non sono
-accettati come link: i loro termini vietano di scaricare l'audio e spesso il flusso è protetto da DRM. Il
-limite di durata non cambia le cose: non esiste una soglia di secondi sotto la quale un sample è libero. La
-cattura dell'audio di sistema non aggira alcuna protezione (le app che proteggono il flusso registrano
-silenzio) ed è pensata per l'uso personale; per pubblicare un brano che contiene il sample servono i diritti
-sull'originale, oppure un sample con licenza libera.
+**Come funziona.** Ogni uscita è letta da `cs-tap` (`clustersound/native/cs_tap.swift`), un piccolo helper
+basato sui Core Audio process tap (macOS 14.2+): riceve lo stesso audio che il dispositivo riproduce. Lo
+compila `tools/build_tap.sh` (lo lancia anche `build_app.sh`); da sorgente, con `swiftc` installato, si
+compila da solo al primo uso. Al primo avvio macOS chiede il permesso *Registrazione audio di sistema*. Senza
+helper resta solo *Tutte le uscite* tramite ScreenCaptureKit (extra `pip install -e ".[capture]"`).
+
+**Nota legale.** Nulla viene decifrato o aggirato: le app che proteggono il flusso registrano silenzio. Le
+registrazioni sono per uso personale (copia privata); per pubblicare un brano che contiene un sample servono i
+diritti sull'originale, oppure un sample con licenza libera. Non esiste una soglia di secondi sotto la quale
+un sample è libero.
 
 ## Max for Live: importare in Ableton Live
 
@@ -411,7 +416,7 @@ e rumore delle etichette (es. "snare roll" dentro un fill di batteria).
 ## Build dell'app
 
 ```bash
-tools/build_app.sh   # -> dist/ClusterSound.app
+tools/build_app.sh   # -> dist/ClusterSound.app (compila anche l'helper cs-tap del Recorder)
 ```
 
 Apri e copia solo `ClusterSound.app`: la cartella `dist/ClusterSound/` contiene un eseguibile nudo che

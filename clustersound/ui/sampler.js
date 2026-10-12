@@ -1,5 +1,6 @@
-// "Sampler" screen: open a longer piece of audio (own file, openly licensed link, system audio capture),
-// mark regions on its waveform (by hand or on transients) and export them as samples.
+// "Recorder" screen: record what the Mac sends to one or more output devices (one file each, several formats),
+// then open a recording below to mark regions on its waveform (by hand or on transients) and export them as
+// samples. Opening own files and openly licensed links is still here, hidden while show_sources is false.
 import { btn, iconBtn, slider, check, num, select, setPlayButton, icon } from './kit.js';
 import { toast } from './sendmenu.js';
 
@@ -8,9 +9,11 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const LS_KEY = 'clustersound.sampler';
 const EDGE_PX = 6;         // grab distance of a region edge
 const MIN_VIEW_S = 0.02;   // deepest zoom
-const ORIGIN_LABEL = { file: 'File', link: 'Link', capture: 'Cattura' };
+const ORIGIN_LABEL = { file: 'File', link: 'Link', capture: 'Registrazione' };
 const CAPTURE_NOTE = 'Registrazione per uso personale (copia privata): nulla viene decifrato o aggirato, e le app '
   + 'che proteggono il flusso registrano silenzio. Per pubblicare un brano che contiene il sample servono i diritti.';
+const mb = (b) => (b >= 1 << 20 ? `${(b / (1 << 20)).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`);
+const clock = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 const fmt = (t) => {
   if (!isFinite(t)) return '–';
   const m = Math.floor(t / 60), s = t - m * 60;
@@ -18,8 +21,9 @@ const fmt = (t) => {
 };
 
 export class SamplerEditor {
-  constructor({ api, player }) {
+  constructor({ api, player, onSendToRack }) {
     this.api = api;
+    this.onSendToRack = onSendToRack; // (refs) -> loads them on the Drum Rack
     this.player = player;
     this.ready = null;
     this.session = null;      // describe() of the open audio
@@ -29,13 +33,16 @@ export class SamplerEditor {
     this.view = { start: 0, end: 1 };
     this.overview = null;     // peaks of the whole source
     this.detail = null;       // peaks of the current view
-    this.regions = [];        // {start, end, name, on}
+    this.regions = [];        // {start, end, name, on, file?: {key, path} of its last export}
     this.sel = -1;
     this.drag = null;
     this.playing = null;      // {start, end} being played
-    this.capture = { running: false, sources: [] };
+    this.rec = { devices: [], formats: {}, running: false, tracks: [], recordings: [] };
+    this.recFmt = null;       // {format, quality, rate, channels}
+    this.recDir = '';
+    this.showSources = false;
     this.linkFiles = [];
-    this.opts = { fade_in_ms: 1, fade_out_ms: 10, normalize: false, sensitivity: 0.5, grab: 15, source: 'system' };
+    this.opts = { fade_in_ms: 1, fade_out_ms: 10, normalize: false, sensitivity: 0.5, devices: null };
     try { Object.assign(this.opts, JSON.parse(localStorage.getItem(LS_KEY) || '{}')); } catch { /* private mode */ }
     this.player.subscribe((on) => { if (!on) { this.playing = null; this._syncPlay(); } });
   }
@@ -49,22 +56,21 @@ export class SamplerEditor {
     const init = await this.api.sampler_init();
     this.supported = init.supported;
     this.maxS = init.max_seconds;
-    this.capture = init.capture;
-    if (!this.capture.sources.some((s) => s.id === this.opts.source)) this.opts.source = this.capture.sources[0]?.id || 'system';
+    this.showSources = !!init.show_sources;
+    this.rec = init.recorder;
+    this.recFmt = init.settings.recorder_format;
+    this.recDir = init.settings.recorder_dir;
     this._buildShell();
+    if (this.rec.running) this._pollRec();
     if (init.session) await this._opened(init);
   }
 
   async show() {
     await this.ensure();
     this._resize();
-    if (this.capture.running) this._pollCapture();
   }
 
-  hide() {
-    this.player.stop();
-    clearTimeout(this.capTimer);
-  }
+  hide() { this.player.stop(); } // a recording keeps going (and polling) on the other tabs
 
   _persist() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(this.opts)); } catch { /* private mode */ }
@@ -76,7 +82,7 @@ export class SamplerEditor {
     const o = this.opts;
     root.innerHTML = `
       <aside class="sidebar sp-side">
-        <div class="filter-block">
+        ${this.showSources ? `<div class="filter-block">
           <div class="filter-title">Sorgente</div>
           ${btn('Apri file audio…', { icon: 'folder-open', cls: 'sp-wide', id: 'sp-open' })}
           <div class="sp-link">
@@ -86,26 +92,28 @@ export class SamplerEditor {
           <div class="hint">Link accettati: ${esc(this.supported)}. YouTube, Spotify, Tidal e gli altri servizi di
             streaming non consentono di scaricare l'audio.</div>
           <div id="sp-files" class="sp-files" hidden></div>
-        </div>
-        <div class="filter-block sp-capture">
-          <div class="filter-title">Cattura audio</div>
-          ${this.capture.sources.length ? `
-            ${select(this.capture.sources.map((s) => [s.id, s.name]), o.source, { id: 'sp-cap-src', label: 'Sorgente della cattura' })}
-            <div class="sp-cap-row">
-              ${btn('Registra', { variant: 'brand', icon: 'circle', id: 'sp-cap-rec' })}
-              <div class="sp-meter" title="Livello"><div id="sp-meter-fill"></div></div>
-            </div>
-            <div class="hint" id="sp-cap-info"></div>
-            <div class="sp-cap-row">
-              ${num(o.grab, { id: 'sp-grab-s', min: 1, max: 300, step: 1, label: 'Secondi da prendere', 'without-steppers': true })}
-              ${btn('Prendi ultimi secondi', { icon: 'download', id: 'sp-grab' })}
-            </div>
-            <div class="hint sp-note">${esc(CAPTURE_NOTE)}</div>`
-          : `<div class="hint">Non disponibile: installa l'extra <code>capture</code>
-              (<code>pip install "clustersound[capture]"</code>).</div>`}
+        </div>` : ''}
+        <div class="filter-block rc-block">
+          <div class="filter-title">Uscite da registrare <span class="links"><a href="#" id="rc-refresh">aggiorna</a></span></div>
+          <div id="rc-devices" class="rc-devices"></div>
+          <div class="filter-title">Formato</div>
+          <div class="rc-fmt" id="rc-fmt"></div>
+          <div class="filter-title">Cartella</div>
+          <div class="rc-folder"><span class="rc-path" id="rc-path"></span>
+            <a href="#" id="rc-pick">Cambia…</a><a href="#" id="rc-reveal">Apri</a></div>
+          <div class="rc-go">
+            ${btn('Registra', { variant: 'brand', icon: 'circle', id: 'rc-rec', cls: 'rc-rec' })}
+            <span class="rc-clock" id="rc-clock">0:00</span>
+          </div>
+          <div class="hint" id="rc-info"></div>
+          <div class="hint sp-note">${esc(CAPTURE_NOTE)}</div>
         </div>
         <div class="filter-block">
-          <div class="filter-title">Esportazione</div>
+          <div class="filter-title">Registrazioni</div>
+          <div id="rc-list" class="rc-list"></div>
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Sample estratti</div>
           <div class="sp-opts">
             ${num(o.fade_in_ms, { id: 'sp-fi', min: 0, max: 200, step: 1, label: 'Fade in (ms)' })}
             ${num(o.fade_out_ms, { id: 'sp-fo', min: 0, max: 2000, step: 5, label: 'Fade out (ms)' })}
@@ -131,16 +139,17 @@ export class SamplerEditor {
           <canvas id="sp-wave" class="sp-wave"></canvas>
           <canvas id="sp-overview" class="sp-overview"></canvas>
           <div class="empty sp-empty" id="sp-empty">
-            <div class="empty-title">Apri un brano da cui estrarre sample</div>
-            <div class="empty-sub">Un file tuo, un link da una fonte con licenza aperta, oppure una cattura
-              dell'audio del Mac. Trascina sulla forma d'onda per creare una regione (max <span class="sp-max"></span>),
-              oppure usa «Taglia sui transienti». Rotella: zoom · Maiusc+rotella: scorri.</div>
+            <div class="empty-title">Registra l'uscita del Mac</div>
+            <div class="empty-sub">Scegli una o più uscite e il formato, poi premi Registra: ogni uscita va in un file.
+              Apri una registrazione per ritagliare i sample: trascina sulla forma d'onda per creare una regione
+              (max <span class="sp-max"></span>) oppure usa «Taglia sui transienti». Rotella: zoom · Maiusc+rotella: scorri.</div>
           </div>
         </div>
         <div class="sp-regions-head">
           <span class="filter-title">Regioni <span id="sp-count"></span></span>
           <span class="spacer"></span>
           ${btn('Svuota', { icon: 'trash-2', id: 'sp-clear' })}
+          ${btn('Al Drum Rack', { icon: 'layout-grid', id: 'sp-rack', title: 'Esporta le regioni selezionate e le carica sui pad liberi del Drum Rack, per suonarle' })}
           ${btn('Esporta selezionate', { variant: 'brand', icon: 'file-down', id: 'sp-export' })}
         </div>
         <div class="sp-regions" id="sp-regions"></div>
@@ -151,11 +160,17 @@ export class SamplerEditor {
     this._renderMax();
     this.renderInfo();
     this.renderRegions();
-    this._renderCapture();
+    this._renderRecorder();
     new ResizeObserver(() => this._resize()).observe($('#sp-wave-wrap'));
   }
 
   _bind() {
+    this._bindRecorder();
+    if (this.showSources) this._bindSources();
+    this._bindRest();
+  }
+
+  _bindSources() {
     $('#sp-open').onclick = async () => this._opened(await this.api.sampler_open_file(null));
     const go = async () => {
       const url = ($('#sp-url').value || '').trim();
@@ -178,12 +193,9 @@ export class SamplerEditor {
       row.classList.remove('busy');
       this._opened(r);
     };
-    if (this.capture.sources.length) {
-      $('#sp-cap-src').addEventListener('change', (e) => { this.opts.source = e.target.value; this._persist(); });
-      $('#sp-cap-rec').onclick = () => this.toggleCapture();
-      $('#sp-grab').onclick = () => this.grab();
-      $('#sp-grab-s').addEventListener('change', (e) => { this.opts.grab = +e.target.value || 15; this._persist(); });
-    }
+  }
+
+  _bindRest() {
     const optNum = (id, key) => $(id).addEventListener('change', (e) => { this.opts[key] = Math.max(0, +e.target.value || 0); this._persist(); this._dropAudio(); });
     optNum('#sp-fi', 'fade_in_ms');
     optNum('#sp-fo', 'fade_out_ms');
@@ -194,6 +206,7 @@ export class SamplerEditor {
     $('#sp-slice').onclick = () => this.autoSlice();
     $('#sp-clear').onclick = () => { this.regions = []; this.sel = -1; this.renderRegions(); this.draw(); };
     $('#sp-export').onclick = () => this.export();
+    $('#sp-rack').onclick = () => this.sendToRack();
     $('#sp-regions').addEventListener('click', (e) => this._regionClick(e));
     $('#sp-regions').addEventListener('change', (e) => {
       const row = e.target.closest('[data-i]');
@@ -300,46 +313,163 @@ export class SamplerEditor {
   _renderMax() {
     document.querySelectorAll('#sampler .sp-max').forEach((el) => { el.textContent = `${this.maxS} s`; });
     const h = $('#sp-max-hint');
-    if (h) h.textContent = `Ogni sample dura al massimo ${this.maxS} s. I file vanno in una sottocartella per origine, `
-      + 'con accanto la licenza (link) o la provenienza (cattura).';
+    if (h) h.textContent = `Ogni sample dura al massimo ${this.maxS} s. Vanno in ~/Music/ClusterSound Samples, `
+      + 'con accanto la provenienza della registrazione.';
   }
 
-  // ---------------------------------------------------------------- capture
-  _renderCapture() {
-    if (!this.capture.sources.length) return;
-    const c = this.capture;
-    setPlayButton($('#sp-cap-rec'), c.running, 'Registra', 'Ferma');
-    $('#sp-cap-rec').querySelector('wa-icon')?.setAttribute('name', c.running ? 'square' : 'circle');
-    $('#sp-cap-src').disabled = c.running;
-    $('#sp-meter-fill').style.width = `${Math.min(100, Math.sqrt(c.level || 0) * 220)}%`;
-    $('#sp-cap-info').innerHTML = c.error ? `<span class="error">${esc(c.error)}</span>`
-      : c.running ? `In registrazione: tengo gli ultimi ${Math.round(c.buffer_seconds)} s (${c.seconds.toFixed(0)} s nel buffer).`
-        : c.seconds ? `Ferma: ${c.seconds.toFixed(0)} s nel buffer.` : 'Registra ciò che il Mac sta suonando, poi prendi gli ultimi secondi.';
+  // ---------------------------------------------------------------- recorder
+  _bindRecorder() {
+    $('#rc-refresh').onclick = async (e) => {
+      e.preventDefault();
+      this.rec.devices = await this.api.recorder_devices();
+      this._renderRecorder();
+    };
+    $('#rc-devices').addEventListener('change', (e) => {
+      const cb = e.target.closest('wa-checkbox[data-dev]');
+      if (!cb) return;
+      const sel = new Set(this._selectedDevices());
+      if (cb.checked) sel.add(cb.dataset.dev); else sel.delete(cb.dataset.dev);
+      this.opts.devices = [...sel];
+      this._persist();
+      this._renderRecButton();
+    });
+    $('#rc-fmt').addEventListener('change', (e) => {
+      const k = e.target.dataset.k;
+      if (!k) return;
+      this.recFmt = { ...this.recFmt, [k]: k === 'rate' ? +e.target.value : e.target.value };
+      if (k === 'format') { // other options depend on the format: fall back to its defaults
+        const f = this.rec.formats[this.recFmt.format];
+        this.recFmt.quality = f.qualities[0][0];
+        if (f.rates) this.recFmt.rate = f.rates[0];
+        if (!f.multichannel && this.recFmt.channels === 'all') this.recFmt.channels = 'stereo';
+        this._renderFormat();
+      }
+      this.api.set_setting('recorder_format', this.recFmt);
+    });
+    $('#rc-pick').onclick = async (e) => {
+      e.preventDefault();
+      const p = await this.api.pick_folder();
+      if (!p) return;
+      this.recDir = (await this.api.set_setting('recorder_dir', p)).recorder_dir;
+      $('#rc-path').textContent = this.recDir;
+      $('#rc-path').title = this.recDir;
+    };
+    $('#rc-reveal').onclick = async (e) => {
+      e.preventDefault();
+      if (!(await this.api.reveal_path(this.recDir))) toast('La cartella verrà creata alla prima registrazione');
+    };
+    $('#rc-rec').onclick = () => this.toggleRecording();
+    $('#rc-list').addEventListener('click', async (e) => {
+      const row = e.target.closest('[data-path]');
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (!row || !act) return;
+      if (act === 'reveal') return this.api.reveal_path(row.dataset.path);
+      this._opened(await this.api.recorder_open(row.dataset.path));
+    });
   }
 
-  async toggleCapture() {
-    const b = $('#sp-cap-rec');
+  _selectedDevices() {
+    const ids = new Set(this.rec.devices.map((d) => d.id));
+    let sel = (this.opts.devices || []).filter((id) => ids.has(id));
+    if (!this.opts.devices) sel = [this.rec.devices.find((d) => d.default)?.id || this.rec.devices[0]?.id].filter(Boolean);
+    return sel;
+  }
+
+  _renderRecorder() {
+    $('#rc-path').textContent = this.recDir;
+    $('#rc-path').title = this.recDir;
+    this._renderFormat();
+    this._renderDevices();
+    this._renderRecButton();
+    this._renderRecordings();
+  }
+
+  _renderFormat() {
+    const f = this.recFmt, spec = this.rec.formats[f.format];
+    const rates = spec.rates ? this.rec.rates.filter(([r]) => spec.rates.includes(r)) : this.rec.rates;
+    const chans = this.rec.channels.filter(([c]) => spec.multichannel || c !== 'all');
+    const dis = this.rec.running;
+    $('#rc-fmt').innerHTML = `
+      ${select(Object.entries(this.rec.formats).map(([k, v]) => [k, v.label]), f.format, { 'data-k': 'format', label: 'Formato', disabled: dis })}
+      ${select(spec.qualities, f.quality, { 'data-k': 'quality', label: 'Qualità', disabled: dis })}
+      ${select(rates, f.rate, { 'data-k': 'rate', label: 'Frequenza', disabled: dis || !!spec.rates })}
+      ${select(chans, f.channels, { 'data-k': 'channels', label: 'Canali', disabled: dis })}`;
+  }
+
+  _renderDevices() {
+    const box = $('#rc-devices');
+    if (!this.rec.devices.length) {
+      box.innerHTML = '<div class="hint">Nessuna uscita registrabile: serve macOS 14.2 o successivo '
+        + '(oppure l\'extra <code>capture</code> per il mix di tutte le uscite).</div>';
+      return;
+    }
+    const sel = new Set(this._selectedDevices());
+    const tracks = Object.fromEntries(this.rec.tracks.map((t) => [t.device, t]));
+    box.innerHTML = this.rec.devices.map((d) => {
+      const t = this.rec.running ? tracks[d.id] : null;
+      const meta = d.sample_rate ? `${d.channels} can · ${(d.sample_rate / 1000).toFixed(1).replace('.0', '')} kHz` : 'tutto ciò che il Mac suona';
+      return `<div class="rc-dev${t ? ' on' : ''}">
+        ${check(`${esc(d.name)}${d.default ? ' <span class="hint">· predefinita</span>' : ''}`, sel.has(d.id),
+          { 'data-dev': d.id, disabled: this.rec.running })}
+        <div class="rc-dev-meta hint">${t ? (t.error ? `<span class="error">${esc(t.error)}</span>`
+          : `${clock(t.seconds)} · ${mb(t.bytes)}`) : meta}</div>
+        ${t && !t.error ? `<div class="sp-meter"><div style="width:${Math.min(100, Math.sqrt(t.level || 0) * 220)}%"></div></div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  _renderRecButton() {
+    const on = this.rec.running, b = $('#rc-rec');
+    setPlayButton(b, on, 'Registra', 'Ferma');
+    b.querySelector('wa-icon')?.setAttribute('name', on ? 'square' : 'circle');
+    const n = this._selectedDevices().length;
+    b.disabled = !on && !n;
+    $('#rc-clock').textContent = clock(on ? this.rec.elapsed : 0);
+    $('#rc-clock').classList.toggle('on', on);
+    $('#rc-info').textContent = on ? `In registrazione su ${this.rec.tracks.filter((t) => !t.error).length} uscit${this.rec.tracks.length === 1 ? 'a' : 'e'}…`
+      : n ? `${n} uscit${n === 1 ? 'a' : 'e'} selezionat${n === 1 ? 'a' : 'e'}: un file per ciascuna.` : 'Seleziona almeno un\'uscita.';
+    document.querySelector('#main-tabs wa-radio[value="sampler"]')?.classList.toggle('recording', on);
+  }
+
+  _renderRecordings() {
+    const list = this.rec.recordings || [];
+    $('#rc-list').innerHTML = list.length ? list.map((r) => `
+      <div class="rc-item" data-path="${esc(r.path)}" title="${esc(r.path)}">
+        <div class="rc-item-name">${esc(r.device)}</div>
+        <div class="hint">${clock(r.seconds)} · ${esc(r.format)} · ${mb(r.bytes)}${r.error ? ` · <span class="error">${esc(r.error)}</span>` : ''}</div>
+        <div class="rc-item-act">
+          ${btn('Apri nell\'editor', { size: 'xs', 'data-act': 'open', icon: 'pencil' })}
+          ${iconBtn('folder-open', 'Mostra nel Finder', { size: 'xs', 'data-act': 'reveal' })}
+        </div>
+      </div>`).join('') : '<div class="hint">Le registrazioni di questa sessione compaiono qui.</div>';
+  }
+
+  async toggleRecording() {
+    const b = $('#rc-rec');
     b.loading = true;
-    this.capture = { ...this.capture, ...(this.capture.running
-      ? await this.api.sampler_capture_stop() : await this.api.sampler_capture_start(this.opts.source)) };
+    const st = this.rec.running ? await this.api.recorder_stop()
+      : await this.api.recorder_start(this._selectedDevices(), this.recFmt);
     b.loading = false;
-    this._renderCapture();
-    if (this.capture.error) this._error(this.capture.error);
-    if (this.capture.running) this._pollCapture();
+    const was = this.rec.running;
+    Object.assign(this.rec, st);
+    if (st.error) this._error(st.error);
+    this._renderRecorder();
+    if (this.rec.running) this._pollRec();
+    else if (was && st.recordings?.length) {
+      const failed = st.tracks.filter((t) => t.error).length;
+      toast(`Registrazione salvata${failed ? ` (${failed} uscit${failed === 1 ? 'a' : 'e'} con errori)` : ''}`);
+      this._opened(await this.api.recorder_open(st.recordings[0].path));
+    }
   }
 
-  _pollCapture() {
-    clearTimeout(this.capTimer);
-    this.capTimer = setTimeout(async () => {
-      this.capture = { ...this.capture, ...(await this.api.sampler_capture_status()) };
-      this._renderCapture();
-      if (this.capture.running && !$('#sampler').hidden) this._pollCapture();
+  _pollRec() {
+    clearTimeout(this.recTimer);
+    this.recTimer = setTimeout(async () => {
+      Object.assign(this.rec, await this.api.recorder_status());
+      this._renderDevices();
+      this._renderRecButton();
+      if (this.rec.running) this._pollRec();
     }, 200);
-  }
-
-  async grab() {
-    const secs = Math.max(1, +$('#sp-grab-s').value || this.opts.grab);
-    this._opened(await this.api.sampler_capture_grab(secs));
   }
 
   // ---------------------------------------------------------------- view
@@ -574,6 +704,7 @@ export class SamplerEditor {
     const on = this.regions.filter((r) => r.on).length;
     $('#sp-count').textContent = this.regions.length ? `(${on} di ${this.regions.length} selezionate)` : '';
     $('#sp-export').disabled = !on;
+    $('#sp-rack').disabled = !on;
     $('#sp-clear').disabled = !this.regions.length;
   }
 
@@ -593,6 +724,7 @@ export class SamplerEditor {
         <span class="sp-time ${r.end - r.start >= this.maxS - 1e-3 ? 'error' : ''}">${fmt(r.end - r.start)}</span>
         ${iconBtn('play', 'Ascolta', { 'data-act': 'play' })}
         ${iconBtn('search', 'Mostra sulla forma d\'onda', { 'data-act': 'zoom' })}
+        ${iconBtn('layout-grid', 'Al Drum Rack', { 'data-act': 'rack' })}
         ${iconBtn('x', 'Elimina', { 'data-act': 'del' })}
       </div>`).join('');
   }
@@ -611,6 +743,7 @@ export class SamplerEditor {
       return this.setView(r.start - pad, r.end + pad);
     }
     if (act === 'play') return this.playRegion(i);
+    if (act === 'rack') return this.sendToRack([i]);
     if (e.target.closest('wa-input, wa-checkbox')) return;
     this.playRegion(i);
   }
@@ -651,21 +784,53 @@ export class SamplerEditor {
   }
 
   // ---------------------------------------------------------------- export
-  async export() {
-    // empty names get the placeholder shown in the list, so numbers match the region numbers
-    const regions = this.regions.map((r, i) => ({ start: r.start, end: r.end, on: r.on, name: r.name || this._defaultName(i) }))
-      .filter((r) => r.on).map(({ start, end, name }) => ({ start, end, name }));
-    if (!regions.length) return;
-    const b = $('#sp-export');
-    b.loading = true;
-    const r = await this.api.sampler_export(regions, this.opts);
-    b.loading = false;
-    if (r.error) return this._error(r.error);
-    const n = r.paths.length;
-    toast(`${n} sample esportat${n === 1 ? 'o' : 'i'}${r.in_library ? ': li analizzo nella libreria' : ''}`);
+  // Regions as WAV files, aligned with `idx`. A region already exported with the same bounds, name and
+  // fades/normalisation reuses its file (sending to the Drum Rack twice doesn't duplicate it).
+  async _files(idx, button) {
+    const key = (r, i) => JSON.stringify([r.start, r.end, r.name || this._defaultName(i), this.opts.fade_in_ms,
+      this.opts.fade_out_ms, this.opts.normalize]);
+    const todo = idx.filter((i) => this.regions[i].file?.key !== key(this.regions[i], i));
+    if (todo.length) {
+      // empty names get the placeholder shown in the list, so numbers match the region numbers
+      const regions = todo.map((i) => ({ start: this.regions[i].start, end: this.regions[i].end, name: this.regions[i].name || this._defaultName(i) }));
+      if (button) button.loading = true;
+      const r = await this.api.sampler_export(regions, this.opts);
+      if (button) button.loading = false;
+      if (r.error) { this._error(r.error); return null; }
+      todo.forEach((i, k) => { if (r.files[k]) this.regions[i].file = { key: key(this.regions[i], i), path: r.files[k] }; });
+      this._showExported(r.folder, r.paths[0]);
+      if (r.in_library) toast('I sample sono nella libreria: li analizzo');
+    }
+    return idx.map((i) => this.regions[i].file?.path || null);
+  }
+
+  _showExported(folder, first) {
+    if (!first) return;
     const head = $('#sp-regions-head-msg') || Object.assign(document.createElement('div'), { id: 'sp-regions-head-msg', className: 'hint sp-exported' });
-    head.innerHTML = `Esportati in <a href="#">${esc(r.folder)}</a>`;
-    head.querySelector('a').onclick = (e) => { e.preventDefault(); this.api.reveal_path(r.paths[0]); };
+    head.innerHTML = `Esportati in <a href="#">${esc(folder)}</a>`;
+    head.querySelector('a').onclick = (e) => { e.preventDefault(); this.api.reveal_path(first); };
     $('#sp-regions').before(head);
+  }
+
+  _checked() { return this.regions.map((r, i) => (r.on ? i : -1)).filter((i) => i >= 0); }
+
+  async export() {
+    const idx = this._checked();
+    if (!idx.length) return;
+    const files = await this._files(idx, $('#sp-export'));
+    if (!files) return;
+    const n = files.filter(Boolean).length;
+    toast(`${n} sample esportat${n === 1 ? 'o' : 'i'}`);
+  }
+
+  // Selected regions (or one) onto free Drum Rack pads, from the rack's selected pad on, to play them there.
+  async sendToRack(idx = this._checked()) {
+    if (!idx.length || !this.onSendToRack) return;
+    const files = await this._files(idx, $('#sp-rack'));
+    if (!files) return;
+    const refs = idx.map((i, k) => files[k] && {
+      kind: 'file', path: files[k], name: files[k].split('/').pop(), cls: null, root: null,
+      dur: +(this.regions[i].end - this.regions[i].start).toFixed(3) }).filter(Boolean);
+    if (refs.length) this.onSendToRack(refs);
   }
 }

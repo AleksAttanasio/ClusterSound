@@ -833,10 +833,33 @@ wa-button.icon-btn.active::part(button) { background: var(--sel-bg); border-colo
 .sp-regions-head .filter-title { margin: 0; display: inline; }
 .sp-regions { flex: 0 1 34%; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius); min-height: 70px; }
 .sp-regions-empty { padding: 14px; }
-.sp-row { display: grid; grid-template-columns: 24px 28px 1fr 90px 80px 28px 28px 28px; align-items: center; gap: 6px; padding: 3px 8px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.sp-row { display: grid; grid-template-columns: 24px 28px 1fr 90px 80px 28px 28px 28px 28px; align-items: center; gap: 6px; padding: 3px 8px; border-bottom: 1px solid var(--line); cursor: pointer; }
 .sp-row:hover { background: var(--bg-3); }
 .sp-row.sel { background: var(--sel-bg); }
 .sp-num { color: var(--text-3); font-family: var(--mono); font-size: 11px; text-align: right; }
 .sp-time { font-family: var(--mono); font-size: 11px; color: var(--text-2); text-align: right; }
 .sp-row wa-input::part(form-control-label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .sp-exported { margin-bottom: -4px; }
+
+/* ---------- Recorder (inside the Sampler tab) ---------- */
+.rc-block .filter-title + .filter-title, .rc-block .rc-devices + .filter-title, .rc-block .rc-fmt + .filter-title, .rc-block .rc-folder + .rc-go { margin-top: 4px; }
+.rc-devices { display: flex; flex-direction: column; gap: 6px; }
+.rc-dev { display: flex; flex-direction: column; gap: 3px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); }
+.rc-dev.on { border-color: var(--sel-line); background: var(--sel-bg); }
+.rc-dev-meta { padding-left: 26px; }
+.rc-dev .sp-meter { margin-left: 26px; height: 6px; flex: none; }
+.rc-dev .sp-meter > div { height: 100%; background: var(--cs-gradient-h); transition: width 80ms linear; }
+.rc-fmt { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.rc-folder { display: flex; align-items: center; gap: 8px; font-size: 11px; min-width: 0; }
+.rc-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; font-family: var(--mono); color: var(--text-3); }
+.rc-go { display: flex; align-items: center; gap: 10px; }
+.rc-rec { flex: 1; }
+.rc-rec::part(base), .rc-rec::part(button) { width: 100%; }
+.rc-clock { font-family: var(--mono); font-size: 16px; color: var(--text-2); min-width: 48px; text-align: right; }
+.rc-clock.on { color: #ef5350; }
+.rc-list { display: flex; flex-direction: column; gap: 6px; }
+.rc-item { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; gap: 3px; }
+.rc-item-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-item-act { display: flex; align-items: center; gap: 6px; }
+.main-tabs wa-radio.recording::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #ef5350; margin-right: 6px; vertical-align: 1px; animation: rc-blink 1s steps(2) infinite; }
+@keyframes rc-blink { 50% { opacity: .25; } }

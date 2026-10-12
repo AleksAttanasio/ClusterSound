@@ -47,6 +47,7 @@ from .racks import select as rack_select
 from .racks import spdsx as rack_spdsx
 from .racks import store as rack_store
 from .sampler import capture as sampler_capture
+from .sampler import recorder as sampler_recorder
 from .sampler import export as sampler_export
 from .sampler import links as sampler_links
 from .sampler import session as sampler_session
@@ -92,7 +93,7 @@ class Api:
         self._recorder = chord_midi_in.Recorder()
         self._live = live_server.Bridge(self._live_stage(), self._resolve, self._describe, self._title)
         self._sampler: sampler_session.SamplerSession | None = None
-        self._capture = sampler_capture.SystemCapture(self._capture_seconds())
+        self._recorder = sampler_recorder.Recorder()
         threading.Thread(target=online_cache.prune, args=(self._cache_mb(),), daemon=True).start()
 
     # pywebview exposes public attributes too, so keep internals underscored
@@ -246,27 +247,26 @@ class Api:
                 "download_dir": s.get("download_dir") or DEFAULT_DIR, "live_port": self._live_port(),
                 "live_library": s.get("live_library") or live_payload.USER_LIBRARY,
                 "sampler_dir": s.get("sampler_dir") or sampler_export.DEFAULT_DIR,
-                "sampler_max_seconds": self._sampler_max(), "capture_buffer_seconds": self._capture_seconds()}
+                "sampler_max_seconds": self._sampler_max(),
+                "recorder_dir": s.get("recorder_dir") or sampler_recorder.DEFAULT_DIR,
+                "recorder_format": sampler_recorder.normalize_format(s.get("recorder_format"))}
 
     def _sampler_max(self) -> float:
         return float(self._settings().get("sampler_max_seconds") or sampler_session.DEFAULT_MAX_SAMPLE_SECONDS)
 
-    def _capture_seconds(self) -> float:
-        return float(self._settings().get("capture_buffer_seconds") or sampler_capture.DEFAULT_BUFFER_SECONDS)
-
     def set_setting(self, key: str, value) -> dict:
         if key not in ("freesound_key", "download_dir", "cache_mb", "live_port", "live_library", "sampler_dir",
-                       "sampler_max_seconds", "capture_buffer_seconds"):
+                       "sampler_max_seconds", "recorder_dir", "recorder_format"):
             return self.get_settings()
-        if key in ("sampler_max_seconds", "capture_buffer_seconds"):
-            lo, hi = (1, sampler_session.DEFAULT_MAX_SAMPLE_SECONDS) if key == "sampler_max_seconds" else (10, 300)
+        if key == "sampler_max_seconds":
             try:
-                value = max(lo, min(hi, float(value)))
+                value = max(1, min(sampler_session.DEFAULT_MAX_SAMPLE_SECONDS, float(value)))
             except (TypeError, ValueError):
                 return self.get_settings()
             self._save_settings(**{key: value})
-            if key == "capture_buffer_seconds" and not self._capture.running:
-                self._capture.seconds = value
+            return self.get_settings()
+        if key == "recorder_format":
+            self._save_settings(recorder_format=sampler_recorder.normalize_format(value if isinstance(value, dict) else None))
             return self.get_settings()
         if key == "live_port":
             try:
@@ -287,7 +287,7 @@ class Api:
             online_cache.prune(value)
             return self.get_settings()
         value = (value or "").strip() or None
-        if key in ("download_dir", "live_library", "sampler_dir") and value:
+        if key in ("download_dir", "live_library", "sampler_dir", "recorder_dir") and value:
             value = os.path.expanduser(value)
         self._save_settings(**{key: value})
         if key == "live_library":
@@ -396,7 +396,8 @@ class Api:
     def reveal_path(self, path: str) -> bool:
         s = self._settings()
         roots = [os.path.realpath(s.get("download_dir") or DEFAULT_DIR),
-                 os.path.realpath(s.get("sampler_dir") or sampler_export.DEFAULT_DIR)]
+                 os.path.realpath(s.get("sampler_dir") or sampler_export.DEFAULT_DIR),
+                 os.path.realpath(s.get("recorder_dir") or sampler_recorder.DEFAULT_DIR)]
         path = os.path.realpath(path or "")
         if not any(path == r or path.startswith(r + os.sep) for r in roots) or not os.path.exists(path):
             return False
@@ -430,7 +431,10 @@ class Api:
 
     def sampler_init(self) -> dict:
         return {**self._sampler_state(), "supported": sampler_links.SUPPORTED,
-                "capture": {"sources": sampler_capture.sources(), **self._capture.status()},
+                "show_sources": False,  # file and link sources stay available but hidden: the tab is the Recorder
+                "recorder": {"devices": sampler_recorder.output_devices(), "formats": sampler_recorder.formats(),
+                             "rates": sampler_recorder.RATES, "channels": sampler_recorder.CHANNELS,
+                             **self._recorder.status()},
                 "settings": self.get_settings()}
 
     def _sampler_open(self, path: str, **kw) -> dict:
@@ -496,35 +500,57 @@ class Api:
         o = opts or {}
         root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
         try:
-            paths = sampler_export.export(self._sampler, regions or [], root, self._sampler_max(),
+            files = sampler_export.export(self._sampler, regions or [], root, self._sampler_max(),
                                           float(o.get("fade_in_ms", 1)), float(o.get("fade_out_ms", 10)),
                                           bool(o.get("normalize")))
         except OSError as e:
             return {"error": f"scrittura non riuscita ({e})"}
+        paths = [p for p in files if p]
         in_library = bool(paths) and self._inside_library(os.path.dirname(paths[0]))
         if in_library:
             self._schedule_rescan()
-        return {"error": None, "paths": paths, "folder": os.path.dirname(paths[0]) if paths else root,
-                "in_library": in_library}
+        # files: one per region (None if it was outside the audio), e.g. for the Drum Rack
+        return {"error": None, "paths": paths, "files": files,
+                "folder": os.path.dirname(paths[0]) if paths else root, "in_library": in_library}
 
-    def sampler_capture_start(self, source: str = sampler_capture.SYSTEM) -> dict:
+    # ------------------------------------------------------------------ recorder
+    def recorder_devices(self) -> list[dict]:
+        return sampler_recorder.output_devices()
+
+    def recorder_start(self, device_ids: list, fmt: dict | None = None) -> dict:
+        known = {d["id"]: d for d in sampler_recorder.output_devices()}
+        devices = [known[i] for i in device_ids or [] if i in known]
+        fmt = sampler_recorder.normalize_format(fmt)
+        self._save_settings(recorder_format=fmt)
+        folder = self._settings().get("recorder_dir") or sampler_recorder.DEFAULT_DIR
         try:
-            return {**self._capture.start(source, self._capture_seconds()), "error": None}
+            return {**self._recorder.start(devices, fmt, folder), "error": None}
         except sampler_capture.CaptureError as e:
-            return {**self._capture.status(), "error": str(e)}
+            return {**self._recorder.status(), "error": str(e)}
 
-    def sampler_capture_stop(self) -> dict:
-        return self._capture.stop()
+    def recorder_stop(self) -> dict:
+        st = self._recorder.stop()
+        if st["recordings"] and self._inside_library(os.path.dirname(st["recordings"][0]["path"])):
+            self._schedule_rescan()
+        return st
 
-    def sampler_capture_status(self) -> dict:
-        return self._capture.status()
+    def recorder_status(self) -> dict:
+        return self._recorder.status()
 
-    def sampler_capture_grab(self, seconds: float | None = None) -> dict:
-        try:
-            self._sampler = self._capture.grab(None if seconds is None else float(seconds))
-        except sampler_capture.CaptureError as e:
-            return {"error": str(e)}
-        return {"error": None, **self._sampler_state()}
+    def recorder_open(self, path: str) -> dict:
+        """A recording of this session (or any file in the recordings folder) into the editor."""
+        root = os.path.realpath(self._settings().get("recorder_dir") or sampler_recorder.DEFAULT_DIR)
+        real = os.path.realpath(path or "")
+        if not (real.startswith(root + os.sep) or any(r["path"] == path for r in self._recorder.recordings)):
+            return {"error": "registrazione non trovata"}
+        if not os.path.isfile(real):
+            return {"error": "file non trovato"}
+        out = self._sampler_open(real, origin="capture")  # samples cut from it keep the personal-use note
+        if not out.get("error"):
+            rec = next((r for r in self._recorder.recordings if os.path.realpath(r["path"]) == real), None)
+            self._sampler.meta = {"device": rec["device"] if rec else "uscita audio",
+                                  "captured_at": time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(real)))}
+        return out
 
     # ================================================================== patterns
     def patterns_init(self) -> dict:

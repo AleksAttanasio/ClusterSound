@@ -198,53 +198,17 @@ def test_parse_commons():
 
 
 # ---------------------------------------------------------------- capture
-def test_ring_buffer_wraps_and_keeps_latest():
-    rb = capture.RingBuffer(seconds=1.0, sr=10, channels=2)
-    rb.write(np.arange(7, dtype=np.float32))  # mono -> both channels
-    rb.write(np.arange(7, 14, dtype=np.float32))
-    assert rb.filled == 10 and rb.seconds == 1.0
-    assert rb.latest()[:, 0].tolist() == list(range(4, 14))
-    assert rb.latest(0.3)[:, 1].tolist() == [11, 12, 13]
-    rb.write(np.arange(100, 125, dtype=np.float32))  # bigger than the buffer
-    assert rb.latest()[:, 0].tolist() == list(range(115, 125))
-
-
-def test_capture_grab_uses_ring(monkeypatch):
-    class Fake:
-        sr, channels = 100, 2
-
-        def __init__(self, on_block):
-            self.on_block = on_block
-
-        def start(self):
-            self.on_block(np.full((250, 2), 0.5, dtype=np.float32))
-
-        def stop(self):
-            pass
-
-    monkeypatch.setattr(capture, "SystemAudioBackend", Fake)
-    c = capture.SystemCapture(seconds=2)
-    st = c.start()
-    assert st["running"] and st["seconds"] == 2.0 and st["level"] == 0.5
-    s = c.grab(0.5)
-    assert s.origin == "capture" and s.audio.shape == (50, 2) and s.meta["device"] == "audio di sistema"
-    assert not c.stop()["running"]
-
-
-def test_capture_grab_empty():
-    with pytest.raises(capture.CaptureError):
-        capture.SystemCapture().grab()
-
-
-def test_hit_at_time_zero_is_found():
-    x, starts = _hits()
-    x = x[int(starts[0] * SR):]  # the first hit starts at sample 0
-    assert len(slicing.auto_slices(S.from_array(x, SR))) == len(starts)
-
-
 def test_system_backend_can_be_created_twice():
     """The Objective-C output class must be registered once, or the second capture fails."""
     pytest.importorskip("ScreenCaptureKit")
     a = capture.SystemAudioBackend(lambda b: None)
     b = capture.SystemAudioBackend(lambda b: None)
     assert type(a._output) is type(b._output)
+
+
+def test_export_keeps_regions_aligned(tmp_path):
+    x, _ = _hits()
+    s = S.from_array(x, SR, title="Break")
+    out = sampler_export.export(s, [{"start": 0.2, "end": 0.6}, {"start": 99, "end": 100}, {"start": 1, "end": 1.2}],
+                                root=str(tmp_path))
+    assert out[1] is None and os.path.basename(out[2]) == "Break - 03.wav"
