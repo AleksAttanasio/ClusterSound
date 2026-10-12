@@ -66,7 +66,7 @@ async function main() {
   rack = new DrumRackEditor({ api: state.api, player, classes: state.classes, getTrail,
     getSequencer: () => pattern, onOpenSequencer: () => setTab('pattern') });
   compose = new ComposeEditor({ api: state.api, player, getPattern: () => pattern, onOpenSequencer: () => setTab('pattern') });
-  sampler = new SamplerEditor({ api: state.api, player, onSendToRack: async (refs) => {
+  sampler = new SamplerEditor({ api: state.api, player, classes: state.classes, onSendToRack: async (refs) => {
     if (await rack.addSamples(refs)) setTab('rack');
   } });
   online.onSend = (ref, x, y) => sendRef(ref, x, y);
