@@ -771,25 +771,50 @@ wa-button.icon-btn.active::part(button) { background: var(--sel-bg); border-colo
 /* ---------------------------------------------------------------- Drum Rack: Roland SPD-SX */
 .rk-device { font-weight: 600; }
 .rk-warn { background: var(--wa-color-warning-fill-quiet); border: 1px solid var(--wa-color-warning-border-normal); color: var(--wa-color-warning-on-quiet); border-radius: 8px; padding: 6px 10px; font-size: 12px; display: flex; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box; }
-.rk-spd { display: flex; flex-direction: column; align-items: center; gap: 14px; max-height: 100%; overflow-y: auto; width: min(520px, calc(100vw - 270px - 28px - 330px)); flex: none; }
-.spd-body { width: 100%; background: linear-gradient(#22252c, #16181d); border: 1px solid #333844; border-radius: 22px 22px 14px 14px; padding: 14px 16px 18px;
-  box-shadow: inset 0 1px 0 #3a3f4b, 0 6px 18px #0008; }
-.spd-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 12px; color: var(--text-2); }
-.spd-head b { letter-spacing: .08em; color: #e8e8e8; }
-.spd-lcd { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--mono); color: #9fe0ff;
-  background: #0b1a22; border: 1px solid #1e3a48; border-radius: 4px; padding: 2px 8px; }
-.spd-brand { font-style: italic; font-weight: 700; color: #c9ccd3; letter-spacing: .04em; }
-.spd-pads { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: 0.55fr 1fr 1fr; gap: 9px; aspect-ratio: 1.15; }
-.spd-pad { border-radius: 9px; background: radial-gradient(circle at 50% 35%, #2a2e37, #1a1d23 70%); border: 1.5px solid color-mix(in srgb, var(--gc) 35%, #2b303b);
-  box-shadow: inset 0 2px 5px #0009; padding: 6px 8px; }
-.spd-pad.spd-top { border-radius: 7px; }
-.spd-pad.full { background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--pc) 40%, #232730), color-mix(in srgb, var(--pc) 18%, #15181e) 75%); }
-.spd-pad.gsel { border-color: var(--gc); box-shadow: inset 0 2px 5px #0009, 0 0 0 3px color-mix(in srgb, var(--gc) 30%, transparent); }
-.spd-pad .rk-note { font-size: 11px; color: var(--text-2); }
-.spd-pad .rk-note i { font-style: normal; color: var(--text-3); margin-left: 3px; }
+.rk-spd { display: flex; flex-direction: column; align-items: center; gap: 14px; max-height: 100%; overflow-y: auto; width: min(600px, calc(100vw - 270px - 330px - 28px)); flex: none; }
+/* the unit, after the top panel drawing in the SPD-SX manual: pads framed by light ribs, control panel below */
+.spd-unit { width: 100%; box-sizing: border-box; padding: 14px 22px 16px; border-radius: 26px 26px 18px 18px; border: 1px solid #3a3f4a;
+  background: linear-gradient(90deg, #1b1d22, #2a2d33 6%, #24272d 50%, #2a2d33 94%, #1b1d22); box-shadow: inset 0 1px 0 #454a56, 0 8px 22px #000a; display: flex; flex-direction: column; gap: 14px; }
+.spd-padarea { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: .37fr 1fr 1fr; gap: 6px; aspect-ratio: 1.02; padding: 6px;
+  background: linear-gradient(#5a606c, #444a55); border: 1px solid #6a707c; border-radius: 10px; box-shadow: 0 0 0 3px #15171b, 0 0 0 4px #3a3f4a; }
+.spd-pad { border-radius: 4px; background: radial-gradient(circle at 50% 40%, #2a2d34, #1b1d22 75%); border: 1.5px solid color-mix(in srgb, var(--gc) 35%, #202329);
+  box-shadow: inset 0 2px 6px #000b; padding: 6px 8px 14px; }
+.spd-pad.spd-top { border-radius: 4px 4px 2px 2px; background: linear-gradient(#34373e, #1e2026); }
+.spd-pad.full { background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--pc) 40%, #24272e), color-mix(in srgb, var(--pc) 16%, #16181d) 78%); }
+.spd-pad.gsel { border-color: var(--gc); box-shadow: inset 0 2px 6px #000b, 0 0 0 2px color-mix(in srgb, var(--gc) 45%, transparent); }
+.spd-pad .rk-note { font-size: 10px; }
+.spd-pad .rk-note i { font-style: normal; color: var(--text-3); }
 .spd-pad .rk-pname { font-size: 11px; }
 .spd-fam { position: absolute; top: 4px; right: 6px; font-size: 9px; padding: 0 4px; border-radius: 3px; background: #0b0d11cc; color: var(--gc); white-space: nowrap; max-width: 70%; overflow: hidden; text-overflow: ellipsis; display: inline-flex; align-items: center; gap: 3px; }
-.spd-pad .rk-badge { top: auto; bottom: 4px; }
+.spd-pad .rk-badge { top: auto; bottom: 4px; right: auto; left: 6px; }
+/* pad indicator, bottom right as on the unit, with the printed pad number */
+.spd-led { position: absolute; right: 6px; bottom: 5px; width: 14px; height: 4px; border-radius: 1px; background: #3a3f4a; box-shadow: inset 0 1px 1px #0008; }
+.spd-pad.full .spd-led { background: var(--pc); box-shadow: 0 0 6px var(--pc); }
+.spd-pad.sel .spd-led { background: #fff; box-shadow: 0 0 7px #fffa; }
+.spd-num { position: absolute; right: 24px; bottom: 2px; font: 600 9px var(--mono); color: #8a909c; }
+.spd-pad.spd-top .rk-pname { max-height: 1.2em; }
+.spd-console { width: 100%; height: auto; display: block; font-family: var(--wa-font-family-body, system-ui); }
+.spd-console .plate { fill: #1d1f24; stroke: #3a3f4a; }
+.spd-console .frame { fill: none; stroke: #4a505c; stroke-width: 1.2; }
+.spd-console .t { fill: #b8bdc7; font-size: 9px; font-weight: 600; letter-spacing: .03em; }
+.spd-console .t.sec { font-size: 9px; paint-order: stroke; stroke: #1d1f24; stroke-width: 6px; }
+.spd-console .t.small { font-size: 6.5px; fill: #8a909c; }
+.spd-console .bt { fill: #c9ccd3; font-size: 8px; font-weight: 600; }
+.spd-console .b { fill: #2e3138; stroke: #4c525e; }
+.spd-console .b.pm + .bt { font-size: 20px; font-weight: 400; transform: translateY(4px); }
+.spd-console .k { fill: #121418; stroke: #4c525e; stroke-width: 1.5; }
+.spd-console .kc { fill: #c3c7cf; stroke: #8a909c; }
+.spd-console .kt { stroke: #1d1f24; stroke-width: 2.5; stroke-linecap: round; }
+.spd-console .ar { fill: #c9ccd3; }
+.spd-console .logo { fill: #e8e8e8; font-size: 15px; font-weight: 700; }
+.spd-console .model { fill: #e8e8e8; font-size: 18px; font-weight: 800; font-style: italic; letter-spacing: .02em; }
+.spd-console .lcd { fill: #0b1a22; stroke: #1e3a48; stroke-width: 2; }
+.spd-console .lcd-t { fill: #9fe0ff; font: 12px var(--mono); }
+.spd-console .lcd-t.dim { fill: #6fb6d6; font-size: 11px; }
+.spd-console .lcd-l { stroke: #1e3a48; }
+.spd-console .dot { fill: #8a909c; }
+.spd-console .led { fill: #3a3f4a; stroke: #555b67; }
+.spd-console .led.on { fill: #ff4a3d; stroke: #ff8a80; filter: drop-shadow(0 0 3px #ff4a3d); }
 .spd-trigs { display: flex; gap: 18px; justify-content: center; width: 100%; }
 .spd-trig { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 42%; }
 .spd-tpad { width: 100%; height: 74px; border-radius: 37px; padding: 6px 26px; box-sizing: border-box; }
