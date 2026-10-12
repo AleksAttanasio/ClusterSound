@@ -24,6 +24,9 @@ stems_imports = []
 if importlib.util.find_spec("demucs") is not None:
     from PyInstaller.utils.hooks import collect_submodules
     stems_imports = collect_submodules("demucs")
+# "Migliora" (extra `enhance`): the app runs itself with --enhance-worker, which imports torch only in that process
+if importlib.util.find_spec("torch") is not None:
+    stems_imports += ["torch", "huggingface_hub", "clustersound.enhance.apollo_net"]
 
 a = Analysis(
     [str(root / "launcher.py")],
@@ -50,7 +53,7 @@ app = BUNDLE(
     icon=str(root / "brand" / "ClusterSound.icns"),
     bundle_identifier="com.clustersound.app",
     info_plist={
-        "CFBundleShortVersionString": "0.4.0",
+        "CFBundleShortVersionString": "0.5.0",
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "12.0",
         "NSAudioCaptureUsageDescription": "Il Recorder registra l'audio in uscita dal Mac solo quando premi Registra.",
