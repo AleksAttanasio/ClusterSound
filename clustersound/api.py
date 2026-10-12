@@ -23,6 +23,9 @@ from .chords import variations as chord_variations
 from .chords.library import CATEGORIES as CHORD_CATEGORIES
 from .chords.library import DEFAULT_DIR as CHORD_DIR
 from .chords.library import ChordLibrary
+from .enhance import job as enhance_job
+from .enhance import models as enhance_models
+from .enhance import runner as enhance_runner
 from .features import TYPES
 from .library import AUDIO_EXT, Library
 from .live import payload as live_payload
@@ -100,6 +103,10 @@ class Api:
         self._stems_job: dict = {"state": "idle", "progress": 0.0, "scope": None, "stems": [], "error": None}
         self._stems_source: sampler_session.SamplerSession | None = None  # what the last job separated
         self._stems_cancel = threading.Event()
+        self._enh_lock = threading.Lock()
+        self._enh_job: dict = {"state": "idle", "progress": 0.0, "model": None, "result": None, "error": None}
+        self._enh_source: sampler_session.SamplerSession | None = None  # what the last job enhanced
+        self._enh_cancel = threading.Event()
         threading.Thread(target=online_cache.prune, args=(self._cache_mb(),), daemon=True).start()
 
     # pywebview exposes public attributes too, so keep internals underscored
@@ -725,6 +732,114 @@ class Api:
         except Exception as e:
             return {"error": f"impossibile leggere il file audio ({e})"}
         s.title = f"{src.title} · {stem['label']}"
+        s.meta = dict(src.meta)
+        self._sampler = s
+        return {"error": None, **self._sampler_state()}
+
+    # ------------------------------------------------------------------ enhance ("Migliora")
+    def enhance_status(self) -> dict:
+        with self._enh_lock:
+            return {**enhance_models.status(), "job": dict(self._enh_job)}
+
+    def _enh_busy(self) -> bool:
+        return self._enh_job["state"] in ("downloading", "running")
+
+    def _enh_set(self, **kw) -> None:
+        with self._enh_lock:
+            self._enh_job.update(kw)
+
+    def _enh_error(self, msg: str) -> dict:
+        return {**self.enhance_status(), "error": msg}
+
+    def enhance_download_model(self, model: str | None = None) -> dict:
+        """Fetch one model's weights once (the user confirmed it); enhancing is offline afterwards."""
+        try:
+            m = enhance_models.get(model)
+        except ValueError as e:
+            return self._enh_error(str(e))
+        if not enhance_models.installed(m.key):
+            return self._enh_error(f"serve l'estensione Migliora: {enhance_models.INSTALL_HINT}")
+        with self._enh_lock:
+            if self._enh_busy():
+                return {**enhance_models.status(), "job": dict(self._enh_job), "error": "operazione già in corso"}
+            self._enh_job = {"state": "downloading", "progress": 0.0, "model": m.key, "result": None, "error": None}
+
+        def work():
+            try:
+                enhance_models.download_model(m.key)
+                self._enh_set(state="idle")
+            except Exception as e:
+                self._enh_set(state="error", error=f"download del modello non riuscito ({e})")
+        threading.Thread(target=work, daemon=True).start()
+        return {**self.enhance_status(), "error": None}
+
+    def enhance_start(self, scope: str = "region", start: float | None = None, end: float | None = None,
+                      model: str | None = None) -> dict:
+        """Enhance one region of the open audio ("region") or all of it ("all") in a background child process;
+        the result is a new WAV next to the samples, the source stays as it is."""
+        s = self._sampler
+        try:
+            m = enhance_models.get(model)
+        except ValueError as e:
+            return self._enh_error(str(e))
+        if not s:
+            return self._enh_error("nessun audio aperto")
+        if not enhance_models.installed(m.key):
+            return self._enh_error(f"serve l'estensione Migliora: {enhance_models.INSTALL_HINT}")
+        if not enhance_models.ready(m.key):
+            return self._enh_error(f"modello {m.label} non scaricato")
+        if scope == "region":
+            if start is None or end is None:
+                return self._enh_error("nessuna regione selezionata")
+            a, b = slicing.clamp(float(start), float(end), float("inf"), s.duration)
+            base = f"{s.title or 'sample'} {a:.2f}-{b:.2f}s"
+        else:
+            scope, a, b, base = "all", 0.0, s.duration, s.title or "registrazione"
+        if b - a < 0.05:
+            return self._enh_error("regione troppo corta")
+        dst = enhance_job.out_path(s, scope, base, self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR)
+        with self._enh_lock:
+            if self._enh_busy():
+                return {**enhance_models.status(), "job": dict(self._enh_job), "error": "miglioramento già in corso"}
+            self._enh_job = {"state": "running", "progress": 0.0, "model": m.key, "scope": scope, "title": s.title,
+                             "seconds": round(b - a, 2), "result": None, "error": None}
+        self._enh_cancel.clear()
+
+        def work():  # keeps its own reference to s: opening other audio meanwhile doesn't affect it
+            try:
+                res = enhance_job.run(s, a, b, m.key, dst, lambda p: self._enh_set(progress=round(p, 3)),
+                                      self._enh_cancel.is_set)
+            except enhance_runner.Cancelled:
+                self._enh_set(state="cancelled")
+                return
+            except Exception as e:
+                self._enh_set(state="error", error=f"miglioramento non riuscito ({e})")
+                return
+            self._enh_source = s
+            self._enh_set(state="done", progress=1.0, result=res)
+            if self._inside_library(os.path.dirname(dst)):
+                self._schedule_rescan()
+        threading.Thread(target=work, daemon=True).start()
+        return {**self.enhance_status(), "error": None}
+
+    def enhance_cancel(self) -> dict:
+        self._enh_cancel.set()
+        return self.enhance_status()
+
+    def enhance_open(self) -> dict:
+        """The last result into the editor; it keeps the source's origin, licence and provenance."""
+        with self._enh_lock:
+            res = self._enh_job.get("result")
+        src = self._enh_source
+        if not res or not src:
+            return {"error": "nessun risultato da aprire"}
+        if not os.path.isfile(res["path"]):
+            return {"error": "file non trovato"}
+        try:
+            s = sampler_session.load_file(res["path"], origin=src.origin, result=src.result)
+        except Exception as e:
+            return {"error": f"impossibile leggere il file audio ({e})"}
+        s.title = f"{src.title} · migliorato"
         s.meta = dict(src.meta)
         self._sampler = s
         return {"error": None, **self._sampler_state()}

@@ -28,6 +28,10 @@ def headless(folder: str, out: str | None) -> int:
 
 
 def main(argv=None) -> int:
+    args = sys.argv[1:] if argv is None else argv
+    if args[:1] == ["--enhance-worker"]:  # the frozen app re-run as an enhancement job (enhance/runner.py)
+        from .enhance import worker
+        return worker.main(args[1:])
     ap = argparse.ArgumentParser(prog="clustersound")
     ap.add_argument("--headless", metavar="DIR", help="analizza DIR senza GUI")
     ap.add_argument("--out", help="file di report .csv o .json (con --headless)")

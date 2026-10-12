@@ -24,6 +24,9 @@ stems_imports = []
 if importlib.util.find_spec("demucs") is not None:
     from PyInstaller.utils.hooks import collect_submodules
     stems_imports = collect_submodules("demucs")
+# "Migliora" (extra `enhance`): the app runs itself with --enhance-worker, which imports torch only in that process
+if importlib.util.find_spec("torch") is not None:
+    stems_imports += ["torch", "huggingface_hub", "clustersound.enhance.apollo_net"]
 
 a = Analysis(
     [str(root / "launcher.py")],

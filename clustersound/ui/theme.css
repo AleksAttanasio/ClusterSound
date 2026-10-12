@@ -65,6 +65,11 @@
   --cs-gradient-h: linear-gradient(90deg, #32d5fe, #1f86fd 55%, #0b3bfa);
   --cs-glow: 0 0 0 1px rgb(47 141 253 / 0.35), 0 4px 18px rgb(11 59 250 / 0.25);
   --cs-amber: #ffb84d;   /* playheads, focus trail, rhythm: kept from 0.1.0 */
+  /* AI actions ("Migliora"): violet, so they read as different from the blue brand */
+  --cs-ai: #b77cff;
+  --cs-ai-gradient: linear-gradient(135deg, #c084fc 0%, #8b3dff 50%, #d23cff 100%);
+  --cs-ai-gradient-h: linear-gradient(90deg, #c084fc, #8b3dff 55%, #d23cff);
+  --cs-ai-glow: 0 0 0 1px rgb(168 85 247 / 0.5), 0 4px 18px rgb(139 61 255 / 0.45);
 }
 
 /* Brand gradient on the primary action only */
