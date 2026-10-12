@@ -3,6 +3,7 @@
 // samples. Opening own files and openly licensed links is still here, hidden while show_sources is false.
 import { btn, iconBtn, slider, check, num, select, seg, setPlayButton, icon } from './kit.js';
 import { toast, showPopover } from './sendmenu.js';
+import { liveToast } from './live.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -159,6 +160,7 @@ export class SamplerEditor {
           <span class="filter-title">Regioni <span id="sp-count"></span></span>
           <span class="spacer"></span>
           ${btn('Svuota', { icon: 'trash-2', id: 'sp-clear' })}
+          ${btn('Invia a Live', { icon: 'music', id: 'sp-live', title: 'Mette in Live, su una nuova traccia audio, la regione selezionata o, senza selezione, tutto l\'audio aperto (serve il device ClusterSound nel set). Il file resta anche nel browser di Live: User Library › ClusterSound › Audio' })}
           ${btn('Al Drum Rack', { icon: 'layout-grid', id: 'sp-rack', title: 'Esporta le regioni selezionate e le carica sui pad liberi del Drum Rack, per suonarle' })}
           ${btn('Esporta selezionate', { variant: 'brand', icon: 'file-down', id: 'sp-export' })}
         </div>
@@ -217,6 +219,7 @@ export class SamplerEditor {
     $('#sp-clear').onclick = () => { this.regions = []; this.sel = -1; this.renderRegions(); this.draw(); };
     $('#sp-export').onclick = () => this.export();
     $('#sp-rack').onclick = () => this.sendToRack();
+    $('#sp-live').onclick = () => this.sendToLive();
     $('#sp-stems').onclick = (e) => this._stemsMenu(e.currentTarget);
     $('#st-box').addEventListener('click', (e) => this._stemsClick(e));
     $('#sp-regions').addEventListener('click', (e) => this._regionClick(e));
@@ -378,6 +381,19 @@ export class SamplerEditor {
       if (act === 'reveal') return this.api.reveal_path(row.dataset.path);
       this._opened(await this.api.recorder_open(row.dataset.path));
     });
+  }
+
+  // The selected region, or all the open audio, onto a new audio track in Live (through the M4L device).
+  async sendToLive() {
+    if (!this.session) return this._error('Apri prima una registrazione');
+    const r = this.regions[this.sel];
+    const b = $('#sp-live');
+    b.loading = true;
+    toast(r ? 'Invio la regione a Live…' : 'Invio l\'audio a Live…');
+    const out = await this.api.sampler_send_to_live(r ? r.start : null, r ? r.end : null, this.opts);
+    b.loading = false;
+    if (out.file && !out.running) return toast('Bridge per Live non attivo: il file è comunque nel browser di Live, User Library › ClusterSound › Audio');
+    liveToast(out);
   }
 
   // ---------------------------------------------------------------- stems

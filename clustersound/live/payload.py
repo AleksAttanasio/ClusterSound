@@ -1,9 +1,12 @@
 """Payloads for the Max for Live device: tracks to create in Live, each with an optional rack preset and clips.
 
-    payload = {"kind": "pattern"|"rack"|"compose", "name", "bpm", "folder",
-               "tracks": [{"name", "role": "drums"|"bass"|"chords"|"melody", "adg": abs path | None,
+    payload = {"kind": "pattern"|"rack"|"compose"|"audio", "name", "bpm", "folder",
+               "tracks": [{"name", "role": "drums"|"bass"|"chords"|"melody"|"audio", "adg": abs path | None,
                            "adg_root": "user_library"|"places" | None, "adg_path": "dir/…/x.adg" | None,
                            "clips": [{"name", "length": beats, "notes": [[pitch, start, dur, vel], …]}]}]}
+
+An "audio" track (the Recorder's audio) has no rack and no MIDI clips but a staged WAV instead:
+audio_file (abs path, for Live 12's create_audio_clip), audio_root / audio_path (browser item, as adg_*).
 
 Times are in beats (quarter notes), which is what Live's clip API takes. Presets are written by the regular
 Ableton exporters into a Stage: by default a "ClusterSound" folder of Live's User Library, which Live always
@@ -14,12 +17,18 @@ import glob
 import os
 from dataclasses import dataclass
 
+import soundfile as sf
+
 from ..chords import melody as chord_melody
 from ..chords import perform as chord_perform
 from ..patterns import ableton as pat_ableton
 from ..patterns import midi as pat_midi
 from ..patterns import model as pat_model
+from ..online.downloads import safe_name, unique_path
 from ..racks import ableton as rack_ableton
+from ..sampler import export as sampler_export
+from ..sampler import slicing
+from ..sampler.session import SamplerSession
 
 USER_LIBRARY = os.path.expanduser("~/Music/Ableton/User Library")
 LIBRARY_FOLDER = "ClusterSound"
@@ -195,3 +204,26 @@ def compose(proj: dict, pure: bool = False, versions: list[str] | None = None) -
                               for m, c in zip(mel, clips)]))
     return {"kind": "compose", "name": name, "bpm": bpm, "folder": None, "tracks": tracks}
 
+
+def audio(s: SamplerSession, stage: Stage, start: float | None = None, end: float | None = None,
+          opts: dict | None = None) -> dict:
+    """The Recorder's audio (all of it, or the region start..end with the export fades) staged as a WAV in
+    <stage>/Audio, as a payload with one audio track. It is also in Live's browser, to drag by hand."""
+    o = opts or {}
+    if start is None or end is None:
+        a, b, y, name = 0.0, s.duration, s.audio, s.title or "Audio"
+    else:
+        a, b = slicing.clamp(start, end, float("inf"), s.duration)
+        y = slicing.render(s, a, b, float("inf"), float(o.get("fade_in_ms", 1)), float(o.get("fade_out_ms", 10)),
+                           bool(o.get("normalize")))
+        name = f"{s.title or 'Audio'} {a:.2f}-{b:.2f}s"
+    if y.shape[0] == 0:
+        raise ValueError("regione vuota")
+    path = unique_path(os.path.join(stage.folder("Audio"), safe_name(name) + ".wav"))
+    sf.write(path, y, s.sr, subtype="PCM_24")
+    sampler_export.write_note(s, path, a, b)
+    name = os.path.splitext(os.path.basename(path))[0]
+    track = {"name": name, "role": "audio", "adg": None, "adg_root": None, "adg_path": None, "clips": [],
+             "audio_file": path, "audio_root": stage.root, "audio_path": stage.browser_path(path),
+             "seconds": round(y.shape[0] / s.sr, 3)}
+    return {"kind": "audio", "name": name, "bpm": None, "folder": os.path.dirname(path), "tracks": [track]}

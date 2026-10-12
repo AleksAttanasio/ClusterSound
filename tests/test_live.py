@@ -209,6 +209,44 @@ def test_bridge_push_queue_and_routes(bridge):
     assert _get(bridge, "/api/init")[0] == 404
 
 
+# ---------------------------------------------------------------- Recorder audio
+def test_audio_payload_whole_and_region(stage):
+    from clustersound.sampler import session as S
+    x = (0.3 * np.sin(np.arange(synth.SR * 2) / synth.SR * 2 * np.pi * 220)).astype(np.float32)
+    s = S.from_array(np.stack([x, x], 1), synth.SR, origin="capture", title="Rec",
+                     meta={"captured_at": "2026-10-12 10:00"})
+    whole = payload.audio(s, stage)
+    t = whole["tracks"][0]
+    assert whole["kind"] == "audio" and t["role"] == "audio" and t["clips"] == [] and t["name"] == "Rec"
+    assert t["audio_root"] == "user_library" and t["audio_path"] == "ClusterSound/Audio/Rec.wav"
+    assert sf.info(t["audio_file"]).frames == synth.SR * 2 and t["seconds"] == 2.0
+    assert "uso personale" in open(t["audio_file"] + ".source.txt").read()
+
+    region = payload.audio(s, stage, 1.5, 0.5, {"fade_in_ms": 0, "fade_out_ms": 0})
+    r = region["tracks"][0]
+    assert r["name"] == "Rec 0.50-1.50s" and abs(r["seconds"] - 1.0) < 1e-3
+    assert payload.audio(s, stage)["tracks"][0]["name"] == "Rec (2)"  # never overwrites
+    with pytest.raises(ValueError):
+        payload.audio(s, stage, 3.0, 4.0)
+
+
+def test_send_to_live_api(stage):
+
+    from clustersound.api import Api
+    from clustersound.live import server
+    from clustersound.sampler import session as S
+    a = object.__new__(Api)
+    a._sampler = None
+    a._live = server.Bridge(stage, _resolve, lambda r: None)
+    a._settings = lambda: {}
+    assert a.sampler_send_to_live()["error"] == "nessun audio aperto"
+    a._sampler = S.from_array(np.zeros((synth.SR, 1), np.float32) + .1, synth.SR, title="Stem · Voce")
+    r = a.sampler_send_to_live(0.2, 0.7)
+    assert r["queued"] == 1 and r["tracks"] == ["Stem · Voce 0.20-0.70s"] and os.path.isfile(r["file"])
+    item = a._live.next()
+    assert item["kind"] == "audio" and item["tracks"][0]["audio_file"] == r["file"]
+
+
 # ---------------------------------------------------------------- Remote Script protocol
 def _protocol():
     import importlib.util

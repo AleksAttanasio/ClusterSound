@@ -9,6 +9,10 @@
 // type. Picking one (or ◀ ▶) loads it on the imported track and plays its clip in loop. Tracks that arrive
 // without an instrument get the first preset of their type right away, so every import plays.
 //
+// "Invia a Live" from the Recorder sends audio: a new audio track with the WAV (staged in User Library ›
+// ClusterSound › Audio) as a clip in the first empty slot of the selected scene. Live 12 creates the clip
+// itself (ClipSlot.create_audio_clip); older versions load it through the Remote Script.
+//
 // "Clip → Melodia" sends the notes of the clip selected in Live (Detail view) to ClusterSound, where Compose
 // imports it as the melody of the current version.
 //
@@ -230,6 +234,14 @@ function trackIndex(trackId) {  // current index of a track in live_set tracks, 
 trackIndex.local = 1;
 
 function importPayload(p) {
+    if (p.kind === "audio" && liveMajor() < 12 && !bridgeOk) {
+        // Live 10/11 can't create an audio clip from Max: without the Remote Script an empty track is all we'd get
+        var file = p.tracks.length ? p.tracks[0].audio_path : "";
+        status("Audio: serve la Remote Script ClusterSoundBridge (Preferenze → Link/MIDI → Control Surface), "
+               + "oppure trascina dal browser → User Library/" + file);
+        busy = false;
+        return;
+    }
     var set = new LiveAPI("live_set");
     var selTrack = pathIndex(new LiveAPI("live_set view selected_track"), "tracks");
     var scene = Math.max(0, pathIndex(new LiveAPI("live_set view selected_scene"), "scenes"));
@@ -241,22 +253,39 @@ function importPayload(p) {
     for (var i = 0; i < p.tracks.length; i++) {
         (function (t, first) {
             // tracks and clips are kept by Live id: indices change as soon as tracks are added or moved
+            var isAudio = t.role === "audio";
             var ref = { name: t.name, role: t.role || "chords", trackId: 0, clipId: 0, cat: null, options: [], total: 0,
                         pick: 0, hasSound: false, pad: null,
                         restore: t.adg_path ? { root: t.adg_root, path: t.adg_path } : null, buses: t.buses || [] };
             refs.push(ref);
             steps.push(function () {
                 var index;
-                if (first && !opts.newtracks && selTrack >= 0) {
+                if (first && !opts.newtracks && selTrack >= 0 && (!isAudio || audioTrack(selTrack))) {
                     index = selTrack;
                 } else {
-                    set.call("create_midi_track", insertAt);
+                    set.call(isAudio ? "create_audio_track" : "create_midi_track", insertAt);
                     index = insertAt >= 0 ? insertAt : set.getcount("tracks") - 1;
                     if (insertAt >= 0) insertAt++;
                     new LiveAPI("live_set tracks " + index).set("name", t.name);
                 }
                 ref.trackId = Number(new LiveAPI("live_set tracks " + index).id);
             });
+            if (isAudio) {
+                steps.push(function () {
+                    var track = trackIndex(ref.trackId), slot = emptySlot(set, track, scene);
+                    var path = "live_set tracks " + track + " clip_slots " + slot;
+                    if (liveMajor() >= 12) {
+                        new LiveAPI(path).call("create_audio_clip", t.audio_file);
+                        if (new LiveAPI(path).get("has_clip")[0]) { ref.hasSound = true; return; }
+                    }
+                    if (!bridgeOk) { notes.push(t.name + ": trascina il file dal browser → User Library/" + t.audio_path); return; }
+                    var id = sendOsc({ cmd: "load_audio", track: track, slot: slot, root: t.audio_root, path: t.audio_path });
+                    wait(id, function (msg) {
+                        if (msg.ok) ref.hasSound = true;
+                        else notes.push(t.name + ": " + msg.error);
+                    });
+                });
+            }
             if (t.adg_path) {
                 steps.push(function () {
                     if (!bridgeOk) { notes.push(t.name + ": Remote Script non attiva, trascina il rack dal browser → " + t.adg_path); return; }
@@ -280,16 +309,19 @@ function importPayload(p) {
     }
     steps.push(function () {
         busy = false;
-        imported = entriesOf(refs);
-        dlog("imported " + imported.length + " entries: " + imported.map(function (e) { return e.name; }).join(", "));
-        sndIdx = 0;
-        for (var k = 0; k < imported.length; k++) if (!imported[k].hasSound) { sndIdx = k; break; }
-        fillSoundTracks();
+        var entries = entriesOf(refs);
+        if (entries.length) {  // audio only: the Suoni menus keep the previous import
+            imported = entries;
+            dlog("imported " + imported.length + " entries: " + imported.map(function (e) { return e.name; }).join(", "));
+            sndIdx = 0;
+            for (var k = 0; k < imported.length; k++) if (!imported[k].hasSound) { sndIdx = k; break; }
+            fillSoundTracks();
+        }
         status("Importato «" + p.name + "»" + (notes.length ? " · " + notes.join(" · ") : ""));
         // a track without an instrument gets the first proposal from Live's library, so the import plays
         for (var j = 0; j < refs.length; j++) {
             (function (r) {
-                if (r.hasSound || !bridgeOk) return;
+                if (r.hasSound || r.role === "audio" || !bridgeOk) return;
                 firstSound(r);
             })(refs[j]);
         }
@@ -328,15 +360,30 @@ function runSteps() {
 }
 runSteps.local = 1;
 
-function writeClip(set, track, slot, clip) {
+function emptySlot(set, track, slot) {
     // first empty slot from the wanted scene down: never overwrite a clip of the set
-    var cs, path;
     for (;; slot++) {
         while (set.getcount("scenes") <= slot) set.call("create_scene", -1);
-        path = "live_set tracks " + track + " clip_slots " + slot;
-        cs = new LiveAPI(path);
-        if (!cs.get("has_clip")[0]) break;
+        if (!new LiveAPI("live_set tracks " + track + " clip_slots " + slot).get("has_clip")[0]) return slot;
     }
+}
+emptySlot.local = 1;
+
+function audioTrack(index) {
+    var t = new LiveAPI("live_set tracks " + index);
+    return t.get("has_audio_input")[0] && !t.get("has_midi_input")[0];
+}
+audioTrack.local = 1;
+
+function liveMajor() {
+    return Number(new LiveAPI("live_app").call("get_major_version")) || 0;
+}
+liveMajor.local = 1;
+
+function writeClip(set, track, slot, clip) {
+    slot = emptySlot(set, track, slot);
+    var path = "live_set tracks " + track + " clip_slots " + slot;
+    var cs = new LiveAPI(path);
     cs.call("create_clip", clip.length);
     var c = new LiveAPI(path + " clip");
     c.set("name", clip.name);
@@ -363,6 +410,7 @@ function entriesOf(refs) {
     var out = [];
     for (var i = 0; i < refs.length; i++) {
         var r = refs[i];
+        if (r.role === "audio") continue;  // nothing to play an audio clip with
         if (r.buses.length) r.name = r.name + " · kit intero";
         out.push(r);
         for (var j = 0; j < r.buses.length; j++) {
