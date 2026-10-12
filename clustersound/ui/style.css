@@ -502,7 +502,7 @@ wa-select.pop-field, wa-input.pop-field { display: block; }
 .pop-check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); cursor: pointer; }
 .pop-row { display: flex; justify-content: space-between; }
 .pop-scale { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-3); }
-.pop-actions { display: flex; justify-content: flex-end; }
+.pop-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .pt-lock { opacity: .45; background: transparent; border-color: transparent; }
 .pt-lock:hover, .pt-lock.on { opacity: 1; }
 .pt-lock.on { background: var(--wa-color-warning-fill-quiet); border-color: var(--wa-color-warning-border-normal); color: var(--wa-color-warning-on-quiet); }
