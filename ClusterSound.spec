@@ -31,13 +31,13 @@ a = Analysis(
     datas=datas,
     binaries=binaries,
     hiddenimports=["webview.platforms.cocoa", "ScreenCaptureKit", "CoreMedia"] + stems_imports,  # extras, if installed
-    excludes=[
+    excludes=[m for m in [
         "tkinter", "_tkinter", "onnx", "onnxruntime", "h5py", "pytest", "IPython", "matplotlib", "scipy",
         "pandas", "PIL", "numpy.f2py", "numpy.distutils", "numpy.testing", "unittest",
         "pydoc", "webview.platforms.qt", "webview.platforms.gtk", "webview.platforms.cef",
         "webview.platforms.winforms", "webview.platforms.edgechromium", "PyQt5", "PyQt6",
         "PySide2", "PySide6", "gi",
-    ],
+    ] if not (stems_imports and m == "unittest")],  # PyTorch imports unittest
     noarchive=False,
 )
 pyz = PYZ(a.pure)
