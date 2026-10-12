@@ -47,13 +47,39 @@ def status() -> dict:
             "install_hint": INSTALL_HINT, "stems": [{"key": k, "label": l} for k, l in STEMS]}
 
 
-def download_model() -> None:
-    """The only step that uses the network: fetches the weights into MODEL_DIR (once)."""
+def _local_bag():
+    """The model from MODEL_DIR only, never from the network (None if it isn't there)."""
+    yml = os.path.join(MODEL_DIR, MODEL + ".yaml")
+    if os.path.isfile(yml):  # demucs >= 4.1: yaml + one safetensors per model of the bag
+        import yaml
+        from demucs.apply import BagOfModels
+        from demucs.hf import load_safetensors_model
+        with open(yml) as f:
+            bag = yaml.safe_load(f)
+        models = [load_safetensors_model(os.path.join(MODEL_DIR, f"{sig}.safetensors")) for sig in bag["models"]]
+        return BagOfModels(models, bag.get("weights"), bag.get("segment"))
     import torch
     from demucs.pretrained import get_model
+    if importlib.util.find_spec("demucs.hf") is not None:
+        return None  # 4.1 would look the name up online first
+    torch.hub.set_dir(MODEL_DIR)  # demucs 4.0: torch.hub cache in MODEL_DIR, no request once it's there
+    return get_model(MODEL)
+
+
+def download_model() -> None:
+    """The only step that uses the network: fetches the weights into MODEL_DIR (once)."""
     os.makedirs(MODEL_DIR, exist_ok=True)
-    torch.hub.set_dir(MODEL_DIR)
-    get_model(MODEL)
+    if importlib.util.find_spec("demucs.hf") is not None:
+        import yaml
+        from demucs.hf import DEFAULT_NAMESPACE, hf_repo_name
+        from huggingface_hub import hf_hub_download
+        repo = f"{DEFAULT_NAMESPACE}/{hf_repo_name(MODEL)}"
+        with open(hf_hub_download(repo, f"{MODEL}.yaml", local_dir=MODEL_DIR)) as f:
+            sigs = yaml.safe_load(f)["models"]
+        for sig in sigs:
+            hf_hub_download(repo, f"{sig}.safetensors", local_dir=MODEL_DIR)
+    if _local_bag() is None:
+        raise RuntimeError("modello non trovato dopo il download")
     with open(_marker(), "w") as f:
         f.write(MODEL + "\n")
 
@@ -63,12 +89,10 @@ class _Demucs:
 
     def __init__(self):
         import torch
-        from demucs.pretrained import get_model
-        if not os.path.isfile(_marker()):
+        self.model = _local_bag() if os.path.isfile(_marker()) else None
+        if self.model is None:
             raise RuntimeError("modello Demucs non scaricato")
-        torch.hub.set_dir(MODEL_DIR)
         self.torch = torch
-        self.model = get_model(MODEL)  # from MODEL_DIR: no network once downloaded
         self.model.eval()
         self.samplerate = int(self.model.samplerate)
         self.device = "mps" if torch.backends.mps.is_available() else "cpu"
