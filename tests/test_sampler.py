@@ -212,3 +212,64 @@ def test_export_keeps_regions_aligned(tmp_path):
     out = sampler_export.export(s, [{"start": 0.2, "end": 0.6}, {"start": 99, "end": 100}, {"start": 1, "end": 1.2}],
                                 root=str(tmp_path))
     assert out[1] is None and os.path.basename(out[2]) == "Break - 03.wav"
+
+
+# ---------------------------------------------------------------- open from the library / Finder
+@pytest.fixture
+def lib_api(tmp_path):
+    from clustersound.api import Api
+    rels = ["Pack A/Loops/loop 1.wav", "Pack A/Loops/loop 2.wav", "Pack A/kick.wav", "Pack B/Snare.wav", "top.wav"]
+    items = []
+    for i, rel in enumerate(rels):
+        p = tmp_path / "lib" / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        sf.write(p, np.zeros(SR // 2, dtype=np.float32), SR)
+        items.append({"id": i, "path": str(p), "rel": rel, "name": os.path.basename(rel), "cls": 0,
+                      "info": {"duration": 0.5}})
+
+    class Lib:
+        root = str(tmp_path / "lib")
+    a = object.__new__(Api)
+    a._lib = Lib()
+    a._lib.items = items
+    a._sampler = None
+    a._sampler_max = lambda: 30.0
+    return a
+
+
+def test_library_browse_folders_files_search(lib_api):
+    top = lib_api.sampler_library_browse()
+    assert [(f["name"], f["count"]) for f in top["folders"]] == [("Pack A", 3), ("Pack B", 1)]
+    assert [f["name"] for f in top["files"]] == ["top.wav"] and top["crumbs"] == [{"name": "lib", "path": ""}]
+    a = lib_api.sampler_library_browse("Pack A")
+    assert [f["path"] for f in a["folders"]] == ["Pack A/Loops"] and [f["name"] for f in a["files"]] == ["kick.wav"]
+    b = lib_api.sampler_library_browse("../Pack B")  # ".." is dropped: never above the library root
+    assert b["folder"] == "Pack B" and [f["name"] for f in b["files"]] == ["Snare.wav"]
+    assert [c["name"] for c in b["crumbs"]] == ["lib", "Pack B"]
+    hits = lib_api.sampler_library_browse("", "LOOP")
+    assert [f["rel"] for f in hits["files"]] == ["Pack A/Loops/loop 1.wav", "Pack A/Loops/loop 2.wav"]
+    assert lib_api.sampler_library_browse("", "l")["folders"]  # 1 character: browse, not search
+    lib_api._lib.root = None
+    assert lib_api.sampler_library_browse()["error"]
+
+
+def test_open_library_item(lib_api):
+    r = lib_api.sampler_open_library(3)
+    assert r["error"] is None and r["session"]["title"] == "Snare" and r["session"]["origin"] == "file"
+    assert lib_api.sampler_open_library(99)["error"] == "sample non trovato"
+
+
+def test_drop_from_finder(lib_api, tmp_path):
+    calls = []
+
+    class Win:
+        def evaluate_js(self, js):
+            calls.append(js)
+    lib_api._window = Win()
+    wav = lib_api._lib.items[0]["path"]
+    lib_api._on_drop({"dataTransfer": {"files": [{"name": "loop 1.wav", "pywebviewFullPath": wav}]}})
+    assert lib_api._sampler.path == wav and '"title": "loop 1"' in calls[-1]
+    txt = tmp_path / "notes.txt"
+    txt.write_text("x")
+    lib_api._on_drop({"dataTransfer": {"files": [{"name": "notes.txt", "pywebviewFullPath": str(txt)}]}})
+    assert "trascina un file audio" in calls[-1] and lib_api._sampler.path == wav

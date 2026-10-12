@@ -1,6 +1,6 @@
 [project]
 name = "clustersound"
-version = "0.3.0"
+version = "0.4.0"
 description = "Classifica e raggruppa in 3D una libreria di sample audio (kick, snare, hat, …)."
 requires-python = ">=3.11"
 dependencies = [

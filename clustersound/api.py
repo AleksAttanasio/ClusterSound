@@ -24,7 +24,7 @@ from .chords.library import CATEGORIES as CHORD_CATEGORIES
 from .chords.library import DEFAULT_DIR as CHORD_DIR
 from .chords.library import ChordLibrary
 from .features import TYPES
-from .library import Library
+from .library import AUDIO_EXT, Library
 from .live import payload as live_payload
 from .live import server as live_server
 from .online import cache as online_cache
@@ -55,6 +55,7 @@ from .sampler import slicing
 from .sampler import stems as sampler_stems
 
 PREVIEW_MAX_SECONDS = 60
+LIBRARY_BROWSE_MAX = 200  # search results shown by "Dalla libreria…"
 EXPORT_DIR = os.path.expanduser("~/Music/ClusterSound Patterns")
 AUDIO_TYPES = ("Audio (*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg)",)
 
@@ -459,6 +460,74 @@ class Api:
         if not os.path.isfile(path):
             return {"error": "file non trovato"}
         return self._sampler_open(path)
+
+    def sampler_current(self) -> dict:
+        return {"error": None, **self._sampler_state()}
+
+    def sampler_library_browse(self, folder: str = "", q: str = "") -> dict:
+        """The library as folders and files, for "Dalla libreria…": the subfolders of folder (with how many
+        files are under each) and its files; with q (2+ characters) the matching files of the whole library."""
+        items = self._lib.items
+        if not self._lib.root or not items:
+            return {"error": "nessuna libreria aperta: scegline una nella scheda Libreria"}
+        folder = "/".join(p for p in (folder or "").split("/") if p not in ("", ".", ".."))
+        file_of = lambda it: {"id": it["id"], "name": it["name"], "rel": it["rel"], "cls": it["cls"],
+                              "dur": round(float(it["info"].get("duration", 0)), 2)}
+        out = {"error": None, "root": self._lib.root, "folder": folder, "q": q or "",
+               "crumbs": [{"name": os.path.basename(self._lib.root.rstrip("/")) or "Libreria", "path": ""}]
+               + [{"name": part, "path": "/".join(folder.split("/")[:i + 1])}
+                  for i, part in enumerate(folder.split("/")) if folder],
+               "folders": [], "files": []}
+        q = (q or "").strip().lower()
+        if len(q) >= 2:
+            hits = [it for it in items if q in it["rel"].lower()]
+            out["files"] = [file_of(it) for it in sorted(hits, key=lambda it: it["rel"].lower())[:LIBRARY_BROWSE_MAX]]
+            out["more"] = max(0, len(hits) - LIBRARY_BROWSE_MAX)
+            return out
+        prefix = folder + "/" if folder else ""
+        counts: dict[str, int] = {}
+        for it in items:
+            rel = it["rel"]
+            if not rel.startswith(prefix):
+                continue
+            rest = rel[len(prefix):]
+            if "/" in rest:
+                sub = rest.split("/", 1)[0]
+                counts[sub] = counts.get(sub, 0) + 1
+            else:
+                out["files"].append(file_of(it))
+        out["folders"] = [{"name": n, "path": prefix + n, "count": c}
+                          for n, c in sorted(counts.items(), key=lambda kv: kv[0].lower())]
+        out["files"].sort(key=lambda f: f["name"].lower())
+        return out
+
+    def sampler_open_library(self, item_id: int) -> dict:
+        try:
+            it = self._lib.items[int(item_id)]
+        except (IndexError, ValueError, TypeError):
+            return {"error": "sample non trovato"}
+        if not os.path.isfile(it["path"]):
+            return {"error": "file non trovato"}
+        return self._sampler_open(it["path"])
+
+    def _bind_drop(self) -> None:
+        """Audio files dropped from the Finder on the Recorder open in its editor (pywebview gives the path)."""
+        from webview.dom import DOMEventHandler
+        el = self._window.dom.get_element("#sampler")
+        if el is None:
+            return
+        el.events.dragover += DOMEventHandler(lambda e: None, prevent_default=True)
+        el.events.drop += DOMEventHandler(self._on_drop, prevent_default=True, stop_propagation=True)
+
+    def _on_drop(self, e: dict) -> None:
+        files = (e.get("dataTransfer") or {}).get("files") or []
+        paths = [f.get("pywebviewFullPath") for f in files if f.get("pywebviewFullPath")]
+        audio = [p for p in paths if os.path.splitext(p)[1].lower() in AUDIO_EXT]
+        if audio:
+            out = self._sampler_open(audio[0])
+        else:
+            out = {"error": "trascina un file audio (wav, aif, flac, mp3, ogg…)" if paths else "file non leggibile"}
+        self._window.evaluate_js(f"window.__cs.sampler && window.__cs.sampler.dropped({json.dumps(out)})")
 
     def sampler_link(self, url: str) -> dict:
         """Resolve a pasted link; a single file opens at once, an item with several files is listed."""

@@ -861,6 +861,15 @@ wa-button.icon-btn.active::part(button) { background: var(--sel-bg); border-colo
 .rc-item { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; gap: 3px; }
 .rc-item-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rc-item-act { display: flex; align-items: center; gap: 6px; }
+.sp-open-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.sp-wave-wrap.sp-drop { outline: 2px dashed var(--wa-color-brand-fill-loud, #7c4dff); outline-offset: -4px; }
+.sp-lib { display: flex; flex-direction: column; gap: 10px; }
+.sp-lib-crumbs { font-size: 12px; opacity: .8; }
+.sp-lib-rows { display: flex; flex-direction: column; gap: 2px; max-height: 55vh; overflow-y: auto; }
+.sp-lib-row { display: grid; grid-template-columns: 18px 1fr auto auto; align-items: center; gap: 10px; padding: 6px 8px; background: none; border: 1px solid transparent; border-radius: 6px; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.sp-lib-row:hover { background: var(--bg); border-color: var(--line); }
+.sp-lib-row.busy { opacity: .5; pointer-events: none; }
+.sp-lib-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .st-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
 wa-radio-group.seg.st-scope::part(form-control-input) { flex-wrap: wrap; }
 .st-meter { height: 6px; flex: none; }

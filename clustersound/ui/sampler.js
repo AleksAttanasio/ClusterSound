@@ -1,7 +1,7 @@
 // "Recorder" screen: record what the Mac sends to one or more output devices (one file each, several formats),
 // then open a recording below to mark regions on its waveform (by hand or on transients) and export them as
 // samples. Opening own files and openly licensed links is still here, hidden while show_sources is false.
-import { btn, iconBtn, slider, check, num, select, seg, setPlayButton, icon } from './kit.js';
+import { btn, iconBtn, slider, check, num, select, seg, text, setPlayButton, icon, openDialog } from './kit.js';
 import { toast, showPopover } from './sendmenu.js';
 import { liveToast } from './live.js';
 
@@ -22,8 +22,9 @@ const fmt = (t) => {
 };
 
 export class SamplerEditor {
-  constructor({ api, player, onSendToRack }) {
+  constructor({ api, player, onSendToRack, classes = [] }) {
     this.api = api;
+    this.classes = classes;   // library classes, for the labels in "Dalla libreria…"
     this.onSendToRack = onSendToRack; // (refs) -> loads them on the Drum Rack
     this.player = player;
     this.ready = null;
@@ -87,6 +88,14 @@ export class SamplerEditor {
     const o = this.opts;
     root.innerHTML = `
       <aside class="sidebar sp-side">
+        <div class="filter-block">
+          <div class="filter-title">Apri audio</div>
+          <div class="sp-open-row">
+            ${btn('Apri file…', { icon: 'folder-open', id: 'sp-open-file', title: 'Un file audio del Mac (wav, aif, flac, mp3, ogg…)' })}
+            ${btn('Dalla libreria…', { icon: 'list', id: 'sp-open-lib', title: 'Un sample o un loop della libreria di ClusterSound, per cartella o per nome' })}
+          </div>
+          <div class="hint">Oppure trascina un file audio dal Finder sulla forma d'onda.</div>
+        </div>
         ${this.showSources ? `<div class="filter-block">
           <div class="filter-title">Sorgente</div>
           ${btn('Apri file audio…', { icon: 'folder-open', cls: 'sp-wide', id: 'sp-open' })}
@@ -150,8 +159,9 @@ export class SamplerEditor {
           <canvas id="sp-wave" class="sp-wave"></canvas>
           <canvas id="sp-overview" class="sp-overview"></canvas>
           <div class="empty sp-empty" id="sp-empty">
-            <div class="empty-title">Registra l'uscita del Mac</div>
+            <div class="empty-title">Registra l'uscita del Mac, o apri un file</div>
             <div class="empty-sub">Scegli una o più uscite e il formato, poi premi Registra: ogni uscita va in un file.
+              Puoi anche aprire un file audio o un sample della libreria, o trascinarlo qui dal Finder.
               Apri una registrazione per ritagliare i sample: trascina sulla forma d'onda per creare una regione
               (max <span class="sp-max"></span>) oppure usa «Taglia sui transienti». Rotella: zoom · Maiusc+rotella: scorri.</div>
           </div>
@@ -177,6 +187,7 @@ export class SamplerEditor {
   }
 
   _bind() {
+    this._bindOpen();
     this._bindRecorder();
     if (this.showSources) this._bindSources();
     this._bindRest();
@@ -204,6 +215,74 @@ export class SamplerEditor {
       const r = await this.api.sampler_open_result(row.dataset.uid);
       row.classList.remove('busy');
       this._opened(r);
+    };
+  }
+
+  _bindOpen() {
+    $('#sp-open-file').onclick = async () => this._opened(await this.api.sampler_open_file(null));
+    $('#sp-open-lib').onclick = () => this.openLibrary();
+    // the path of a file dropped from the Finder comes from Python (pywebview): here only the highlight
+    const wrap = $('#sp-wave-wrap');
+    let depth = 0;
+    const isFile = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+    wrap.addEventListener('dragenter', (e) => { if (isFile(e)) { depth++; wrap.classList.add('sp-drop'); } });
+    wrap.addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; wrap.classList.remove('sp-drop'); } });
+    wrap.addEventListener('drop', () => { depth = 0; wrap.classList.remove('sp-drop'); });
+  }
+
+  // called by Python after an audio file was dropped from the Finder
+  dropped(r) {
+    $('#sp-wave-wrap')?.classList.remove('sp-drop');
+    if (!r?.error) toast(`Aperto: ${r.session.title}`);
+    this._opened(r);
+  }
+
+  async openLibrary(folder = this.opts.libFolder || '', q = '') {
+    const r = await this.api.sampler_library_browse(folder, q);
+    if (r.error) {
+      if (folder) { this.opts.libFolder = ''; this._persist(); return this.openLibrary('', q); }
+      return this._error(r.error);
+    }
+    this.opts.libFolder = r.folder;
+    this._persist();
+    const label = (f) => this.classes[f.cls]?.label || '';
+    const rows = r.folders.map((f) => `<button class="sp-lib-row" data-folder="${esc(f.path)}">
+        ${icon('folder-open')}<span class="sp-lib-name">${esc(f.name)}</span><span class="hint">${f.count} file</span></button>`)
+      .concat(r.files.map((f) => `<button class="sp-lib-row" data-id="${f.id}" title="${esc(f.rel)}">
+        ${icon('music')}<span class="sp-lib-name">${esc(r.q ? f.rel : f.name)}</span>
+        <span class="hint">${esc(label(f))}</span><span class="hint">${fmt(f.dur)}</span></button>`));
+    const crumbs = r.crumbs.map((c, i) => i === r.crumbs.length - 1 && !r.q ? `<b>${esc(c.name)}</b>`
+      : `<a href="#" data-folder="${esc(c.path)}">${esc(c.name)}</a>`).join(' › ');
+    const body = `<div class="sp-lib">
+        ${text(r.q, { id: 'sp-lib-q', placeholder: 'Cerca per nome o cartella in tutta la libreria', 'with-clear': true })}
+        <div class="sp-lib-crumbs">${crumbs}${r.q ? ' › <b>ricerca</b>' : ''}</div>
+        <div class="sp-lib-rows">${rows.join('') || '<div class="hint">Nessun file audio qui.</div>'}</div>
+        ${r.more ? `<div class="hint">… e altri ${r.more}: affina la ricerca.</div>` : ''}
+      </div>`;
+    const dlg = openDialog('sp-lib-dlg', { label: 'Apri dalla libreria', body, width: '640px' });
+    const qEl = dlg.querySelector('#sp-lib-q');
+    let timer;
+    qEl.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const v = qEl.value || '';
+        if (v.trim().length === 1) return;
+        await this.openLibrary(r.folder, v);
+        const again = document.querySelector('#sp-lib-q');
+        again?.focus();
+      }, 250);
+    });
+    if (r.q) setTimeout(() => qEl.focus(), 0);
+    dlg.querySelector('.sp-lib').onclick = async (e) => {
+      const f = e.target.closest('[data-folder]');
+      if (f) { e.preventDefault(); return this.openLibrary(f.dataset.folder, ''); }
+      const it = e.target.closest('[data-id]');
+      if (!it) return;
+      it.classList.add('busy');
+      const out = await this.api.sampler_open_library(+it.dataset.id);
+      if (out.error) { it.classList.remove('busy'); return this._error(out.error); }
+      dlg.close();
+      this._opened(out);
     };
   }
 
