@@ -106,3 +106,44 @@ def test_real_demucs(tmp_path):
     s = S.from_array(_noise(8.0), SR)
     res = stems.separate(s, 0, s.duration, str(tmp_path), "real")
     assert all(os.path.getsize(r["path"]) > 0 for r in res)
+
+
+# ---------------------------------------------------------------- api job
+@pytest.fixture
+def api(tmp_path, fake, monkeypatch):
+    import threading
+    import time
+
+    from clustersound.api import Api
+    a = object.__new__(Api)
+    a._stems_lock = threading.Lock()
+    a._stems_job = {"state": "idle", "progress": 0.0, "scope": None, "stems": [], "error": None}
+    a._stems_source = None
+    a._stems_cancel = threading.Event()
+    a._sampler = None
+    monkeypatch.setattr(Api, "_settings", lambda self: {"sampler_dir": str(tmp_path / "samples")})
+    monkeypatch.setattr(Api, "_inside_library", lambda self, folder: False)
+    monkeypatch.setattr(stems, "status", lambda: {"installed": True, "model_ready": True})
+
+    def wait():
+        for _ in range(200):
+            if a.stems_status()["job"]["state"] not in ("running", "downloading"):
+                return a.stems_status()["job"]
+            time.sleep(0.01)
+        raise TimeoutError
+    a.wait = wait
+    return a
+
+
+def test_api_region_job_and_open(api, tmp_path):
+    assert api.stems_start()["error"] == "nessun audio aperto"
+    api._sampler = S.from_array(_noise(2.0), SR, origin="capture", title="Rec", meta={"device": "Cuffie"})
+    assert api.stems_start("region")["error"] == "nessuna regione selezionata"
+    assert api.stems_start("region", 0.5, 1.5)["error"] is None
+    job = api.wait()
+    assert job["state"] == "done" and job["scope"] == "region" and len(job["stems"]) == len(stems.STEMS)
+    assert job["stems"][0]["path"].startswith(str(tmp_path / "samples"))
+    assert api.stems_open(str(tmp_path / "other.wav"))["error"] == "stem non trovato"
+    r = api.stems_open(job["stems"][0]["path"])
+    assert r["error"] is None and r["session"]["title"] == "Rec · Batteria" and r["session"]["origin"] == "capture"
+    assert api._sampler.meta["device"] == "Cuffie" and abs(api._sampler.duration - 1.0) < 1e-3

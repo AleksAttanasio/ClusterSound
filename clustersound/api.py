@@ -52,6 +52,7 @@ from .sampler import export as sampler_export
 from .sampler import links as sampler_links
 from .sampler import session as sampler_session
 from .sampler import slicing
+from .sampler import stems as sampler_stems
 
 PREVIEW_MAX_SECONDS = 60
 EXPORT_DIR = os.path.expanduser("~/Music/ClusterSound Patterns")
@@ -94,6 +95,10 @@ class Api:
         self._live = live_server.Bridge(self._live_stage(), self._resolve, self._describe, self._title)
         self._sampler: sampler_session.SamplerSession | None = None
         self._recorder = sampler_recorder.Recorder()
+        self._stems_lock = threading.Lock()
+        self._stems_job: dict = {"state": "idle", "progress": 0.0, "scope": None, "stems": [], "error": None}
+        self._stems_source: sampler_session.SamplerSession | None = None  # what the last job separated
+        self._stems_cancel = threading.Event()
         threading.Thread(target=online_cache.prune, args=(self._cache_mb(),), daemon=True).start()
 
     # pywebview exposes public attributes too, so keep internals underscored
@@ -551,6 +556,103 @@ class Api:
             self._sampler.meta = {"device": rec["device"] if rec else "uscita audio",
                                   "captured_at": time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(real)))}
         return out
+
+    # ------------------------------------------------------------------ stems
+    def stems_status(self) -> dict:
+        with self._stems_lock:
+            return {**sampler_stems.status(), "job": dict(self._stems_job)}
+
+    def _stems_busy(self) -> bool:
+        return self._stems_job["state"] in ("downloading", "running")
+
+    def _stems_set(self, **kw) -> None:
+        with self._stems_lock:
+            self._stems_job.update(kw)
+
+    def stems_download_model(self) -> dict:
+        """Fetch the Demucs weights once (the user confirmed it); separation is offline afterwards."""
+        if not sampler_stems.installed():
+            return {**self.stems_status(), "error": f"serve l'estensione stem: {sampler_stems.INSTALL_HINT}"}
+        with self._stems_lock:
+            if self._stems_busy():
+                return {**sampler_stems.status(), "job": dict(self._stems_job), "error": "operazione già in corso"}
+            self._stems_job.update(state="downloading", progress=0.0, error=None)
+
+        def work():
+            try:
+                sampler_stems.download_model()
+                self._stems_set(state="idle")
+            except Exception as e:
+                self._stems_set(state="error", error=f"download del modello non riuscito ({e})")
+        threading.Thread(target=work, daemon=True).start()
+        return {**self.stems_status(), "error": None}
+
+    def stems_start(self, scope: str = "all", start: float | None = None, end: float | None = None) -> dict:
+        """Separate the open audio (scope "all") or one region of it ("region") in the background."""
+        s = self._sampler
+        st = sampler_stems.status()
+        if not s:
+            return {**self.stems_status(), "error": "nessun audio aperto"}
+        if not st["installed"]:
+            return {**self.stems_status(), "error": f"serve l'estensione stem: {sampler_stems.INSTALL_HINT}"}
+        if not st["model_ready"]:
+            return {**self.stems_status(), "error": "modello Demucs non scaricato"}
+        if scope == "region":
+            if start is None or end is None:
+                return {**self.stems_status(), "error": "nessuna regione selezionata"}
+            a, b = slicing.clamp(float(start), float(end), float("inf"), s.duration)
+            base = f"{s.title or 'sample'} {a:.2f}-{b:.2f}s"
+        else:
+            scope, a, b, base = "all", 0.0, s.duration, s.title or "registrazione"
+        if b - a < 0.1:
+            return {**self.stems_status(), "error": "regione troppo corta"}
+        root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
+        folder = sampler_stems.out_folder(s, scope, root)
+        with self._stems_lock:
+            if self._stems_busy():
+                return {**sampler_stems.status(), "job": dict(self._stems_job), "error": "separazione già in corso"}
+            self._stems_job = {"state": "running", "progress": 0.0, "scope": scope, "stems": [], "error": None,
+                               "title": s.title, "folder": folder}
+        self._stems_cancel.clear()
+
+        def work():  # keeps its own reference to s: opening other audio meanwhile doesn't affect it
+            try:
+                res = sampler_stems.separate(s, a, b, folder, base, lambda p: self._stems_set(progress=round(p, 3)),
+                                             self._stems_cancel.is_set)
+            except sampler_stems.Cancelled:
+                self._stems_set(state="cancelled")
+                return
+            except Exception as e:
+                self._stems_set(state="error", error=f"separazione non riuscita ({e})")
+                return
+            self._stems_source = s
+            self._stems_set(state="done", progress=1.0, stems=res)
+            if self._inside_library(folder):
+                self._schedule_rescan()
+        threading.Thread(target=work, daemon=True).start()
+        return {**self.stems_status(), "error": None}
+
+    def stems_cancel(self) -> dict:
+        self._stems_cancel.set()
+        return self.stems_status()
+
+    def stems_open(self, path: str) -> dict:
+        """One stem of the last job into the editor; it keeps the source's origin, licence and provenance."""
+        with self._stems_lock:
+            stem = next((r for r in self._stems_job["stems"] if r["path"] == path), None)
+        src = self._stems_source
+        if not stem or not src:
+            return {"error": "stem non trovato"}
+        if not os.path.isfile(path):
+            return {"error": "file non trovato"}
+        try:
+            s = sampler_session.load_file(path, origin=src.origin, result=src.result)
+        except Exception as e:
+            return {"error": f"impossibile leggere il file audio ({e})"}
+        s.title = f"{src.title} · {stem['label']}"
+        s.meta = dict(src.meta)
+        self._sampler = s
+        return {"error": None, **self._sampler_state()}
 
     # ================================================================== patterns
     def patterns_init(self) -> dict:
