@@ -89,34 +89,66 @@ class ClusterSoundBridge(ControlSurface):
             self._list(msg)
         elif cmd == "load_item":
             self._load_item(msg)
+        elif cmd == "load_audio":
+            self._load_audio(msg, 0)
         else:
             self._reply(msg, False, error="comando sconosciuto: %s" % cmd)
 
-    def _load(self, msg, tries):
-        song = self.song()
-        tracks = list(song.tracks)
-        idx = int(msg.get("track", -1))
-        if not -len(tracks) <= idx < len(tracks):
-            self._reply(msg, False, error="traccia %d inesistente" % idx)
-            return
+    def _find(self, msg, tries, retry, what="preset"):
+        """The browser item at msg["path"]; None after scheduling retry(tries + 1) (a file just written takes
+        a few seconds to be indexed) or replying with an error once the tries are over."""
         browser = Live.Application.get_application().browser
         path = msg.get("path") or msg.get("place", "")
         item = protocol.find_item(self._roots(browser, msg.get("root")), path)
         if item is None or not item.is_loadable:
             if tries < MAX_TRIES:
-                self.schedule_message(RETRY_TICKS, lambda: self._load(msg, tries + 1))
+                self.schedule_message(RETRY_TICKS, lambda: retry(msg, tries + 1))
             else:
                 where = "User Library" if msg.get("root") == "user_library" else "Places"
-                self._reply(msg, False, error="preset non trovato in %s: %s" % (where, path))
-            return
+                self._reply(msg, False, error="%s non trovato in %s: %s" % (what, where, path))
+            return None
         if tries:
             self._log("found %s after %d retries" % (path, tries))
+        return item
+
+    def _load(self, msg, tries):
+        tracks = list(self.song().tracks)
+        idx = int(msg.get("track", -1))
+        if not -len(tracks) <= idx < len(tracks):
+            self._reply(msg, False, error="traccia %d inesistente" % idx)
+            return
+        item = self._find(msg, tries, self._load)
+        if item is None:
+            return
         track = tracks[idx]
         if not self._midi(track, msg):
             return
         with self._selected(track, msg):
-            browser.load_item(item)
+            Live.Application.get_application().browser.load_item(item)
         self._reply(msg, True, track=tracks.index(track))
+
+    def _load_audio(self, msg, tries):
+        """An audio file from the browser into an empty clip slot of an audio track (the Recorder's audio)."""
+        track = self._track(msg)
+        if track is None:
+            self._reply(msg, False, error="traccia %s inesistente" % msg.get("track"))
+            return
+        if track.has_midi_input:
+            self._reply(msg, False, error="«%s» non è una traccia audio" % track.name)
+            return
+        slots = list(track.clip_slots)
+        slot = int(msg.get("slot", 0))
+        if not 0 <= slot < len(slots) or slots[slot].has_clip:
+            self._reply(msg, False, error="slot %d non disponibile" % slot)
+            return
+        item = self._find(msg, tries, self._load_audio, "file audio")
+        if item is None:
+            return
+        view = self.song().view
+        with self._selected(track, msg):
+            view.highlighted_clip_slot = slots[slot]  # the browser loads a sample into the highlighted slot
+            Live.Application.get_application().browser.load_item(item)
+        self._reply(msg, True, track=list(self.song().tracks).index(track), slot=slot)
 
     def _track(self, msg):
         tracks = list(self.song().tracks)
