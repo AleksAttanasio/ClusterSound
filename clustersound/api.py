@@ -500,16 +500,18 @@ class Api:
         o = opts or {}
         root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
         try:
-            paths = sampler_export.export(self._sampler, regions or [], root, self._sampler_max(),
+            files = sampler_export.export(self._sampler, regions or [], root, self._sampler_max(),
                                           float(o.get("fade_in_ms", 1)), float(o.get("fade_out_ms", 10)),
                                           bool(o.get("normalize")))
         except OSError as e:
             return {"error": f"scrittura non riuscita ({e})"}
+        paths = [p for p in files if p]
         in_library = bool(paths) and self._inside_library(os.path.dirname(paths[0]))
         if in_library:
             self._schedule_rescan()
-        return {"error": None, "paths": paths, "folder": os.path.dirname(paths[0]) if paths else root,
-                "in_library": in_library}
+        # files: one per region (None if it was outside the audio), e.g. for the Drum Rack
+        return {"error": None, "paths": paths, "files": files,
+                "folder": os.path.dirname(paths[0]) if paths else root, "in_library": in_library}
 
     # ------------------------------------------------------------------ recorder
     def recorder_devices(self) -> list[dict]:
