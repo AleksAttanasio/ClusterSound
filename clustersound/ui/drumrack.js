@@ -5,6 +5,7 @@ import { toast, suggestBus, showPopover } from './sendmenu.js';
 import { sendToLive } from './live.js';
 import { NO_ALT, dynControls, wireDynControls, readDynControls } from './pattern.js';
 import { btn, openDialog } from './kit.js';
+import { settingsLink, setRow, savedFlash } from './settings.js';
 import { svg } from './icons.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -96,6 +97,22 @@ export class DrumRackEditor {
 
   hide() { this.player.stop(); }
 
+  /** Drum Rack section of the Settings page: MIDI notes of the 8×8 kit's pads. */
+  async renderSettings(body) {
+    await this.ensure();
+    const kit = this.racks.grid64;
+    body.innerHTML = setRow('Note MIDI dei pad', `Vale per il kit 8×8 aperto (<b>${esc(kit.name)}</b>) ed è salvata con il kit: determina le note del Drum Rack esportato e inviato a Live. La SPD-SX usa sempre le note dei suoi pad.`,
+      `<wa-select id="set-rk-map" size="s" value="${kit.mapping}" label="Note" style="width:300px">
+         <wa-option value="launchpad">Launchpad / Live (quadranti 4×4)</wa-option>
+         <wa-option value="rows">Righe sequenziali (36 + riga×8)</wa-option></wa-select>`);
+    body.querySelector('#set-rk-map').addEventListener('change', (e) => {
+      kit.mapping = e.target.value;
+      this._persist();
+      if (!this.isSpd) this.renderGrid();
+      savedFlash(body);
+    });
+  }
+
   _persist() {
     try {
       if (this.isSpd) localStorage.setItem(LS_SPD, JSON.stringify({ rack: this.rack, pad: this.pad }));
@@ -177,10 +194,6 @@ export class DrumRackEditor {
           <wa-select id="rk-device" size="s" class="rk-select rk-device" title="Per quale strumento è il kit">${DEVICES.map(([id, l]) => `<wa-option value="${id}">${l}</wa-option>`).join('')}</wa-select>
           <wa-input id="rk-name" size="s" class="rk-name" maxlength="80" title="Nome del kit (anche del file .adg)"></wa-input>
           <wa-radio-group id="rk-geo" class="seg" orientation="horizontal" size="s" label="Geometria"></wa-radio-group>
-          <wa-select id="rk-map" size="s" class="rk-select" title="Note MIDI dei pad">
-            <wa-option value="launchpad">Note: Launchpad / Live (quadranti 4×4)</wa-option>
-            <wa-option value="rows">Note: righe sequenziali (36 + riga×8)</wa-option>
-          </wa-select>
           <div class="spacer"></div>
           ${btn('Auto-riempi', { id: 'rk-auto', icon: 'sparkles', title: 'Riempie i gruppi vuoti in base alla famiglia (Alt+clic: rigenera tutti i gruppi non bloccati)' })}
           ${btn('Casuale', { id: 'rk-random', icon: 'dices', title: 'Per ogni gruppo non bloccato: un gruppo di sample simili a caso della sua famiglia, con sample a caso' })}
@@ -192,6 +205,7 @@ export class DrumRackEditor {
           ${btn('Sequencer', { id: 'rk-toseq', icon: 'arrow-right', title: 'Carica i sample del kit nei bus del Sequencer' })}
           ${btn('Esporta per Ableton', { id: 'rk-export', variant: 'brand', icon: 'file-down' })}
           ${btn('Invia a Live', { id: 'rk-live', title: 'Crea in Live una traccia con questo Drum Rack (serve il device ClusterSound nel set)' })}
+          ${settingsLink('rack', 'Impostazioni del Drum Rack')}
         </div>
         <div class="rk-stage">
           <div id="rk-grid" class="rk-grid"></div>
@@ -213,7 +227,6 @@ export class DrumRackEditor {
     });
     $('#rk-device').onchange = (e) => this.setDevice(e.target.value);
     $('#rk-gen').onclick = (e) => this.openGenerate(e.currentTarget);
-    $('#rk-map').onchange = (e) => { this.rack.mapping = e.target.value; this._persist(); this.renderGrid(); };
     $('#rk-name').oninput = (e) => {
       this.rack.name = e.target.value;
       this._persist();
@@ -352,7 +365,6 @@ export class DrumRackEditor {
     $('#rk-device').value = this.device;
     $('#rk-geo').innerHTML = list.map((g) => `<wa-radio appearance="button" value="${g.id}">${esc(g.label)}</wa-radio>`).join('');
     $('#rk-geo').title = this.isSpd ? 'Configurazione dei pad: quali gruppi e quali famiglie' : '';
-    $('#rk-map').hidden = this.isSpd;
     $('#rk-gen').hidden = !this.isSpd;
     $('#rk-export').innerHTML = `<wa-icon slot="start" name="file-down"></wa-icon>${this._exportLabel()}`;
     $('#rk-export').title = this.isSpd ? 'Drum Rack per Live sulle note della SPD-SX + WAV 16 bit per SPD-SX Wave Manager' : '';
@@ -371,7 +383,6 @@ export class DrumRackEditor {
   // ---------------------------------------------------------------- render
   renderAll() {
     $('#rk-name').value = this.rack.name;
-    $('#rk-map').value = this.rack.mapping;
     $('#rk-geo').value = this.rack.geometry;
     this.renderSaved();
     this.renderGrid();
