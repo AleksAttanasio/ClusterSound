@@ -416,6 +416,52 @@ export class DrumRackEditor {
     grid.innerHTML = html.join('');
   }
 
+  // SPD-SX control panel, drawn after the top panel in the manual (decorative: only the LCD and the
+  // TRIG IN lights follow the kit). viewBox units ≈ the manual's drawing, left to right.
+  _spdConsole() {
+    const spd = this.meta.spdsx;
+    const t = this.rack.triggers || {};
+    const ref = this.rack.pads[this.pad];
+    const txt = (x, y, s, cls = 't', anchor = 'middle') => `<text x="${x}" y="${y}" class="${cls}" text-anchor="${anchor}">${s}</text>`;
+    const knob = (x, y, r, label, ly) => `<circle cx="${x}" cy="${y}" r="${r}" class="k"/><circle cx="${x}" cy="${y}" r="${r * 0.62}" class="kc"/>
+      <line x1="${x}" y1="${y - r * 0.62}" x2="${x}" y2="${y - r * 0.2}" class="kt"/>${txt(x, ly, label)}`;
+    const button = (x, y, w, h, label, cls = '') => `<rect x="${x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" rx="4" class="b ${cls}"/>${label ? txt(x, y + 3.5, label, 'bt') : ''}`;
+    const led = (x, y, on) => `<circle cx="${x}" cy="${y}" r="5" class="led ${on ? 'on' : ''}"/>`;
+    const tri = (x, y, d) => {
+      const pts = { u: [[0, -7], [-7, 5], [7, 5]], d: [[0, 7], [-7, -5], [7, -5]], l: [[-7, 0], [5, -7], [5, 7]], r: [[7, 0], [-5, -7], [-5, 7]] }[d];
+      return `<rect x="${x - 17}" y="${y - 13}" width="34" height="26" rx="6" class="b"/><polygon points="${pts.map(([a, b]) => `${x + a},${y + b}`).join(' ')}" class="ar"/>`;
+    };
+    const pad = this.pad < 9 ? `PAD ${this.pad + 1}` : spd.labels[this.pad] ?? '';
+    const line2 = `${pad}  ${ref ? ref.name.replace(/\.[^.]+$/, '') : '—'}`;
+    return `<svg class="spd-console" viewBox="0 0 975 235" aria-hidden="true">
+      <rect x="1" y="1" width="973" height="233" rx="10" class="plate"/>
+      ${button(37, 42, 52, 24, 'POWER')}
+      ${knob(115, 68, 19, 'MASTER', 30)}${knob(188, 68, 19, 'PHONES', 30)}${knob(262, 68, 19, 'CLICK', 30)}
+      <rect x="315" y="24" width="38" height="13" rx="6.5" class="b"/>${txt(334, 34, 'TEMPO', 'bt')}
+      ${txt(334, 56, 'START/STOP')}${button(334, 73, 36, 18, '')}
+      <rect x="4" y="99" width="386" height="128" rx="8" class="frame"/>${txt(197, 104, 'MASTER EFFECTS', 't sec')}
+      ${knob(62, 160, 36, 'CONTROL 1', 214)}${knob(188, 160, 36, 'CONTROL 2', 214)}
+      ${button(292, 133, 54, 24, 'FILTER')}${button(355, 133, 54, 24, 'DELAY')}${button(292, 178, 54, 24, 'S.LOOP')}${button(355, 178, 54, 24, 'FX')}
+      ${txt(426, 28, 'Roland', 'logo', 'start')}${txt(498, 30, 'SPD-SX', 'model', 'start')}${txt(500, 39, 'SAMPLING PAD', 't small', 'start')}
+      <rect x="427" y="46" width="174" height="88" rx="4" class="lcd"/>
+      <text x="438" y="72" class="lcd-t">KIT</text><text x="470" y="72" class="lcd-t spd-lcd">${esc(this.rack.name || 'Kit')}</text>
+      <text x="438" y="98" class="lcd-t dim">${esc(line2.length > 26 ? line2.slice(0, 25) + '…' : line2)}</text>
+      <line x1="433" y1="112" x2="595" y2="112" class="lcd-l"/>
+      ${[451, 514, 577].map((x) => `<circle cx="${x}" cy="146" r="1.6" class="dot"/>${button(x, 178, 50, 24, '')}`).join('')}
+      ${txt(623, 25, 'TRIG IN', 't', 'start')}${led(672, 21, t.trig1)}${txt(684, 25, '-')}${led(696, 21, t.trig2)}${led(722, 21, false)}${txt(734, 25, '-')}${led(746, 21, false)}
+      ${txt(764, 25, 'FOOT SW', 't', 'start')}${led(824, 21, false)}${txt(836, 25, '-')}${led(848, 21, false)}
+      ${txt(935, 20, 'VISUAL CONTROL', 't small')}${txt(935, 29, 'V-LINK', 't small')}
+      <rect x="638" y="50" width="135" height="155" rx="8" class="frame"/>
+      ${button(672, 73, 50, 22, 'KIT')}${button(737, 73, 50, 22, 'MENU')}${button(672, 122, 50, 22, 'SAMPLING')}${button(737, 122, 50, 22, 'QUICK')}
+      ${button(672, 177, 40, 34, '')}${txt(672, 171, 'ALL', 'bt')}${txt(672, 180, 'SOUND', 'bt')}${txt(672, 189, 'OFF', 'bt')}
+      ${txt(737, 160, 'SHIFT')}${button(737, 178, 50, 22, 'PAD CHECK')}
+      ${tri(877, 55, 'u')}${tri(820, 74, 'l')}${tri(934, 74, 'r')}${tri(877, 93, 'd')}
+      ${button(827, 124, 60, 18, 'EXIT')}${button(927, 124, 60, 18, 'ENTER')}
+      <rect x="796" y="154" width="164" height="38" rx="7" class="frame"/>
+      ${button(836, 173, 74, 30, '−', 'pm')}${button(919, 173, 74, 30, '+', 'pm')}
+    </svg>`;
+  }
+
   // SPD-SX as seen from the player: the narrow pads 1-3 at the top, 4-9 below, then the trigger inputs
   renderSpd() {
     const spd = this.meta.spdsx;
@@ -436,8 +482,9 @@ export class DrumRackEditor {
       return `<div class="rk-pad spd-pad ${extra} ${ref ? 'full' : ''} ${p === this.pad ? 'sel' : ''} ${g === sel ? 'gsel' : ''}" data-p="${p}"
         draggable="${ref ? 'true' : 'false'}" style="--gc:${fam.color};${ref ? `--pc:${color}` : ''}"
         title="${esc(spd.labels[p])} · ${noteName(spd.notes[p])}${ref ? ` · ${esc(ref.name)}` : ' · vuoto'}">
-        <span class="rk-note">${p < 9 ? p + 1 : ''} <i>${noteName(spd.notes[p])}</i></span>${badge ? `<span class="rk-badge">${badge}</span>` : ''}
-        ${tag}<span class="rk-pname">${ref ? esc(ref.name.replace(/\.[^.]+$/, '')) : ''}</span></div>`;
+        <span class="rk-note"><i>${noteName(spd.notes[p])}</i></span>${badge ? `<span class="rk-badge">${badge}</span>` : ''}
+        ${tag}<span class="rk-pname">${ref ? esc(ref.name.replace(/\.[^.]+$/, '')) : ''}</span>
+        ${p < 9 ? `<span class="spd-num">${p + 1}</span><i class="spd-led"></i>` : ''}</div>`;
     };
     const trig = (p, key, label, icon) => `<div class="spd-trig ${t[key] ? '' : 'off'}">
         ${t[key] ? cell(p, 'spd-tpad') : `<div class="spd-tpad spd-empty">${icon}<span>non collegato</span></div>`}
@@ -446,9 +493,9 @@ export class DrumRackEditor {
     const grid = $('#rk-grid');
     grid.className = 'rk-spd';
     grid.innerHTML = `
-      <div class="spd-body">
-        <div class="spd-head"><b>SPD-SX</b><span class="spd-lcd">${esc(this.rack.name || 'Kit')}</span><span class="spd-brand">Roland</span></div>
-        <div class="spd-pads">${Array.from({ length: 9 }, (_, p) => cell(p, p < 3 ? 'spd-top' : '')).join('')}</div>
+      <div class="spd-unit">
+        <div class="spd-padarea">${Array.from({ length: 9 }, (_, p) => cell(p, p < 3 ? 'spd-top' : '')).join('')}</div>
+        ${this._spdConsole()}
       </div>
       <div class="spd-trigs">
         ${trig(spd.trig1, 'trig1', 'Pedale (Trig 1)', PEDAL_ICON)}
