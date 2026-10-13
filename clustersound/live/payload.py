@@ -25,12 +25,13 @@ from ..patterns import ableton as pat_ableton
 from ..patterns import midi as pat_midi
 from ..patterns import model as pat_model
 from ..online.downloads import safe_name, unique_path
+from ..paths import IS_WIN
 from ..racks import ableton as rack_ableton
 from ..sampler import export as sampler_export
 from ..sampler import slicing
 from ..sampler.session import SamplerSession
 
-USER_LIBRARY = os.path.expanduser("~/Music/Ableton/User Library")
+USER_LIBRARY = os.path.expanduser("~/Documents/Ableton/User Library" if IS_WIN else "~/Music/Ableton/User Library")
 LIBRARY_FOLDER = "ClusterSound"
 PLACES_FOLDER = "Live Import"
 

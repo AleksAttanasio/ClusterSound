@@ -8,17 +8,19 @@ dependencies = [
     "soundfile>=0.12",
     "soxr>=0.3",
     "pywebview>=5.0",
+    "soundcard>=0.4.5; sys_platform == 'win32'",  # Recorder on Windows: WASAPI loopback
 ]
 
 [project.optional-dependencies]
 dev = ["pytest", "pyinstaller>=6.0", "h5py"]
 midi = ["python-rtmidi>=1.5"]  # Compose: record a melody from a MIDI keyboard
-# Recorder: "all outputs" through ScreenCaptureKit when the cs-tap helper (macOS 14.2+) is missing
-# Recorder: stem separation (drums, bass, guitar, vocals) with Demucs, on the Mac only
+# Recorder: stem separation (drums, bass, guitar, vocals) with Demucs, on this computer (CUDA, MPS or CPU)
 stems = ["demucs>=4.0.1", "torch>=2.1"]
-# Recorder: "Migliora" (AI restoration of samples) with Apollo, on the Mac only
+# Recorder: "Migliora" (AI restoration of samples) with Apollo, on this computer (CUDA, MPS or CPU)
 enhance = ["torch>=2.1", "huggingface_hub>=0.20"]
-capture = ["pyobjc-framework-ScreenCaptureKit>=10", "pyobjc-framework-CoreMedia>=10"]
+# Recorder: "all outputs" through ScreenCaptureKit when the cs-tap helper (macOS 14.2+) is missing
+capture = ["pyobjc-framework-ScreenCaptureKit>=10; sys_platform == 'darwin'",
+           "pyobjc-framework-CoreMedia>=10; sys_platform == 'darwin'"]
 
 [project.scripts]
 clustersound = "clustersound.__main__:main"

@@ -1,6 +1,6 @@
 # ClusterSound
 
-App desktop per macOS che analizza una cartella di sample audio (ricorsivamente), assegna ogni
+App desktop per macOS e Windows che analizza una cartella di sample audio (ricorsivamente), assegna ogni
 file a una classe di suono — kick, snare, hat, … — e mostra l'intera libreria come nuvola 3D in
 cui suoni simili stanno vicini e il colore di ogni punto è la sua classe. I file originali non
 vengono mai modificati.
@@ -13,6 +13,17 @@ uv venv -p 3.12 .venv && uv pip install -p .venv -e ".[dev]"
 .venv/bin/python -m clustersound --headless ~/Samples --out report.csv   # batch, senza GUI
 ```
 
+Su Windows (10 o 11, con il runtime Edge WebView2, già presente su Windows 11):
+
+```powershell
+py -3.12 -m venv .venv; .venv\Scripts\pip install -e ".[dev]"
+.venv\Scripts\python -m clustersound
+```
+
+I dati dell'app stanno in `~/Library/Application Support/ClusterSound` sul Mac e in `%APPDATA%\ClusterSound`
+su Windows; le cache in `~/Library/Caches/ClusterSound` e `%LOCALAPPDATA%\ClusterSound\Cache`. Nel resto del
+documento i percorsi sono quelli del Mac. Le differenze di Windows sono in [Windows](#windows).
+
 **Interfaccia**: a sinistra il pannello delle sezioni (*Sample*: Libreria, Store, Recorder · *Crea*:
 Sequencer, Drum Rack, Compose), con **Impostazioni** in fondo; il pulsante accanto al logo lo riduce a sole
 icone. Le opzioni di fino di ogni sezione (cartelle, formati, dispositivi, mappature MIDI…) stanno in
@@ -21,13 +32,13 @@ relativa.
 
 - **Cartella** (Impostazioni › Libreria, o *Scegli cartella…* dalla libreria vuota): analizza
   wav/aif/flac/ogg/mp3/caf. I risultati finiscono in cache
-  (`~/Library/Application Support/ClusterSound/cache.sqlite`): una riscansione rilegge solo i
+  (`cache.sqlite` nella cartella dei dati dell'app): una riscansione rilegge solo i
   file nuovi o modificati.
 - **Vista 3D**: trascina per ruotare, scroll per lo zoom, tasto destro per spostare.
   **Clic su un punto** = riproduzione immediata e apertura della tendina di dettaglio.
 - **Tendina**: forma d'onda + inviluppo RMS in dB con fasi ADSR stimate, spettrogramma
   (clic per riprodurre da quel punto), peak/RMS/crest, attack/decay/sustain/release, T60,
-  formato. Azioni: *Mostra nella cartella* (Finder), *Trova simili*, cambio classe.
+  formato. Azioni: *Mostra nella cartella* (Finder / Esplora file), *Trova simili*, cambio classe.
 - **Correzioni**: cambiare la classe di un sample la rende un esempio di training; le altre
   classificazioni si aggiornano in pochi secondi. Le etichette manuali restano in cache.
 - **Filtri**: classe (clic; Alt+clic = solo quella), tipo (One-shot / Loop / Long), confidenza
@@ -88,7 +99,7 @@ ufficiale da cui scaricarli: niente scraping. I loghi stanno in `clustersound/ui
   commerciale*, tipo (one-shot/loop/long), durata, BPM, tonalità, solo lossless, file singoli o
   pack, ordinamento. Accanto a ogni filtro un'etichetta (FS·OV·IA·CC) indica quali fonti lo applicano
   lato server; sulle altre viene applicato localmente.
-- **Anteprima**: ▶ riproduce subito (l'audio passa da Python, con cache in `~/Library/Caches/ClusterSound`).
+- **Anteprima**: ▶ riproduce subito (l'audio passa da Python, nella cartella delle cache).
 - **Download** (⬇): in `~/Music/ClusterSound Downloads/<Fonte>/` (configurabile), con accanto un
   `.license.txt` che riporta autore, licenza, link e testo di attribuzione. Da Freesound senza
   login OAuth si scarica l'anteprima HQ mp3; l'originale si scarica dalla pagina (↗).
@@ -279,12 +290,12 @@ insieme agli accordi in entrambe le viste (♫ nella barra la silenzia).
   e una per ogni layer non muto), *Solo accordi* o *Solo melodia*. *Invia a Live* crea anche una traccia per
   ogni layer accanto agli *Accordi* (il basso con un suono da basso, pad e keys da tastiera).
 
-## Scheda Recorder: registrare l'uscita audio del Mac
+## Scheda Recorder: registrare l'uscita audio
 
-Registra ciò che il Mac manda a una o più uscite audio, ognuna nel suo file, poi ritaglia i sample dalla
+Registra ciò che il computer manda a una o più uscite audio, ognuna nel suo file, poi ritaglia i sample dalla
 registrazione: finiscono nella libreria e vengono classificati come gli altri.
 
-- **Uscite da registrare** (Impostazioni › Recorder, come formato, cartella, fade e normalizzazione): casse, cuffie, interfacce audio, AirPlay… più *Tutte le uscite (mix)*. Se ne
+- **Uscite da registrare** (Impostazioni › Recorder, come formato, cartella, fade e normalizzazione): casse, cuffie, interfacce audio, AirPlay… più *Tutte le uscite (mix)* (su Windows *Uscita predefinita*). Se ne
   selezioni più di una, partono insieme e ognuna ha il suo file, il suo meter e la sua dimensione.
   *Aggiorna l'elenco* rilegge i dispositivi collegati.
 - **Formato**: WAV (16/24 bit, 32 float), AIFF, FLAC (16/24 bit), CAF, MP3 (128–320 kbps), OGG Vorbis,
@@ -292,7 +303,7 @@ registrazione: finiscono nella libreria e vengono classificati come gli altri.
   44,1/48/96 kHz; stereo, mono o tutti i canali (solo nei formati non compressi).
 - **Cartella**: `~/Music/ClusterSound Recordings/<data ora> - <uscita>.<ext>`, con accanto un `.source.txt`
   di provenienza. La registrazione continua anche se cambi sezione (pallino rosso sulla voce Recorder).
-- **Apri audio**: oltre alle registrazioni, l'editor apre qualsiasi file audio del Mac (*Apri file…*, oppure
+- **Apri audio**: oltre alle registrazioni, l'editor apre qualsiasi file audio del computer (*Apri file…*, oppure
   trascinalo dal Finder sulla forma d'onda) e i sample o i loop della libreria (*Dalla libreria…*: navighi per
   cartelle e pack, o cerchi per nome in tutta la libreria). Valgono tagli, stem, *Invia a Live* e Drum Rack.
 - **Editor**: allo stop la registrazione si apre sotto. Trascina sulla forma d'onda per creare una regione, i
@@ -325,18 +336,20 @@ basato sui Core Audio process tap (macOS 14.2+): riceve lo stesso audio che il d
 compila `tools/build_tap.sh` (lo lancia anche `build_app.sh`); da sorgente, con `swiftc` installato, si
 compila da solo al primo uso. Al primo avvio macOS chiede il permesso *Registrazione audio di sistema*. Senza
 helper resta solo *Tutte le uscite* tramite ScreenCaptureKit (extra `pip install -e ".[capture]"`).
+Su Windows ogni uscita è registrata in WASAPI loopback con la libreria `soundcard` (installata da sola):
+vedi [Windows](#windows).
 
 **Stem.** La separazione usa [Demucs](https://github.com/adefossez/demucs) (`htdemucs_6s`) e gira tutta sul
-Mac, su GPU Apple (MPS) se c'è, altrimenti su CPU: l'audio non lascia mai il computer. PyTorch è pesante, quindi
+computer, su GPU (Apple MPS o NVIDIA CUDA) se c'è, altrimenti su CPU: l'audio non lascia mai il computer. PyTorch è pesante, quindi
 è un extra: `pip install -e ".[stems]"`. Al primo uso *Estrai stem* chiede di scaricare il modello (~55 MB, una
-sola volta) in `~/Library/Application Support/ClusterSound/models/demucs`; da lì in poi viene caricato solo da
+sola volta) in `models/demucs` nella cartella dei dati dell'app; da lì in poi viene caricato solo da
 quella cartella, senza rete. Le sorgenti lunghe sono separate a blocchi di 60 s con dissolvenza incrociata
 (memoria contenuta, avanzamento e *Annulla*); su un Mac con chip Apple servono pochi secondi per minuto di audio.
 
 **Migliora.** Usa [Apollo](https://github.com/JusperLee/Apollo) (Kai Li, Yi Luo, 2024; licenza CC BY-SA 4.0),
-una rete da 16,6 M parametri per il restauro di musica compressa. Gira tutta sul Mac, senza servizi esterni.
+una rete da 16,6 M parametri per il restauro di musica compressa. Gira tutta sul computer, senza servizi esterni.
 Extra: `pip install -e ".[enhance]"`. Al primo uso chiede di scaricare i pesi (66 MB, una sola volta) in
-`~/Library/Application Support/ClusterSound/models/apollo`. Il modello non resta in memoria: ogni lavoro gira
+`models/apollo` nella cartella dei dati dell'app. Il modello non resta in memoria: ogni lavoro gira
 in un processo a parte che carica solo il modello, elabora l'audio a blocchi di 2 s, un canale alla volta, e poi
 esce, restituendo tutta la memoria al sistema. Quando non lo usi, l'app non importa nemmeno PyTorch.
 
@@ -372,7 +385,7 @@ Places.
 
 Installazione (una volta):
 
-1. `tools/install_live.sh`: costruisce `ClusterSound.amxd` e lo copia con la Remote Script nella User Library
+1. `tools/install_live.sh` (su Windows `python tools\install_live.py`): costruisce `ClusterSound.amxd` e lo copia con la Remote Script nella User Library
    (`~/Music/Ableton/User Library`, oppure passa il percorso come argomento).
 2. Riavvia Live. In *Preferenze → Link/MIDI* scegli **ClusterSoundBridge** come Control Surface, con Input e
    Output su *Nessuno*.
@@ -472,6 +485,30 @@ tools/build_app.sh   # -> dist/ClusterSound.app (compila anche l'helper cs-tap d
 
 Apri e copia solo `ClusterSound.app`: la cartella `dist/ClusterSound/` contiene un eseguibile nudo che
 il Finder lancia dentro il Terminale (lo script la elimina dopo la build).
+
+Su Windows (PyInstaller costruisce solo per il sistema su cui gira):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build_app.ps1   # -> dist\ClusterSound\ClusterSound.exe
+```
+
+Si distribuisce l'intera cartella `dist\ClusterSound`. L'icona `brand/ClusterSound.ico` è nel repository
+(`tools/build_icon.sh` la rigenera sul Mac insieme all'`.icns`).
+
+## Windows
+
+Tutto funziona come sul Mac, con queste differenze:
+
+- **Interfaccia**: la finestra usa Edge WebView2; scorciatoie con `Ctrl` al posto di `⌘`; *Mostra nella
+  cartella* apre Esplora file.
+- **Recorder**: ogni uscita è registrata in WASAPI loopback (`soundcard`). Non esiste un mix di tutte le
+  uscite: la prima voce è l'*Uscita predefinita* di Windows. Il loopback non può escludere un processo, quindi
+  nella registrazione finisce anche l'audio riprodotto da ClusterSound. Il formato M4A non è disponibile
+  (usa `afconvert`, solo macOS); nessun permesso da concedere.
+- **Stem e Migliora**: su GPU NVIDIA se PyTorch è installato con CUDA, altrimenti su CPU.
+- **Ableton Live**: la User Library predefinita è `~/Documents/Ableton/User Library`; il device e la Remote
+  Script si installano con `python tools\install_live.py`.
+- I nomi di file riservati da Windows (`CON`, `NUL`, `COM1`…) ricevono un `_` davanti.
 
 ## Strumenti di sviluppo
 

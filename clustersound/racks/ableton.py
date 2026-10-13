@@ -8,6 +8,7 @@ import os
 import time
 
 from ..online.downloads import license_text, safe_name, unique_path
+from ..paths import file_manager
 from ..patterns import ableton as live
 from ..patterns.model import NOTE_NAMES
 from . import layouts
@@ -89,7 +90,7 @@ def readme(rack: dict, adg: str, names: dict[int, str], settings: list[dict], ha
     lines = [
         rack["name"], f"{len(names)} pad · geometria {layouts.GEOMETRY_LABELS[rack['geometry']]} · note: {mapping}", "",
         "IN ABLETON LIVE (10 o successivo)",
-        f"1. Trascina \"{adg}\" su una traccia MIDI vuota (dal Finder o dal Browser > Places).",
+        f"1. Trascina \"{adg}\" su una traccia MIDI vuota (da {file_manager()} o dal Browser > Places).",
         "2. Arma/seleziona la traccia e metti il Launchpad Pro in modalità Note: con un Drum Rack Live mostra",
         "   la griglia a 64 pad e ogni tasto suona il sample indicato qui sotto.",
     ]

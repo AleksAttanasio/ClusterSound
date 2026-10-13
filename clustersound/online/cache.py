@@ -9,10 +9,11 @@ import threading
 import time
 import urllib.request
 
+from ..paths import cache_dir
 from .base import USER_AGENT
 from .downloads import host_allowed
 
-CACHE_DIR = os.path.expanduser("~/Library/Caches/ClusterSound/previews")
+CACHE_DIR = str(cache_dir() / "previews")
 DEFAULT_MAX_MB = 300
 MAX_FILE_BYTES = 60 << 20
 

@@ -1,4 +1,4 @@
-"""Stem separation (drums, bass, guitar, piano, vocals, rest) with Demucs, on this Mac only.
+"""Stem separation (drums, bass, guitar, piano, vocals, rest) with Demucs, on this computer only.
 
 Demucs and PyTorch are the optional extra `stems`: nothing is imported until a separation starts. The model
 weights are downloaded once, when the user confirms, into the app's support folder; after that everything
@@ -14,11 +14,12 @@ import soundfile as sf
 import soxr
 
 from ..online.downloads import safe_name, unique_path
+from ..paths import data_dir_path, torch_device
 from . import export as sampler_export
 from .session import SamplerSession
 
 MODEL = "htdemucs_6s"  # 6 sources: drums, bass, other, vocals, guitar, piano
-MODEL_DIR = os.path.expanduser("~/Library/Application Support/ClusterSound/models/demucs")
+MODEL_DIR = str(data_dir_path() / "models" / "demucs")
 MODEL_MB = 55
 STEMS = [("drums", "Batteria"), ("bass", "Basso"), ("guitar", "Chitarra"), ("piano", "Piano"), ("vocals", "Voce"),
          ("other", "Altro")]
@@ -56,7 +57,7 @@ def _local_bag():
         import yaml
         from demucs.apply import BagOfModels
         from demucs.hf import load_safetensors_model
-        with open(yml) as f:
+        with open(yml, encoding="utf-8") as f:
             bag = yaml.safe_load(f)
         models = [load_safetensors_model(os.path.join(MODEL_DIR, f"{sig}.safetensors")) for sig in bag["models"]]
         return BagOfModels(models, bag.get("weights"), bag.get("segment"))
@@ -76,13 +77,13 @@ def download_model() -> None:
         from demucs.hf import DEFAULT_NAMESPACE, hf_repo_name
         from huggingface_hub import hf_hub_download
         repo = f"{DEFAULT_NAMESPACE}/{hf_repo_name(MODEL)}"
-        with open(hf_hub_download(repo, f"{MODEL}.yaml", local_dir=MODEL_DIR)) as f:
+        with open(hf_hub_download(repo, f"{MODEL}.yaml", local_dir=MODEL_DIR), encoding="utf-8") as f:
             sigs = yaml.safe_load(f)["models"]
         for sig in sigs:
             hf_hub_download(repo, f"{sig}.safetensors", local_dir=MODEL_DIR)
     if _local_bag() is None:
         raise RuntimeError("modello non trovato dopo il download")
-    with open(_marker(), "w") as f:
+    with open(_marker(), "w", encoding="utf-8") as f:
         f.write(MODEL + "\n")
 
 
@@ -97,7 +98,7 @@ class _Demucs:
         self.torch = torch
         self.model.eval()
         self.samplerate = int(self.model.samplerate)
-        self.device = "mps" if torch.backends.mps.is_available() else "cpu"
+        self.device = torch_device(torch)
 
     def _run(self, wav, device: str):
         from demucs.apply import apply_model

@@ -11,6 +11,12 @@ setBasePath(new URL('./vendor/webawesome', import.meta.url).href);
 const ICONS = new URL('./vendor/lucide/', import.meta.url);
 registerIconLibrary('default', { resolver: (name) => new URL(`${name}.svg`, ICONS).href });
 
+// Platform words for hints and tooltips: shortcuts (⌘ on the Mac, Ctrl on Windows) and the file manager.
+export const IS_MAC = /Mac/i.test(navigator.platform || navigator.userAgent);
+export const MOD = IS_MAC ? '⌘' : 'Ctrl+';
+export const SHIFT_MOD = IS_MAC ? '⇧⌘' : 'Ctrl+Maiusc+';
+export const FILE_MANAGER = IS_MAC ? 'Finder' : 'Esplora file';
+
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // {a: 1, b: true, c: false, d: null} -> ' a="1" b' (false/null attributes are dropped)

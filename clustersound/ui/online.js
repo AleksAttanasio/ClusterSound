@@ -3,6 +3,7 @@
 // Views: home (provider strip, categories, featured rows) · results (sounds or packs, grid or list)
 // · pack page · provider page.
 import { svg } from './icons.js';
+import { FILE_MANAGER } from './kit.js';
 import { setRow, savedFlash, openSettings } from './settings.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -886,7 +887,7 @@ export class Online {
     $('#dl-in-library').hidden = !jobs.length || this.inLibrary !== true;
     $('#downloads-list').innerHTML = jobs.slice().reverse().map((j) => {
       const pct = j.total ? Math.min(100, (100 * j.bytes) / j.total) : (j.status === 'done' ? 100 : 0);
-      return `<div class="dl-row ${j.status}" ${j.path ? `data-path="${esc(j.path)}" title="Mostra nel Finder"` : ''}>
+      return `<div class="dl-row ${j.status}" ${j.path ? `data-path="${esc(j.path)}" title="Mostra in ${FILE_MANAGER}"` : ''}>
         <span class="dl-name">${esc(j.title)}</span><span class="dl-src">${esc(j.source)}</span>
         <span class="dl-state">${j.status === 'done' ? svg('check', 12) : j.status === 'error' ? `<span class="error" title="${esc(j.error)}">Errore</span>` : `${Math.round(pct)}%`}</span>
         <span class="dl-bar"><span style="width:${pct}%"></span></span></div>`;
@@ -919,7 +920,7 @@ export class Online {
     const s = await this.api.get_settings();
     const keyHint = s.freesound_key_set ? `Impostata (${esc(s.freesound_key_hint)}). <a href="#" id="set-key-clear">Rimuovi chiave</a>` : 'Nessuna chiave: Freesound resta escluso dalle ricerche.';
     body.innerHTML =
-      setRow('API key Freesound', `Gratuita: crea un account e <a href="#" id="set-getkey">richiedi una chiave</a>, poi incolla il valore "Client secret/Api key". Resta salvata solo su questo Mac. ${keyHint}`,
+      setRow('API key Freesound', `Gratuita: crea un account e <a href="#" id="set-getkey">richiedi una chiave</a>, poi incolla il valore "Client secret/Api key". Resta salvata solo su questo computer. ${keyHint}`,
         `<wa-input id="set-key" type="password" password-toggle size="s" autocomplete="off" label="API key" placeholder="${s.freesound_key_set ? 'Incolla per sostituirla' : 'Incolla qui la tua API key'}" style="width:260px"></wa-input>`)
       + setRow('Cartella dei download', 'Ogni file va in una sottocartella per fonte, con accanto un file .license.txt.',
         `<span class="set-path" title="${esc(s.download_dir)}">${esc(s.download_dir)}</span>

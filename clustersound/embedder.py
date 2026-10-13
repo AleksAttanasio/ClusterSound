@@ -16,7 +16,7 @@ _class_names: list[str] | None = None
 def class_names() -> list[str]:
     global _class_names
     if _class_names is None:
-        with open(resource_path("models/yamnet_class_map.csv"), newline="") as f:
+        with open(resource_path("models/yamnet_class_map.csv"), newline="", encoding="utf-8") as f:
             _class_names = [row["display_name"] for row in csv.DictReader(f)]
     return _class_names
 

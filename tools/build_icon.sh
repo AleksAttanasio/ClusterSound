@@ -1,5 +1,6 @@
 #!/bin/sh
-# Builds brand/ClusterSound.icns (the app's Dock/Finder icon) from brand/logo-app.svg:
+# Builds brand/ClusterSound.icns (the app's Dock/Finder icon) and brand/ClusterSound.ico (Windows) from
+# brand/logo-app.svg:
 # the drop mark on a black squircle, already drawn with the ~10% margin macOS icons expect.
 set -e
 cd "$(dirname "$0")/.."
@@ -14,5 +15,11 @@ for s in 16 32 128 256 512; do
   sips -s format png -z $d $d "$src" --out "$set_dir/icon_${s}x${s}@2x.png" >/dev/null
 done
 iconutil -c icns "$set_dir" -o brand/ClusterSound.icns
+ico=""
+for s in 16 24 32 48 64 128 256; do
+  sips -s format png -z $s $s "$src" --out "$work/ico_$s.png" >/dev/null
+  ico="$ico $work/ico_$s.png"
+done
+python3 tools/make_ico.py brand/ClusterSound.ico $ico >/dev/null
 rm -rf "$work"
-echo "Pronto: brand/ClusterSound.icns"
+echo "Pronto: brand/ClusterSound.icns, brand/ClusterSound.ico"

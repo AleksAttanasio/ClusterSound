@@ -35,13 +35,13 @@ def save_current_kit(p: dict) -> None:
     """The pattern open in the Sequencer (its samples, layers and mix): the kit for sequences saved without one."""
     path = data_dir() / KIT_FILE
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(p))
+    tmp.write_text(json.dumps(p), encoding="utf-8")
     os.replace(tmp, path)
 
 
 def current_kit() -> dict | None:
     try:
-        p = json.loads((data_dir() / KIT_FILE).read_text())
+        p = json.loads((data_dir() / KIT_FILE).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     return p if isinstance(p, dict) and p.get("buses") else None

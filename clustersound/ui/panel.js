@@ -1,6 +1,6 @@
 // Detail drawer: class, actions, dynamics (waveform + RMS envelope + ADSR), spectrogram, metrics.
 
-import { btn } from './kit.js';
+import { btn, FILE_MANAGER } from './kit.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (v, d = 1, unit = '') => (v === null || v === undefined || Number.isNaN(v) ? '—' : `${Number(v).toFixed(d)}${unit}`);
@@ -71,7 +71,7 @@ export class Panel {
       </div>
       <div class="p-actions">
         ${btn(playLabel(playing), { variant: 'brand', 'data-act': 'play' })}
-        ${btn('Mostra nella cartella', { icon: 'folder-open', 'data-act': 'reveal', title: 'Apre il Finder con il file selezionato' })}
+        ${btn('Mostra nella cartella', { icon: 'folder-open', 'data-act': 'reveal', title: `Apre ${FILE_MANAGER} con il file selezionato` })}
         ${btn('Trova simili', { icon: 'sparkles', 'data-act': 'similar' })}
         ${btn('Invia', { 'data-act': 'send', 'with-caret': true, title: 'Aggiungi il sample a un bus del Sequencer o al Drum Rack' })}
         ${btn('Altri nello Store', { icon: 'store', 'data-act': 'store', title: `Cerca sample gratuiti di tipo «${cls.label}» nello Store` })}

@@ -1,7 +1,8 @@
-"""Record what the Mac sends to one or more output devices, each into its own file, in several formats.
+"""Record what the computer sends to one or more output devices, each into its own file, in several formats.
 
-Each output device is read by cs-tap (clustersound/native/cs_tap.swift), a small helper built on Core Audio
-process taps (macOS 14.2+). Without the helper, "all outputs" falls back to ScreenCaptureKit.
+On the Mac each output device is read by cs-tap (clustersound/native/cs_tap.swift), a small helper built on Core
+Audio process taps (macOS 14.2+); without the helper, "all outputs" falls back to ScreenCaptureKit. On Windows
+each output is recorded through WASAPI loopback (wasapi.py).
 Nothing is decrypted or bypassed: apps that protect their stream record silence.
 """
 import json
@@ -17,12 +18,13 @@ import soundfile as sf
 import soxr
 
 from ..online.downloads import safe_name, unique_path
-from ..paths import resource_path
+from ..paths import IS_MAC, IS_WIN, cache_dir, resource_path
+from . import wasapi
 from .capture import CaptureError, SystemAudioBackend
 from .export import CAPTURE_NOTE
 
 DEFAULT_DIR = os.path.expanduser("~/Music/ClusterSound Recordings")
-CACHE_BIN = os.path.expanduser("~/Library/Caches/ClusterSound/bin/cs-tap")
+CACHE_BIN = str(cache_dir() / "bin" / "cs-tap")
 ALL = "all"
 BLOCK_FRAMES = 2048
 
@@ -163,6 +165,8 @@ class Writer:
 
 # ------------------------------------------------------------------ helper
 def _mac_supports_taps() -> bool:
+    if not IS_MAC:
+        return False
     v = tuple(int(x) for x in (platform.mac_ver()[0] or "0").split(".")[:2] + ["0"])[:2]
     return v >= (14, 2)
 
@@ -191,9 +195,13 @@ def tap_binary(build: bool = True) -> str | None:
 
 
 def output_devices() -> list[dict]:
-    """Output devices that can be recorded; the first entry is the mix of all outputs."""
+    """Output devices that can be recorded; the first entry is the mix of all outputs (on Windows: the default
+    output). An entry without sample_rate shows its "note" instead."""
+    if IS_WIN:
+        return wasapi.output_devices(ALL)
     binary = tap_binary()
-    mix = {"id": ALL, "name": "Tutte le uscite (mix)", "channels": 2, "sample_rate": None, "default": False}
+    mix = {"id": ALL, "name": "Tutte le uscite (mix)", "channels": 2, "sample_rate": None, "default": False,
+           "note": "Tutto ciò che il Mac suona"}
     if binary is None:
         return [mix | {"backend": "sck"}] if SystemAudioBackend.available() else []
     try:
@@ -314,7 +322,18 @@ def source_text(name: str, started: str, seconds: float, fmt: dict) -> str:
             f"Formato: {FORMATS[fmt['format']]['label']} · {fmt['quality']}\n\n{CAPTURE_NOTE}\n")
 
 
+def unavailable_hint() -> str:
+    """Why no output can be recorded on this system (shown when output_devices() is empty)."""
+    if IS_WIN:
+        return ("Nessuna uscita registrabile: serve il pacchetto <code>soundcard</code> "
+                "e almeno un dispositivo di uscita attivo.")
+    return ("Nessuna uscita registrabile: serve macOS 14.2 o successivo "
+            "(oppure l'extra <code>capture</code> per il mix di tutte le uscite).")
+
+
 def _default_backend(device: dict, on_block):
+    if device.get("backend") == "wasapi":
+        return wasapi.LoopbackBackend(None if device["id"] == ALL else device["id"], on_block)
     if device.get("backend") == "sck":
         return SystemAudioBackend(on_block)
     return TapBackend(device["id"], on_block)
