@@ -8,6 +8,7 @@ import { ComposeEditor } from './compose.js';
 import { SamplerEditor } from './sampler.js';
 import { showSendMenu } from './sendmenu.js';
 import { isTypingTarget } from './kit.js';
+import { Nav, TAB_LABELS } from './nav.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -22,7 +23,6 @@ const state = {
   focus: null, // {center, items: [{id, sim}], trail: [id…]} while the similar-samples view is open
   lastTrail: [], // trail of the last similar-samples view (kept after closing it, for the Drum Rack)
   simK: (() => { try { return Math.min(60, Math.max(5, +localStorage.getItem('cs.simK') || 12)); } catch { return 12; } })(),
-  libMode: (() => { try { return localStorage.getItem('cs.libMode') === 'store' ? 'store' : 'local'; } catch { return 'local'; } })(),
 };
 
 const player = new Player({ onState: onPlayState });
@@ -36,7 +36,9 @@ function whenApiReady() {
   });
 }
 
-let scene, panel, online, pattern, rack, compose, sampler;
+let scene, panel, online, pattern, rack, compose, sampler, nav;
+
+const TABS = ['library', 'online', 'pattern', 'rack', 'compose', 'sampler'];
 
 async function main() {
   state.api = await whenApiReady();
@@ -71,13 +73,17 @@ async function main() {
   } });
   online.onSend = (ref, x, y) => sendRef(ref, x, y);
   online.onLibrary = (path) => { setTab('library'); setFolder(path); };
+  nav = new Nav($('#nav'), { onSelect: (tab) => setTab(tab) });
+  window.__cs.nav = nav;
   buildSidebar();
   bindUi();
   if (init.last_folder) {
     setFolder(init.last_folder, false);
     state.api.restore(init.last_folder);
   }
-  if (state.libMode === 'store') setTab('online');
+  let last = 'library';
+  try { last = localStorage.getItem('cs.tab') || 'library'; } catch { /* private mode */ }
+  setTab(TABS.includes(last) ? last : 'library');
   poll();
 }
 
@@ -198,6 +204,7 @@ async function loadResults() {
   state.data = d;
   $('#empty').hidden = true;
   $('#btn-export').disabled = false;
+  nav.setBadge('library', d.cls.length);
   scene.setData(d, state.classes.map((c) => c.color));
   applyFilters();
   computeCentroids();
@@ -579,31 +586,19 @@ async function sendLibraryItem(id, x, y) {
   sendRef(ref, x, y);
 }
 
-// The Library section has two modes: the local folder ('library') and the free online store ('online').
+// One section at a time; the left navigation and the page header follow it.
 function setTab(tab) {
-  if (tab === 'library' && state.libMode === 'store') tab = 'online';
-  if (tab === 'library' || tab === 'online') {
-    state.libMode = tab === 'online' ? 'store' : 'local';
-    try { localStorage.setItem('cs.libMode', state.libMode); } catch { /* private mode */ }
-  }
   state.tab = tab;
+  try { localStorage.setItem('cs.tab', tab); } catch { /* private mode */ }
   player.stop();
   if (tab !== 'pattern' && pattern) pattern.hide();
   if (tab !== 'rack' && rack) rack.hide();
   if (tab !== 'compose' && compose) compose.hide();
   if (tab !== 'sampler' && sampler) sampler.hide();
-  const inLibrary = tab === 'library' || tab === 'online';
-  $('#main-tabs').value = inLibrary ? 'library' : tab;
-  $('#lib-mode').value = state.libMode;
-  $('#library').hidden = tab !== 'library';
-  $('#online').hidden = tab !== 'online';
-  $('#pattern').hidden = tab !== 'pattern';
-  $('#rack').hidden = tab !== 'rack';
-  $('#compose').hidden = tab !== 'compose';
-  $('#sampler').hidden = tab !== 'sampler';
-  document.querySelectorAll('.lib-section').forEach((el) => el.classList.toggle('tab-hidden', !inLibrary));
-  document.querySelectorAll('.lib-only').forEach((el) => el.classList.toggle('tab-hidden', tab !== 'library'));
-  document.querySelectorAll('.online-only').forEach((el) => { el.hidden = tab !== 'online'; });
+  nav.setActive(tab);
+  $('#crumb-title').textContent = TAB_LABELS[tab] || '';
+  for (const t of TABS) $('#' + t).hidden = t !== tab;
+  document.querySelectorAll('.head-tools').forEach((el) => { el.hidden = el.dataset.for !== tab; });
   if (tab === 'online') online.show(); else if (tab === 'pattern') pattern.show();
   else if (tab === 'rack') rack.show(); else if (tab === 'compose') compose.show();
   else if (tab === 'sampler') sampler.show(); else scene.resize();
@@ -616,12 +611,6 @@ function openStore(instruments = null) {
 }
 
 function bindUi() {
-  $('#main-tabs').addEventListener('change', (e) => { if (e.target.id === 'main-tabs') setTab(e.target.value); });
-  $('#lib-mode').addEventListener('change', (e) => {
-    if (e.target.id !== 'lib-mode') return;
-    state.libMode = e.target.value === 'store' ? 'store' : 'local'; // explicit choice: no "last mode" redirect
-    setTab(state.libMode === 'store' ? 'online' : 'library');
-  });
   $('#btn-empty-store').onclick = () => openStore();
   $('#list-body').addEventListener('contextmenu', (e) => {
     const r = e.target.closest('.list-row');

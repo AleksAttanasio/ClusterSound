@@ -13,41 +13,44 @@
   <script type="module" src="vendor/webawesome/webawesome.loader.js"></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand"><img class="brand-mark" src="assets/logo-mark.svg" alt=""><span class="brand-word">ClusterSound</span></div>
-    <wa-radio-group id="main-tabs" class="seg main-tabs" orientation="horizontal" size="s" value="library" label="Sezione">
-      <wa-radio appearance="button" value="library">Libreria</wa-radio>
-      <wa-radio appearance="button" value="pattern">Sequencer</wa-radio>
-      <wa-radio appearance="button" value="rack">Drum Rack</wa-radio>
-      <wa-radio appearance="button" value="compose">Compose</wa-radio>
-      <wa-radio appearance="button" value="sampler">Recorder</wa-radio>
-    </wa-radio-group>
-    <wa-radio-group id="lib-mode" class="seg lib-mode lib-section" orientation="horizontal" size="s" value="local" label="Libreria">
-      <wa-radio appearance="button" value="local" title="La mia libreria: la cartella di sample sul Mac"><wa-icon name="folder-open" label="La mia libreria"></wa-icon><span class="lbl">La mia libreria</span></wa-radio>
-      <wa-radio appearance="button" value="store" title="Store: sample e pack gratuiti online"><wa-icon name="store" label="Store"></wa-icon><span class="lbl">Store</span></wa-radio>
-    </wa-radio-group>
-    <wa-button id="btn-folder" class="lib-only" variant="brand" size="s"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli cartella…</wa-button>
-    <div id="folder-path" class="folder-path lib-only" title="">Nessuna cartella</div>
-    <wa-button id="btn-rescan" class="lib-only" appearance="filled-outlined" size="s" disabled title="Rianalizza la cartella (i file invariati vengono letti dalla cache)"><wa-icon slot="start" name="refresh-cw"></wa-icon>Riscansiona</wa-button>
-    <div class="online-only online-search" hidden>
-      <wa-input id="online-q" class="search" type="search" size="s" placeholder="Cerca sample gratuiti (es. dusty, 909, vinyl)…" autocomplete="off"><wa-icon slot="start" name="search"></wa-icon></wa-input>
-      <wa-button id="online-go" variant="brand" size="s">Cerca</wa-button>
+  <nav id="nav" class="nav" aria-label="Sezioni">
+    <div class="nav-head">
+      <div class="brand"><img class="brand-mark" src="assets/logo-mark.svg" alt=""><span class="brand-word">ClusterSound</span></div>
+      <button id="nav-toggle" class="nav-toggle" type="button" title="Riduci il pannello"><wa-icon name="panel-left-close" label="Riduci il pannello"></wa-icon></button>
     </div>
-    <div class="progress-wrap lib-only" id="progress-wrap" hidden>
-      <wa-progress-bar id="progress-bar" class="progress" value="0" label="Avanzamento analisi"></wa-progress-bar>
-      <div id="progress-text" class="progress-text"></div>
+    <div id="nav-items" class="nav-items"></div>
+  </nav>
+
+  <div class="content">
+  <header class="page-head">
+    <div class="crumb"><span id="crumb-title" class="crumb-title">Libreria</span><span id="crumb-sub" class="crumb-sub" hidden></span></div>
+    <div class="head-tools" data-for="library">
+      <wa-button id="btn-folder" variant="brand" size="s"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli cartella…</wa-button>
+      <div id="folder-path" class="folder-path" title="">Nessuna cartella</div>
+      <wa-button id="btn-rescan" appearance="filled-outlined" size="s" disabled title="Rianalizza la cartella (i file invariati vengono letti dalla cache)"><wa-icon slot="start" name="refresh-cw"></wa-icon>Riscansiona</wa-button>
+      <div class="progress-wrap" id="progress-wrap" hidden>
+        <wa-progress-bar id="progress-bar" class="progress" value="0" label="Avanzamento analisi"></wa-progress-bar>
+        <div id="progress-text" class="progress-text"></div>
+      </div>
+      <div class="spacer"></div>
+      <wa-radio-group id="view-toggle" class="seg" orientation="horizontal" size="s" value="3d" label="Vista">
+        <wa-radio appearance="button" value="3d"><wa-icon name="box"></wa-icon>3D</wa-radio>
+        <wa-radio appearance="button" value="list"><wa-icon name="list"></wa-icon>Lista</wa-radio>
+      </wa-radio-group>
+      <wa-button id="btn-export" appearance="filled-outlined" size="s" disabled><wa-icon slot="start" name="file-down"></wa-icon>Esporta report</wa-button>
     </div>
-    <div class="spacer"></div>
-    <wa-radio-group id="view-toggle" class="seg lib-only" orientation="horizontal" size="s" value="3d" label="Vista">
-      <wa-radio appearance="button" value="3d"><wa-icon name="box"></wa-icon>3D</wa-radio>
-      <wa-radio appearance="button" value="list"><wa-icon name="list"></wa-icon>Lista</wa-radio>
-    </wa-radio-group>
-    <wa-button id="btn-export" class="lib-only" appearance="filled-outlined" size="s" disabled><wa-icon slot="start" name="file-down"></wa-icon>Esporta report</wa-button>
-    <wa-radio-group id="online-group" class="seg online-only" orientation="horizontal" size="s" value="source" label="Raggruppa i risultati" hidden>
-      <wa-radio appearance="button" value="source">Per fonte</wa-radio>
-      <wa-radio appearance="button" value="instrument">Per strumento</wa-radio>
-    </wa-radio-group>
-    <wa-button id="btn-settings" class="icon-btn online-only" appearance="plain" size="s" hidden title="Impostazioni: API key Freesound, cartella download"><wa-icon name="settings" label="Impostazioni"></wa-icon></wa-button>
+    <div class="head-tools" data-for="online" hidden>
+      <div class="online-search">
+        <wa-input id="online-q" class="search" type="search" size="s" placeholder="Cerca sample gratuiti (es. dusty, 909, vinyl)…" autocomplete="off"><wa-icon slot="start" name="search"></wa-icon></wa-input>
+        <wa-button id="online-go" variant="brand" size="s">Cerca</wa-button>
+      </div>
+      <div class="spacer"></div>
+      <wa-radio-group id="online-group" class="seg" orientation="horizontal" size="s" value="source" label="Raggruppa i risultati">
+        <wa-radio appearance="button" value="source">Per fonte</wa-radio>
+        <wa-radio appearance="button" value="instrument">Per strumento</wa-radio>
+      </wa-radio-group>
+      <wa-button id="btn-settings" class="icon-btn" appearance="plain" size="s" title="Impostazioni: API key Freesound, cartella download"><wa-icon name="settings" label="Impostazioni"></wa-icon></wa-button>
+    </div>
   </header>
 
   <div class="layout" id="library">
@@ -141,6 +144,8 @@
   <div class="layout compose-layout" id="compose" hidden></div>
 
   <div class="layout sampler-layout" id="sampler" hidden></div>
+
+  </div>
 
   <wa-dialog id="settings" label="Impostazioni online" light-dismiss style="--width: 540px">
     <div class="settings-body">

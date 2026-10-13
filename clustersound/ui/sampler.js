@@ -558,7 +558,7 @@ export class SamplerEditor {
     const box = $('#st-box');
     if (!box) return;
     const j = this.stems?.job || {};
-    const tab = document.querySelector('#main-tabs wa-radio[value="sampler"]');
+    const tab = document.querySelector('.nav-item[data-tab="sampler"]');
     if (j.state === 'downloading' || j.state === 'running') {
       const pct = Math.round((j.progress || 0) * 100);
       box.innerHTML = `<div class="rc-item">
@@ -583,7 +583,7 @@ export class SamplerEditor {
           : 'Apri una registrazione e usa «Estrai stem»: gli stem compaiono qui.';
       box.innerHTML = `<div class="hint">${msg}</div>`;
     }
-    tab?.classList.toggle('stems-busy', j.state === 'running');
+    tab?.classList.toggle('busy', j.state === 'running');
   }
 
   async _stemsClick(e) {
@@ -775,7 +775,7 @@ export class SamplerEditor {
     $('#rc-clock').classList.toggle('on', on);
     $('#rc-info').textContent = on ? `In registrazione su ${this.rec.tracks.filter((t) => !t.error).length} uscit${this.rec.tracks.length === 1 ? 'a' : 'e'}…`
       : n ? `${n} uscit${n === 1 ? 'a' : 'e'} selezionat${n === 1 ? 'a' : 'e'}: un file per ciascuna.` : 'Seleziona almeno un\'uscita.';
-    document.querySelector('#main-tabs wa-radio[value="sampler"]')?.classList.toggle('recording', on);
+    document.querySelector('.nav-item[data-tab="sampler"]')?.classList.toggle('recording', on);
   }
 
   _renderRecordings() {
