@@ -889,19 +889,19 @@ export class SamplerEditor {
       const x0 = this._x(r.start), x1 = this._x(r.end);
       if (x1 < 0 || x0 > W) return;
       const sel = i === this.sel;
-      ctx.fillStyle = sel ? 'rgba(47,141,253,.28)' : r.on ? 'rgba(47,141,253,.13)' : 'rgba(143,155,182,.08)';
+      ctx.fillStyle = sel ? 'rgba(0,176,159,.28)' : r.on ? 'rgba(0,176,159,.13)' : 'rgba(154,154,154,.08)';
       ctx.fillRect(x0, 0, x1 - x0, H);
-      ctx.fillStyle = sel ? '#6cc2fd' : '#2f8dfd';
+      ctx.fillStyle = sel ? '#2fd1bd' : '#00b09f';
       ctx.fillRect(x0, 0, Math.max(1, dpr), H);
       ctx.fillRect(x1 - Math.max(1, dpr), 0, Math.max(1, dpr), H);
       ctx.font = `${11 * dpr}px ${css.getPropertyValue('--wa-font-family-body')}`;
-      ctx.fillStyle = sel ? '#e6eaf4' : '#8f9bb6';
+      ctx.fillStyle = sel ? '#ececec' : '#9a9a9a';
       if (x1 - x0 > 30 * dpr) ctx.fillText(String(i + 1), x0 + 4 * dpr, 14 * dpr);
     });
     // grid (seconds)
     const len = end - start;
     const step = [0.01, 0.05, 0.1, 0.5, 1, 5, 10, 30, 60, 300].find((s) => len / s < 12) || 600;
-    ctx.fillStyle = 'rgba(143,155,182,.5)';
+    ctx.fillStyle = 'rgba(154,154,154,.5)';
     ctx.font = `${10 * dpr}px ${css.getPropertyValue('--wa-font-family-code')}`;
     for (let t = Math.ceil(start / step) * step; t < end; t += step) {
       const x = this._x(t);
@@ -910,9 +910,9 @@ export class SamplerEditor {
     }
     // waveform
     const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, '#32d5fe');
-    grad.addColorStop(0.5, '#2086fd');
-    grad.addColorStop(1, '#32d5fe');
+    grad.addColorStop(0, '#2fd1bd');
+    grad.addColorStop(0.5, '#00b09f');
+    grad.addColorStop(1, '#2fd1bd');
     ctx.fillStyle = grad;
     const mid = H / 2, amp = H / 2 - 16 * dpr;
     const p = this.detail && Math.abs(this.detail.start - start) < 1e-3 && Math.abs(this.detail.end - end) < 1e-3 ? this.detail : this.overview;
@@ -931,7 +931,7 @@ export class SamplerEditor {
     // selection being drawn and playhead
     if (this.drag?.kind === 'new') {
       const x0 = this._x(this.drag.a), x1 = this._x(this.drag.b);
-      ctx.fillStyle = this.drag.limited ? 'rgba(239,83,80,.25)' : 'rgba(108,194,253,.25)';
+      ctx.fillStyle = this.drag.limited ? 'rgba(239,83,80,.25)' : 'rgba(47,209,189,.25)';
       ctx.fillRect(Math.min(x0, x1), 0, Math.abs(x1 - x0), H);
     }
     if (this.playing && this.player.playing) {
@@ -946,16 +946,16 @@ export class SamplerEditor {
     ctx.clearRect(0, 0, W, H);
     const p = this.overview;
     if (!p || !this.duration) return;
-    ctx.fillStyle = 'rgba(143,155,182,.55)';
+    ctx.fillStyle = 'rgba(154,154,154,.55)';
     const n = p.wave_min.length;
     for (let k = 0; k < n; k++) {
       const x = k / n * W;
       ctx.fillRect(x, H / 2 - p.wave_max[k] * H / 2, Math.max(1, W / n), Math.max(1, (p.wave_max[k] - p.wave_min[k]) * H / 2));
     }
-    ctx.fillStyle = 'rgba(47,141,253,.5)';
+    ctx.fillStyle = 'rgba(0,176,159,.5)';
     for (const r of this.regions) ctx.fillRect(r.start / this.duration * W, H - 3, Math.max(1, (r.end - r.start) / this.duration * W), 3);
     const x0 = this.view.start / this.duration * W, x1 = this.view.end / this.duration * W;
-    ctx.strokeStyle = '#2f8dfd';
+    ctx.strokeStyle = '#00b09f';
     ctx.lineWidth = devicePixelRatio;
     ctx.strokeRect(x0 + 0.5, 0.5, Math.max(2, x1 - x0) - 1, H - 1);
   }
