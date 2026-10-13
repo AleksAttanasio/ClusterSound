@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- ClusterSound app icon: the mark of logo-drop.svg on a black macOS squircle (824px body, 100px margin). -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#000"/>
+  <svg x="212" y="212" width="600" height="600" viewBox="5 300 1010 1010">
+  <defs>
+    <mask id="cs-gaps">
+      <rect x="0" y="0" width="1024" height="1536" fill="#fff"/>
+      <polygon points="469,800 554,800 598.5,900 424.5,900" fill="#000"/>
+      <polygon points="428.7,890 593.3,890 644.2,960 377.8,960" fill="#000"/>
+    </mask>
+  </defs>
+  <path fill="#00b09f" d="M511 318C525 345 588 420 588 469A77 77 0 0 1 434 469C434 420 497 345 511 318Z"/>
+  <g fill="#fff">
+    <path d="M511 616.5A42.5 42.5 0 0 1 540 690C530 705 523 718 523 740C523 800 560 900 620 965C650 995 690 1015 706 1040C706 1080 620 1110 511 1110C402 1110 316 1080 316 1040C332 1015 372 995 402 965C462 900 499 800 499 740C499 718 492 705 482 690A42.5 42.5 0 0 1 511 616.5Z"/>
+    <g mask="url(#cs-gaps)" fill-rule="evenodd">
+      <path d="M56 1057a455 222 0 1 0 910 0a455 222 0 1 0 -910 0ZM112 1052a399 191 0 1 0 798 0a399 191 0 1 0 -798 0Z"/>
+      <path d="M199 1045a312 139 0 1 0 624 0a312 139 0 1 0 -624 0ZM238 1044a273 107 0 1 0 546 0a273 107 0 1 0 -546 0Z"/>
+    </g>
+  </g>
+  </svg>
+</svg>
