@@ -588,6 +588,7 @@ async function renderLibrarySettings(body) {
 function showCrumb() {
   const sub = $('#crumb-sub');
   sub.hidden = state.tab !== 'library' || !state.folder;
+  $('#crumb-sep').hidden = sub.hidden;
   sub.textContent = state.folder;
   sub.title = `${state.folder}\nClic: cambia cartella nelle Impostazioni`;
 }

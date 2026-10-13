@@ -83,7 +83,9 @@ body.nav-collapsed .nav-item.recording::before, body.nav-collapsed .nav-item.bus
 .crumb { flex: none; display: flex; align-items: baseline; gap: 8px; min-width: 0; margin-right: 8px; }
 .crumb-title { font-size: 15px; font-weight: 600; white-space: nowrap; }
 .crumb-sub { font: 500 13px var(--mono); color: var(--wa-color-brand-on-quiet); max-width: 36vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
-.crumb-sub::before { content: "/"; color: var(--text-2); margin-right: 8px; font-family: var(--font); }
+.crumb-sep { color: var(--text-2); }
+/* paths are right-aligned (direction: rtl) to ellipsize on the left: LRM marks keep the leading "/" in place */
+.crumb-sub::before, .crumb-sub::after, .set-path::before, .set-path::after, .rc-path::before, .rc-path::after, .cp-pack-path::before, .cp-pack-path::after { content: "\200E"; }
 .head-tools { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
 .page-head .more-btn { margin-left: auto; font-size: 16px; }
 .crumb-sub[data-settings-link] { cursor: pointer; }
