@@ -1,7 +1,8 @@
 // "Pattern" screen: genre patterns on drum buses (with sample layers) + bass line, MIDI/Ableton export.
 import { Sequencer, refKey } from './sequencer.js';
 import { suggestBus, toast, showPopover } from './sendmenu.js';
-import { Arranger } from './arranger.js';
+import { Arranger, midiMap, setMidiMap } from './arranger.js';
+import { settingsLink, setRow, savedFlash } from './settings.js';
 import { sendToLive } from './live.js';
 import { btn, setPlayButton, openDialog } from './kit.js';
 import { svg } from './icons.js';
@@ -83,6 +84,15 @@ export class PatternEditor {
   }
 
   hide() { this.stop(); }
+
+  /** Sequencer section of the Settings page. */
+  renderSettings(body) {
+    const map = midiMap();
+    body.innerHTML = setRow('Note della batteria nel MIDI', 'Come vengono scritte le note dei bus di batteria nei file MIDI esportati (pattern e canzone).',
+      `<wa-select id="set-midi-map" size="s" value="${map}" label="Mappatura" style="width:230px">
+         <wa-option value="drumrack">Drum Rack di Ableton (C1…)</wa-option><wa-option value="gm">General MIDI</wa-option></wa-select>`);
+    body.querySelector('#set-midi-map').addEventListener('change', (e) => { setMidiMap(e.target.value); savedFlash(body); });
+  }
 
   // ---------------------------------------------------------------- pattern state
   _persist(fromArranger = false) {
@@ -371,11 +381,11 @@ export class PatternEditor {
         <label>Battute <wa-select id="pt-bars" size="s" value="1"><wa-option value="1">1</wa-option><wa-option value="2">2</wa-option><wa-option value="4">4</wa-option></wa-select></label>
         <label>Tonalità <wa-select id="pt-key" size="s">${keys}</wa-select><wa-select id="pt-oct" size="s" title="Ottava del basso (convenzione Ableton: C1 = nota MIDI 36)"><wa-option value="0">-1</wa-option><wa-option value="1">0</wa-option><wa-option value="2">1</wa-option><wa-option value="3">2</wa-option></wa-select></label>
         <div class="spacer"></div>
-        <wa-select id="pt-map" size="s" value="drumrack" title="Mappatura note della batteria nel MIDI"><wa-option value="drumrack">MIDI: Drum Rack (C1…)</wa-option><wa-option value="gm">MIDI: General MIDI</wa-option></wa-select>
         <wa-button-group label="Esporta">
           ${btn('MIDI', { id: 'pt-midi', icon: 'file-down' })}${btn('WAV', { id: 'pt-wav' })}${btn('Invia a Live', { id: 'pt-live', title: 'Crea in Live le tracce Drums e Bass con rack e clip (serve il device ClusterSound nel set)' })}
         </wa-button-group>
         ${btn('Esporta per Ableton', { id: 'pt-abl', variant: 'brand', icon: 'file-down', title: 'Cartella con Drum Rack .adg, sample, MIDI e loop pronta per Ableton Live' })}
+        ${settingsLink('pattern', 'Opzioni di export')}
       </div>
       <div class="pt-bar pt-tools">
         ${btn('Kit casuale', { id: 'pt-random', icon: 'dices', title: 'Sceglie a caso un gruppo di sample simili per ogni bus non bloccato e ne prende sample a caso' })}
@@ -420,7 +430,7 @@ export class PatternEditor {
     $('#pt-clear').onclick = () => this.clearSamples();
     $('#pt-save').onclick = () => this.saveVariant();
     $('#pt-del').onclick = () => this.deleteVariant();
-    $('#pt-midi').onclick = async () => { const p = await this.api.export_midi(this._exportable(), $('#pt-map').value); if (p) toast(`MIDI salvato: ${p.split('/').pop()}`); };
+    $('#pt-midi').onclick = async () => { const p = await this.api.export_midi(this._exportable(), midiMap()); if (p) toast(`MIDI salvato: ${p.split('/').pop()}`); };
     $('#pt-wav').onclick = async () => { toast('Rendering…'); const p = await this.api.export_wav(this._exportable()); if (p) toast(`WAV salvato: ${p.split('/').pop()}`); };
     $('#pt-abl').onclick = async () => {
       toast('Preparazione pacchetto Ableton…');
