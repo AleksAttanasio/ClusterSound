@@ -79,7 +79,7 @@ export class Panel {
 
       <div>
         <div class="section-title">Dinamica
-          <span class="legend-inline"><span style="color:#7d8597">onda</span><span style="color:#e6e8ee">RMS dB</span></span>
+          <span class="legend-inline"><span style="color:#8a8a8a">Onda</span><span style="color:#ececec">RMS dB</span></span>
         </div>
         ${dyn.error ? `<div class="error">${esc(dyn.error)}</div>` : '<canvas class="wave" id="cv-wave"></canvas><canvas class="mel" id="cv-mel"></canvas>'}
       </div>
@@ -169,7 +169,7 @@ export class Panel {
     // ADSR phases as shaded bands
     const phases = [['A', a.attack_start, a.attack_end], ['D', a.attack_end, a.decay_end],
       ['S', a.decay_end, a.release_start], ['R', a.release_start, a.release_end]];
-    ctx.font = '600 10px -apple-system, sans-serif';
+    ctx.font = `600 10px ${getComputedStyle(document.documentElement).getPropertyValue('--wa-font-family-body')}`;
     for (const [k, t0, t1] of phases) {
       if (t0 === undefined || t1 === undefined || t1 <= t0) continue;
       ctx.fillStyle = ADSR_COLORS[k] + '1c';
@@ -182,7 +182,7 @@ export class Panel {
     // waveform (min/max columns)
     const mid = h / 2, amp = h * 0.46;
     const mn = dyn.wave_min || [], mx = dyn.wave_max || [];
-    ctx.fillStyle = '#7d8597';
+    ctx.fillStyle = '#8a8a8a';
     const n = mx.length;
     for (let i = 0; i < n; i++) {
       const x = (i / n) * w;
@@ -194,7 +194,7 @@ export class Panel {
     const env = dyn.env_db || [];
     const dt = dyn.env_dt || 0.005;
     const Y = (db) => (Math.min(0, Math.max(-60, db)) / -60) * (h - 4) + 2;
-    ctx.strokeStyle = '#e6e8ee';
+    ctx.strokeStyle = '#ececec';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     env.forEach((db, i) => { const x = X(i * dt); i ? ctx.lineTo(x, Y(db)) : ctx.moveTo(x, Y(db)); });
@@ -210,8 +210,8 @@ export class Panel {
       ctx.setLineDash([]);
     }
     // dB scale
-    ctx.fillStyle = '#6b7283';
-    ctx.font = '9px -apple-system, sans-serif';
+    ctx.fillStyle = '#6b6b6b';
+    ctx.font = `9px ${getComputedStyle(document.documentElement).getPropertyValue('--wa-font-family-code')}`;
     for (const db of [0, -20, -40, -60]) ctx.fillText(`${db}`, w - 20, Math.min(h - 3, Y(db) + 9));
 
     if (playhead !== null) {

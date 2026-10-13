@@ -1,0 +1,3 @@
+Inter 4.1 (web/InterVariable.woff2, github.com/rsms/inter)
+JetBrains Mono 2.304 (Regular, Medium, Bold woff2, github.com/JetBrains/JetBrainsMono)
+Both SIL Open Font License 1.1. Vendored; do not edit.

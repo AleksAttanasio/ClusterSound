@@ -4,6 +4,7 @@
 import { btn, iconBtn, slider, check, num, select, seg, text, setPlayButton, icon, openDialog } from './kit.js';
 import { toast, showPopover } from './sendmenu.js';
 import { liveToast } from './live.js';
+import { settingsLink, setRow, savedFlash } from './settings.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -112,13 +113,10 @@ export class SamplerEditor {
           <div id="sp-files" class="sp-files" hidden></div>
         </div>` : ''}
         <div class="filter-block rc-block">
-          <div class="filter-title">Uscite da registrare <span class="links"><a href="#" id="rc-refresh">aggiorna</a></span></div>
+          <div class="filter-title rc-title">Registra l'uscita del Mac ${settingsLink('sampler', 'Uscite, formato e cartella')}</div>
           <div id="rc-devices" class="rc-devices"></div>
-          <div class="filter-title">Formato</div>
-          <div class="rc-fmt" id="rc-fmt"></div>
-          <div class="filter-title">Cartella</div>
-          <div class="rc-folder"><span class="rc-path" id="rc-path"></span>
-            <a href="#" id="rc-pick">Cambia…</a><a href="#" id="rc-reveal">Apri</a></div>
+          <div class="rc-folder"><span class="rc-fmt-sum" id="rc-fmt-sum"></span><span class="rc-path" id="rc-path"></span>
+            ${iconBtn('folder-open', 'Mostra la cartella nel Finder', { size: 'xs', id: 'rc-reveal' })}</div>
           <div class="rc-go">
             ${btn('Registra', { variant: 'brand', icon: 'circle', id: 'rc-rec', cls: 'rc-rec' })}
             <span class="rc-clock" id="rc-clock">0:00</span>
@@ -139,12 +137,8 @@ export class SamplerEditor {
           <div id="en-box" class="rc-list"></div>
         </div>
         <div class="filter-block">
-          <div class="filter-title">Sample estratti</div>
-          <div class="sp-opts">
-            ${num(o.fade_in_ms, { id: 'sp-fi', min: 0, max: 200, step: 1, label: 'Fade in (ms)' })}
-            ${num(o.fade_out_ms, { id: 'sp-fo', min: 0, max: 2000, step: 5, label: 'Fade out (ms)' })}
-          </div>
-          ${check('Normalizza a −0,3 dBFS', o.normalize, { id: 'sp-norm' })}
+          <div class="filter-title rc-title">Sample estratti ${settingsLink('sampler', 'Fade e normalizzazione')}</div>
+          <div class="hint" id="sp-opts-sum"></div>
           <div class="hint" id="sp-max-hint"></div>
         </div>
       </aside>
@@ -264,7 +258,7 @@ export class SamplerEditor {
       : `<a href="#" data-folder="${esc(c.path)}">${esc(c.name)}</a>`).join(' › ');
     const body = `<div class="sp-lib">
         ${text(r.q, { id: 'sp-lib-q', placeholder: 'Cerca per nome o cartella in tutta la libreria', 'with-clear': true })}
-        <div class="sp-lib-crumbs">${crumbs}${r.q ? ' › <b>ricerca</b>' : ''}</div>
+        <div class="sp-lib-crumbs">${crumbs}${r.q ? ' › <b>Ricerca</b>' : ''}</div>
         <div class="sp-lib-rows">${rows.join('') || '<div class="hint">Nessun file audio qui.</div>'}</div>
         ${r.more ? `<div class="hint">… e altri ${r.more}: affina la ricerca.</div>` : ''}
       </div>`;
@@ -296,10 +290,6 @@ export class SamplerEditor {
   }
 
   _bindRest() {
-    const optNum = (id, key) => $(id).addEventListener('change', (e) => { this.opts[key] = Math.max(0, +e.target.value || 0); this._persist(); this._dropAudio(); });
-    optNum('#sp-fi', 'fade_in_ms');
-    optNum('#sp-fo', 'fade_out_ms');
-    $('#sp-norm').addEventListener('change', (e) => { this.opts.normalize = e.target.checked; this._persist(); this._dropAudio(); });
     $('#sp-sens').addEventListener('change', (e) => { this.opts.sensitivity = +e.target.value; this._persist(); });
     $('#sp-play').onclick = () => this.togglePlay();
     $('#sp-fit').onclick = () => this.setView(0, this.duration);
@@ -410,9 +400,14 @@ export class SamplerEditor {
       <span class="hint">${fmt(s.duration)} · ${s.sr} Hz · ${s.channels === 1 ? 'mono' : 'stereo'}${who}${
         s.truncated ? ' · aperti solo i primi 20 minuti' : ''}</span>${page}
       ${s.origin === 'capture' ? `<span class="hint sp-note-inline">${icon('triangle-alert')} solo uso personale</span>` : ''}
-      ${src?.suspect ? `<span class="sp-badge warn" title="Sembra materiale commerciale ricaricato con una licenza libera">verifica i diritti</span>` : ''}`;
+      ${src?.suspect ? `<span class="sp-badge warn" title="Sembra materiale commerciale ricaricato con una licenza libera">Verifica i diritti</span>` : ''}`;
     const a = box.querySelector('.sp-page');
     if (a) a.onclick = (e) => { e.preventDefault(); this.api.open_url(a.dataset.url); };
+  }
+
+  _renderOptsSummary() {
+    const o = this.opts, el = $('#sp-opts-sum');
+    if (el) el.textContent = `Fade ${o.fade_in_ms} ms in · ${o.fade_out_ms} ms out${o.normalize ? ' · normalizzati a −0,3 dBFS' : ''}.`;
   }
 
   _renderMax() {
@@ -424,41 +419,6 @@ export class SamplerEditor {
 
   // ---------------------------------------------------------------- recorder
   _bindRecorder() {
-    $('#rc-refresh').onclick = async (e) => {
-      e.preventDefault();
-      this.rec.devices = await this.api.recorder_devices();
-      this._renderRecorder();
-    };
-    $('#rc-devices').addEventListener('change', (e) => {
-      const cb = e.target.closest('wa-checkbox[data-dev]');
-      if (!cb) return;
-      const sel = new Set(this._selectedDevices());
-      if (cb.checked) sel.add(cb.dataset.dev); else sel.delete(cb.dataset.dev);
-      this.opts.devices = [...sel];
-      this._persist();
-      this._renderRecButton();
-    });
-    $('#rc-fmt').addEventListener('change', (e) => {
-      const k = e.target.dataset.k;
-      if (!k) return;
-      this.recFmt = { ...this.recFmt, [k]: k === 'rate' ? +e.target.value : e.target.value };
-      if (k === 'format') { // other options depend on the format: fall back to its defaults
-        const f = this.rec.formats[this.recFmt.format];
-        this.recFmt.quality = f.qualities[0][0];
-        if (f.rates) this.recFmt.rate = f.rates[0];
-        if (!f.multichannel && this.recFmt.channels === 'all') this.recFmt.channels = 'stereo';
-        this._renderFormat();
-      }
-      this.api.set_setting('recorder_format', this.recFmt);
-    });
-    $('#rc-pick').onclick = async (e) => {
-      e.preventDefault();
-      const p = await this.api.pick_folder();
-      if (!p) return;
-      this.recDir = (await this.api.set_setting('recorder_dir', p)).recorder_dir;
-      $('#rc-path').textContent = this.recDir;
-      $('#rc-path').title = this.recDir;
-    };
     $('#rc-reveal').onclick = async (e) => {
       e.preventDefault();
       if (!(await this.api.reveal_path(this.recDir))) toast('La cartella verrà creata alla prima registrazione');
@@ -558,7 +518,7 @@ export class SamplerEditor {
     const box = $('#st-box');
     if (!box) return;
     const j = this.stems?.job || {};
-    const tab = document.querySelector('#main-tabs wa-radio[value="sampler"]');
+    const tab = document.querySelector('.nav-item[data-tab="sampler"]');
     if (j.state === 'downloading' || j.state === 'running') {
       const pct = Math.round((j.progress || 0) * 100);
       box.innerHTML = `<div class="rc-item">
@@ -583,7 +543,7 @@ export class SamplerEditor {
           : 'Apri una registrazione e usa «Estrai stem»: gli stem compaiono qui.';
       box.innerHTML = `<div class="hint">${msg}</div>`;
     }
-    tab?.classList.toggle('stems-busy', j.state === 'running');
+    tab?.classList.toggle('busy', j.state === 'running');
   }
 
   async _stemsClick(e) {
@@ -614,7 +574,7 @@ export class SamplerEditor {
     const m = this._enhModel();
     const scope = forceScope || (r ? 'region' : 'all');
     const models = st.models.length > 1
-      ? seg(st.models.map((x) => [x.key, esc(x.label)]), m.key, { 'data-o': 'model', cls: 'en-models' }) : '';
+      ? `<div class="en-model"><b>${esc(m.label)}</b>${settingsLink('sampler', 'Cambia modello')}</div>` : '';
     const facts = `<div class="en-facts">
         <span>${icon('download')} ${m.mb} MB</span><span title="Memoria usata solo durante il lavoro">RAM ${esc(m.ram)}</span>
         <span title="Su Apple Silicon (GPU)">${esc(m.speed)}</span></div>`;
@@ -637,12 +597,7 @@ export class SamplerEditor {
       <div class="hint en-license">Modello ${esc(m.label.split(' · ')[0])}, licenza ${esc(m.license)}. Il modello si carica solo
         mentre lavora, in un processo a parte: finito il lavoro la memoria torna libera.</div>
       ${go ? `<div class="pop-actions">${go}</div>` : ''}`);
-    pop.querySelector('[data-o=model]')?.addEventListener('change', (e) => {
-      this.opts.enhModel = e.target.value;
-      this._persist();
-      pop.close();
-      this._enhMenu(anchor, forceScope);
-    });
+    pop.querySelector('[data-settings-link]')?.addEventListener('click', () => pop.close());
     pop.querySelectorAll('[data-go]').forEach((b) => {
       b.onclick = async () => {
         let out;
@@ -725,26 +680,32 @@ export class SamplerEditor {
   _renderRecorder() {
     $('#rc-path').textContent = this.recDir;
     $('#rc-path').title = this.recDir;
-    this._renderFormat();
+    const f = this.recFmt, spec = this.rec.formats[f.format];
+    const lbl = (list, v) => list.find(([k]) => String(k) === String(v))?.[1] ?? v;
+    $('#rc-fmt-sum').textContent = `${spec.label} · ${lbl(spec.qualities, f.quality)} · ${lbl(this.rec.channels, f.channels)}`;
+    this._renderOptsSummary();
     this._renderDevices();
     this._renderRecButton();
     this._renderRecordings();
+    if (this._setBody?.isConnected) this._renderSetDevices();
   }
 
-  _renderFormat() {
+  _formatControls() {
     const f = this.recFmt, spec = this.rec.formats[f.format];
     const rates = spec.rates ? this.rec.rates.filter(([r]) => spec.rates.includes(r)) : this.rec.rates;
     const chans = this.rec.channels.filter(([c]) => spec.multichannel || c !== 'all');
     const dis = this.rec.running;
-    $('#rc-fmt').innerHTML = `
+    return `
       ${select(Object.entries(this.rec.formats).map(([k, v]) => [k, v.label]), f.format, { 'data-k': 'format', label: 'Formato', disabled: dis })}
       ${select(spec.qualities, f.quality, { 'data-k': 'quality', label: 'Qualità', disabled: dis })}
       ${select(rates, f.rate, { 'data-k': 'rate', label: 'Frequenza', disabled: dis || !!spec.rates })}
       ${select(chans, f.channels, { 'data-k': 'channels', label: 'Canali', disabled: dis })}`;
   }
 
+  // On screen: the outputs that will be recorded (chosen in Settings), with live meters while recording.
   _renderDevices() {
     const box = $('#rc-devices');
+    if (!box) return;
     if (!this.rec.devices.length) {
       box.innerHTML = '<div class="hint">Nessuna uscita registrabile: serve macOS 14.2 o successivo '
         + '(oppure l\'extra <code>capture</code> per il mix di tutte le uscite).</div>';
@@ -752,17 +713,98 @@ export class SamplerEditor {
     }
     const sel = new Set(this._selectedDevices());
     const tracks = Object.fromEntries(this.rec.tracks.map((t) => [t.device, t]));
-    box.innerHTML = this.rec.devices.map((d) => {
+    const shown = this.rec.devices.filter((d) => (this.rec.running ? tracks[d.id] : sel.has(d.id)));
+    box.innerHTML = shown.map((d) => {
       const t = this.rec.running ? tracks[d.id] : null;
-      const meta = d.sample_rate ? `${d.channels} can · ${(d.sample_rate / 1000).toFixed(1).replace('.0', '')} kHz` : 'tutto ciò che il Mac suona';
+      const meta = d.sample_rate ? `${d.channels} can · ${(d.sample_rate / 1000).toFixed(1).replace('.0', '')} kHz` : 'Tutto ciò che il Mac suona';
       return `<div class="rc-dev${t ? ' on' : ''}">
-        ${check(`${esc(d.name)}${d.default ? ' <span class="hint">· predefinita</span>' : ''}`, sel.has(d.id),
-          { 'data-dev': d.id, disabled: this.rec.running })}
+        <div class="rc-dev-name">${esc(d.name)}${d.default ? ' <span class="hint">· predefinita</span>' : ''}</div>
         <div class="rc-dev-meta hint">${t ? (t.error ? `<span class="error">${esc(t.error)}</span>`
           : `${clock(t.seconds)} · ${mb(t.bytes)}`) : meta}</div>
         ${t && !t.error ? `<div class="sp-meter"><div style="width:${Math.min(100, Math.sqrt(t.level || 0) * 220)}%"></div></div>` : ''}
       </div>`;
     }).join('');
+  }
+
+  // Settings: which outputs to record.
+  _renderSetDevices() {
+    const box = this._setBody.querySelector('#set-rc-devices');
+    if (!this.rec.devices.length) {
+      box.innerHTML = '<span class="hint">Nessuna uscita registrabile: serve macOS 14.2 o successivo.</span>';
+      return;
+    }
+    const sel = new Set(this._selectedDevices());
+    box.innerHTML = this.rec.devices.map((d) => check(`${esc(d.name)}${d.default ? ' <span class="hint">· predefinita</span>' : ''}`,
+      sel.has(d.id), { 'data-dev': d.id, disabled: this.rec.running })).join('');
+  }
+
+  /** Recorder section of the Settings page. */
+  async renderSettings(body) {
+    await this.ensure();
+    this._setBody = body;
+    const o = this.opts;
+    const enhModels = this.enh?.models || [];
+    body.innerHTML =
+      setRow('Uscite da registrare', 'Ogni uscita scelta va in un file a parte. <a href="#" id="set-rc-refresh">Aggiorna l\'elenco</a>',
+        '<div class="set-checks" id="set-rc-devices"></div>')
+      + setRow('Formato', 'Formato, qualità, frequenza e canali dei file registrati.', `<div class="rc-fmt set-rc-fmt" id="set-rc-fmt">${this._formatControls()}</div>`)
+      + setRow('Cartella delle registrazioni', '',
+        `<span class="set-path" id="set-rc-path" title="${esc(this.recDir)}">${esc(this.recDir)}</span>
+         <wa-button id="set-rc-pick" size="s" appearance="filled-outlined"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli…</wa-button>`)
+      + setRow('Fade dei sample estratti', 'Applicati a ogni regione esportata, per evitare click all\'inizio e alla fine.',
+        `${num(o.fade_in_ms, { id: 'set-sp-fi', min: 0, max: 200, step: 1, label: 'Fade in', style: 'width:120px' }).replace('></wa-number-input>', '><span slot="end" class="hint">ms in</span></wa-number-input>')}
+         ${num(o.fade_out_ms, { id: 'set-sp-fo', min: 0, max: 2000, step: 5, label: 'Fade out', style: 'width:130px' }).replace('></wa-number-input>', '><span slot="end" class="hint">ms out</span></wa-number-input>')}`)
+      + setRow('Normalizza', 'Porta il picco di ogni sample estratto a −0,3 dBFS.', `<wa-switch id="set-sp-norm" size="s" ${o.normalize ? 'checked' : ''}></wa-switch>`)
+      + (enhModels.length > 1 ? setRow('Modello di «Migliora»', esc(this._enhModel().detail),
+        select(enhModels.map((m) => [m.key, m.label]), this._enhModel().key, { id: 'set-en-model', label: 'Modello', style: 'width:280px' })) : '');
+    this._renderSetDevices();
+    const saved = () => { this._persist(); savedFlash(body); };
+    body.querySelector('#set-rc-refresh').onclick = async (e) => {
+      e.preventDefault();
+      this.rec.devices = await this.api.recorder_devices();
+      this._renderRecorder();
+    };
+    body.querySelector('#set-rc-devices').addEventListener('change', (e) => {
+      const cb = e.target.closest('wa-checkbox[data-dev]');
+      if (!cb) return;
+      const sel = new Set(this._selectedDevices());
+      if (cb.checked) sel.add(cb.dataset.dev); else sel.delete(cb.dataset.dev);
+      this.opts.devices = [...sel];
+      saved();
+      this._renderDevices();
+      this._renderRecButton();
+    });
+    body.querySelector('#set-rc-fmt').addEventListener('change', async (e) => {
+      const k = e.target.dataset.k;
+      if (!k) return;
+      this.recFmt = { ...this.recFmt, [k]: k === 'rate' ? +e.target.value : e.target.value };
+      if (k === 'format') { // other options depend on the format: fall back to its defaults
+        const f = this.rec.formats[this.recFmt.format];
+        this.recFmt.quality = f.qualities[0][0];
+        if (f.rates) this.recFmt.rate = f.rates[0];
+        if (!f.multichannel && this.recFmt.channels === 'all') this.recFmt.channels = 'stereo';
+        body.querySelector('#set-rc-fmt').innerHTML = this._formatControls();
+      }
+      await this.api.set_setting('recorder_format', this.recFmt);
+      this._renderRecorder();
+      savedFlash(body);
+    });
+    body.querySelector('#set-rc-pick').onclick = async () => {
+      const p = await this.api.pick_folder();
+      if (!p) return;
+      this.recDir = (await this.api.set_setting('recorder_dir', p)).recorder_dir;
+      body.querySelector('#set-rc-path').textContent = this.recDir;
+      body.querySelector('#set-rc-path').title = this.recDir;
+      this._renderRecorder();
+      savedFlash(body);
+    };
+    const optNum = (id, key) => body.querySelector(id).addEventListener('change', (e) => {
+      this.opts[key] = Math.max(0, +e.target.value || 0); saved(); this._dropAudio(); this._renderOptsSummary();
+    });
+    optNum('#set-sp-fi', 'fade_in_ms');
+    optNum('#set-sp-fo', 'fade_out_ms');
+    body.querySelector('#set-sp-norm').addEventListener('change', (e) => { this.opts.normalize = e.target.checked; saved(); this._dropAudio(); this._renderOptsSummary(); });
+    body.querySelector('#set-en-model')?.addEventListener('change', (e) => { this.opts.enhModel = e.target.value; saved(); });
   }
 
   _renderRecButton() {
@@ -775,7 +817,7 @@ export class SamplerEditor {
     $('#rc-clock').classList.toggle('on', on);
     $('#rc-info').textContent = on ? `In registrazione su ${this.rec.tracks.filter((t) => !t.error).length} uscit${this.rec.tracks.length === 1 ? 'a' : 'e'}…`
       : n ? `${n} uscit${n === 1 ? 'a' : 'e'} selezionat${n === 1 ? 'a' : 'e'}: un file per ciascuna.` : 'Seleziona almeno un\'uscita.';
-    document.querySelector('#main-tabs wa-radio[value="sampler"]')?.classList.toggle('recording', on);
+    document.querySelector('.nav-item[data-tab="sampler"]')?.classList.toggle('recording', on);
   }
 
   _renderRecordings() {
@@ -889,19 +931,19 @@ export class SamplerEditor {
       const x0 = this._x(r.start), x1 = this._x(r.end);
       if (x1 < 0 || x0 > W) return;
       const sel = i === this.sel;
-      ctx.fillStyle = sel ? 'rgba(47,141,253,.28)' : r.on ? 'rgba(47,141,253,.13)' : 'rgba(143,155,182,.08)';
+      ctx.fillStyle = sel ? 'rgba(0,176,159,.28)' : r.on ? 'rgba(0,176,159,.13)' : 'rgba(154,154,154,.08)';
       ctx.fillRect(x0, 0, x1 - x0, H);
-      ctx.fillStyle = sel ? '#6cc2fd' : '#2f8dfd';
+      ctx.fillStyle = sel ? '#2fd1bd' : '#00b09f';
       ctx.fillRect(x0, 0, Math.max(1, dpr), H);
       ctx.fillRect(x1 - Math.max(1, dpr), 0, Math.max(1, dpr), H);
       ctx.font = `${11 * dpr}px ${css.getPropertyValue('--wa-font-family-body')}`;
-      ctx.fillStyle = sel ? '#e6eaf4' : '#8f9bb6';
+      ctx.fillStyle = sel ? '#ececec' : '#9a9a9a';
       if (x1 - x0 > 30 * dpr) ctx.fillText(String(i + 1), x0 + 4 * dpr, 14 * dpr);
     });
     // grid (seconds)
     const len = end - start;
     const step = [0.01, 0.05, 0.1, 0.5, 1, 5, 10, 30, 60, 300].find((s) => len / s < 12) || 600;
-    ctx.fillStyle = 'rgba(143,155,182,.5)';
+    ctx.fillStyle = 'rgba(154,154,154,.5)';
     ctx.font = `${10 * dpr}px ${css.getPropertyValue('--wa-font-family-code')}`;
     for (let t = Math.ceil(start / step) * step; t < end; t += step) {
       const x = this._x(t);
@@ -910,9 +952,9 @@ export class SamplerEditor {
     }
     // waveform
     const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, '#32d5fe');
-    grad.addColorStop(0.5, '#2086fd');
-    grad.addColorStop(1, '#32d5fe');
+    grad.addColorStop(0, '#2fd1bd');
+    grad.addColorStop(0.5, '#00b09f');
+    grad.addColorStop(1, '#2fd1bd');
     ctx.fillStyle = grad;
     const mid = H / 2, amp = H / 2 - 16 * dpr;
     const p = this.detail && Math.abs(this.detail.start - start) < 1e-3 && Math.abs(this.detail.end - end) < 1e-3 ? this.detail : this.overview;
@@ -931,7 +973,7 @@ export class SamplerEditor {
     // selection being drawn and playhead
     if (this.drag?.kind === 'new') {
       const x0 = this._x(this.drag.a), x1 = this._x(this.drag.b);
-      ctx.fillStyle = this.drag.limited ? 'rgba(239,83,80,.25)' : 'rgba(108,194,253,.25)';
+      ctx.fillStyle = this.drag.limited ? 'rgba(239,83,80,.25)' : 'rgba(47,209,189,.25)';
       ctx.fillRect(Math.min(x0, x1), 0, Math.abs(x1 - x0), H);
     }
     if (this.playing && this.player.playing) {
@@ -946,16 +988,16 @@ export class SamplerEditor {
     ctx.clearRect(0, 0, W, H);
     const p = this.overview;
     if (!p || !this.duration) return;
-    ctx.fillStyle = 'rgba(143,155,182,.55)';
+    ctx.fillStyle = 'rgba(154,154,154,.55)';
     const n = p.wave_min.length;
     for (let k = 0; k < n; k++) {
       const x = k / n * W;
       ctx.fillRect(x, H / 2 - p.wave_max[k] * H / 2, Math.max(1, W / n), Math.max(1, (p.wave_max[k] - p.wave_min[k]) * H / 2));
     }
-    ctx.fillStyle = 'rgba(47,141,253,.5)';
+    ctx.fillStyle = 'rgba(0,176,159,.5)';
     for (const r of this.regions) ctx.fillRect(r.start / this.duration * W, H - 3, Math.max(1, (r.end - r.start) / this.duration * W), 3);
     const x0 = this.view.start / this.duration * W, x1 = this.view.end / this.duration * W;
-    ctx.strokeStyle = '#2f8dfd';
+    ctx.strokeStyle = '#00b09f';
     ctx.lineWidth = devicePixelRatio;
     ctx.strokeRect(x0 + 0.5, 0.5, Math.max(2, x1 - x0) - 1, H - 1);
   }
