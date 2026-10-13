@@ -1,5 +1,7 @@
 # ClusterSound
 
+[![Documentazione](https://img.shields.io/badge/docs-documentazione-00b09f?style=for-the-badge&logo=materialformkdocs&logoColor=white)](https://aleksattanasio.github.io/ClusterSound/)
+
 App desktop per macOS e Windows che analizza una cartella di sample audio (ricorsivamente), assegna ogni
 file a una classe di suono — kick, snare, hat, 808, pad… — e mostra l'intera libreria come nuvola 3D in
 cui suoni simili stanno vicini. Da lì costruisci kit, groove e progressioni e li porti in Ableton Live.
@@ -49,10 +51,10 @@ Dettagli in [Installazione](https://aleksattanasio.github.io/ClusterSound/guida/
 | [Modelli AI](https://aleksattanasio.github.io/ClusterSound/ai/) | YAMNet in numpy, classificatore auto-addestrato, Demucs, Apollo |
 | [Algoritmi](https://aleksattanasio.github.io/ClusterSound/algoritmi/) | classificazione, clustering, scelta dei sample, groove, armonia, melodia |
 
-I sorgenti del sito sono in [`docs/`](docs/) (MkDocs Material). Per vederlo in locale:
+I sorgenti del sito sono in [`docs/`](docs/) (MkDocs Material). Per vederlo in locale (http://127.0.0.1:8000):
 
 ```bash
-pip install -r docs/requirements.txt && mkdocs serve
+uvx --with mkdocs-material==9.5.39 mkdocs serve
 ```
 
 ## Sviluppo
