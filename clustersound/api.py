@@ -516,7 +516,7 @@ class Api:
         return self._sampler_open(it["path"])
 
     def _bind_drop(self) -> None:
-        """Audio files dropped from the Finder on the Recorder open in its editor (pywebview gives the path)."""
+        """Audio files dropped from the Finder / File Explorer on the Recorder open in its editor (pywebview gives the path)."""
         from webview.dom import DOMEventHandler
         el = self._window.dom.get_element("#sampler")
         if el is None:
