@@ -77,5 +77,5 @@ def download_model(key: str) -> None:
     hf_hub_download(m.repo, m.filename, local_dir=model_dir(key))
     if not os.path.isfile(weights_path(key)):
         raise RuntimeError("pesi non trovati dopo il download")
-    with open(_marker(key), "w") as f:
+    with open(_marker(key), "w", encoding="utf-8") as f:
         f.write(f"{m.repo}/{m.filename}\n")

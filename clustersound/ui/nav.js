@@ -1,5 +1,5 @@
 // Left navigation: one entry per section, grouped, with Settings at the bottom.
-// It can be reduced to icons only; the choice is remembered on this Mac.
+// It can be reduced to icons only; the choice is remembered on this computer.
 import { icon } from './kit.js';
 
 const ITEMS = [

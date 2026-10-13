@@ -1,7 +1,7 @@
-// "Recorder" screen: record what the Mac sends to one or more output devices (one file each, several formats),
+// "Recorder" screen: record what the computer sends to one or more output devices (one file each, several formats),
 // then open a recording below to mark regions on its waveform (by hand or on transients) and export them as
 // samples. Opening own files and openly licensed links is still here, hidden while show_sources is false.
-import { btn, iconBtn, slider, check, num, select, seg, text, setPlayButton, icon, openDialog } from './kit.js';
+import { btn, iconBtn, slider, check, num, select, seg, text, setPlayButton, icon, openDialog, FILE_MANAGER } from './kit.js';
 import { toast, showPopover } from './sendmenu.js';
 import { liveToast } from './live.js';
 import { settingsLink, setRow, savedFlash } from './settings.js';
@@ -96,10 +96,10 @@ export class SamplerEditor {
         <div class="filter-block">
           <div class="filter-title">Apri audio</div>
           <div class="sp-open-row">
-            ${btn('Apri file…', { icon: 'folder-open', id: 'sp-open-file', title: 'Un file audio del Mac (wav, aif, flac, mp3, ogg…)' })}
+            ${btn('Apri file…', { icon: 'folder-open', id: 'sp-open-file', title: 'Un file audio del computer (wav, aif, flac, mp3, ogg…)' })}
             ${btn('Dalla libreria…', { icon: 'list', id: 'sp-open-lib', title: 'Un sample o un loop della libreria di ClusterSound, per cartella o per nome' })}
           </div>
-          <div class="hint">Oppure trascina un file audio dal Finder sulla forma d'onda.</div>
+          <div class="hint">Oppure trascina un file audio da ${FILE_MANAGER} sulla forma d'onda.</div>
         </div>
         ${this.showSources ? `<div class="filter-block">
           <div class="filter-title">Sorgente</div>
@@ -113,10 +113,10 @@ export class SamplerEditor {
           <div id="sp-files" class="sp-files" hidden></div>
         </div>` : ''}
         <div class="filter-block rc-block">
-          <div class="filter-title rc-title">Registra l'uscita del Mac ${settingsLink('sampler', 'Uscite, formato e cartella')}</div>
+          <div class="filter-title rc-title">Registra l'uscita audio ${settingsLink('sampler', 'Uscite, formato e cartella')}</div>
           <div id="rc-devices" class="rc-devices"></div>
           <div class="rc-folder"><span class="rc-fmt-sum" id="rc-fmt-sum"></span><span class="rc-path" id="rc-path"></span>
-            ${iconBtn('folder-open', 'Mostra la cartella nel Finder', { size: 'xs', id: 'rc-reveal' })}</div>
+            ${iconBtn('folder-open', `Mostra la cartella in ${FILE_MANAGER}`, { size: 'xs', id: 'rc-reveal' })}</div>
           <div class="rc-go">
             ${btn('Registra', { variant: 'brand', icon: 'circle', id: 'rc-rec', cls: 'rc-rec' })}
             <span class="rc-clock" id="rc-clock">0:00</span>
@@ -153,8 +153,8 @@ export class SamplerEditor {
             <span class="hint">Sensibilità</span>${slider(0, 1, 0.05, o.sensitivity, { id: 'sp-sens', label: 'Sensibilità' })}
           </span>
           <span class="sp-sep"></span>
-          ${btn('Estrai stem', { icon: 'audio-lines', id: 'sp-stems', title: 'Separa batteria, basso, chitarra, voce e resto, sul Mac' })}
-          ${btn('Migliora', { icon: 'sparkles', id: 'sp-enh', cls: 'cs-ai', title: 'Restauro AI della regione selezionata (o di tutto l\'audio): alte frequenze e artefatti di compressione, sul Mac' })}
+          ${btn('Estrai stem', { icon: 'audio-lines', id: 'sp-stems', title: 'Separa batteria, basso, chitarra, voce e resto, su questo computer' })}
+          ${btn('Migliora', { icon: 'sparkles', id: 'sp-enh', cls: 'cs-ai', title: 'Restauro AI della regione selezionata (o di tutto l\'audio): alte frequenze e artefatti di compressione, su questo computer' })}
           <span class="spacer"></span>
           <span class="hint" id="sp-view-info"></span>
         </div>
@@ -162,9 +162,9 @@ export class SamplerEditor {
           <canvas id="sp-wave" class="sp-wave"></canvas>
           <canvas id="sp-overview" class="sp-overview"></canvas>
           <div class="empty sp-empty" id="sp-empty">
-            <div class="empty-title">Registra l'uscita del Mac, o apri un file</div>
+            <div class="empty-title">Registra l'uscita audio, o apri un file</div>
             <div class="empty-sub">Scegli una o più uscite e il formato, poi premi Registra: ogni uscita va in un file.
-              Puoi anche aprire un file audio o un sample della libreria, o trascinarlo qui dal Finder.
+              Puoi anche aprire un file audio o un sample della libreria, o trascinarlo qui da ${FILE_MANAGER}.
               Apri una registrazione per ritagliare i sample: trascina sulla forma d'onda per creare una regione
               (max <span class="sp-max"></span>) oppure usa «Taglia sui transienti». Rotella: zoom · Maiusc+rotella: scorri.</div>
           </div>
@@ -224,7 +224,7 @@ export class SamplerEditor {
   _bindOpen() {
     $('#sp-open-file').onclick = async () => this._opened(await this.api.sampler_open_file(null));
     $('#sp-open-lib').onclick = () => this.openLibrary();
-    // the path of a file dropped from the Finder comes from Python (pywebview): here only the highlight
+    // the path of a file dropped from the Finder / File Explorer comes from Python (pywebview): here only the highlight
     const wrap = $('#sp-wave-wrap');
     let depth = 0;
     const isFile = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
@@ -233,7 +233,7 @@ export class SamplerEditor {
     wrap.addEventListener('drop', () => { depth = 0; wrap.classList.remove('sp-drop'); });
   }
 
-  // called by Python after an audio file was dropped from the Finder
+  // called by Python after an audio file was dropped from the Finder / File Explorer
   dropped(r) {
     $('#sp-wave-wrap')?.classList.remove('sp-drop');
     if (!r?.error) toast(`Aperto: ${r.session.title}`);
@@ -455,17 +455,17 @@ export class SamplerEditor {
     const r = this.regions[this.sel];
     let body;
     if (!st?.installed) {
-      body = `<div class="hint">La separazione gira sul Mac con Demucs (PyTorch), un'estensione da installare una volta:</div>
+      body = `<div class="hint">La separazione gira su questo computer con Demucs (PyTorch), un'estensione da installare una volta:</div>
         <code class="st-code">${esc(st?.install_hint || '')}</code>`;
     } else if (!st.model_ready) {
       body = `<div class="hint">Serve il modello Demucs (~${st.model_mb} MB), da scaricare una sola volta. Dopo la separazione
-        funziona offline: l'audio non lascia mai il Mac.</div>
+        funziona offline: l'audio non lascia mai il computer.</div>
         <div class="pop-actions">${btn('Scarica il modello', { variant: 'brand', icon: 'download', 'data-go': 'download' })}</div>`;
     } else {
       const choosable = st.stems.filter((x) => x.choosable);
       const keys = new Set(this.opts.stemKeys || choosable.map((x) => x.key));
       const scope = r && this.opts.stemScope === 'region' ? 'region' : 'all';
-      body = `<div class="hint">Un file WAV per stem, sul Mac, senza servizi esterni.</div>
+      body = `<div class="hint">Un file WAV per stem, su questo computer, senza servizi esterni.</div>
         <div class="st-keys">${choosable.map((x) => check(esc(x.label), keys.has(x.key), { 'data-key': x.key })).join('')}</div>
         <div class="hint">+ <b>Altro</b>: tutto ciò che non hai scelto, così non si perde nulla.</div>
         ${seg([['all', 'Registrazione intera'], ['region', 'Regione selezionata', { disabled: !r, title: r ? `${fmt(r.start)} – ${fmt(r.end)}` : 'Seleziona una regione' }]],
@@ -534,7 +534,7 @@ export class SamplerEditor {
         <div class="rc-item st-item" data-path="${esc(r.path)}" title="${esc(r.path)}">
           <div class="rc-item-act"><span class="rc-item-name">${esc(r.label)}</span><span class="spacer"></span>
             ${btn('Apri nell\'editor', { size: 'xs', 'data-act': 'open', icon: 'pencil' })}
-            ${iconBtn('folder-open', 'Mostra nel Finder', { size: 'xs', 'data-act': 'reveal' })}
+            ${iconBtn('folder-open', `Mostra in ${FILE_MANAGER}`, { size: 'xs', 'data-act': 'reveal' })}
           </div>
         </div>`).join('');
     } else {
@@ -580,11 +580,11 @@ export class SamplerEditor {
         <span title="Su Apple Silicon (GPU)">${esc(m.speed)}</span></div>`;
     let body, go;
     if (!m.installed) {
-      body = `<div class="hint">Il miglioramento gira sul Mac con PyTorch, un'estensione da installare una volta:</div>
+      body = `<div class="hint">Il miglioramento gira su questo computer con PyTorch, un'estensione da installare una volta:</div>
         <code class="st-code">${esc(st.install_hint)}</code>`;
     } else if (!m.model_ready) {
       body = `<div class="hint">Serve il modello <b>${esc(m.label)}</b> (~${m.mb} MB), da scaricare una sola volta. Dopo funziona
-        offline: l'audio non lascia mai il Mac.</div>`;
+        offline: l'audio non lascia mai il computer.</div>`;
       go = btn('Scarica il modello', { variant: 'brand', icon: 'download', 'data-go': 'download' });
     } else {
       body = `${seg([['region', 'Regione selezionata', { disabled: !r, title: r ? `${fmt(r.start)} – ${fmt(r.end)}` : 'Seleziona una regione' }],
@@ -650,7 +650,7 @@ export class SamplerEditor {
         <div class="rc-item-name">${what}</div>
         <div class="rc-item-act"><span class="hint">${(j.result.sr / 1000).toFixed(1)} kHz</span><span class="spacer"></span>
           ${btn('Apri nell\'editor', { size: 'xs', 'data-act': 'open', icon: 'pencil' })}
-          ${iconBtn('folder-open', 'Mostra nel Finder', { size: 'xs', 'data-act': 'reveal' })}
+          ${iconBtn('folder-open', `Mostra in ${FILE_MANAGER}`, { size: 'xs', 'data-act': 'reveal' })}
         </div>
       </div>`;
     } else {
@@ -707,8 +707,7 @@ export class SamplerEditor {
     const box = $('#rc-devices');
     if (!box) return;
     if (!this.rec.devices.length) {
-      box.innerHTML = '<div class="hint">Nessuna uscita registrabile: serve macOS 14.2 o successivo '
-        + '(oppure l\'extra <code>capture</code> per il mix di tutte le uscite).</div>';
+      box.innerHTML = `<div class="hint">${this.rec.hint || 'Nessuna uscita registrabile.'}</div>`;
       return;
     }
     const sel = new Set(this._selectedDevices());
@@ -716,7 +715,7 @@ export class SamplerEditor {
     const shown = this.rec.devices.filter((d) => (this.rec.running ? tracks[d.id] : sel.has(d.id)));
     box.innerHTML = shown.map((d) => {
       const t = this.rec.running ? tracks[d.id] : null;
-      const meta = d.sample_rate ? `${d.channels} can · ${(d.sample_rate / 1000).toFixed(1).replace('.0', '')} kHz` : 'Tutto ciò che il Mac suona';
+      const meta = d.sample_rate ? `${d.channels} can · ${(d.sample_rate / 1000).toFixed(1).replace('.0', '')} kHz` : (d.note || '');
       return `<div class="rc-dev${t ? ' on' : ''}">
         <div class="rc-dev-name">${esc(d.name)}${d.default ? ' <span class="hint">· predefinita</span>' : ''}</div>
         <div class="rc-dev-meta hint">${t ? (t.error ? `<span class="error">${esc(t.error)}</span>`
@@ -730,7 +729,7 @@ export class SamplerEditor {
   _renderSetDevices() {
     const box = this._setBody.querySelector('#set-rc-devices');
     if (!this.rec.devices.length) {
-      box.innerHTML = '<span class="hint">Nessuna uscita registrabile: serve macOS 14.2 o successivo.</span>';
+      box.innerHTML = `<span class="hint">${this.rec.hint || 'Nessuna uscita registrabile.'}</span>`;
       return;
     }
     const sel = new Set(this._selectedDevices());
@@ -828,7 +827,7 @@ export class SamplerEditor {
         <div class="hint">${clock(r.seconds)} · ${esc(r.format)} · ${mb(r.bytes)}${r.error ? ` · <span class="error">${esc(r.error)}</span>` : ''}</div>
         <div class="rc-item-act">
           ${btn('Apri nell\'editor', { size: 'xs', 'data-act': 'open', icon: 'pencil' })}
-          ${iconBtn('folder-open', 'Mostra nel Finder', { size: 'xs', 'data-act': 'reveal' })}
+          ${iconBtn('folder-open', `Mostra in ${FILE_MANAGER}`, { size: 'xs', 'data-act': 'reveal' })}
         </div>
       </div>`).join('') : '<div class="hint">Le registrazioni di questa sessione compaiono qui.</div>';
   }

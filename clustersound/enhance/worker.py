@@ -14,6 +14,8 @@ import numpy as np
 import soundfile as sf
 import soxr
 
+from ..paths import torch_device
+
 # Measured with Apollo on MPS, 30 s stereo: 2 s blocks one channel at a time peak at ~1.6 GB (6 s stereo blocks:
 # ~6 GB) for ~15% more time; 0.5 s of padding already matches a single pass within -80 dB.
 CHUNK_S = 2.0   # processed per block: bounded memory whatever the length
@@ -67,12 +69,12 @@ def enhance(fn: Callable[[np.ndarray], np.ndarray], model_sr: int, x: np.ndarray
 
 
 class TorchModel:
-    """A torch module as fn: (channels, n) float32 -> (channels, n), on the GPU (MPS) when it can."""
+    """A torch module as fn: (channels, n) float32 -> (channels, n), on the GPU (CUDA or MPS) when it can."""
 
     def __init__(self, net, sr: int):
         import torch
         self.torch, self.net, self.sr = torch, net, sr
-        self.device = "mps" if torch.backends.mps.is_available() else "cpu"
+        self.device = torch_device(torch)
         self.net.to(self.device)
 
     def _run(self, x):
@@ -94,6 +96,8 @@ class TorchModel:
             out = np.concatenate([self._channel(x[i:i + 1]) for i in range(x.shape[0])])
         if self.device == "mps":
             self.torch.mps.empty_cache()  # MPS keeps every block's buffers cached otherwise
+        elif self.device == "cuda":
+            self.torch.cuda.empty_cache()
         return out
 
 

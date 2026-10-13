@@ -70,7 +70,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         if self.path in ("/", "/index.html"):
-            html = (UI / "index.html").read_text()
+            html = (UI / "index.html").read_text(encoding="utf-8")
             html = html.replace("<script type=\"module\"", SHIM % json.dumps(METHODS) + "\n<script type=\"module\"")
             body = html.encode()
             self.send_response(200)

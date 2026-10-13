@@ -8,7 +8,7 @@
 import { toast, showPopover } from './sendmenu.js';
 import { sendToLive } from './live.js';
 import { velGain } from './sequencer.js';
-import { btn, openDialog as waDialog, isTypingTarget } from './kit.js';
+import { btn, openDialog as waDialog, isTypingTarget, MOD, SHIFT_MOD } from './kit.js';
 import { svg } from './icons.js';
 import { settingsLink, setRow, savedFlash } from './settings.js';
 
@@ -509,7 +509,7 @@ export class ComposeEditor {
             ${btn('Pattern', { id: 'cp-withpat', icon: 'drum', title: 'Suona insieme al pattern del Sequencer' })}${btn('<wa-icon name="chevron-down" label="Impostazioni pattern"></wa-icon>', { id: 'cp-patset', title: 'Pattern: basso, volumi, BPM' })}
           </wa-button-group>
           <wa-button-group label="Cronologia">
-            <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-undo" title="Annulla (⌘Z)"><wa-icon name="undo-2" label="Annulla"></wa-icon></wa-button><wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-redo" title="Ripeti (⇧⌘Z)"><wa-icon name="redo-2" label="Ripeti"></wa-icon></wa-button>
+            <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-undo" title="Annulla (${MOD}Z)"><wa-icon name="undo-2" label="Annulla"></wa-icon></wa-button><wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-redo" title="Ripeti (${SHIFT_MOD}Z)"><wa-icon name="redo-2" label="Ripeti"></wa-icon></wa-button>
           </wa-button-group>
           ${btn('Apri…', { id: 'cp-open', icon: 'folder-open' })}
           ${btn('Salva', { id: 'cp-save', icon: 'save' })}
@@ -1417,7 +1417,7 @@ export class ComposeEditor {
       if (moved && (cur.start !== orig.start || cur.len !== orig.len)) {
         this.edit(() => { Object.assign(c, cur); this._resolve(c.id); this._select(c.id); });
       } else {
-        this._select(c.id, e.shiftKey || e.metaKey);
+        this._select(c.id, e.shiftKey || e.metaKey || e.ctrlKey);
         this.renderTimeline();
         this.renderInspector();
         this.refresh();
@@ -1471,7 +1471,7 @@ export class ComposeEditor {
       </div>
       <div class="cp-actions">
         ${xs('Varia armonia…', { variant: 'brand', icon: 'sparkles', 'data-act': 'vary', title: "Voicing, colore e sostituzioni dell'accordo (V)" })}
-        ${xs('Duplica', { icon: 'copy', 'data-act': 'dup', title: 'Duplica (⌘D)' })}
+        ${xs('Duplica', { icon: 'copy', 'data-act': 'dup', title: `Duplica (${MOD}D)` })}
         ${xs('Elimina', { icon: 'trash-2', 'data-act': 'del', title: 'Elimina (Canc)' })}
       </div>
       <div class="cp-sec-title"><span>Esecuzione</span>
@@ -1611,7 +1611,7 @@ export class ComposeEditor {
       <div class="cp-vtools"><div class="chips" data-kinds>${kinds.map(([k, l]) => chipBtn(`data-kind="${k}"`, esc(l), this.clipKinds.includes(k))).join('')}</div>
         ${xs('Altre proposte', { icon: 'dices', 'data-gen': true })}</div>
       <div class="cp-vlist" data-list><div class="hint">Genero…</div></div>
-      <div class="hint">Play: ascolta nel contesto (dalla battuta prima) · Usa: sostituisce l'accordo (annullabile con ⌘Z)</div>`);
+      <div class="hint">Play: ascolta nel contesto (dalla battuta prima) · Usa: sostituisce l'accordo (annullabile con ${MOD}Z)</div>`);
     let seed = 1 + Math.floor(Math.random() * 1e6);
     const load = async () => {
       m.querySelector('[data-list]').innerHTML = '<div class="hint">Genero…</div>';
@@ -1720,7 +1720,7 @@ export class ComposeEditor {
       <div class="cp-vtools"><label class="cp-field">Quanto variare <wa-slider size="s" min="10" max="100" step="5" value="${this.ui.modeAmount || 50}" data-amount label="Quanto variare"></wa-slider></label>
         ${xs('Genera', { variant: 'brand', icon: 'dices', 'data-gen': true })}</div>
       <div class="cp-vlist" data-list></div>
-      <div class="hint">Gli accordi non cambiano. Play: ascolta · Usa: sostituisce la modalità corrente (⌘Z per tornare indietro) · Tieni: la aggiunge come nuova modalità</div>`);
+      <div class="hint">Gli accordi non cambiano. Play: ascolta · Usa: sostituisce la modalità corrente (${MOD}Z per tornare indietro) · Tieni: la aggiunge come nuova modalità</div>`);
     let seed = 1 + Math.floor(Math.random() * 1e6);
     const load = async () => {
       m.querySelector('[data-list]').innerHTML = '<div class="hint">Genero…</div>';
@@ -1842,7 +1842,7 @@ export class ComposeEditor {
     $('#cp-mgen').hidden = $('#cp-mharm').hidden = !mel;
     $('#cp-even').hidden = mel;
     $('#cp-tlhint').textContent = mel
-      ? 'Clic su uno spazio vuoto: nuova nota (trascina per allungarla) · trascina una nota per spostarla, il bordo destro per allungarla · Alt+trascina: velocity · doppio clic: elimina · ↑↓ trasponi (⇧ ottava) · ←→ sposta · ⌘A tutte'
+      ? `Clic su uno spazio vuoto: nuova nota (trascina per allungarla) · trascina una nota per spostarla, il bordo destro per allungarla · Alt+trascina: velocity · doppio clic: elimina · ↑↓ trasponi (⇧ ottava) · ←→ sposta · ${MOD}A tutte`
       : 'Trascina gli accordi sulla timeline · trascina un blocco per spostarlo, il bordo destro per allungarlo · doppio clic: ascolta · V: varia armonia · Canc: elimina';
   }
 
@@ -2170,7 +2170,7 @@ export class ComposeEditor {
   _genList() {
     if (this._genBusy) return '<div class="hint">Genero…</div>';
     const L = this.layer;
-    if (!this._genItems) return `<div class="hint">${this.seq.clips.length ? `Scegli il tipo e premi «Genera»: Play ascolta con gli accordi e gli altri layer · Usa: sostituisce il layer «${esc(L.name)}» se è dello stesso tipo · + Layer: lo aggiunge sopra gli altri (⌘Z per tornare indietro).` : 'Servono prima degli accordi (vista Armonia).'}</div>`;
+    if (!this._genItems) return `<div class="hint">${this.seq.clips.length ? `Scegli il tipo e premi «Genera»: Play ascolta con gli accordi e gli altri layer · Usa: sostituisce il layer «${esc(L.name)}» se è dello stesso tipo · + Layer: lo aggiunge sopra gli altri (${MOD}Z per tornare indietro).` : 'Servono prima degli accordi (vista Armonia).'}</div>`;
     return this._genItems.map((m, i) => {
       const same = m.role === L.role;
       return `
@@ -2284,7 +2284,7 @@ export class ComposeEditor {
       ${btn('Clip da Ableton', { icon: 'upload', 'data-live': true, title: 'In Live: seleziona una clip MIDI e premi «Clip → Melodia» nel device ClusterSound' })}
       <div class="cp-sec-title"><span>Tastiera MIDI</span></div>
       <div data-rec><span class="hint">Cerco le tastiere…</span></div>
-      <div class="hint">Sostituisce il layer «${esc(this.layer.name)}» della versione ${this.project.active} (⌘Z per tornare indietro). Da una parte con accordi viene presa la nota più alta.</div>`);
+      <div class="hint">Sostituisce il layer «${esc(this.layer.name)}» della versione ${this.project.active} (${MOD}Z per tornare indietro). Da una parte con accordi viene presa la nota più alta.</div>`);
     this.api.compose_midi_inputs().then((r) => {
       const box = pop.querySelector('[data-rec]');
       if (!box) return;
@@ -2346,7 +2346,7 @@ export class ComposeEditor {
     if (res?.error) { toast(res.error); return; }
     if (!res?.notes?.length) { toast('Nessuna nota registrata'); return; }
     this.edit(() => { this.melNotes = res.notes; this.melSel.clear(); this._fitMelodyBars(); });
-    toast(`Registrate ${res.notes.length} note (⌘Z per tornare alla melodia di prima)`);
+    toast(`Registrate ${res.notes.length} note (${MOD}Z per tornare alla melodia di prima)`);
   }
 
   _applyImport(res) {

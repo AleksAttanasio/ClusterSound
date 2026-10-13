@@ -16,7 +16,7 @@ import numpy as np
 import soundfile as sf
 
 from ..online.downloads import license_text, safe_name, unique_path
-from ..paths import resource_path
+from ..paths import file_manager, resource_path
 from . import arrange, midi, model, render
 
 TEMPLATES = "patterns/templates/live10_racks.xml.gz"
@@ -271,7 +271,7 @@ def readme(p: dict, base: str, pads: list[dict], has_bass: bool, licences: list)
         "0. Imposta il tempo del progetto a " + f"{p['bpm']:.0f} BPM.",
     ]
     if pads:
-        lines += [f"1. Trascina \"{base} Drum Rack.adg\" su una traccia MIDI vuota (dal Finder o dal Browser > Places).",
+        lines += [f"1. Trascina \"{base} Drum Rack.adg\" su una traccia MIDI vuota (da {file_manager()} o dal Browser > Places).",
                   "2. Trascina \"Drums.mid\" in uno slot clip della stessa traccia.",
                   "   Pad del Drum Rack: " + ", ".join(f"{pd['name']} = {_note_name(pd['note'])}" for pd in pads) + "."]
         alt = [model.BUS_BY_ID[b][1] for b in model.DRUM_IDS if model.alternating(p["buses"][b])]
