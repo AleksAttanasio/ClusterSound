@@ -60,7 +60,7 @@ class OnlineResult:
     def to_dict(self) -> dict:
         d = asdict(self)
         d["commercial_ok"] = self.commercial_ok
-        d["license_label"] = LICENSES.get(self.license, LICENSES["unknown"])["label"]
+        d["license_label"] = tr(LICENSES.get(self.license, LICENSES["unknown"])["label"])
         extra = d.pop("extra", None) or {}
         d["info"] = {k: extra[k] for k in INFO_KEYS if extra.get(k) is not None}
         return d
