@@ -17,12 +17,12 @@ import soundfile as sf
 import soxr
 
 from ..online.downloads import safe_name, unique_path
-from ..paths import resource_path
+from ..paths import IS_MAC, cache_dir, resource_path
 from .capture import CaptureError, SystemAudioBackend
 from .export import CAPTURE_NOTE
 
 DEFAULT_DIR = os.path.expanduser("~/Music/ClusterSound Recordings")
-CACHE_BIN = os.path.expanduser("~/Library/Caches/ClusterSound/bin/cs-tap")
+CACHE_BIN = str(cache_dir() / "bin" / "cs-tap")
 ALL = "all"
 BLOCK_FRAMES = 2048
 

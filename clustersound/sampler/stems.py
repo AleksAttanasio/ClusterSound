@@ -1,4 +1,4 @@
-"""Stem separation (drums, bass, guitar, piano, vocals, rest) with Demucs, on this Mac only.
+"""Stem separation (drums, bass, guitar, piano, vocals, rest) with Demucs, on this computer only.
 
 Demucs and PyTorch are the optional extra `stems`: nothing is imported until a separation starts. The model
 weights are downloaded once, when the user confirms, into the app's support folder; after that everything
@@ -14,11 +14,12 @@ import soundfile as sf
 import soxr
 
 from ..online.downloads import safe_name, unique_path
+from ..paths import data_dir_path
 from . import export as sampler_export
 from .session import SamplerSession
 
 MODEL = "htdemucs_6s"  # 6 sources: drums, bass, other, vocals, guitar, piano
-MODEL_DIR = os.path.expanduser("~/Library/Application Support/ClusterSound/models/demucs")
+MODEL_DIR = str(data_dir_path() / "models" / "demucs")
 MODEL_MB = 55
 STEMS = [("drums", "Batteria"), ("bass", "Basso"), ("guitar", "Chitarra"), ("piano", "Piano"), ("vocals", "Voce"),
          ("other", "Altro")]
