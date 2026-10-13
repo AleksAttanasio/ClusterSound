@@ -10,6 +10,7 @@ import { sendToLive } from './live.js';
 import { velGain } from './sequencer.js';
 import { btn, openDialog as waDialog, isTypingTarget } from './kit.js';
 import { svg } from './icons.js';
+import { settingsLink, setRow, savedFlash } from './settings.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -387,6 +388,45 @@ export class ComposeEditor {
 
   hide() { this.stop(); }
 
+  async pickFolder() {
+    this.meta = { ...this.meta, ...(await this.api.compose_pick_folder()) };
+    this.keyData.clear();
+    await this.loadBrowser();
+  }
+
+  /** Compose section of the Settings page. */
+  async renderSettings(body) {
+    await this.ensure();
+    const ui = this.ui;
+    body.innerHTML =
+      setRow('Cartella del chord pack', 'Gli accordi del browser vengono da qui, organizzati per tonalità.',
+        `<span class="set-path" title="${esc(this.meta.dir)}">${esc(this.meta.dir)}</span>
+         <wa-button id="set-cp-dir" size="s" appearance="filled-outlined"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli…</wa-button>`)
+      + setRow('Suono dell\'anteprima', 'Lo strumento con cui suonano accordi e melodia in Compose. Non viene esportato.',
+        `<wa-select id="set-cp-synth" size="s" value="${ui.synth}" label="Suono" style="width:200px">${SYNTHS.map(([v, l]) => `<wa-option value="${v}">${l}</wa-option>`).join('')}</wa-select>`)
+      + setRow('Tastiera MIDI', 'Da quale ingresso registrare la melodia (Importa melodia › Registra).',
+        '<span class="hint" id="set-cp-port">Cerco le tastiere…</span>')
+      + setRow('Il basso segue gli accordi', 'Suonando insieme al pattern del Sequencer, il basso del pattern viene trasposto sulla fondamentale di ogni accordo.',
+        `<wa-switch id="set-cp-bass" size="s" ${ui.bassFollow ? 'checked' : ''}></wa-switch>`)
+      + setRow('Esporta solo gli accordi', 'MIDI e Live ricevono gli accordi «puri», senza ritmica, strum, arpeggi e humanize della modalità.',
+        `<wa-switch id="set-cp-pure" size="s" ${ui.pure ? 'checked' : ''}></wa-switch>`);
+    const saved = () => { this._persist(); savedFlash(body); };
+    body.querySelector('#set-cp-dir').onclick = async () => { await this.pickFolder(); savedFlash(body); this.renderSettings(body); };
+    body.querySelector('#set-cp-synth').addEventListener('change', (e) => { ui.synth = this.synth.preset = e.target.value; saved(); });
+    body.querySelector('#set-cp-bass').addEventListener('change', (e) => {
+      ui.bassFollow = e.target.checked;
+      if (this._pat) this._pat.seq.bassShift = null;
+      saved();
+    });
+    body.querySelector('#set-cp-pure').addEventListener('change', (e) => { ui.pure = e.target.checked; saved(); });
+    const r = await this.api.compose_midi_inputs();
+    const box = body.querySelector('#set-cp-port');
+    if (!box) return;
+    if (!r?.available || !r.ports.length) { box.textContent = r?.hint || 'Nessuna tastiera MIDI collegata.'; return; }
+    box.outerHTML = `<wa-select id="set-cp-port" size="s" value="${Math.min(ui.midiPort || 0, r.ports.length - 1)}" label="Ingresso" style="width:260px">${r.ports.map((p, i) => `<wa-option value="${i}">${esc(p)}</wa-option>`).join('')}</wa-select>`;
+    body.querySelector('#set-cp-port').addEventListener('change', (e) => { ui.midiPort = +e.target.value; saved(); });
+  }
+
   _persist() {
     try { localStorage.setItem(LS_KEY, JSON.stringify({ project: this.project, browse: this.browse, ui: this.ui })); } catch { /* private mode */ }
   }
@@ -436,7 +476,7 @@ export class ComposeEditor {
     const tonics = (flats) => SHARPS.map((n, i) => `<wa-option value="${i}">${flats && FLATS[i] !== n ? `${FLATS[i]}` : n}</wa-option>`).join('');
     root.innerHTML = `
       <aside class="sidebar cp-browser">
-        <div class="cp-pack"><span class="cp-pack-path" id="cp-dir"></span><button class="link-btn" id="cp-dir-pick">Cambia…</button></div>
+        <div class="cp-pack"><span class="cp-pack-path" id="cp-dir"></span>${settingsLink('compose', 'Cartella del chord pack e preferenze')}</div>
         <div class="cp-keyrow">
           <wa-select id="cp-b-tonic" size="s" class="cp-select" value="0">${tonics(true)}</wa-select>
           <wa-radio-group id="cp-b-mode" class="seg" orientation="horizontal" size="s" value="major" label="Modo">
@@ -461,7 +501,6 @@ export class ComposeEditor {
           <wa-select id="cp-tonic" size="s" class="cp-select cp-key" title="Tonalità della progressione">${tonics(true)}</wa-select>
           <wa-select id="cp-mode" size="s" class="cp-select cp-kmode"><wa-option value="major">maggiore</wa-option><wa-option value="minor">minore</wa-option></wa-select>
           <div class="spacer"></div>
-          <wa-select id="cp-synth" size="s" class="cp-select cp-synth" title="Suono dell'anteprima (non viene esportato)">${SYNTHS.map(([v, l]) => `<wa-option value="${v}">${l}</wa-option>`).join('')}</wa-select>
           <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-melmute" title="Melodia: on / muta"><wa-icon name="music" label="Melodia"></wa-icon></wa-button>
           <wa-button class="cp-play" variant="brand" size="s" id="cp-play" title="Play / stop (Spazio)"><wa-icon name="play" label="Play"></wa-icon></wa-button>
           <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-loop" title="Loop"><wa-icon name="rotate-ccw" label="Loop"></wa-icon></wa-button>
@@ -507,11 +546,6 @@ export class ComposeEditor {
   }
 
   _bindShell() {
-    $('#cp-dir-pick').onclick = async () => {
-      this.meta = { ...this.meta, ...(await this.api.compose_pick_folder()) };
-      this.keyData.clear();
-      await this.loadBrowser();
-    };
     $('#cp-b-tonic').onchange = (e) => { this.browse.tonic = +e.target.value; this._persist(); this.loadBrowser(); };
     $('#cp-b-mode').addEventListener('change', (e) => {
       if (e.target.id !== 'cp-b-mode') return;
@@ -559,7 +593,6 @@ export class ComposeEditor {
     });
     $('#cp-tonic').onchange = (e) => this.setKey(+e.target.value, this.seq.key.mode);
     $('#cp-mode').onchange = (e) => this.setKey(this.seq.key.tonic, e.target.value);
-    $('#cp-synth').onchange = (e) => { this.ui.synth = this.synth.preset = e.target.value; this._persist(); };
     $('#cp-view').addEventListener('change', (e) => { if (e.target.id === 'cp-view') this.setView(e.target.value); });
     $('#cp-melmute').onclick = () => {
       this.ui.melMute = !this.ui.melMute;
@@ -705,7 +738,7 @@ export class ComposeEditor {
     if (!this.meta.exists) {
       $('#cp-list').innerHTML = `<div class="cp-empty">Cartella del chord pack non trovata:<br><code>${esc(this.meta.dir)}</code><br>
         ${xs('Scegli la cartella…', { id: 'cp-dir-pick2', icon: 'folder-open' })}</div>`;
-      $('#cp-dir-pick2').onclick = () => $('#cp-dir-pick').click();
+      $('#cp-dir-pick2').onclick = () => this.pickFolder();
       return;
     }
     this.current = await this.keyChords(this.browseKey);
@@ -1090,18 +1123,11 @@ export class ComposeEditor {
     const pop = showPopover(anchor, `
       <div class="cp-sec-title"><span>Pattern del Sequencer</span></div>
       <div>${esc(g?.name || 'Pattern')} · ${esc(p.name || '')}<br><span class="hint">${Math.round(p.bpm)} BPM · ${p.bars} ${p.bars === 1 ? 'battuta' : 'battute'} · basso in ${esc(p.key)}</span></div>
-      <wa-checkbox size="s" class="cp-own" data-bass ${this.ui.bassFollow ? 'checked' : ''}>il basso segue gli accordi</wa-checkbox>
       <label class="cp-field">Accordi <wa-slider size="s" min="0" max="1.2" step="0.05" value="${this.ui.chordVol}" data-cv label="Volume accordi"></wa-slider></label>
       <label class="cp-field">Pattern <wa-slider size="s" min="0" max="1.2" step="0.05" value="${this.ui.patVol}" data-pv label="Volume pattern"></wa-slider></label>
       ${xs(`Usa il BPM del pattern (${Math.round(p.bpm)})`, { 'data-usebpm': true })}
       ${xs(`Swing del pattern (${p.swing}) nella modalità`, { 'data-swing': true })}
       ${xs('Apri nel Sequencer', { icon: 'arrow-right', 'data-open': true })}`);
-    pop.querySelector('[data-bass]').onchange = (e) => {
-      this.ui.bassFollow = e.target.checked;
-      this._persist();
-      if (this._pat) this._pat.seq.bassShift = null;
-      if (this.transport.playing) this.play(Math.floor(this.transport.position / (16 * STEP_TICKS)) * 16 * STEP_TICKS);
-    };
     pop.querySelector('[data-cv]').oninput = (e) => { this.ui.chordVol = +e.target.value; this.synth.setVolume(this.ui.chordVol); this._persist(); };
     pop.querySelector('[data-pv]').oninput = (e) => {
       this.ui.patVol = +e.target.value;
@@ -1147,7 +1173,6 @@ export class ComposeEditor {
     set('#cp-snap', String(this.ui.snap));
     set('#cp-tonic', String(s.key.tonic));
     set('#cp-mode', s.key.mode);
-    set('#cp-synth', this.ui.synth);
     $('#cp-keymode').value = s.keyMode;
     const play = $('#cp-play');
     const state = this._rec ? 'rec' : this.transport.playing ? 'stop' : 'play';
@@ -2263,13 +2288,13 @@ export class ComposeEditor {
       const box = pop.querySelector('[data-rec]');
       if (!box) return;
       if (!r?.available || !r.ports.length) { box.innerHTML = `<span class="hint">${esc(r?.hint || 'Nessuna tastiera MIDI collegata')}</span>`; return; }
-      box.innerHTML = `<div class="cp-mform"><wa-select size="s" class="cp-select" data-port value="${Math.min(this.ui.midiPort || 0, r.ports.length - 1)}">${r.ports.map((p, i) => `<wa-option value="${i}">${esc(p)}</wa-option>`).join('')}</wa-select>
+      const port = Math.min(this.ui.midiPort || 0, r.ports.length - 1);
+      box.innerHTML = `<div class="cp-mform"><span class="cp-port" title="Si cambia in Impostazioni › Compose">${esc(r.ports[port])}</span>${settingsLink('compose', 'Scegli la tastiera MIDI')}
         ${xs('Registra', { variant: 'danger', icon: 'circle', 'data-record': true, title: '4 click di attacco, poi suona sopra gli accordi · Spazio o Stop per fermare' })}</div>`;
+      box.querySelector('[data-settings-link]').addEventListener('click', () => pop.close());
       box.querySelector('[data-record]').onclick = () => {
-        this.ui.midiPort = +box.querySelector('[data-port]').value;
-        this._persist();
         pop.close();
-        this.startRecording(this.ui.midiPort);
+        this.startRecording(port);
       };
     });
     pop.querySelector('[data-file]').onclick = async () => {
@@ -2395,13 +2420,13 @@ export class ComposeEditor {
       ${btn(`Versione ${p.active} · ${esc(this.mode.name)} → .mid`, { variant: 'brand', icon: 'file-down', 'data-one': true })}
       ${many ? btn(`Tutte le versioni (${p.order.join(', ')}) con ${esc(this.mode.name)} → cartella`, { icon: 'folder-open', 'data-all': true }) : ''}
       ${manyModes ? btn(`Versione ${p.active} con tutte le modalità → cartella`, { icon: 'folder-open', 'data-modes': true }) : ''}
-      <wa-checkbox size="s" class="cp-own" data-pure ${this.ui.pure ? 'checked' : ''}>solo accordi (senza ritmica, strum, arpeggi e humanize)</wa-checkbox>
       ${hasMel ? `<wa-radio-group class="seg cp-seg" orientation="horizontal" size="xs" data-parts value="${this.ui.parts}" label="Parti">${PARTS.map(([k, l]) => `<wa-radio appearance="button" value="${k}">${l}</wa-radio>`).join('')}</wa-radio-group>
         <div class="hint">Accordi + melodia: un .mid con una traccia per gli accordi e una per ogni layer (i layer muti restano fuori).</div>` : ''}
       ${btn(`Versione ${p.active} → Live`, { 'data-live': true })}
       ${many ? btn('Tutte le versioni → Live (una clip ciascuna)', { 'data-live-all': true }) : ''}
-      <div class="hint">In Ableton: trascina il file su una traccia MIDI. Il tempo del file è ${p.bpm} BPM. «→ Live» crea la traccia con le clip tramite il device ClusterSound.</div>`);
-    pop.querySelector('[data-pure]').onchange = (e) => { this.ui.pure = e.target.checked; this._persist(); };
+      <div class="hint">In Ableton: trascina il file su una traccia MIDI. Il tempo del file è ${p.bpm} BPM. «→ Live» crea la traccia con le clip tramite il device ClusterSound.</div>
+      <div class="hint">${this.ui.pure ? 'Esporta solo gli accordi (senza ritmica, strum, arpeggi e humanize).' : 'Esporta l\'esecuzione completa (ritmica, strum, arpeggi e humanize).'} <a href="#" data-settings-link="compose">Opzioni di export…</a></div>`);
+    pop.querySelector('[data-settings-link]').addEventListener('click', () => pop.close());
     pop.querySelector('[data-parts]')?.addEventListener('change', (e) => {
       if (!e.target.matches('[data-parts]')) return;
       this.ui.parts = e.target.value;

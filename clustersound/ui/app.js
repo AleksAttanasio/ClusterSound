@@ -82,6 +82,7 @@ async function main() {
   settings.add('online', 'Store', 'store', (body) => online.renderSettings(body));
   settings.add('pattern', 'Sequencer', 'audio-lines', (body) => pattern.renderSettings(body));
   settings.add('rack', 'Drum Rack', 'drum', (body) => rack.renderSettings(body));
+  settings.add('compose', 'Compose', 'piano', (body) => compose.renderSettings(body));
   window.addEventListener('cs:open-settings', (e) => setTab('settings', e.detail));
   buildSidebar();
   bindUi();
