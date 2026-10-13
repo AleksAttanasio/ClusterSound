@@ -54,3 +54,10 @@ def test_is_inside(tmp_path):
     assert paths.is_inside(str(tmp_path / "a" / "b"), str(tmp_path / "a"))
     assert paths.is_inside(str(tmp_path / "a"), str(tmp_path / "a") + os.sep)
     assert not paths.is_inside(str(tmp_path / "ab"), str(tmp_path / "a"))
+
+
+@pytest.mark.parametrize("name,expected", [("CON", "_CON"), ("nul.wav", "_nul.wav"), ("com1", "_com1"),
+                                           ("Console", "Console"), ("aux kick", "aux kick")])
+def test_safe_name_avoids_windows_device_names(name, expected):
+    from clustersound.online.downloads import safe_name
+    assert safe_name(name) == expected

@@ -57,7 +57,7 @@ def _local_bag():
         import yaml
         from demucs.apply import BagOfModels
         from demucs.hf import load_safetensors_model
-        with open(yml) as f:
+        with open(yml, encoding="utf-8") as f:
             bag = yaml.safe_load(f)
         models = [load_safetensors_model(os.path.join(MODEL_DIR, f"{sig}.safetensors")) for sig in bag["models"]]
         return BagOfModels(models, bag.get("weights"), bag.get("segment"))
@@ -77,13 +77,13 @@ def download_model() -> None:
         from demucs.hf import DEFAULT_NAMESPACE, hf_repo_name
         from huggingface_hub import hf_hub_download
         repo = f"{DEFAULT_NAMESPACE}/{hf_repo_name(MODEL)}"
-        with open(hf_hub_download(repo, f"{MODEL}.yaml", local_dir=MODEL_DIR)) as f:
+        with open(hf_hub_download(repo, f"{MODEL}.yaml", local_dir=MODEL_DIR), encoding="utf-8") as f:
             sigs = yaml.safe_load(f)["models"]
         for sig in sigs:
             hf_hub_download(repo, f"{sig}.safetensors", local_dir=MODEL_DIR)
     if _local_bag() is None:
         raise RuntimeError("modello non trovato dopo il download")
-    with open(_marker(), "w") as f:
+    with open(_marker(), "w", encoding="utf-8") as f:
         f.write(MODEL + "\n")
 
 

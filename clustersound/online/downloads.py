@@ -21,10 +21,15 @@ def host_allowed(url: str) -> bool:
     return any(host == h or host.endswith("." + h) for h in ALLOWED_HOSTS)
 
 
+# names Windows reserves for devices, with any extension ("con.wav" is the console too)
+_RESERVED = re.compile(r"(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?", re.I)
+
+
 def safe_name(text: str, limit: int = 120) -> str:
     text = re.sub(r"[\\/:*?\"<>|\x00-\x1f]+", " ", text or "").strip(" .")
     text = re.sub(r"\s+", " ", text)
-    return text[:limit].rstrip(" .") or "sample"
+    text = text[:limit].rstrip(" .") or "sample"
+    return f"_{text}" if _RESERVED.fullmatch(text) else text
 
 
 def unique_path(path: str) -> str:

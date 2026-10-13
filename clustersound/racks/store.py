@@ -16,7 +16,7 @@ def _path():
 
 def _load() -> list[dict]:
     try:
-        data = json.loads(_path().read_text())
+        data = json.loads(_path().read_text(encoding="utf-8"))
         return data.get("racks", []) if isinstance(data, dict) else []
     except (OSError, ValueError):
         return []
@@ -24,7 +24,7 @@ def _load() -> list[dict]:
 
 def _save(items: list[dict]) -> None:
     tmp = _path().with_suffix(".tmp")
-    tmp.write_text(json.dumps({"version": 1, "racks": items}))
+    tmp.write_text(json.dumps({"version": 1, "racks": items}), encoding="utf-8")
     tmp.replace(_path())
 
 

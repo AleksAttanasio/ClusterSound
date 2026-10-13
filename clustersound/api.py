@@ -114,13 +114,13 @@ class Api:
 
     def _settings(self) -> dict:
         try:
-            return json.loads(self._settings_path.read_text())
+            return json.loads(self._settings_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return {}
 
     def _save_settings(self, **kw) -> None:
         s = self._settings() | kw
-        self._settings_path.write_text(json.dumps(s))
+        self._settings_path.write_text(json.dumps(s), encoding="utf-8")
 
     # ------------------------------------------------------------------ setup
     def init(self) -> dict:
