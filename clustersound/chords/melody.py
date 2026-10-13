@@ -75,7 +75,7 @@ def notes_of(seq: dict, layer_id: str | None = None) -> list[dict]:
 # ------------------------------------------------------------------ render
 def render(seq: dict, layer_id: str | None = None) -> list[tuple[int, int, int, int]]:
     """[(start tick, end tick, pitch, velocity)] of a layer (default: all the layers that aren't muted) with
-    the swing of the Modalità, cut at the sequence length."""
+    the swing of the Mode, cut at the sequence length."""
     if layer_id:
         notes = notes_of(seq, layer_id)
     else:

@@ -1,6 +1,6 @@
 """Chord progression (and its melody) -> Standard MIDI File: drag it onto MIDI tracks in Ableton.
 
-One track -> type 0; more -> type 1: the chords ("Accordi") and one track per melody layer (its name)."""
+One track -> type 0; more -> type 1: the chords ("Chords") and one track per melody layer (its name)."""
 import struct
 
 from ..patterns.midi import _track

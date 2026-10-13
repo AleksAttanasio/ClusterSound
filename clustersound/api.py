@@ -739,7 +739,7 @@ class Api:
         self._sampler = s
         return {"error": None, **self._sampler_state()}
 
-    # ------------------------------------------------------------------ enhance ("Migliora")
+    # ------------------------------------------------------------------ enhance ("Enhance")
     def enhance_status(self) -> dict:
         with self._enh_lock:
             return {**enhance_models.status(), "job": dict(self._enh_job)}

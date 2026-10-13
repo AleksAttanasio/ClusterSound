@@ -1,4 +1,4 @@
-"""One "Migliora" job on the sampler's audio: the span goes to a temp WAV, the worker enhances it, the result lands
+"""One "Enhance" job on the sampler's audio: the span goes to a temp WAV, the worker enhances it, the result lands
 next to where the source's samples go, with the same licence/provenance note."""
 import os
 import tempfile

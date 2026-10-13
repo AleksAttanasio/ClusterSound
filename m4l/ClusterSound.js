@@ -26,7 +26,7 @@ autowatch = 1;
 inlets = 1;
 outlets = 7;
 
-var KINDS = [["pattern", "Pattern salvati"], ["sequence", "Sequenze"], ["rack", "Drum rack"], ["compose", "Progressioni"]];
+var KINDS = [["pattern", "Saved patterns"], ["sequence", "Sequences"], ["rack", "Drum racks"], ["compose", "Progressions"]];
 var OUT_MENU_KINDS = 0, OUT_MENU_ITEMS = 1, OUT_STATUS = 2, OUT_UDP = 3, OUT_SND_TRACKS = 4, OUT_SND_ITEMS = 5,
     OUT_SND_TYPES = 6;
 var PAGE = 60;
@@ -64,7 +64,7 @@ function refresh() {
         if (err) return status(err);
         catalog = data;
         fillItems();
-        status("Connesso a ClusterSound" + (bridgeOk ? " · Remote Script ok" : ""));
+        status("Connected to ClusterSound" + (bridgeOk ? " · Remote Script ok" : ""));
     });
     sendOsc({ cmd: "ping" });
 }
@@ -78,10 +78,10 @@ function receive(v) { opts.receive = v ? 1 : 0; }
 
 function importa() {
     var list = currentList();
-    if (!list.length) return status("Niente da importare");
+    if (!list.length) return status("Nothing to import");
     var it = list[Math.min(itemIdx, list.length - 1)];
     var k = KINDS[kindIdx][0];
-    status("Preparo «" + it.name + "»…");
+    status("Preparing «" + it.name + "»…");
     busy = true;
     http("/live/payload?kind=" + k + "&id=" + encodeURIComponent(it.id), function (err, data) {
         if (err) { busy = false; return status(err); }
@@ -91,18 +91,18 @@ function importa() {
 
 function inviaclip() {
     var clip = new LiveAPI("live_set view detail_clip");
-    if (!clip || Number(clip.id) === 0) return status("Seleziona una clip MIDI in Live (vista Detail)");
-    if (!clip.get("is_midi_clip")[0]) return status("La clip selezionata è audio: serve una clip MIDI");
+    if (!clip || Number(clip.id) === 0) return status("Select a MIDI clip in Live (Detail view)");
+    if (!clip.get("is_midi_clip")[0]) return status("The selected clip is audio: a MIDI clip is needed");
     var len = Number(clip.get("length")[0]);
     var notes = clipNotes(clip, len);
-    if (!notes.length) return status("La clip selezionata non ha note");
+    if (!notes.length) return status("The selected clip has no notes");
     var name = String(clip.get("name")[0] || "Clip");
     var body = JSON.stringify({ name: name, length: len, notes: notes });
     dlog("clip «" + name + "»: " + notes.length + " note → ClusterSound");
     http("/live/clip?data=" + encodeURIComponent(body), function (err, data) {
         if (err) return status(err);
-        if (!data || !data.ok) return status("ClusterSound non ha confermato la clip: aggiorna l'app");
-        status("«" + name + "» inviata: in ClusterSound → Compose → Melodia → Importa → Clip da Ableton");
+        if (!data || !data.ok) return status("ClusterSound did not confirm the clip: update the app");
+        status("«" + name + "» sent: in ClusterSound → Compose → Melody → Import → Clip from Ableton");
     });
 }
 
@@ -166,9 +166,9 @@ function http(path, cb) {
         if (this.readyState !== 4) return;
         var text = this.responseText;
         if (this.status === 204 || (this.status === 200 && !text)) return cb(null, null);
-        if (!this.status) return cb("ClusterSound non raggiungibile (porta " + port + "): apri l'app");
+        if (!this.status) return cb("ClusterSound not reachable (port " + port + "): open the app");
         var data = null;
-        try { data = JSON.parse(text); } catch (e) { return cb("Risposta non valida da ClusterSound"); }
+        try { data = JSON.parse(text); } catch (e) { return cb("Invalid reply from ClusterSound"); }
         if (data && data.error) return cb(data.error);
         cb(null, data);
     };
@@ -237,8 +237,8 @@ function importPayload(p) {
     if (p.kind === "audio" && liveMajor() < 12 && !bridgeOk) {
         // Live 10/11 can't create an audio clip from Max: without the Remote Script an empty track is all we'd get
         var file = p.tracks.length ? p.tracks[0].audio_path : "";
-        status("Audio: serve la Remote Script ClusterSoundBridge (Preferenze → Link/MIDI → Control Surface), "
-               + "oppure trascina dal browser → User Library/" + file);
+        status("Audio: it needs the ClusterSoundBridge Remote Script (Settings → Link/MIDI → Control Surface), "
+               + "or drag it from the browser → User Library/" + file);
         busy = false;
         return;
     }
@@ -278,7 +278,7 @@ function importPayload(p) {
                         new LiveAPI(path).call("create_audio_clip", t.audio_file);
                         if (new LiveAPI(path).get("has_clip")[0]) { ref.hasSound = true; return; }
                     }
-                    if (!bridgeOk) { notes.push(t.name + ": trascina il file dal browser → User Library/" + t.audio_path); return; }
+                    if (!bridgeOk) { notes.push(t.name + ": drag the file from the browser → User Library/" + t.audio_path); return; }
                     var id = sendOsc({ cmd: "load_audio", track: track, slot: slot, root: t.audio_root, path: t.audio_path });
                     wait(id, function (msg) {
                         if (msg.ok) ref.hasSound = true;
@@ -288,7 +288,7 @@ function importPayload(p) {
             }
             if (t.adg_path) {
                 steps.push(function () {
-                    if (!bridgeOk) { notes.push(t.name + ": Remote Script non attiva, trascina il rack dal browser → " + t.adg_path); return; }
+                    if (!bridgeOk) { notes.push(t.name + ": Remote Script not active, drag the rack from the browser → " + t.adg_path); return; }
                     var id = sendOsc({ cmd: "load", track: trackIndex(ref.trackId), root: t.adg_root, path: t.adg_path });
                     wait(id, function (msg) {
                         if (msg.ok) ref.hasSound = true;
@@ -317,7 +317,7 @@ function importPayload(p) {
             for (var k = 0; k < imported.length; k++) if (!imported[k].hasSound) { sndIdx = k; break; }
             fillSoundTracks();
         }
-        status("Importato «" + p.name + "»" + (notes.length ? " · " + notes.join(" · ") : ""));
+        status("Imported «" + p.name + "»" + (notes.length ? " · " + notes.join(" · ") : ""));
         // a track without an instrument gets the first proposal from Live's library, so the import plays
         for (var j = 0; j < refs.length; j++) {
             (function (r) {
@@ -335,7 +335,7 @@ function wait(id, done) {
     waitTask = new Task(function () {
         if (!waiting || waiting.id !== id) return;
         waiting = null;
-        done({ ok: false, error: "nessuna risposta dalla Remote Script" });
+        done({ ok: false, error: "no reply from the Remote Script" });
         bridgeOk = false;
         runSteps();
     }, this);
@@ -346,7 +346,7 @@ wait.local = 1;
 function runSteps() {
     while (steps.length && !waiting) {
         var s = steps.shift();
-        try { s(); } catch (e) { status("Errore: " + e); dlog("step error: " + e); }
+        try { s(); } catch (e) { status("Error: " + e); dlog("step error: " + e); }
     }
     if (steps.length || waiting) return;
     // idle: the menus show the current state, then the click that came in while loading is played
@@ -411,7 +411,7 @@ function entriesOf(refs) {
     for (var i = 0; i < refs.length; i++) {
         var r = refs[i];
         if (r.role === "audio") continue;  // nothing to play an audio clip with
-        if (r.buses.length) r.name = r.name + " · kit intero";
+        if (r.buses.length) r.name = r.name + " · whole kit";
         out.push(r);
         for (var j = 0; j < r.buses.length; j++) {
             var b = r.buses[j];
@@ -426,7 +426,7 @@ entriesOf.local = 1;
 
 function typesFor(r) {
     var out = [];
-    if (r.pad !== null) out.push({ key: r.role, name: "Colpi di " + r.busLabel });
+    if (r.pad !== null) out.push({ key: r.role, name: r.busLabel + " hits" });
     return out.concat(cats || []);
 }
 typesFor.local = 1;
@@ -435,9 +435,9 @@ typesFor.local = 1;
 // fetched so far and, if the type has more, an entry that fetches the next page.
 function choices(r) {
     var out = [];
-    if (r.restore) out.push({ label: r.pad !== null ? "★ Kit ClusterSound (ripristina tutto)" : "★ Sample ClusterSound", restore: true });
+    if (r.restore) out.push({ label: r.pad !== null ? "★ ClusterSound kit (restore everything)" : "★ ClusterSound sample", restore: true });
     for (var i = 0; i < r.options.length; i++) out.push({ label: r.options[i].name + "  ·  " + r.options[i].folder, opt: r.options[i] });
-    if (r.options.length < r.total) out.push({ label: "… altri " + (r.total - r.options.length), more: true });
+    if (r.options.length < r.total) out.push({ label: "… " + (r.total - r.options.length) + " more", more: true });
     return out;
 }
 choices.local = 1;
@@ -480,7 +480,7 @@ fillSoundItems.local = 1;
 function ensureTypes(then) {
     if (cats) return then();
     steps.push(function () {
-        if (!bridgeOk) return status("Remote Script non attiva: niente strumenti di Live da provare");
+        if (!bridgeOk) return status("Remote Script not active: no Live instruments to try");
         var id = sendOsc({ cmd: "categories" });
         wait(id, function (msg) {
             if (!msg.ok) return status(msg.error);
@@ -508,7 +508,7 @@ function listType(r, offset, then) {  // fetch a page of the presets of r.cat
             r.options = offset ? r.options.concat(msg.items) : msg.items;
             r.total = msg.total;
             if (r === current()) fillSoundItems();
-            status(r.name + ": " + r.total + " strumenti in «" + typeName(r) + "»");
+            status(r.name + ": " + r.total + " instruments in «" + typeName(r) + "»");
             if (then) then();
         });
     });
@@ -537,11 +537,11 @@ function loadOption(r, play) {
         var c = choices(r)[r.pick];
         if (!c || c.more) return;
         var index = trackIndex(r.trackId);
-        if (index < 0) return status(r.name + ": la traccia non c'è più");
+        if (index < 0) return status(r.name + ": the track is gone");
         var cmd = c.restore ? { cmd: "load", track: index, root: r.restore.root, path: r.restore.path }
                             : { cmd: "load_item", track: index, item: c.opt.id };
         if (!c.restore && r.pad !== null) cmd.pad = r.pad;
-        status(r.name + ": carico «" + c.label + "»…");
+        status(r.name + ": loading «" + c.label + "»…");
         var id = sendOsc(cmd);
         wait(id, function (msg) {
             if (!msg.ok) return status(r.name + ": " + msg.error);
@@ -559,7 +559,7 @@ function fire(r) {
 }
 fire.local = 1;
 
-function play(r) {  // load the picked entry and play; "… altri" fetches the next page and plays its first preset
+function play(r) {  // load the picked entry and play; "… more" fetches the next page and plays its first preset
     var c = choices(r)[r.pick];
     if (c && c.more) listType(r, r.options.length, function () { fillSoundItems(); loadOption(r, true); });
     else loadOption(r, true);
@@ -602,7 +602,7 @@ function playOrQueue(r) {  // never drop a click: while something loads, the las
     if (waiting || steps.length) {
         pending = r;
         var c = choices(r)[r.pick];
-        return status("Dopo il caricamento: «" + (c ? c.label : "") + "»");
+        return status("After loading: «" + (c ? c.label : "") + "»");
     }
     play(r);
 }
@@ -617,7 +617,7 @@ function sndpick(i) {  // choosing an instrument plays it on the clip right away
 
 function prova() {
     var r = current();
-    if (!r) return status("Importa prima qualcosa: gli strumenti si provano sulle tracce importate");
+    if (!r) return status("Import something first: instruments are tried on the imported tracks");
     var now = Date.now();
     if (now - lastProva < DOUBLE_CLICK) {  // double click: also go to the track
         lastProva = 0;

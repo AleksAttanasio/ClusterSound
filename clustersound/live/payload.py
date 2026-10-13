@@ -179,7 +179,7 @@ def _layer_clips(seq: dict, suffix: str = "") -> dict[str, tuple[str, dict]]:
 def compose(proj: dict, pure: bool = False, versions: list[str] | None = None) -> dict:
     """A Compose project ({versions, order, modes, modeActive, bpm, name}) or a single playable seq.
 
-    Every harmony version becomes a clip of one "Accordi" track, played with the active Modalità; every melody
+    Every harmony version becomes a clip of one "Chords" track, played with the active Mode; every melody
     layer (by name: "Melodia", "Basso"…) gets its own track, with its clip in the scene of its harmony."""
     name = proj.get("name") or "Progressione"
     bpm = float(proj.get("bpm") or 120)

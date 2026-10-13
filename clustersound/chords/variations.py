@@ -1,4 +1,4 @@
-"""Variations, deterministic for a given seed: harmony (a chord, the whole progression) and Modalità
+"""Variations, deterministic for a given seed: harmony (a chord, the whole progression) and Mode
 (rhythm grid and way of playing), kept apart."""
 import copy
 import math
@@ -308,7 +308,7 @@ def vary_progression(seq: dict, kinds: list[str], amount: float, seed: int, pool
     return out
 
 
-# ------------------------------------------------------------------ Modalità (rhythm + playing)
+# ------------------------------------------------------------------ Mode (rhythm + playing)
 MODE_KINDS = [("density", N_("Density")), ("syncopation", N_("Syncopation")), ("accents", N_("Accents")), ("preset", N_("Another rhythm")),
               ("play", N_("Playing style")), ("strum", "Strum"), ("feel", "Feel / humanize")]
 
@@ -432,7 +432,7 @@ _MODE_GEN = {"density": _m_density, "syncopation": _m_syncopation, "accents": _m
 
 
 def vary_mode(mode: dict, kinds: list[str], amount: float, seed: int, count: int = 4) -> list[dict]:
-    """Alternative Modalità (same harmony): [{kind, label, mode}]."""
+    """Alternative Mode (same harmony): [{kind, label, mode}]."""
     base = perform.mode_of({"mode": mode})
     kinds = [k for k in kinds if k in _MODE_GEN] or ["density"]
     amount = max(.05, min(1.0, float(amount)))

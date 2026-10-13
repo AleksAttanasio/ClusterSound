@@ -1,4 +1,4 @@
-"""How a chord progression is played: the "Modalità" (a rhythm grid + a way of playing every strike) and the
+"""How a chord progression is played: the "Mode" (a rhythm grid + a way of playing every strike) and the
 per-chord overrides.
 
     mode = {"name", "swing": 50..75,
@@ -133,7 +133,7 @@ def _legacy_style(st: dict) -> tuple[dict, dict | str]:
 
 
 def mode_of(seq: dict) -> dict:
-    """The Modalità of a sequence (v1 sequences: built from defaultStyle)."""
+    """The Mode of a sequence (v1 sequences: built from defaultStyle)."""
     if seq.get("mode"):
         m = _merge(DEFAULT_MODE, seq["mode"])
     else:

@@ -132,8 +132,8 @@ def categories(browser):
     """[(key, label)]: the Sounds folders, the drum kits and every instrument's presets."""
     out = [("sounds:" + c.name, c.name) for c in _children(getattr(browser, "sounds", None))
            if getattr(c, "is_folder", False)]
-    out.append((DRUM_KITS, "Kit di batteria"))
-    out += [("instruments:" + d.name, "Preset di " + d.name) for d in _children(getattr(browser, "instruments", None))
+    out.append((DRUM_KITS, "Drum kits"))
+    out += [("instruments:" + d.name, d.name + " presets") for d in _children(getattr(browser, "instruments", None))
             if getattr(d, "is_folder", False) or getattr(d, "is_device", False)]
     return out
 
