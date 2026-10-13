@@ -1,6 +1,7 @@
 """SQLite cache of per-file analysis results, user labels and 3D projections."""
 import io
 import json
+import os
 import sqlite3
 import threading
 from pathlib import Path
@@ -46,11 +47,11 @@ class Cache:
 
     def get_many(self, root: str) -> dict[str, tuple[float, int, bytes]]:
         """Raw cached rows under a folder, in one query: path -> (mtime, size, blob)."""
-        prefix = root.rstrip("/") + "/"
+        prefix = root.rstrip("/" + os.sep) + os.sep
         with self._lock:
-            rows = self._db.execute(
+            rows = self._db.execute(  # [prefix, prefix with its separator + 1): every path under root
                 "SELECT path, mtime, size, blob FROM files WHERE path >= ? AND path < ? AND version=?",
-                (prefix, prefix[:-1] + "0", ANALYSIS_VERSION)).fetchall()
+                (prefix, prefix[:-1] + chr(ord(os.sep) + 1), ANALYSIS_VERSION)).fetchall()
         return {p: (m, s, b) for p, m, s, b in rows}
 
     def put(self, path: str, mtime: float, size: int, arrays: dict, meta: dict) -> None:

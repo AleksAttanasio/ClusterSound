@@ -4,7 +4,6 @@ import io
 import json
 import mimetypes
 import os
-import subprocess
 import threading
 import time
 import urllib.parse
@@ -42,7 +41,7 @@ from .patterns import midi as pat_midi
 from .patterns import model as pat_model
 from .patterns import render as pat_render
 from .patterns import store as pat_store
-from .paths import data_dir
+from .paths import data_dir, is_inside, open_folder, reveal
 from .racks import ableton as rack_ableton
 from .racks import dynamics_match
 from .racks import layouts as rack_layouts
@@ -202,7 +201,7 @@ class Api:
         path = self._lib.items[int(item_id)]["path"]
         if not os.path.exists(path):
             return False
-        subprocess.run(["open", "-R", path], check=False)
+        reveal(path)
         return True
 
     def similar(self, item_id: int, k: int = 12) -> list[dict]:
@@ -348,8 +347,7 @@ class Api:
         lib_root = self._lib.root
         if not lib_root:
             return False
-        folder, lib_root = os.path.realpath(folder), os.path.realpath(lib_root)
-        return folder == lib_root or folder.startswith(lib_root + os.sep)
+        return is_inside(folder, lib_root)
 
     def _downloads_in_library(self) -> bool:
         return self._inside_library(self._settings().get("download_dir") or DEFAULT_DIR)
@@ -408,19 +406,18 @@ class Api:
 
     def reveal_path(self, path: str) -> bool:
         s = self._settings()
-        roots = [os.path.realpath(s.get("download_dir") or DEFAULT_DIR),
-                 os.path.realpath(s.get("sampler_dir") or sampler_export.DEFAULT_DIR),
-                 os.path.realpath(s.get("recorder_dir") or sampler_recorder.DEFAULT_DIR)]
+        roots = [s.get("download_dir") or DEFAULT_DIR, s.get("sampler_dir") or sampler_export.DEFAULT_DIR,
+                 s.get("recorder_dir") or sampler_recorder.DEFAULT_DIR]
         path = os.path.realpath(path or "")
-        if not any(path == r or path.startswith(r + os.sep) for r in roots) or not os.path.exists(path):
+        if not any(is_inside(path, r) for r in roots) or not os.path.exists(path):
             return False
-        subprocess.run(["open", "-R", path] if os.path.isfile(path) else ["open", path], check=False)
+        reveal(path)
         return True
 
     def open_download_dir(self) -> bool:
         root = self._settings().get("download_dir") or DEFAULT_DIR
         os.makedirs(root, exist_ok=True)
-        subprocess.run(["open", root], check=False)
+        open_folder(root)
         return True
 
     def open_url(self, url: str) -> bool:
@@ -481,7 +478,7 @@ class Api:
         file_of = lambda it: {"id": it["id"], "name": it["name"], "rel": it["rel"], "cls": it["cls"],
                               "dur": round(float(it["info"].get("duration", 0)), 2)}
         out = {"error": None, "root": self._lib.root, "folder": folder, "q": q or "",
-               "crumbs": [{"name": os.path.basename(self._lib.root.rstrip("/")) or "Libreria", "path": ""}]
+               "crumbs": [{"name": os.path.basename(self._lib.root.rstrip("/" + os.sep)) or "Libreria", "path": ""}]
                + [{"name": part, "path": "/".join(folder.split("/")[:i + 1])}
                   for i, part in enumerate(folder.split("/")) if folder],
                "folders": [], "files": []}
@@ -620,9 +617,9 @@ class Api:
 
     def recorder_open(self, path: str) -> dict:
         """A recording of this session (or any file in the recordings folder) into the editor."""
-        root = os.path.realpath(self._settings().get("recorder_dir") or sampler_recorder.DEFAULT_DIR)
+        root = self._settings().get("recorder_dir") or sampler_recorder.DEFAULT_DIR
         real = os.path.realpath(path or "")
-        if not (real.startswith(root + os.sep) or any(r["path"] == path for r in self._recorder.recordings)):
+        if not ((is_inside(real, root) and real != os.path.realpath(root)) or any(r["path"] == path for r in self._recorder.recordings)):
             return {"error": "registrazione non trovata"}
         if not os.path.isfile(real):
             return {"error": "file non trovato"}
@@ -1036,7 +1033,7 @@ class Api:
             folder = pat_ableton.export_package(p, root, self._resolve, self._describe, self._title(p))
         except Exception as e:
             return {"error": f"{type(e).__name__}: {e}"}
-        subprocess.run(["open", folder], check=False)
+        open_folder(folder)
         return {"folder": folder}
 
 
@@ -1210,7 +1207,7 @@ class Api:
             path = os.path.join(folder, name + ".mid")
             chord_export.write(path, seq, pure, parts)
             files.append(path)
-        subprocess.run(["open", folder], check=False)
+        open_folder(folder)
         return {"folder": folder, "files": files}
 
     def list_progressions(self) -> list[dict]:
@@ -1436,7 +1433,7 @@ class Api:
             folder = rack_ableton.export_rack(rack, root, self._resolve, self._describe)
         except Exception as e:
             return {"error": f"{type(e).__name__}: {e}"}
-        subprocess.run(["open", folder], check=False)
+        open_folder(folder)
         return {"folder": folder}
 
     # ================================================================== Ableton Live (Max for Live bridge)
