@@ -3,19 +3,19 @@ Trigger 1 69, Trigger 2 70) so the instrument plays Live over USB MIDI, plus the
 44.1 kHz WAVs named by pad, ready to be imported with SPD-SX Wave Manager.
 """
 import os
-import time
 
 import numpy as np
 import soundfile as sf
 import soxr
 
+from ..i18n import tr
 from ..online.downloads import license_text, safe_name, unique_path
 from ..patterns import ableton as live
 from . import layouts, spdsx
 from .ableton import _label, note_name
 
 SPD_SR = 44100
-SHORT = {spdsx.TRIG1: "T1 Pedale", spdsx.TRIG2: "T2"}
+SHORT = {spdsx.TRIG1: "T1 Pedal", spdsx.TRIG2: "T2"}
 
 
 def pad_tag(p: int) -> str:
@@ -68,11 +68,11 @@ def export_rack(rack: dict, dest_root: str, resolve, describe) -> str:
                      "choke": settings[g]["choke"]})
         names[p] = label
     if not pads:
-        raise ValueError("nessun pad con un sample da esportare")
+        raise ValueError(tr("no pad with a sample to export"))
     pads.sort(key=lambda x: x["note"])
     adg = f"{title} SPD-SX Drum Rack.adg"
     live.write_adg(live.drum_rack_document(pads), os.path.join(folder, adg))
-    with open(os.path.join(folder, "LEGGIMI.txt"), "w", encoding="utf-8") as f:
+    with open(os.path.join(folder, live.readme_file()), "w", encoding="utf-8") as f:
         f.write(readme(rack, adg, names, settings, bool(licences)))
     return folder
 
@@ -88,39 +88,39 @@ def pad_map(rack: dict, names: dict[int, str], width: int = 18) -> list[str]:
         out.append(sep)
     t = spdsx.triggers_of(rack)
     for p, key in ((spdsx.TRIG1, "trig1"), (spdsx.TRIG2, "trig2")):
-        state = names.get(p, "·") if t[key] else "non collegato"
-        out.append(f"{spdsx.PAD_LABELS[p]} · {note_name(spdsx.NOTES[p])}: {state}")
+        state = names.get(p, "·") if t[key] else tr("not connected")
+        out.append(f"{tr(spdsx.PAD_LABELS[p])} · {note_name(spdsx.NOTES[p])}: {state}")
     return out
 
 
 def readme(rack: dict, adg: str, names: dict[int, str], settings: list[dict], has_licences: bool) -> str:
     config = spdsx.CONFIGS[rack["geometry"]][0]
     lines = [
-        rack["name"], f"Roland SPD-SX · {len(names)} pad · configurazione {config}", "",
-        "MAPPA DEI PAD (come li vedi suonando: la riga dei pad 1-3 è quella in alto)",
+        rack["name"], tr("Roland SPD-SX · {n} pads · layout {config}", n=len(names), config=tr(config)), "",
+        tr("PAD MAP (as you see them while playing: the row of pads 1-3 is the top one)"),
         *pad_map(rack, names), "",
-        "SULLA SPD-SX (senza computer)",
-        "1. Apri SPD-SX Wave Manager, collega la SPD-SX via USB e importa i file della cartella SPD-SX/",
-        "   (WAV 16 bit / 44,1 kHz: non serve conversione).",
-        "2. In un kit libero assegna ogni wave al pad indicato all'inizio del nome",
-        "   (P1-P9 = pad 1-9, \"T1 Pedale\" = Trigger 1, \"T2\" = Trigger 2).",
-        "3. Per il pedale: collega il pedale/trigger (es. KT-10) a TRIG IN 1 e scegli il suo tipo in",
+        tr("ON THE SPD-SX (no computer)"),
+        tr("1. Open SPD-SX Wave Manager, connect the SPD-SX over USB and import the files in the SPD-SX/ folder"),
+        "   " + tr("(16-bit / 44.1 kHz WAV: no conversion needed)."),
+        tr("2. In a free kit assign every wave to the pad shown at the start of its name"),
+        "   " + tr('(P1-P9 = pads 1-9, "T1 Pedal" = Trigger 1, "T2" = Trigger 2).'),
+        tr("3. For the pedal: connect the pedal/trigger (e.g. KT-10) to TRIG IN 1 and choose its type in"),
         "   MENU > SETUP > TRIGGER.",
         "",
-        "IN ABLETON LIVE (la SPD-SX come controller MIDI)",
-        f"1. Trascina \"{adg}\" su una traccia MIDI vuota.",
-        "2. Collega la SPD-SX via USB e abilitala come ingresso MIDI (Preferenze > Link, Tempo e MIDI > Track).",
-        "3. Le note sono quelle di fabbrica della SPD-SX: pad 1-9 = 60-68 (C3-G#3 in Live), Trigger 1 = 69,",
-        "   Trigger 2 = 70. Se le hai cambiate: MENU > KIT > MIDI > NOTE# sulla SPD-SX.",
-        "   Se nel kit della SPD-SX ci sono già dei suoni, usa un kit vuoto per sentire solo Live.",
+        tr("IN ABLETON LIVE (the SPD-SX as a MIDI controller)"),
+        tr('1. Drag "{file}" onto an empty MIDI track.', file=adg),
+        tr("2. Connect the SPD-SX over USB and enable it as a MIDI input (Settings > Link, Tempo & MIDI > Track)."),
+        tr("3. The notes are the SPD-SX factory ones: pads 1-9 = 60-68 (C3-G#3 in Live), Trigger 1 = 69,"),
+        "   " + tr("Trigger 2 = 70. If you changed them: MENU > KIT > MIDI > NOTE# on the SPD-SX."),
+        "   " + tr("If the SPD-SX kit already has sounds, use an empty kit to hear only Live."),
     ]
     chokes = sorted({s["choke"] for s in settings if s["choke"]})
     if chokes:
-        lines.append("   Choke group attivi: " + ", ".join(map(str, chokes)) + " (i pad dello stesso gruppo si zittiscono a vicenda).")
-    lines += ["", "SE IL PRESET .adg NON SI APRE",
-              "Crea un Drum Rack vuoto e trascina ogni file di Samples/ sul pad della nota indicata nella mappa.", ""]
+        lines.append("   " + tr("Active choke groups: {groups} (pads of the same group silence each other).",
+                               groups=", ".join(map(str, chokes))))
+    lines += ["", tr("IF THE .adg PRESET DOES NOT OPEN"),
+              tr("Create an empty Drum Rack and drag every file in Samples/ onto the pad of the note shown in the map."), ""]
     if has_licences:
-        lines += ["LICENZE", "Alcuni sample vengono da fonti online: leggi i file .license.txt accanto a ciascuno",
-                  "(autore, licenza e testo di attribuzione da riportare se richiesto).", ""]
-    lines.append(f"Creato con ClusterSound il {time.strftime('%Y-%m-%d %H:%M')}")
+        lines += live.license_lines() + [""]
+    lines.append(live.created_line())
     return "\n".join(lines) + "\n"

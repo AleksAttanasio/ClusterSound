@@ -6,6 +6,7 @@ import importlib.util
 import os
 from dataclasses import dataclass
 
+from ..i18n import N_, tr
 from ..paths import data_dir
 
 INSTALL_HINT = 'pip install -e ".[enhance]"'
@@ -27,9 +28,9 @@ class Model:
 
 
 MODELS = {m.key: m for m in [
-    Model("apollo", "Apollo · veloce",
-          "Ripara l'audio compresso (MP3, streaming) e ricostruisce le alte frequenze tagliate. Pensato per la musica.",
-          "JusperLee/Apollo", "pytorch_model.bin", 44100, 66, "~1,6 GB", "~15 s ogni 30 s di audio",
+    Model("apollo", N_("Apollo · fast"),
+          N_("Repairs compressed audio (MP3, streaming) and rebuilds the cut high frequencies. Made for music."),
+          "JusperLee/Apollo", "pytorch_model.bin", 44100, 66, "~1,6 GB", N_("~15 s per 30 s of audio"),
           "CC BY-SA 4.0"),
 ]}
 DEFAULT = "apollo"
@@ -50,7 +51,7 @@ def _marker(key: str) -> str:
 def get(key: str | None) -> Model:
     m = MODELS.get(key or DEFAULT)
     if not m:
-        raise ValueError(f"modello sconosciuto: {key}")
+        raise ValueError(f"unknown model: {key}")
     return m
 
 
@@ -64,7 +65,7 @@ def ready(key: str) -> bool:
 
 def status() -> dict:
     return {"install_hint": INSTALL_HINT, "default": DEFAULT, "models": [
-        {"key": m.key, "label": m.label, "detail": m.detail, "mb": m.mb, "ram": m.ram, "speed": m.speed,
+        {"key": m.key, "label": tr(m.label), "detail": tr(m.detail), "mb": m.mb, "ram": m.ram, "speed": tr(m.speed),
          "license": m.license, "sr": m.sr, "installed": installed(m.key), "model_ready": installed(m.key) and ready(m.key)}
         for m in MODELS.values()]}
 
@@ -76,6 +77,6 @@ def download_model(key: str) -> None:
     os.makedirs(model_dir(key), exist_ok=True)
     hf_hub_download(m.repo, m.filename, local_dir=model_dir(key))
     if not os.path.isfile(weights_path(key)):
-        raise RuntimeError("pesi non trovati dopo il download")
+        raise RuntimeError("weights not found after the download")
     with open(_marker(key), "w", encoding="utf-8") as f:
         f.write(f"{m.repo}/{m.filename}\n")

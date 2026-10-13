@@ -101,7 +101,7 @@ def test_suggest_after_dominant(tmp_path):
     g = next(c for c in pool if c["name"] == "G Maj")
     out = harmony.suggest([_clip(g)], pool, C_MAJ, lib.bigrams("major"))
     assert out[0]["degree"] in ("I", "vi")
-    assert any("cadenza" in r for r in out[0]["reasons"])
+    assert any("cadence" in r for r in out[0]["reasons"])
     assert out[0]["score"] == 1.0 and all(0 < r["score"] <= 1 for r in out)
     assert len({(r["chord"]["root"], r["degree"]) for r in out}) == len(out)  # one entry per chord
 
@@ -260,7 +260,7 @@ def test_export_roundtrip(tmp_path):
     assert len(read_notes(str(pure))) == 8
 
 
-@pytest.mark.skipif(not os.path.isdir(DEFAULT_DIR), reason="Unison MIDI Chord Pack non installato")
+@pytest.mark.skipif(not os.path.isdir(DEFAULT_DIR), reason="Unison MIDI Chord Pack not installed")
 def test_real_pack():
     lib = ChordLibrary()
     keys = lib.available_keys()

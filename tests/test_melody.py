@@ -136,7 +136,7 @@ def test_layers_become_tracks_and_midi_tracks(tmp_path):
     a = {"bars": 1, "clips": clips, "melody": {"layers": [lead, bass, pad], "active": "l"}}
     b = {"bars": 1, "clips": clips, "melody": {"layers": [bass]}}
     out = payload.compose({"name": "P", "bpm": 90, "order": ["A", "B"], "versions": {"A": a, "B": b}})
-    assert [(t["name"], t["role"]) for t in out["tracks"]] == [("Accordi – P", "chords"), ("Melodia – P", "melody"),
+    assert [(t["name"], t["role"]) for t in out["tracks"]] == [("Chords – P", "chords"), ("Melodia – P", "melody"),
                                                                ("Basso – P", "bass")]
     assert [c["name"] for c in out["tracks"][1]["clips"]] == ["Melodia A", ""]
     assert [c["name"] for c in out["tracks"][2]["clips"]] == ["Basso A", "Basso B"]

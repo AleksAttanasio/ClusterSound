@@ -6,12 +6,13 @@ from typing import Callable
 
 import soundfile as sf
 
+from ..i18n import tr
 from ..online.downloads import safe_name, unique_path
 from ..sampler import export as sampler_export
 from ..sampler.session import SamplerSession
 from . import runner
 
-SUFFIX = " (migliorato)"
+SUFFIX = " ({enhanced})"  # the word follows the interface language
 
 
 def out_path(s: SamplerSession, scope: str, base: str, sampler_root: str) -> str:
@@ -20,7 +21,7 @@ def out_path(s: SamplerSession, scope: str, base: str, sampler_root: str) -> str
         folder = os.path.dirname(s.path)
     else:
         folder = sampler_export.folder_for(s, sampler_root)
-    return unique_path(os.path.join(folder, safe_name(base + SUFFIX) + ".wav"))
+    return unique_path(os.path.join(folder, safe_name(base + SUFFIX.format(enhanced=tr("enhanced"))) + ".wav"))
 
 
 def run(s: SamplerSession, start: float, end: float, model: str, dst: str,
@@ -29,7 +30,7 @@ def run(s: SamplerSession, start: float, end: float, model: str, dst: str,
     a, b = s._span(start, end)
     x = s.audio[a:b]
     if x.shape[0] == 0:
-        raise ValueError("regione vuota")
+        raise ValueError(tr("empty region"))
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     fd, src = tempfile.mkstemp(suffix=".wav", prefix="cs-enhance-")
     os.close(fd)

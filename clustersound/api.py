@@ -222,9 +222,9 @@ class Api:
 
         def work():
             with self._relabel_lock:
-                lib._set_progress("classifying", 0, 0, "Ri-addestramento…")
+                lib._set_progress("classifying", 0, 0, i18n.tr("Retraining…"))
                 lib.reclassify()
-                lib._set_progress("done", len(lib.items), len(lib.items), "Classi aggiornate")
+                lib._set_progress("done", len(lib.items), len(lib.items), i18n.tr("Classes updated"))
 
         threading.Thread(target=work, daemon=True).start()
         return {"ok": True, "version": lib.version}
@@ -246,8 +246,8 @@ class Api:
     def online_init(self) -> dict:
         return {"sources": [{"id": k, "label": v} for k, v in online.LABELS.items()],
                 "pack_sources": online.PACK_SOURCES,
-                "providers": catalog.providers(), "curated": catalog.curated(),
-                "licenses": {k: v["label"] for k, v in LICENSES.items()},
+                "providers": i18n.localize(catalog.providers()), "curated": i18n.localize(catalog.curated()),
+                "licenses": {k: i18n.tr(v["label"]) for k, v in LICENSES.items()},
                 "server_filters": online.server_filters(),
                 "settings": self.get_settings()}
 
@@ -316,12 +316,12 @@ class Api:
 
     def online_more(self, source: str, params: dict, page: int) -> dict:
         if source not in online.SOURCES:
-            return {"error": "fonte sconosciuta", "results": []}
+            return {"error": i18n.tr("unknown source"), "results": []}
         return online.search_source(source, params or {}, int(page), self._settings())
 
     def online_packs(self, source: str, params: dict, page: int) -> dict:
         if source not in online.PACK_SOURCES:
-            return {"error": "fonte senza pack", "results": []}
+            return {"error": i18n.tr("this source has no packs"), "results": []}
         return online.search_source(source, params or {}, int(page), self._settings(), packs=True)
 
     def online_pack(self, uid: str, page: int = 1) -> dict:
@@ -337,7 +337,7 @@ class Api:
         except SourceError as e:
             return {"error": str(e)}
         if not files:
-            return {"error": "nessun file scaricabile in questo pack"}
+            return {"error": i18n.tr("no downloadable file in this pack")}
         root = self._settings().get("download_dir") or DEFAULT_DIR
         queued = 0
         for f in files:
@@ -394,11 +394,11 @@ class Api:
         """Queue a download. For packs, `url` picks one of the pack's archives."""
         r = online.get(uid)
         if r is None:
-            return {"error": "risultato non trovato"}
+            return {"error": i18n.tr("result not found")}
         if url:
             ident = r.extra.get("identifier", "")
             if not (r.is_pack and url.startswith(f"https://archive.org/download/{urllib.parse.quote(ident)}/")):
-                return {"error": "file non appartenente al pack"}
+                return {"error": i18n.tr("file not part of the pack")}
         root = self._settings().get("download_dir") or DEFAULT_DIR
         try:
             return {**self._downloader.enqueue(r, url or r.download_url, root),
@@ -449,7 +449,7 @@ class Api:
                 "show_sources": False,  # file and link sources stay available but hidden: the tab is the Recorder
                 "recorder": {"devices": sampler_recorder.output_devices(), "formats": sampler_recorder.formats(),
                              "hint": sampler_recorder.unavailable_hint(),
-                             "rates": sampler_recorder.RATES, "channels": sampler_recorder.CHANNELS,
+                             "rates": i18n.localize(sampler_recorder.RATES), "channels": i18n.localize(sampler_recorder.CHANNELS),
                              **self._recorder.status()},
                 "settings": self.get_settings()}
 
@@ -457,7 +457,7 @@ class Api:
         try:
             self._sampler = sampler_session.load_file(path, **kw)
         except Exception as e:
-            return {"error": f"impossibile leggere il file audio ({e})"}
+            return {"error": i18n.tr("cannot read the audio file ({error})", error=e)}
         return {"error": None, **self._sampler_state()}
 
     def sampler_open_file(self, path: str | None = None) -> dict:
@@ -468,7 +468,7 @@ class Api:
                 return {"error": None, "cancelled": True}
             path = res[0] if isinstance(res, (list, tuple)) else res
         if not os.path.isfile(path):
-            return {"error": "file non trovato"}
+            return {"error": i18n.tr("file not found")}
         return self._sampler_open(path)
 
     def sampler_current(self) -> dict:
@@ -479,12 +479,12 @@ class Api:
         files are under each) and its files; with q (2+ characters) the matching files of the whole library."""
         items = self._lib.items
         if not self._lib.root or not items:
-            return {"error": "nessuna libreria aperta: scegline una nella scheda Libreria"}
+            return {"error": i18n.tr("no library open: choose one in the Library tab")}
         folder = "/".join(p for p in (folder or "").split("/") if p not in ("", ".", ".."))
         file_of = lambda it: {"id": it["id"], "name": it["name"], "rel": it["rel"], "cls": it["cls"],
                               "dur": round(float(it["info"].get("duration", 0)), 2)}
         out = {"error": None, "root": self._lib.root, "folder": folder, "q": q or "",
-               "crumbs": [{"name": os.path.basename(self._lib.root.rstrip("/" + os.sep)) or "Libreria", "path": ""}]
+               "crumbs": [{"name": os.path.basename(self._lib.root.rstrip("/" + os.sep)) or i18n.tr("Library"), "path": ""}]
                + [{"name": part, "path": "/".join(folder.split("/")[:i + 1])}
                   for i, part in enumerate(folder.split("/")) if folder],
                "folders": [], "files": []}
@@ -515,9 +515,9 @@ class Api:
         try:
             it = self._lib.items[int(item_id)]
         except (IndexError, ValueError, TypeError):
-            return {"error": "sample non trovato"}
+            return {"error": i18n.tr("sample not found")}
         if not os.path.isfile(it["path"]):
-            return {"error": "file non trovato"}
+            return {"error": i18n.tr("file not found")}
         return self._sampler_open(it["path"])
 
     def _bind_drop(self) -> None:
@@ -536,7 +536,7 @@ class Api:
         if audio:
             out = self._sampler_open(audio[0])
         else:
-            out = {"error": "trascina un file audio (wav, aif, flac, mp3, ogg…)" if paths else "file non leggibile"}
+            out = {"error": i18n.tr("drop an audio file (wav, aif, flac, mp3, ogg…)") if paths else i18n.tr("unreadable file")}
         self._window.evaluate_js(f"window.__cs.sampler && window.__cs.sampler.dropped({json.dumps(out)})")
 
     def sampler_link(self, url: str) -> dict:
@@ -554,10 +554,10 @@ class Api:
         r = online.get(uid)
         url = r and (r.download_url or r.preview_url)
         if not url:
-            return {"error": "file non trovato"}
+            return {"error": i18n.tr("file not found")}
         path = online_cache.ensure(url, self._cache_mb())
         if not path:
-            return {"error": "download non riuscito (file troppo grande o host non consentito)"}
+            return {"error": i18n.tr("download failed (file too large or host not allowed)")}
         return self._sampler_open(path, origin="link", result=r)
 
     def sampler_view(self, start: float = 0.0, end: float | None = None, cols: int = 1200) -> dict | None:
@@ -580,7 +580,7 @@ class Api:
 
     def sampler_export(self, regions: list, opts: dict | None = None) -> dict:
         if not self._sampler:
-            return {"error": "nessun audio aperto nel Sampler"}
+            return {"error": i18n.tr("no audio open in the Sampler")}
         o = opts or {}
         root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
         try:
@@ -588,7 +588,7 @@ class Api:
                                           float(o.get("fade_in_ms", 1)), float(o.get("fade_out_ms", 10)),
                                           bool(o.get("normalize")))
         except OSError as e:
-            return {"error": f"scrittura non riuscita ({e})"}
+            return {"error": i18n.tr("write failed ({error})", error=e)}
         paths = [p for p in files if p]
         in_library = bool(paths) and self._inside_library(os.path.dirname(paths[0]))
         if in_library:
@@ -626,13 +626,13 @@ class Api:
         root = self._settings().get("recorder_dir") or sampler_recorder.DEFAULT_DIR
         real = os.path.realpath(path or "")
         if not ((is_inside(real, root) and real != os.path.realpath(root)) or any(r["path"] == path for r in self._recorder.recordings)):
-            return {"error": "registrazione non trovata"}
+            return {"error": i18n.tr("recording not found")}
         if not os.path.isfile(real):
-            return {"error": "file non trovato"}
+            return {"error": i18n.tr("file not found")}
         out = self._sampler_open(real, origin="capture")  # samples cut from it keep the personal-use note
         if not out.get("error"):
             rec = next((r for r in self._recorder.recordings if os.path.realpath(r["path"]) == real), None)
-            self._sampler.meta = {"device": rec["device"] if rec else "uscita audio",
+            self._sampler.meta = {"device": rec["device"] if rec else i18n.tr("audio output"),
                                   "captured_at": time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(real)))}
         return out
 
@@ -651,10 +651,10 @@ class Api:
     def stems_download_model(self) -> dict:
         """Fetch the Demucs weights once (the user confirmed it); separation is offline afterwards."""
         if not sampler_stems.installed():
-            return {**self.stems_status(), "error": f"serve l'estensione stem: {sampler_stems.INSTALL_HINT}"}
+            return {**self.stems_status(), "error": i18n.tr("the stems extension is required: {hint}", hint=sampler_stems.INSTALL_HINT)}
         with self._stems_lock:
             if self._stems_busy():
-                return {**sampler_stems.status(), "job": dict(self._stems_job), "error": "operazione già in corso"}
+                return {**sampler_stems.status(), "job": dict(self._stems_job), "error": i18n.tr("operation already in progress")}
             self._stems_job.update(state="downloading", progress=0.0, error=None)
 
         def work():
@@ -662,7 +662,7 @@ class Api:
                 sampler_stems.download_model()
                 self._stems_set(state="idle")
             except Exception as e:
-                self._stems_set(state="error", error=f"download del modello non riuscito ({e})")
+                self._stems_set(state="error", error=i18n.tr("model download failed ({error})", error=e))
         threading.Thread(target=work, daemon=True).start()
         return {**self.stems_status(), "error": None}
 
@@ -677,25 +677,25 @@ class Api:
             return {**self.stems_status(), "error": str(e)}
         st = sampler_stems.status()
         if not s:
-            return {**self.stems_status(), "error": "nessun audio aperto"}
+            return {**self.stems_status(), "error": i18n.tr("no audio open")}
         if not st["installed"]:
-            return {**self.stems_status(), "error": f"serve l'estensione stem: {sampler_stems.INSTALL_HINT}"}
+            return {**self.stems_status(), "error": i18n.tr("the stems extension is required: {hint}", hint=sampler_stems.INSTALL_HINT)}
         if not st["model_ready"]:
-            return {**self.stems_status(), "error": "modello Demucs non scaricato"}
+            return {**self.stems_status(), "error": i18n.tr("Demucs model not downloaded")}
         if scope == "region":
             if start is None or end is None:
-                return {**self.stems_status(), "error": "nessuna regione selezionata"}
+                return {**self.stems_status(), "error": i18n.tr("no region selected")}
             a, b = slicing.clamp(float(start), float(end), float("inf"), s.duration)
             base = f"{s.title or 'sample'} {a:.2f}-{b:.2f}s"
         else:
-            scope, a, b, base = "all", 0.0, s.duration, s.title or "registrazione"
+            scope, a, b, base = "all", 0.0, s.duration, s.title or i18n.tr("recording")
         if b - a < 0.1:
-            return {**self.stems_status(), "error": "regione troppo corta"}
+            return {**self.stems_status(), "error": i18n.tr("region too short")}
         root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
         folder = sampler_stems.out_folder(s, scope, root)
         with self._stems_lock:
             if self._stems_busy():
-                return {**sampler_stems.status(), "job": dict(self._stems_job), "error": "separazione già in corso"}
+                return {**sampler_stems.status(), "job": dict(self._stems_job), "error": i18n.tr("separation already in progress")}
             self._stems_job = {"state": "running", "progress": 0.0, "scope": scope, "stems": [], "error": None,
                                "title": s.title, "folder": folder, "keys": keys}
         self._stems_cancel.clear()
@@ -708,7 +708,7 @@ class Api:
                 self._stems_set(state="cancelled")
                 return
             except Exception as e:
-                self._stems_set(state="error", error=f"separazione non riuscita ({e})")
+                self._stems_set(state="error", error=i18n.tr("separation failed ({error})", error=e))
                 return
             self._stems_source = s
             self._stems_set(state="done", progress=1.0, stems=res)
@@ -727,13 +727,13 @@ class Api:
             stem = next((r for r in self._stems_job["stems"] if r["path"] == path), None)
         src = self._stems_source
         if not stem or not src:
-            return {"error": "stem non trovato"}
+            return {"error": i18n.tr("stem not found")}
         if not os.path.isfile(path):
-            return {"error": "file non trovato"}
+            return {"error": i18n.tr("file not found")}
         try:
             s = sampler_session.load_file(path, origin=src.origin, result=src.result)
         except Exception as e:
-            return {"error": f"impossibile leggere il file audio ({e})"}
+            return {"error": i18n.tr("cannot read the audio file ({error})", error=e)}
         s.title = f"{src.title} · {stem['label']}"
         s.meta = dict(src.meta)
         self._sampler = s
@@ -761,10 +761,10 @@ class Api:
         except ValueError as e:
             return self._enh_error(str(e))
         if not enhance_models.installed(m.key):
-            return self._enh_error(f"serve l'estensione Migliora: {enhance_models.INSTALL_HINT}")
+            return self._enh_error(i18n.tr("the Enhance extension is required: {hint}", hint=enhance_models.INSTALL_HINT))
         with self._enh_lock:
             if self._enh_busy():
-                return {**enhance_models.status(), "job": dict(self._enh_job), "error": "operazione già in corso"}
+                return {**enhance_models.status(), "job": dict(self._enh_job), "error": i18n.tr("operation already in progress")}
             self._enh_job = {"state": "downloading", "progress": 0.0, "model": m.key, "result": None, "error": None}
 
         def work():
@@ -772,7 +772,7 @@ class Api:
                 enhance_models.download_model(m.key)
                 self._enh_set(state="idle")
             except Exception as e:
-                self._enh_set(state="error", error=f"download del modello non riuscito ({e})")
+                self._enh_set(state="error", error=i18n.tr("model download failed ({error})", error=e))
         threading.Thread(target=work, daemon=True).start()
         return {**self.enhance_status(), "error": None}
 
@@ -786,24 +786,24 @@ class Api:
         except ValueError as e:
             return self._enh_error(str(e))
         if not s:
-            return self._enh_error("nessun audio aperto")
+            return self._enh_error(i18n.tr("no audio open"))
         if not enhance_models.installed(m.key):
-            return self._enh_error(f"serve l'estensione Migliora: {enhance_models.INSTALL_HINT}")
+            return self._enh_error(i18n.tr("the Enhance extension is required: {hint}", hint=enhance_models.INSTALL_HINT))
         if not enhance_models.ready(m.key):
-            return self._enh_error(f"modello {m.label} non scaricato")
+            return self._enh_error(i18n.tr("model {name} not downloaded", name=m.label))
         if scope == "region":
             if start is None or end is None:
-                return self._enh_error("nessuna regione selezionata")
+                return self._enh_error(i18n.tr("no region selected"))
             a, b = slicing.clamp(float(start), float(end), float("inf"), s.duration)
             base = f"{s.title or 'sample'} {a:.2f}-{b:.2f}s"
         else:
-            scope, a, b, base = "all", 0.0, s.duration, s.title or "registrazione"
+            scope, a, b, base = "all", 0.0, s.duration, s.title or i18n.tr("recording")
         if b - a < 0.05:
-            return self._enh_error("regione troppo corta")
+            return self._enh_error(i18n.tr("region too short"))
         dst = enhance_job.out_path(s, scope, base, self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR)
         with self._enh_lock:
             if self._enh_busy():
-                return {**enhance_models.status(), "job": dict(self._enh_job), "error": "miglioramento già in corso"}
+                return {**enhance_models.status(), "job": dict(self._enh_job), "error": i18n.tr("enhancement already in progress")}
             self._enh_job = {"state": "running", "progress": 0.0, "model": m.key, "scope": scope, "title": s.title,
                              "seconds": round(b - a, 2), "result": None, "error": None}
         self._enh_cancel.clear()
@@ -816,7 +816,7 @@ class Api:
                 self._enh_set(state="cancelled")
                 return
             except Exception as e:
-                self._enh_set(state="error", error=f"miglioramento non riuscito ({e})")
+                self._enh_set(state="error", error=i18n.tr("enhancement failed ({error})", error=e))
                 return
             self._enh_source = s
             self._enh_set(state="done", progress=1.0, result=res)
@@ -835,14 +835,14 @@ class Api:
             res = self._enh_job.get("result")
         src = self._enh_source
         if not res or not src:
-            return {"error": "nessun risultato da aprire"}
+            return {"error": i18n.tr("no result to open")}
         if not os.path.isfile(res["path"]):
-            return {"error": "file non trovato"}
+            return {"error": i18n.tr("file not found")}
         try:
             s = sampler_session.load_file(res["path"], origin=src.origin, result=src.result)
         except Exception as e:
-            return {"error": f"impossibile leggere il file audio ({e})"}
-        s.title = f"{src.title} · migliorato"
+            return {"error": i18n.tr("cannot read the audio file ({error})", error=e)}
+        s.title = f"{src.title} · {i18n.tr('enhanced')}"
         s.meta = dict(src.meta)
         self._sampler = s
         return {"error": None, **self._sampler_state()}
@@ -1012,7 +1012,8 @@ class Api:
     @staticmethod
     def _title(p: dict) -> str:
         if p.get("sections"):
-            return f"{p.get('name') or 'Sequenza'} {int(round(p.get('bpm', 120)))}bpm - {p['bars']} battute"
+            return i18n.tr("{name} {bpm}bpm - {bars} bars", name=p.get("name") or i18n.tr("Sequence"),
+                           bpm=int(round(p.get("bpm", 120))), bars=p["bars"])
         g = pat_genres.GENRE_BY_ID.get(p.get("genre"), {})
         return f"{g.get('name', 'Pattern')} - {p.get('name', 'Main')} {int(round(p.get('bpm', 120)))}bpm"
 
@@ -1053,10 +1054,12 @@ class Api:
     def compose_init(self) -> dict:
         lib = self._chord_lib()
         return {"dir": lib.root, "exists": lib.exists(), "keys": lib.available_keys() if lib.exists() else [],
-                "categories": CHORD_CATEGORIES, "styles": chord_perform.meta(),
-                "clipKinds": chord_variations.CLIP_KINDS, "progKinds": chord_variations.PROG_KINDS, "modeKinds": chord_variations.MODE_KINDS,
-                "melody": {"densities": chord_melody.DENSITIES, "contours": chord_melody.CONTOURS, "rates": chord_melody.RATES,
-                           "roles": chord_melody.roles_meta()},
+                **i18n.localize({
+                    "categories": CHORD_CATEGORIES, "styles": chord_perform.meta(),
+                    "clipKinds": chord_variations.CLIP_KINDS, "progKinds": chord_variations.PROG_KINDS,
+                    "modeKinds": chord_variations.MODE_KINDS,
+                    "melody": {"densities": chord_melody.DENSITIES, "contours": chord_melody.CONTOURS, "rates": chord_melody.RATES,
+                               "roles": chord_melody.roles_meta()}}),
                 "saved": pat_store.list_progressions()}
 
     def compose_pick_folder(self, path: str | None = None) -> dict:
@@ -1137,7 +1140,7 @@ class Api:
         try:
             ppq, spans = pat_midi.read_note_spans(path)
         except Exception as e:
-            return {"error": f"File MIDI non leggibile: {e}"}
+            return {"error": i18n.tr("Unreadable MIDI file: {error}", error=e)}
         notes = chord_melody.from_spans(spans, ppq, max(1, int(grid)))
         return {"name": os.path.splitext(os.path.basename(path))[0], "notes": notes,
                 "key": chord_melody.detect_key(notes) if notes else None}
@@ -1157,13 +1160,14 @@ class Api:
 
     @staticmethod
     def _prog_title(seq: dict) -> str:
-        return f"{seq.get('name') or 'Accordi'} {int(round(seq.get('bpm', 120)))}bpm - {seq.get('bars', 4)} battute"
+        return i18n.tr("{name} {bpm}bpm - {bars} bars", name=seq.get("name") or i18n.tr("Chords"),
+                       bpm=int(round(seq.get("bpm", 120))), bars=seq.get("bars", 4))
 
     def compose_melody_from_live(self, grid: int = 1) -> dict:
         """The last clip sent by the Max for Live device ("Clip → Melodia")."""
         clip = self._live.last_clip()
         if not clip:
-            return {"error": "Nessuna clip ricevuta: in Live seleziona una clip MIDI e premi «Clip → Melodia» nel device ClusterSound"}
+            return {"error": i18n.tr("No clip received: in Live select a MIDI clip and press «Clip → Melody» in the ClusterSound device")}
         ppq = chord_perform.PPQ
         spans = [(round(s * ppq), round((s + d) * ppq), p, v) for p, s, d, v in clip["notes"]]
         notes = chord_melody.from_spans(spans, ppq, max(1, int(grid)))
@@ -1172,11 +1176,11 @@ class Api:
 
     def compose_midi_inputs(self) -> dict:
         if not self._recorder.available():
-            return {"available": False, "ports": [], "hint": chord_midi_in.HINT}
+            return {"available": False, "ports": [], "hint": i18n.tr(chord_midi_in.HINT)}
         try:
             return {"available": True, "ports": self._recorder.ports()}
         except Exception as e:
-            return {"available": False, "ports": [], "hint": f"MIDI non disponibile: {e}"}
+            return {"available": False, "ports": [], "hint": i18n.tr("MIDI not available: {error}", error=e)}
 
     def compose_record_start(self, port: int = 0) -> dict:
         try:
@@ -1469,7 +1473,7 @@ class Api:
     def sampler_send_to_live(self, start: float | None = None, end: float | None = None, opts: dict | None = None) -> dict:
         """The audio open in the Recorder (or one region of it) onto a new audio track in Live, via the device."""
         if not self._sampler:
-            return {"error": "nessun audio aperto"}
+            return {"error": i18n.tr("no audio open")}
         try:
             item = live_payload.audio(self._sampler, self._live.stage, None if start is None else float(start),
                                       None if end is None else float(end), opts)

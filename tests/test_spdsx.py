@@ -197,12 +197,12 @@ def test_export_spdsx(tmp_path):
     notes = sorted(128 - int(b.find("ZoneSettings/ReceivingNote").get("Value")) for b in doc.findall(".//DrumBranchPreset"))
     assert notes == [60, 64, 69]
     spd = sorted(os.listdir(os.path.join(folder, "SPD-SX")))
-    assert spd == ["P1 - chat.wav", "P5 - snare.wav", "T1 Pedale - kick.wav"]
+    assert spd == ["P1 - chat.wav", "P5 - snare.wav", "T1 Pedal - kick.wav"]
     for f in spd:
         info = sf.info(os.path.join(folder, "SPD-SX", f))
         assert info.samplerate == 44100 and info.subtype == "PCM_16"
-    text = open(os.path.join(folder, "LEGGIMI.txt"), encoding="utf-8").read()
-    assert "Wave Manager" in text and "Pedale (Trig 1) · A3: kick" in text and "Trig 2 · A#3: non collegato" in text
+    text = open(os.path.join(folder, "README.txt"), encoding="utf-8").read()
+    assert "Wave Manager" in text and "Pedal (Trig 1) · A3: kick" in text and "Trig 2 · A#3: not connected" in text
 
 
 def test_rimshots_in_a_rim_group_are_not_snares():

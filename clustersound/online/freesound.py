@@ -2,6 +2,7 @@
 import re
 from concurrent.futures import ThreadPoolExecutor
 
+from ..i18n import tr
 from . import instruments as inst
 from .base import OnlineResult, SourceError, clean_tags, http_get, normalize_license
 
@@ -72,7 +73,7 @@ def parse(data: dict) -> list[OnlineResult]:
             license=normalize_license(s.get("license")), license_url=s.get("license", ""),
             duration=s.get("duration"), tags=tags, bpm=s.get("bpm"), key=s.get("tonality"),
             preview_url=hq, download_url=hq,
-            download_note="anteprima HQ mp3 · l'originale si scarica dalla pagina Freesound",
+            download_note=tr("HQ mp3 preview · the original is downloaded from the Freesound page"),
             page_url=s.get("url") or f"https://freesound.org/s/{s['id']}/",
             waveform_img=(s.get("images") or {}).get("waveform_m"), format=s.get("type", ""),
             samplerate=s.get("samplerate"), filesize=s.get("filesize"), type=typ,
@@ -89,7 +90,7 @@ def pack_id(uri: str | None) -> str | None:
 def _auth(settings: dict) -> dict:
     key = (settings or {}).get("freesound_key")
     if not key:
-        raise SourceError("API key mancante: aggiungila nelle impostazioni (⚙)")
+        raise SourceError(tr("API key missing: add it in the settings (⚙)"))
     return {"Authorization": f"Token {key}"}
 
 

@@ -9,12 +9,13 @@ A rack is the same JSON as the 64-pad one, with "device": "spdsx" and
 """
 import random
 
+from ..i18n import N_, tr
 from . import layouts
 
 PADS = 11
 TRIG1, TRIG2 = 9, 10
 NOTES = list(range(60, 69)) + [69, 70]
-PAD_LABELS = [str(i + 1) for i in range(9)] + ["Pedale (Trig 1)", "Trig 2"]
+PAD_LABELS = [str(i + 1) for i in range(9)] + [N_("Pedal (Trig 1)"), "Trig 2"]
 KICK_PAD = 7  # pad 8, bottom centre: the kick goes here when no pedal is connected
 DEFAULT_TRIGGERS = {"trig1": True, "trig2": False}
 
@@ -25,12 +26,12 @@ def _p(*nums: int) -> list[int]:
 
 # id -> (label, [(pads in fill order, family)]); the first pad of a group gets the seed
 CONFIGS = {
-    "spd_kit": ("Kit classico", [(_p(1, 2, 3), "hatscym"), (_p(5, 4, 6), "snareclap"), (_p(8, 7, 9), "tom")]),
-    "spd_rows": ("Righe", [(_p(1, 2, 3), "hats"), (_p(5, 4, 6), "snareclap"), (_p(7, 8, 9), "perc")]),
-    "spd_cols": ("Colonne", [(_p(1, 4, 7), "hats"), (_p(5, 2, 8), "snareclap"), (_p(3, 6, 9), "perc")]),
-    "spd_cross": ("Croce", [(_p(5), "snare"), (_p(2, 4, 6, 8), "perc"), (_p(1, 3, 7, 9), "hatscym")]),
-    "spd_perc": ("Percussioni", [(_p(1, 2, 3), "shaker"), (_p(4, 5, 6), "perc"), (_p(7, 8, 9), "perc")]),
-    "spd_free": ("Libero", [([p], "any") for p in range(9)]),
+    "spd_kit": (N_("Classic kit"), [(_p(1, 2, 3), "hatscym"), (_p(5, 4, 6), "snareclap"), (_p(8, 7, 9), "tom")]),
+    "spd_rows": (N_("Rows"), [(_p(1, 2, 3), "hats"), (_p(5, 4, 6), "snareclap"), (_p(7, 8, 9), "perc")]),
+    "spd_cols": (N_("Columns"), [(_p(1, 4, 7), "hats"), (_p(5, 2, 8), "snareclap"), (_p(3, 6, 9), "perc")]),
+    "spd_cross": (N_("Cross"), [(_p(5), "snare"), (_p(2, 4, 6, 8), "perc"), (_p(1, 3, 7, 9), "hatscym")]),
+    "spd_perc": (N_("Percussion"), [(_p(1, 2, 3), "shaker"), (_p(4, 5, 6), "perc"), (_p(7, 8, 9), "perc")]),
+    "spd_free": (N_("Free"), [([p], "any") for p in range(9)]),
 }
 GEOMETRIES = list(CONFIGS)
 TRIGGER_FAMILIES = {"t1": "kick", "t2": "cymbal"}
@@ -42,7 +43,7 @@ ROLES = {
     "cymbal": {"chat", "ohat", "hats", "cymbal", "hatscym"},
 }
 ROLE_CAPS = {"kick": 2, "snare": 3, "cymbal": 5}
-ROLE_LABELS = {"kick": "kick", "snare": "snare / clap", "cymbal": "hat / piatti"}
+ROLE_LABELS = {"kick": "kick", "snare": "snare / clap", "cymbal": N_("hat / cymbals")}
 # role of a sample by its class, for groups of a generic family (a rimshot is not a snare to play)
 _CLASS_ROLE = {"kick": "kick", "sub808": "kick", "snare": "snare", "clap": "snare", "snap": "snare",
                "closed_hat": "cymbal", "open_hat": "cymbal", "ride": "cymbal", "crash": "cymbal", "cymbal_other": "cymbal"}
@@ -152,7 +153,7 @@ def playability(rack: dict) -> list[str]:
     """Warnings for roles that take more pads than a player can use."""
     rack = validate(rack)
     counts = _role_counts(rack, _families(rack))
-    return [f"{n} pad di {ROLE_LABELS[role]}: troppi per suonare comodamente (massimo {ROLE_CAPS[role]})"
+    return [tr("{n} {role} pads: too many to play comfortably (at most {max})", n=n, role=tr(ROLE_LABELS[role]), max=ROLE_CAPS[role])
             for role, n in counts.items() if n > ROLE_CAPS[role]]
 
 
@@ -199,8 +200,8 @@ def random_config(rng: random.Random | int | None = None, triggers: dict | None 
 def ui_layout() -> dict:
     return {
         "pads": PADS, "trig1": TRIG1, "trig2": TRIG2, "kick_pad": KICK_PAD,
-        "notes": NOTES, "labels": PAD_LABELS,
-        "configs": [{"id": g, "label": CONFIGS[g][0]} for g in GEOMETRIES],
+        "notes": NOTES, "labels": [tr(x) for x in PAD_LABELS],
+        "configs": [{"id": g, "label": tr(CONFIGS[g][0])} for g in GEOMETRIES],
         "caps": ROLE_CAPS,
         # effective groups per configuration and trigger state, keyed "<geometry>|<trig1><trig2>" (e.g. "spd_kit|10")
         "layouts": {f"{g}|{int(t1)}{int(t2)}": {"id": g, "groups": groups(g, t), "keys": group_keys(g, t),

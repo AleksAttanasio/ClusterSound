@@ -105,11 +105,11 @@ def load_model(key: str) -> TorchModel:
     from . import models
     m = models.get(key)
     if not models.ready(key):
-        raise RuntimeError(f"modello {m.label} non scaricato")
+        raise RuntimeError(f"model {m.label} not downloaded")
     if key == "apollo":
         from . import apollo_net
         return TorchModel(apollo_net.load(models.weights_path(key)), apollo_net.SR)
-    raise ValueError(f"modello sconosciuto: {key}")
+    raise ValueError(f"unknown model: {key}")
 
 
 def main(argv=None) -> int:
@@ -121,7 +121,7 @@ def main(argv=None) -> int:
     try:
         x, sr = sf.read(args.src, dtype="float32", always_2d=True)
         if not len(x):
-            raise ValueError("audio vuoto")
+            raise ValueError("empty audio")
         _say(progress=0.0, stage="loading")
         model = load_model(args.model)
         _say(progress=0.0, stage="running", device=model.device)

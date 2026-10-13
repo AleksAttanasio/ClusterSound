@@ -19,6 +19,7 @@ import urllib.parse
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from ..i18n import tr
 from ..paths import data_dir
 from ..patterns import arrange as pat_arrange
 from ..patterns import genres as pat_genres
@@ -71,7 +72,7 @@ class Bridge:
             return payload.rack(data, self.stage, self.resolve, self.describe)
         if kind == "compose":
             return payload.compose(data, pure=bool(opts.get("pure")), versions=opts.get("versions"))
-        raise ValueError(f"tipo sconosciuto: {kind}")
+        raise ValueError(f"unknown kind: {kind}")
 
     @staticmethod
     def sequence_kit(seq: dict) -> tuple[dict | None, str]:
@@ -87,10 +88,10 @@ class Bridge:
                 return user, ""
         kit = current_kit()
         if kit and _has_samples(kit):
-            return kit, " (kit attuale)"
+            return kit, " (current kit)"
         if src.get("genre") in pat_genres.GENRE_BY_ID:
             n = len(pat_genres.variants(src["genre"]))
-            return pat_genres.build(src["genre"], min(int(src.get("variant") or 0), n - 1)), " (solo MIDI)"
+            return pat_genres.build(src["genre"], min(int(src.get("variant") or 0), n - 1)), " (MIDI only)"
         return None, ""
 
     @classmethod
@@ -101,9 +102,9 @@ class Bridge:
                 return None
             kit, _ = cls.sequence_kit(seq)
             if kit is None:
-                raise ValueError("sequenza senza kit: aprila nel Sequencer e salvala di nuovo")
+                raise ValueError("sequence without a kit: open it in the Sequencer and save it again")
             flat = pat_arrange.flatten(kit, seq)
-            flat["name"] = seq.get("name") or "Sequenza"
+            flat["name"] = seq.get("name") or tr("Sequence")
             return flat
         items = {"pattern": pat_store.list_user, "rack": rack_store.list_racks,
                  "compose": pat_store.list_progressions}.get(kind)
@@ -140,11 +141,11 @@ class Bridge:
             if 0 <= p <= 127 and d > 0:
                 notes.append([int(p), s, d, int(max(1, min(127, v)))])
         if not notes:
-            raise ValueError("la clip non ha note")
+            raise ValueError("the clip has no notes")
         with self._lock:
             self.clip = {"name": str(data.get("name") or "Clip")[:120], "length": float(data.get("length") or 0),
                          "notes": notes, "at": time.time()}
-        print(f"[live] clip «{self.clip['name']}» ricevuta: {len(notes)} note", file=sys.stderr, flush=True)
+        print(f"[live] clip «{self.clip['name']}» received: {len(notes)} notes", file=sys.stderr, flush=True)
         return {"ok": True, "notes": len(notes)}
 
     def last_clip(self) -> dict | None:
@@ -157,7 +158,7 @@ class Bridge:
         try:
             self.server = ThreadingHTTPServer(("127.0.0.1", int(port)), _handler(self))
         except OSError as e:
-            self.error = f"porta {port} non disponibile: {e.strerror or e}"
+            self.error = tr("port {port} not available: {error}", port=port, error=e.strerror or e)
             return False
         self.server.daemon_threads = True
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
@@ -204,7 +205,7 @@ def _handler(bridge: Bridge):
                     kind, item_id = q.get("kind", ""), q.get("id", "")
                     data = bridge.find(kind, item_id)
                     if data is None:
-                        return self._json({"error": f"{kind} {item_id} non trovato"}, 404)
+                        return self._json({"error": f"{kind} {item_id} not found"}, 404)
                     return self._json(bridge.build(kind, data))
                 if url.path == "/live/next":
                     item = bridge.next()

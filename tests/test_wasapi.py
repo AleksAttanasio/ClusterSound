@@ -77,7 +77,7 @@ def test_record_default_and_device(fake_sc, tmp_path):
     st = rec.stop()
     assert fake_sc.opened == ["{a}", "{b}"]  # the mix entry is the default output
     assert [r["error"] for r in st["recordings"]] == [None, None]
-    for r, ch in zip(sorted(st["recordings"], key=lambda r: r["device"] != "Uscita predefinita"), (6, 2)):
+    for r, ch in zip(sorted(st["recordings"], key=lambda r: r["device"] != "Default output"), (6, 2)):
         info = sf.info(r["path"])
         assert info.samplerate == wasapi.RATE and info.channels == ch and info.frames > 0
 

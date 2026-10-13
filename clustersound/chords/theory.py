@@ -30,7 +30,9 @@ def key_uses_flats(tonic: int, mode: str) -> bool:
 
 
 def key_name(tonic: int, mode: str) -> str:
-    return f"{note_name(tonic, key_uses_flats(tonic, mode))} {'maggiore' if mode == 'major' else 'minore'}"
+    from ..i18n import tr
+    note = note_name(tonic, key_uses_flats(tonic, mode))
+    return tr("{note} major", note=note) if mode == "major" else tr("{note} minor", note=note)
 
 
 def parse_pc(s: str) -> int | None:

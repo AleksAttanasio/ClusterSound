@@ -7,12 +7,14 @@ when its transport started.
 import threading
 import time
 
+from ..i18n import tr
+
 try:
     import rtmidi
 except ImportError:  # optional
     rtmidi = None
 
-HINT = "Per registrare dalla tastiera installa python-rtmidi: pip install python-rtmidi"
+HINT = "To record from the keyboard install python-rtmidi: pip install python-rtmidi"
 
 
 class Recorder:
@@ -48,7 +50,7 @@ class Recorder:
         m = rtmidi.MidiIn()
         names = m.get_ports()
         if not names:
-            raise RuntimeError("Nessuna tastiera MIDI collegata")
+            raise RuntimeError(tr("No MIDI keyboard connected"))
         m.open_port(max(0, min(len(names) - 1, int(port))))
         with self._lock:
             self._open, self._notes = {}, []

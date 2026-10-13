@@ -180,7 +180,7 @@ def test_bridge_sequences(bridge, samples):
     orphan = pat_store.save_sequence({**_sequence(), "name": "X"})
 
     names = {s["id"]: s["name"] for s in _get(bridge, "/live/catalog")[1]["sequence"]}
-    assert names[with_kit["id"]] == "Seq" and names[from_user["id"]] == "U" and names[midi_only["id"]] == "G (solo MIDI)"
+    assert names[with_kit["id"]] == "Seq" and names[from_user["id"]] == "U" and names[midi_only["id"]] == "G (MIDI only)"
 
     status, out = _get(bridge, f"/live/payload?kind=sequence&id={with_kit['id']}")
     assert status == 200 and out["kind"] == "pattern"
@@ -191,12 +191,12 @@ def test_bridge_sequences(bridge, samples):
     status, out = _get(bridge, f"/live/payload?kind=sequence&id={midi_only['id']}")
     assert status == 200 and out["tracks"][0]["adg"] is None and out["tracks"][0]["clips"][0]["notes"]
     status, out = _get(bridge, f"/live/payload?kind=sequence&id={orphan['id']}")
-    assert status == 500 and "senza kit" in out["error"]
+    assert status == 500 and "without a kit" in out["error"]
 
     from clustersound.live import server
     server.save_current_kit(kit)  # the Sequencer's kit fills in for sequences saved without one
     names = {s["id"]: s["name"] for s in _get(bridge, "/live/catalog")[1]["sequence"]}
-    assert names[midi_only["id"]] == "G (kit attuale)" and names[orphan["id"]] == "X (kit attuale)"
+    assert names[midi_only["id"]] == "G (current kit)" and names[orphan["id"]] == "X (current kit)"
     assert _get(bridge, f"/live/payload?kind=sequence&id={orphan['id']}")[1]["tracks"][0]["adg"]
 
 
@@ -220,7 +220,7 @@ def test_audio_payload_whole_and_region(stage):
     assert whole["kind"] == "audio" and t["role"] == "audio" and t["clips"] == [] and t["name"] == "Rec"
     assert t["audio_root"] == "user_library" and t["audio_path"] == "ClusterSound/Audio/Rec.wav"
     assert sf.info(t["audio_file"]).frames == synth.SR * 2 and t["seconds"] == 2.0
-    assert "uso personale" in open(t["audio_file"] + ".source.txt").read()
+    assert "personal use" in open(t["audio_file"] + ".source.txt").read()
 
     region = payload.audio(s, stage, 1.5, 0.5, {"fade_in_ms": 0, "fade_out_ms": 0})
     r = region["tracks"][0]
@@ -239,7 +239,7 @@ def test_send_to_live_api(stage):
     a._sampler = None
     a._live = server.Bridge(stage, _resolve, lambda r: None)
     a._settings = lambda: {}
-    assert a.sampler_send_to_live()["error"] == "nessun audio aperto"
+    assert a.sampler_send_to_live()["error"] == "no audio open"
     a._sampler = S.from_array(np.zeros((synth.SR, 1), np.float32) + .1, synth.SR, title="Stem · Voce")
     r = a.sampler_send_to_live(0.2, 0.7)
     assert r["queued"] == 1 and r["tracks"] == ["Stem · Voce 0.20-0.70s"] and os.path.isfile(r["file"])

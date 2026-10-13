@@ -15,6 +15,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import soundfile as sf
 
+from ..i18n import tr
 from ..online.downloads import license_text, safe_name, unique_path
 from ..paths import file_manager, resource_path
 from . import arrange, midi, model, render
@@ -255,46 +256,64 @@ def export_package(p: dict, dest_root: str, resolve, describe, title: str) -> st
             write_adg(instrument_rack_document(instrument_rack(chains)), os.path.join(folder, f"{base} Bass.adg"))
             midi.write(os.path.join(folder, "Bass.mid"), p, "bass")
     midi.write(os.path.join(folder, "Pattern (Drums + Bass, GM).mid"), p, "both", "gm")
-    loop_name = "Sequenza.wav" if p.get("sections") else "Loop.wav"
+    loop_name = loop_file(p)
     render.write_wav(os.path.join(folder, loop_name), p, resolve)
 
-    with open(os.path.join(folder, "LEGGIMI.txt"), "w", encoding="utf-8") as f:
+    with open(os.path.join(folder, readme_file()), "w", encoding="utf-8") as f:
         f.write(readme(p, base, pads, bool(bass["notes"] and blayers), licences))
     return folder
 
 
+def readme_file() -> str:
+    """Name of the instructions file written in every export folder (in the interface language)."""
+    return tr("README") + ".txt"
+
+
+def loop_file(p: dict) -> str:
+    return (tr("Sequence") if p.get("sections") else "Loop") + ".wav"
+
+
+def license_lines() -> list[str]:
+    return [tr("LICENCES"), tr("Some samples come from online sources: read the .license.txt file next to each one"),
+            tr("(author, licence and attribution text to include if required).")]
+
+
+def created_line() -> str:
+    return tr("Created with ClusterSound on {date}", date=time.strftime("%Y-%m-%d %H:%M"))
+
+
 def readme(p: dict, base: str, pads: list[dict], has_bass: bool, licences: list) -> str:
     lines = [
-        f"{base}", f"{p['bpm']:.0f} BPM · swing {p['swing']:.0f}% · {p['bars']} battut{'a' if p['bars'] == 1 else 'e'}"
-        f" · tonalità {p['key']}", "",
-        "IN ABLETON LIVE (10 o successivo)",
-        "0. Imposta il tempo del progetto a " + f"{p['bpm']:.0f} BPM.",
+        f"{base}", f"{p['bpm']:.0f} BPM · swing {p['swing']:.0f}% · "
+        + (tr("1 bar") if p["bars"] == 1 else tr("{n} bars", n=p["bars"])) + " · " + tr("key {key}", key=p["key"]), "",
+        tr("IN ABLETON LIVE (10 or later)"),
+        tr("0. Set the project tempo to {bpm} BPM.", bpm=f"{p['bpm']:.0f}"),
     ]
     if pads:
-        lines += [f"1. Trascina \"{base} Drum Rack.adg\" su una traccia MIDI vuota (da {file_manager()} o dal Browser > Places).",
-                  "2. Trascina \"Drums.mid\" in uno slot clip della stessa traccia.",
-                  "   Pad del Drum Rack: " + ", ".join(f"{pd['name']} = {_note_name(pd['note'])}" for pd in pads) + "."]
+        lines += [tr('1. Drag "{file}" onto an empty MIDI track (from {app} or from the Browser > Places).',
+                     file=f"{base} Drum Rack.adg", app=file_manager()),
+                  tr('2. Drag "Drums.mid" into a clip slot of the same track.'),
+                  "   " + tr("Drum Rack pads: {pads}.", pads=", ".join(f"{pd['name']} = {_note_name(pd['note'])}" for pd in pads))]
         alt = [model.BUS_BY_ID[b][1] for b in model.DRUM_IDS if model.alternating(p["buses"][b])]
         if alt:
-            lines.append("   " + ", ".join(alt) + ": i sample si alternano, quindi ognuno ha il suo pad e il MIDI suona"
-                         " quello giusto a ogni colpo (con \"casuale ogni giro\" è registrato il primo giro).")
+            lines.append("   " + tr('{buses}: the samples alternate, so each one has its own pad and the MIDI plays'
+                                    ' the right one on every hit (with "random every loop" the first loop is recorded).',
+                                    buses=", ".join(alt)))
     if has_bass:
-        lines += [f"3. Trascina \"{base} Bass.adg\" su una seconda traccia MIDI e poi \"Bass.mid\" nello slot clip.",
-                  "   Il Simpler del basso è monofonico, con la nota radice del sample già impostata"
-                  " (e Glide attivo se il pattern ha note legate)."]
+        lines += [tr('3. Drag "{file}" onto a second MIDI track, then "Bass.mid" into its clip slot.', file=f"{base} Bass.adg"),
+                  "   " + tr("The bass Simpler is monophonic, with the root note of the sample already set"
+                            " (and Glide on if the pattern has tied notes).")]
     if p.get("sections"):
-        lines += ["", "SCALETTA DELLA SEQUENZA (Drums.mid e Bass.mid la contengono tutta, dalla battuta 1)"]
+        lines += ["", tr("RUNNING ORDER OF THE SEQUENCE (Drums.mid and Bass.mid contain all of it, from bar 1)")]
         lines += ["   " + x for x in arrange.outline(p)]
-    loop_name = "Sequenza.wav" if p.get("sections") else "Loop.wav"
-    lines += ["", f"{loop_name} è già renderizzato: puoi trascinarlo direttamente su una traccia audio.",
-              "\"Pattern (Drums + Bass, GM).mid\" usa la mappa General MIDI (per altri sampler/DAW).", "",
-              "SE IL PRESET .adg NON SI APRE",
-              "Crea un Drum Rack vuoto, seleziona tutti i file di Samples/ nell'ordine delle cartelle e trascinali sul pad C1:",
-              "si dispongono sui pad successivi. Poi trascina Drums.mid.", ""]
+    lines += ["", tr("{file} is already rendered: you can drag it straight onto an audio track.", file=loop_file(p)),
+              tr('"Pattern (Drums + Bass, GM).mid" uses the General MIDI map (for other samplers/DAWs).'), "",
+              tr("IF THE .adg PRESET DOES NOT OPEN"),
+              tr("Create an empty Drum Rack, select all the files in Samples/ in folder order and drag them onto pad C1:"),
+              tr("they spread over the following pads. Then drag Drums.mid."), ""]
     if licences:
-        lines += ["LICENZE", "Alcuni sample vengono da fonti online: leggi i file .license.txt accanto a ciascuno",
-                  "(autore, licenza e testo di attribuzione da riportare se richiesto)."]
-    lines.append(f"\nCreato con ClusterSound il {time.strftime('%Y-%m-%d %H:%M')}")
+        lines += license_lines()
+    lines.append("\n" + created_line())
     return "\n".join(lines) + "\n"
 
 

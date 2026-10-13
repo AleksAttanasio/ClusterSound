@@ -5,8 +5,8 @@ The Drum Rack is built with the same templates as the Pattern export (patterns/a
 in Live's 64-pad drum layout every pad of the controller plays the sample shown in ClusterSound.
 """
 import os
-import time
 
+from ..i18n import tr
 from ..online.downloads import license_text, safe_name, unique_path
 from ..paths import file_manager
 from ..patterns import ableton as live
@@ -60,11 +60,11 @@ def export_rack(rack: dict, dest_root: str, resolve, describe) -> str:
         pads.append({"name": label[:40], "note": note, "devices": [dev], "choke": settings[g]["choke"]})
         names[p] = label
     if not pads:
-        raise ValueError("nessun pad con un sample da esportare")
+        raise ValueError(tr("no pad with a sample to export"))
     pads.sort(key=lambda x: x["note"])
     adg = f"{title} Drum Rack.adg"
     live.write_adg(live.drum_rack_document(pads), os.path.join(folder, adg))
-    with open(os.path.join(folder, "LEGGIMI.txt"), "w", encoding="utf-8") as f:
+    with open(os.path.join(folder, live.readme_file()), "w", encoding="utf-8") as f:
         f.write(readme(rack, adg, names, settings, bool(licences)))
     return folder
 
@@ -84,26 +84,27 @@ def pad_map(rack: dict, names: dict[int, str], width: int = 14) -> list[str]:
 
 
 def readme(rack: dict, adg: str, names: dict[int, str], settings: list[dict], has_licences: bool) -> str:
-    mapping = ("layout Drum del Launchpad / di Live: 4 quadranti 4×4 (36-51 in basso a sinistra, 52-67 in basso"
-               " a destra, 68-83 in alto a sinistra, 84-99 in alto a destra)") if rack["mapping"] == "launchpad" \
-        else "righe sequenziali: 36 in basso a sinistra, +1 per colonna, +8 per riga"
+    mapping = tr("Launchpad / Live Drum layout: four 4×4 quadrants (36-51 bottom left, 52-67 bottom"
+                 " right, 68-83 top left, 84-99 top right)") if rack["mapping"] == "launchpad" \
+        else tr("sequential rows: 36 bottom left, +1 per column, +8 per row")
     lines = [
-        rack["name"], f"{len(names)} pad · geometria {layouts.GEOMETRY_LABELS[rack['geometry']]} · note: {mapping}", "",
-        "IN ABLETON LIVE (10 o successivo)",
-        f"1. Trascina \"{adg}\" su una traccia MIDI vuota (da {file_manager()} o dal Browser > Places).",
-        "2. Arma/seleziona la traccia e metti il Launchpad Pro in modalità Note: con un Drum Rack Live mostra",
-        "   la griglia a 64 pad e ogni tasto suona il sample indicato qui sotto.",
+        rack["name"], tr("{n} pads · layout {layout} · notes: {mapping}", n=len(names),
+                         layout=tr(layouts.GEOMETRY_LABELS[rack["geometry"]]), mapping=mapping), "",
+        tr("IN ABLETON LIVE (10 or later)"),
+        tr('1. Drag "{file}" onto an empty MIDI track (from {app} or from the Browser > Places).', file=adg, app=file_manager()),
+        tr("2. Arm/select the track and put the Launchpad Pro in Note mode: with a Drum Rack Live shows"),
+        "   " + tr("the 64-pad grid and every key plays the sample shown below."),
     ]
     if rack["mapping"] == "rows":
-        lines.append("   (Mappa a righe: usala con una Custom Mode del Launchpad che invia 36 + riga*8 + colonna.)")
+        lines.append("   " + tr("(Row map: use it with a Launchpad Custom Mode that sends 36 + row*8 + column.)"))
     chokes = sorted({s["choke"] for s in settings if s["choke"]})
     if chokes:
-        lines.append("   Choke group attivi: " + ", ".join(map(str, chokes)) + " (i pad dello stesso gruppo si zittiscono a vicenda).")
-    lines += ["", "MAPPA DEI PAD (come sul controller, riga in alto per prima)"] + pad_map(rack, names)
-    lines += ["", "SE IL PRESET .adg NON SI APRE",
-              "Crea un Drum Rack vuoto e trascina ogni file di Samples/ sul pad della nota indicata all'inizio del nome.", ""]
+        lines.append("   " + tr("Active choke groups: {groups} (pads of the same group silence each other).",
+                               groups=", ".join(map(str, chokes))))
+    lines += ["", tr("PAD MAP (as on the controller, top row first)")] + pad_map(rack, names)
+    lines += ["", tr("IF THE .adg PRESET DOES NOT OPEN"),
+              tr("Create an empty Drum Rack and drag every file in Samples/ onto the pad of the note at the start of its name."), ""]
     if has_licences:
-        lines += ["LICENZE", "Alcuni sample vengono da fonti online: leggi i file .license.txt accanto a ciascuno",
-                  "(autore, licenza e testo di attribuzione da riportare se richiesto).", ""]
-    lines.append(f"Creato con ClusterSound il {time.strftime('%Y-%m-%d %H:%M')}")
+        lines += live.license_lines() + [""]
+    lines.append(live.created_line())
     return "\n".join(lines) + "\n"

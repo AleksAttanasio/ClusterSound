@@ -4,15 +4,16 @@ import time
 
 import soundfile as sf
 
+from ..i18n import N_, tr
 from ..online.downloads import license_text, safe_name, unique_path
 from . import slicing
 from .session import DEFAULT_MAX_SAMPLE_SECONDS, SamplerSession
 
 DEFAULT_DIR = os.path.expanduser("~/Music/ClusterSound Samples")
-ORIGIN_FOLDER = {"file": "Da file", "capture": "Cattura audio"}
-CAPTURE_NOTE = ("Registrazione dall'audio di sistema, per uso personale (copia privata). "
-                "I diritti sul brano originale restano dei titolari: verificali prima di pubblicare "
-                "o distribuire qualcosa che contiene questo sample.")
+ORIGIN_FOLDER = {"file": "From file", "capture": "Audio capture"}
+CAPTURE_NOTE = N_("Recorded from the system audio, for personal use (private copy). "
+                  "The rights to the original track stay with their owners: check them before publishing "
+                  "or distributing anything that contains this sample.")
 
 
 def folder_for(s: SamplerSession, root: str) -> str:
@@ -23,14 +24,18 @@ def folder_for(s: SamplerSession, root: str) -> str:
     return os.path.join(root, top, safe_name(s.title or "sample"))
 
 
+def region_line(start: float, end: float) -> str:
+    return tr("Region: {start}–{end} s", start=f"{start:.3f}", end=f"{end:.3f}")
+
+
 def source_text(s: SamplerSession, start: float, end: float) -> str:
-    lines = [f"Sorgente: {s.title or 'senza titolo'}", f"Regione: {start:.3f}–{end:.3f} s"]
+    lines = [tr("Source: {v}", v=s.title or tr("untitled")), region_line(start, end)]
     if s.origin == "capture":
-        lines += [f"Registrato il: {s.meta.get('captured_at', '')}", f"Dispositivo: {s.meta.get('device', 'audio di sistema')}",
-                  "", CAPTURE_NOTE]
+        lines += [tr("Recorded on: {v}", v=s.meta.get("captured_at", "")),
+                  tr("Device: {v}", v=s.meta.get("device", tr("system audio"))), "", tr(CAPTURE_NOTE)]
     elif s.path:
-        lines.append(f"File: {s.path}")
-    lines.append(f"\nEstratto con ClusterSound il {time.strftime('%Y-%m-%d %H:%M')}")
+        lines.append(tr("File: {v}", v=s.path))
+    lines.append("\n" + tr("Extracted with ClusterSound on {date}", date=time.strftime("%Y-%m-%d %H:%M")))
     return "\n".join(lines) + "\n"
 
 
@@ -38,7 +43,7 @@ def write_note(s: SamplerSession, path: str, start: float, end: float) -> None:
     """The source's licence (links) or provenance (capture) next to a file cut from it."""
     if s.origin == "link" and s.result:
         text = license_text(s.result, s.result.download_url or s.result.page_url)
-        text += f"Regione: {start:.3f}–{end:.3f} s\n"
+        text += region_line(start, end) + "\n"
         with open(path + ".license.txt", "w", encoding="utf-8") as f:
             f.write(text)
     elif s.origin == "capture":

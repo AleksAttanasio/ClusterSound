@@ -12,6 +12,7 @@ Racks with "device": "spdsx" (geometries "spd_*") are the Roland SPD-SX's 11 pad
 functions below dispatch to it, a rack without "device" is a 64-pad one.
 """
 from .. import taxonomy
+from ..i18n import N_, tr
 
 N = 8
 PADS = N * N
@@ -36,18 +37,18 @@ FAMILIES = [
     ("perc", "Perc", ["perc_other", "cowbell", "hand_drum", "bell", "woodblock", "shaker", "tambourine"]),
     ("fx", "FX", ["riser", "impact", "downlifter", "noise", "foley"]),
     ("vox", "Vocal", ["vocal", "spoken"]),
-    ("any", "Qualsiasi", []),
+    ("any", N_("Any"), []),
 ]
 FAMILY_BY_ID = {f[0]: f for f in FAMILIES}
 HAT_FAMILIES = {"chat", "ohat", "hats"}
 
 GEOMETRIES = ["cols8", "blocks2", "blocks4", "quadcols", "free"]
 GEOMETRY_LABELS = {
-    "cols8": "Colonne ×8",
-    "blocks2": "Blocchi 2×2",
-    "blocks4": "Blocchi 4×4",
-    "quadcols": "4×4 a colonne",
-    "free": "Libero",
+    "cols8": N_("Columns ×8"),
+    "blocks2": N_("Blocks 2×2"),
+    "blocks4": N_("Blocks 4×4"),
+    "quadcols": N_("4×4 in columns"),
+    "free": N_("Free"),
 }
 
 
@@ -195,9 +196,9 @@ def note_of(rack: dict, p: int) -> int:
 
 def ui_layouts() -> dict:
     return {
-        "geometries": [{"id": g, "label": GEOMETRY_LABELS[g], "groups": groups(g), "families": default_families(g)}
+        "geometries": [{"id": g, "label": tr(GEOMETRY_LABELS[g]), "groups": groups(g), "families": default_families(g)}
                        for g in GEOMETRIES],
-        "families": [{"id": f, "label": label, "classes": classes, "color": family_color(f)}
+        "families": [{"id": f, "label": tr(label), "classes": classes, "color": family_color(f)}
                      for f, label, classes in FAMILIES],
         "notes": {m: [note_for(p, m) for p in range(PADS)] for m in ("launchpad", "rows")},
         "spdsx": spdsx.ui_layout(),

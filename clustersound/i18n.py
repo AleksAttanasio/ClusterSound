@@ -46,3 +46,27 @@ def tr(text: str, **kw) -> str:
     """Translate English text into the current language; {name} placeholders are filled from kw."""
     s = _catalogs.get(_lang, {}).get(text, text)
     return s.format(**kw) if kw else s
+
+
+def N_(text: str) -> str:
+    """Mark English text for translation without translating it yet (module constants are built once,
+    before the language is known): localize() or tr() translates it where it reaches the UI."""
+    return text
+
+
+LABEL_KEYS = frozenset({"label", "name", "hint", "desc", "description", "shapeLabel", "title", "note"})
+
+
+def localize(obj):
+    """A copy of obj with its labels translated: values under LABEL_KEYS in dicts, and the items after the
+    first in (id, label, …) tuples/lists. Ids and other values are never touched."""
+    if isinstance(obj, dict):
+        return {k: (tr(v) if k in LABEL_KEYS and isinstance(v, str) else localize(v)) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        if len(obj) >= 2 and isinstance(obj[0], str) and any(isinstance(v, str) for v in obj[1:]) \
+                and all(not isinstance(v, (dict, list, tuple)) for v in obj):
+            out = [obj[0], *(tr(v) if isinstance(v, str) else v for v in obj[1:])]
+        else:
+            out = [localize(v) for v in obj]
+        return tuple(out) if isinstance(obj, tuple) else out
+    return obj
