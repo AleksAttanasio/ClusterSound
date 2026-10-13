@@ -944,10 +944,16 @@ wa-button.icon-btn.active::part(button) { background: var(--sel-bg); border-colo
 .rc-devices { display: flex; flex-direction: column; gap: 6px; }
 .rc-dev { display: flex; flex-direction: column; gap: 3px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); }
 .rc-dev.on { border-color: var(--sel-line); background: var(--sel-bg); }
-.rc-dev-meta { padding-left: 26px; }
-.rc-dev .sp-meter { margin-left: 26px; height: 6px; flex: none; }
+.rc-dev .sp-meter { height: 6px; flex: none; }
 .rc-dev .sp-meter > div { height: 100%; background: var(--cs-gradient-h); transition: width 80ms linear; }
 .rc-fmt { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.rc-title { display: flex; align-items: center; justify-content: space-between; }
+.rc-title .more-btn { margin: -6px -6px -6px 0; }
+.rc-dev-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-fmt-sum { flex: none; color: var(--text-2); font-family: var(--mono); }
+.set-rc-fmt { width: 360px; }
+.set-checks { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.en-model { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .rc-folder { display: flex; align-items: center; gap: 8px; font-size: 11px; min-width: 0; }
 .rc-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; font-family: var(--mono); color: var(--text-3); }
 .rc-go { display: flex; align-items: center; gap: 10px; }
