@@ -1,0 +1,124 @@
+site_name: ClusterSound
+site_description: Classifica, esplora in 3D e mette al lavoro una libreria di sample audio.
+site_url: https://aleksattanasio.github.io/ClusterSound/
+repo_url: https://github.com/AleksAttanasio/ClusterSound
+repo_name: AleksAttanasio/ClusterSound
+edit_uri: edit/main/docs/
+copyright: ClusterSound
+
+theme:
+  name: material
+  language: it
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
+  font:
+    text: Inter
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Tema chiaro
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Tema scuro
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+    - toc.follow
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra_javascript:
+  - assets/javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Guida rapida:
+      - guida/index.md
+      - Installazione: guida/installazione.md
+      - Primo avvio: guida/primo-avvio.md
+      - Ableton Live: guida/ableton-live.md
+      - Build dell'app: guida/build.md
+      - Risoluzione problemi: guida/risoluzione-problemi.md
+  - Manuale:
+      - manuale/index.md
+      - Interfaccia: manuale/interfaccia.md
+      - Libreria: manuale/libreria.md
+      - Store: manuale/store.md
+      - Recorder: manuale/recorder.md
+      - Sequencer: manuale/sequencer.md
+      - Drum Rack: manuale/drum-rack.md
+      - Compose: manuale/compose.md
+      - Melodia: manuale/melodia.md
+      - Max for Live: manuale/max-for-live.md
+  - Tecnica:
+      - tecnica/index.md
+      - Architettura: tecnica/architettura.md
+      - Backend: tecnica/backend.md
+      - Frontend: tecnica/frontend.md
+      - Dati e persistenza: tecnica/dati-e-persistenza.md
+      - Integrazione con Live: tecnica/integrazione-live.md
+      - Sviluppo e test: tecnica/sviluppo.md
+  - Modelli AI:
+      - ai/index.md
+      - YAMNet: ai/yamnet.md
+      - Classificatore: ai/classificatore.md
+      - Demucs (stem): ai/demucs.md
+      - Apollo (Migliora): ai/apollo.md
+  - Algoritmi:
+      - algoritmi/index.md
+      - Analisi audio: algoritmi/analisi-audio.md
+      - Classificazione: algoritmi/classificazione.md
+      - Clustering e mappa 3D: algoritmi/clustering-e-mappa.md
+      - Scelta dei sample nei Drum Rack: algoritmi/drum-rack.md
+      - Sequencer e groove: algoritmi/sequencer.md
+      - Armonia e accordi: algoritmi/armonia.md
+      - Melodia: algoritmi/melodia.md
+      - Recorder e slicing: algoritmi/recorder-e-slicing.md
+      - Store: algoritmi/store.md
+  - Riferimento:
+      - Classi: riferimento/classi.md
+      - Impostazioni: riferimento/impostazioni.md
+      - Scorciatoie: riferimento/scorciatoie.md
