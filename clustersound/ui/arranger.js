@@ -5,6 +5,12 @@ import { sendToLive } from './live.js';
 import { btn, setPlayButton } from './kit.js';
 import { svg } from './icons.js';
 
+// Drum notes in exported MIDI: 'drumrack' (C1… as an Ableton Drum Rack) or 'gm' (General MIDI).
+// Chosen in Settings › Sequencer; pattern and song export read it from here.
+const LS_MIDI_MAP = 'cs.seq.midiMap';
+export const midiMap = () => { try { return localStorage.getItem(LS_MIDI_MAP) === 'gm' ? 'gm' : 'drumrack'; } catch { return 'drumrack'; } };
+export const setMidiMap = (v) => { try { localStorage.setItem(LS_MIDI_MAP, v === 'gm' ? 'gm' : 'drumrack'); } catch { /* private mode */ } };
+
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -282,7 +288,7 @@ export class Arranger {
     const flat = await this.api.sequence_flatten(this.ed.p, this.seq);
     if (flat.error) { toast(flat.error); return; }
     if (kind === 'midi') {
-      const p = await this.api.export_midi(flat, $('#pt-map').value);
+      const p = await this.api.export_midi(flat, midiMap());
       if (p) toast(`MIDI della sequenza salvato: ${p.split('/').pop()}`);
     } else if (kind === 'wav') {
       toast('Rendering della sequenza…');
@@ -427,7 +433,7 @@ export class Arranger {
         <div class="sq-card-top"><span class="sq-num">${i + 1}</span><span class="sq-label">${esc(b.label)}</span>
           <button class="sq-ib" data-a="play-from" title="Suona da qui">${svg('play', 10)}</button></div>
         <canvas class="sq-thumb" data-i="${i}"></canvas>
-        <div class="sq-card-bot"><span class="sq-bars">batt. ${bar}–${bar + len - 1}</span>
+        <div class="sq-card-bot"><span class="sq-bars">Batt. ${bar}–${bar + len - 1}</span>
           <span class="sq-rep"><button class="sq-ib" data-a="rep-">${svg('minus', 10)}</button><b>×${b.repeat || 1}</b><button class="sq-ib" data-a="rep+">${svg('plus', 10)}</button></span>
           <span class="sq-tools"><button class="sq-ib" data-a="dup" title="Duplica">${svg('copy', 10)}</button><button class="sq-ib" data-a="ren" title="Rinomina">${svg('pencil', 10)}</button><button class="sq-ib danger" data-a="del" title="Elimina">${svg('x', 10)}</button></span></div>
       </div>`;

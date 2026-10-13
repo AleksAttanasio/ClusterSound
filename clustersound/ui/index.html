@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ClusterSound</title>
-  <link rel="icon" type="image/png" href="assets/logo-mark.png">
+  <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg">
   <link rel="stylesheet" href="vendor/webawesome/styles/themes/default.css">
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="style.css">
@@ -13,41 +13,40 @@
   <script type="module" src="vendor/webawesome/webawesome.loader.js"></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand"><img class="brand-mark" src="assets/logo-mark.png" alt=""><img class="brand-word" src="assets/logo-wordmark.png" alt="ClusterSound"></div>
-    <wa-radio-group id="main-tabs" class="seg main-tabs" orientation="horizontal" size="s" value="library" label="Sezione">
-      <wa-radio appearance="button" value="library">Libreria</wa-radio>
-      <wa-radio appearance="button" value="pattern">Sequencer</wa-radio>
-      <wa-radio appearance="button" value="rack">Drum Rack</wa-radio>
-      <wa-radio appearance="button" value="compose">Compose</wa-radio>
-      <wa-radio appearance="button" value="sampler">Recorder</wa-radio>
-    </wa-radio-group>
-    <wa-radio-group id="lib-mode" class="seg lib-mode lib-section" orientation="horizontal" size="s" value="local" label="Libreria">
-      <wa-radio appearance="button" value="local" title="La mia libreria: la cartella di sample sul Mac"><wa-icon name="folder-open" label="La mia libreria"></wa-icon><span class="lbl">La mia libreria</span></wa-radio>
-      <wa-radio appearance="button" value="store" title="Store: sample e pack gratuiti online"><wa-icon name="store" label="Store"></wa-icon><span class="lbl">Store</span></wa-radio>
-    </wa-radio-group>
-    <wa-button id="btn-folder" class="lib-only" variant="brand" size="s"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli cartella…</wa-button>
-    <div id="folder-path" class="folder-path lib-only" title="">Nessuna cartella</div>
-    <wa-button id="btn-rescan" class="lib-only" appearance="filled-outlined" size="s" disabled title="Rianalizza la cartella (i file invariati vengono letti dalla cache)"><wa-icon slot="start" name="refresh-cw"></wa-icon>Riscansiona</wa-button>
-    <div class="online-only online-search" hidden>
-      <wa-input id="online-q" class="search" type="search" size="s" placeholder="Cerca sample gratuiti (es. dusty, 909, vinyl)…" autocomplete="off"><wa-icon slot="start" name="search"></wa-icon></wa-input>
-      <wa-button id="online-go" variant="brand" size="s">Cerca</wa-button>
+  <nav id="nav" class="nav" aria-label="Sezioni">
+    <div class="nav-head">
+      <div class="brand"><img class="brand-mark" src="assets/logo-mark.svg" alt=""><span class="brand-word">ClusterSound</span></div>
+      <button id="nav-toggle" class="nav-toggle" type="button" title="Riduci il pannello"><wa-icon name="panel-left-close" label="Riduci il pannello"></wa-icon></button>
     </div>
-    <div class="progress-wrap lib-only" id="progress-wrap" hidden>
-      <wa-progress-bar id="progress-bar" class="progress" value="0" label="Avanzamento analisi"></wa-progress-bar>
-      <div id="progress-text" class="progress-text"></div>
+    <div id="nav-items" class="nav-items"></div>
+  </nav>
+
+  <div class="content">
+  <header class="page-head">
+    <div class="crumb"><span id="crumb-title" class="crumb-title">Libreria</span><span id="crumb-sep" class="crumb-sep" hidden>/</span><span id="crumb-sub" class="crumb-sub" hidden></span></div>
+    <div class="head-tools" data-for="library">
+      <div class="progress-wrap" id="progress-wrap" hidden>
+        <wa-progress-bar id="progress-bar" class="progress" value="0" label="Avanzamento analisi"></wa-progress-bar>
+        <div id="progress-text" class="progress-text"></div>
+      </div>
+      <div class="spacer"></div>
+      <wa-radio-group id="view-toggle" class="seg" orientation="horizontal" size="s" value="3d" label="Vista">
+        <wa-radio appearance="button" value="3d"><wa-icon name="box"></wa-icon>3D</wa-radio>
+        <wa-radio appearance="button" value="list"><wa-icon name="list"></wa-icon>Lista</wa-radio>
+      </wa-radio-group>
     </div>
-    <div class="spacer"></div>
-    <wa-radio-group id="view-toggle" class="seg lib-only" orientation="horizontal" size="s" value="3d" label="Vista">
-      <wa-radio appearance="button" value="3d"><wa-icon name="box"></wa-icon>3D</wa-radio>
-      <wa-radio appearance="button" value="list"><wa-icon name="list"></wa-icon>Lista</wa-radio>
-    </wa-radio-group>
-    <wa-button id="btn-export" class="lib-only" appearance="filled-outlined" size="s" disabled><wa-icon slot="start" name="file-down"></wa-icon>Esporta report</wa-button>
-    <wa-radio-group id="online-group" class="seg online-only" orientation="horizontal" size="s" value="source" label="Raggruppa i risultati" hidden>
-      <wa-radio appearance="button" value="source">Per fonte</wa-radio>
-      <wa-radio appearance="button" value="instrument">Per strumento</wa-radio>
-    </wa-radio-group>
-    <wa-button id="btn-settings" class="icon-btn online-only" appearance="plain" size="s" hidden title="Impostazioni: API key Freesound, cartella download"><wa-icon name="settings" label="Impostazioni"></wa-icon></wa-button>
+    <div class="head-tools" data-for="online" hidden>
+      <div class="online-search">
+        <wa-input id="online-q" class="search" type="search" size="s" placeholder="Cerca sample gratuiti (es. dusty, 909, vinyl)…" autocomplete="off"><wa-icon slot="start" name="search"></wa-icon></wa-input>
+        <wa-button id="online-go" variant="brand" size="s">Cerca</wa-button>
+      </div>
+      <div class="spacer"></div>
+      <wa-radio-group id="online-group" class="seg" orientation="horizontal" size="s" value="source" label="Raggruppa i risultati">
+        <wa-radio appearance="button" value="source">Per fonte</wa-radio>
+        <wa-radio appearance="button" value="instrument">Per strumento</wa-radio>
+      </wa-radio-group>
+    </div>
+    <wa-button id="head-more" class="icon-btn more-btn" appearance="plain" size="s" title="Impostazioni della sezione" data-settings-link=""><wa-icon name="ellipsis" label="Impostazioni della sezione"></wa-icon></wa-button>
   </header>
 
   <div class="layout" id="library">
@@ -64,7 +63,7 @@
       <div class="filter-block classes-block">
         <div class="filter-title">
           Classi
-          <span class="links"><a href="#" id="cls-all">tutte</a> · <a href="#" id="cls-none">nessuna</a></span>
+          <span class="links"><a href="#" id="cls-all">Tutte</a> · <a href="#" id="cls-none">Nessuna</a></span>
         </div>
         <div id="class-list"></div>
       </div>
@@ -96,11 +95,12 @@
         </div>
         <div id="layout-badge" class="layout-badge" hidden></div>
         <div id="empty" class="empty">
-          <img class="empty-logo" src="assets/logo-app.png" alt="">
+          <img class="empty-logo" src="assets/logo-app.svg" alt="">
           <div class="empty-title">Scegli una cartella di sample</div>
           <div class="empty-sub">ClusterSound analizza ricorsivamente tutti i file audio (wav, aif, flac, ogg, mp3),
             li classifica (kick, snare, hat…) e li dispone in 3D per somiglianza.
             I file originali non vengono mai modificati.</div>
+          <wa-button id="btn-empty-folder" class="empty-cta" variant="brand" size="m"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli cartella…</wa-button>
           <div class="empty-store">Non hai ancora sample?
             <wa-button id="btn-empty-store" size="s" appearance="filled-outlined"><wa-icon slot="start" name="store"></wa-icon>Sfoglia lo Store gratuito</wa-button></div>
         </div>
@@ -142,27 +142,10 @@
 
   <div class="layout sampler-layout" id="sampler" hidden></div>
 
-  <wa-dialog id="settings" label="Impostazioni online" light-dismiss style="--width: 540px">
-    <div class="settings-body">
-      <wa-input id="set-key" type="password" password-toggle size="s" autocomplete="off" label="API key Freesound">
-        <span slot="hint">Gratuita: crea un account e <a href="#" id="set-getkey">richiedi una chiave</a>, poi incolla il valore "Client secret/Api key".
-          Resta salvata solo su questo Mac. <a href="#" id="set-clear">Rimuovi chiave</a></span>
-      </wa-input>
-      <div class="field-row">
-        <wa-input id="set-dir" size="s" label="Cartella dei download"></wa-input>
-        <wa-button id="set-pick" size="s" appearance="filled-outlined"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli…</wa-button>
-      </div>
-      <span class="hint">Ogni file viene salvato in una sottocartella per fonte, con accanto un file .license.txt.</span>
-      <div class="field-row">
-        <wa-number-input id="set-cache" size="s" min="50" max="10000" step="50" label="Cache temporanea (anteprime e sample provati nel sequencer)"><span slot="end" class="hint">MB</span></wa-number-input>
-        <wa-button id="set-cache-clear" size="s" appearance="filled-outlined"><wa-icon slot="start" name="trash-2"></wa-icon>Svuota cache</wa-button>
-      </div>
-      <span class="hint" id="set-cache-used"></span>
-      <wa-number-input id="set-live-port" size="s" min="1024" max="65535" step="1" label="Bridge per Ableton Live (device Max for Live ClusterSound)" without-steppers><span slot="end" class="hint">porta</span></wa-number-input>
-      <span class="hint" id="set-live-status"></span>
-    </div>
-    <div slot="footer" class="modal-actions"><wa-button id="set-cancel" size="s" appearance="filled-outlined">Annulla</wa-button><wa-button id="set-save" size="s" variant="brand">Salva</wa-button></div>
-  </wa-dialog>
+  <div class="settings-layout" id="settings" hidden></div>
+
+  </div>
+
 
   <script type="module" src="app.js"></script>
 </body>

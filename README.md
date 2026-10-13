@@ -13,7 +13,14 @@ uv venv -p 3.12 .venv && uv pip install -p .venv -e ".[dev]"
 .venv/bin/python -m clustersound --headless ~/Samples --out report.csv   # batch, senza GUI
 ```
 
-- **Scegli cartella…**: analizza wav/aif/flac/ogg/mp3/caf. I risultati finiscono in cache
+**Interfaccia**: a sinistra il pannello delle sezioni (*Sample*: Libreria, Store, Recorder · *Crea*:
+Sequencer, Drum Rack, Compose), con **Impostazioni** in fondo; il pulsante accanto al logo lo riduce a sole
+icone. Le opzioni di fino di ogni sezione (cartelle, formati, dispositivi, mappature MIDI…) stanno in
+**Impostazioni**, divise per sezione e salvate subito; il pulsante **⋯** di ogni schermata apre la sezione
+relativa.
+
+- **Cartella** (Impostazioni › Libreria, o *Scegli cartella…* dalla libreria vuota): analizza
+  wav/aif/flac/ogg/mp3/caf. I risultati finiscono in cache
   (`~/Library/Application Support/ClusterSound/cache.sqlite`): una riscansione rilegge solo i
   file nuovi o modificati.
 - **Vista 3D**: trascina per ruotare, scroll per lo zoom, tasto destro per spostare.
@@ -25,7 +32,7 @@ uv venv -p 3.12 .venv && uv pip install -p .venv -e ".[dev]"
   classificazioni si aggiornano in pochi secondi. Le etichette manuali restano in cache.
 - **Filtri**: classe (clic; Alt+clic = solo quella), tipo (One-shot / Loop / Long), confidenza
   minima, ricerca per nome. **Lista**: tabella ordinabile, frecce ↑↓ per scorrere e ascoltare.
-- **Esporta report**: CSV o JSON con classe, confidenza, alternative, sottocluster, tipo.
+- **Esporta report** (Impostazioni › Libreria): CSV o JSON con classe, confidenza, alternative, sottocluster, tipo.
 
 Scorciatoie: `Spazio` play/stop, `Esc` chiude la tendina.
 
@@ -43,10 +50,10 @@ Ogni sample ha anche un **Tipo** (One-shot / Loop / Long-Texture) e un **sottocl
 la sua classe (k-means sugli embedding, k scelto con silhouette).
 Colori, keyword e mappatura AudioSet stanno in `clustersound/taxonomy.py`.
 
-## Store: sample e pack gratuiti (Libreria → Store)
+## Store: sample e pack gratuiti
 
-Nella scheda **Libreria** il selettore **La mia libreria | Store** passa dalla cartella locale a uno
-store di sample gratuiti. Ci si arriva anche dalla libreria vuota ("Sfoglia lo Store gratuito") e
+La sezione **Store** è uno store di sample gratuiti; API key Freesound, cartella dei download e pack
+sospetti si impostano in Impostazioni › Store. Ci si arriva anche dalla libreria vuota ("Sfoglia lo Store gratuito") e
 dalla tendina di un sample ("Altri nello Store": apre lo store sulla stessa classe).
 
 - **Home**: i provider con il loro logo, le categorie (Kick, Snare, Hat, 808…), i pack in evidenza
@@ -91,7 +98,7 @@ ufficiale da cui scaricarli: niente scraping. I loghi stanno in `clustersound/ui
 
 ## Scheda Sequencer: prova dei sample su groove tipici
 
-La seconda scheda (**Libreria | Sequencer | Drum Rack | Compose**) è un sequencer per provare i sample su pattern tipici e portarli in Ableton.
+La sezione **Sequencer** è un sequencer per provare i sample su pattern tipici e portarli in Ableton.
 
 - **47 generi, 191 pattern**, con la bass music in primo piano:
   - *Bass music UK*: UK garage 2-step, speed garage, bassline, UK funky, grime, dubstep, riddim, tearout, halftime, breaks, future garage;
@@ -139,9 +146,9 @@ La seconda scheda (**Libreria | Sequencer | Drum Rack | Compose**) è un sequenc
 
 ## Scheda Drum Rack: kit per Launchpad Pro (64 pad) e Roland SPD-SX
 
-La quarta scheda costruisce un Drum Rack 8×8 pensato per un controller come il Novation Launchpad Pro MK3.
+La sezione **Drum Rack** costruisce un Drum Rack 8×8 pensato per un controller come il Novation Launchpad Pro MK3.
 
-- **Mappatura delle note**: *Launchpad / Live* (default), cioè 4 quadranti 4×4 con 36–51 in basso a sinistra, 52–67 in basso a destra, 68–83 in alto a sinistra e 84–99 in alto a destra; oppure *righe sequenziali* (36 + riga×8 + colonna), per le Custom Mode.
+- **Mappatura delle note** (Impostazioni › Drum Rack): *Launchpad / Live* (default), cioè 4 quadranti 4×4 con 36–51 in basso a sinistra, 52–67 in basso a destra, 68–83 in alto a sinistra e 84–99 in alto a destra; oppure *righe sequenziali* (36 + riga×8 + colonna), per le Custom Mode.
 - **Geometrie**: ognuna divide i 64 pad in gruppi di sample simili; i pad restano al loro posto quando cambi geometria.
   - *Colonne ×8*: 8 colonne da 8 (es. tutti gli hat su una colonna);
   - *Blocchi 2×2*: 16 gruppi da 4;
@@ -149,7 +156,7 @@ La quarta scheda costruisce un Drum Rack 8×8 pensato per un controller come il 
   - *4×4 a colonne*: ogni quadrante è una famiglia e ogni colonna un gruppo di 4 (gruppi diversi della stessa classe prendono sotto-cluster diversi);
   - *Libero*: un pad alla volta.
 - **Seed**: è l'ultimo sample cliccato, nel browser a sinistra o su un pad. **Riempi gruppo** mette il seed sul pad selezionato e i sample simili sugli altri pad del gruppo.
-- **Dalla vista 3D**: tasto destro su un punto (o "Invia ▾" nel pannello del sample) apre il menu *Invia*. In alto c'è la sezione **Drum Rack** con **+ aggiungi** (sul pad selezionato, o sul primo libero del gruppo) e **+ aggiungi e apri ▦**, che passa anche alla scheda Drum Rack. Con *con i simili* il sample riempie l'intero gruppo insieme ai suoi simili.
+- **Dalla vista 3D**: tasto destro su un punto (o "Invia ▾" nel pannello del sample) apre il menu *Invia*. In alto c'è la sezione **Drum Rack** con **+ Aggiungi** (sul pad selezionato, o sul primo libero del gruppo) e **+ Aggiungi e apri ▦**, che passa anche alla sezione Drum Rack. Con *Con i simili* il sample riempie l'intero gruppo insieme ai suoi simili.
 - **Modalità**:
   - *Più simili*;
   - *Casuale*: pesca per somiglianza con uno slider di variazione; *Rigenera* rifà l'estrazione;
@@ -194,8 +201,9 @@ Il menu in alto a sinistra della barra sceglie lo strumento: **Controller 8×8 (
 
 ## Scheda Compose: progressioni di accordi
 
-La quinta scheda costruisce progressioni con le clip MIDI di un chord pack organizzato come l'**Unison MIDI
-Chord Pack** (default `~/Documents/Unison MIDI Chord Pack`; *Cambia…* in alto a sinistra per un'altra cartella).
+La sezione **Compose** costruisce progressioni con le clip MIDI di un chord pack organizzato come l'**Unison MIDI
+Chord Pack** (default `~/Documents/Unison MIDI Chord Pack`; un'altra cartella si sceglie in Impostazioni › Compose, insieme
+al suono dell'anteprima, alla tastiera MIDI, al basso che segue gli accordi e all'export dei soli accordi).
 Il pack non viene mai modificato: i file vengono letti e indicizzati in memoria.
 
 - **Browser**: gli accordi della tonalità scelta, raggruppati per grado (I, ii, bVII…) e colorati per funzione
@@ -276,14 +284,14 @@ insieme agli accordi in entrambe le viste (♫ nella barra la silenzia).
 Registra ciò che il Mac manda a una o più uscite audio, ognuna nel suo file, poi ritaglia i sample dalla
 registrazione: finiscono nella libreria e vengono classificati come gli altri.
 
-- **Uscite da registrare**: casse, cuffie, interfacce audio, AirPlay… più *Tutte le uscite (mix)*. Se ne
+- **Uscite da registrare** (Impostazioni › Recorder, come formato, cartella, fade e normalizzazione): casse, cuffie, interfacce audio, AirPlay… più *Tutte le uscite (mix)*. Se ne
   selezioni più di una, partono insieme e ognuna ha il suo file, il suo meter e la sua dimensione.
-  *aggiorna* rilegge i dispositivi collegati.
+  *Aggiorna l'elenco* rilegge i dispositivi collegati.
 - **Formato**: WAV (16/24 bit, 32 float), AIFF, FLAC (16/24 bit), CAF, MP3 (128–320 kbps), OGG Vorbis,
   Opus (48 kHz) e M4A/AAC (128–256 kbps, convertito con `afconvert`). Frequenza del dispositivo oppure
   44,1/48/96 kHz; stereo, mono o tutti i canali (solo nei formati non compressi).
 - **Cartella**: `~/Music/ClusterSound Recordings/<data ora> - <uscita>.<ext>`, con accanto un `.source.txt`
-  di provenienza. La registrazione continua anche se cambi scheda (pallino rosso sulla tab).
+  di provenienza. La registrazione continua anche se cambi sezione (pallino rosso sulla voce Recorder).
 - **Apri audio**: oltre alle registrazioni, l'editor apre qualsiasi file audio del Mac (*Apri file…*, oppure
   trascinalo dal Finder sulla forma d'onda) e i sample o i loop della libreria (*Dalla libreria…*: navighi per
   cartelle e pack, o cerchi per nome in tutta la libreria). Valgono tagli, stem, *Invia a Live* e Drum Rack.
@@ -294,7 +302,7 @@ registrazione: finiscono nella libreria e vengono classificati come gli altri.
 - **Sample estratti**: WAV 24 bit in `~/Music/ClusterSound Samples/`, con fade e normalizzazione opzionali,
   massimo 30 s ciascuno (impostazione `sampler_max_seconds`).
 - **Al Drum Rack**: carica le regioni selezionate (o una sola, dall'icona sulla sua riga) sui pad liberi del Drum
-  Rack, a partire dal pad selezionato e in ordine di nota (C1, C#1, D1…), e apre la scheda per suonarle. Le
+  Rack, a partire dal pad selezionato e in ordine di nota (C1, C#1, D1…), e apre la sezione per suonarle. Le
   regioni vengono esportate come sopra; una regione già esportata e non modificata riusa il suo file.
 - **Invia a Live**: mette in Ableton, su una nuova traccia audio dopo quella selezionata, la regione
   selezionata o, senza selezione, tutto l'audio aperto (registrazione o stem), nel primo slot vuoto della scena
@@ -350,8 +358,8 @@ un sample è libero.
 Il device **ClusterSound** (effetto MIDI, Live 10.1 Suite o successivo) importa direttamente nel set i pattern,
 i drum rack e le progressioni di Compose, senza trascinare file. È fatto di tre pezzi:
 
-- **l'app**, che all'avvio apre un piccolo server solo locale (`127.0.0.1:8770`, porta modificabile nelle
-  Impostazioni) con il catalogo e i contenuti pronti per Live;
+- **l'app**, che all'avvio apre un piccolo server solo locale (`127.0.0.1:8770`, porta modificabile in
+  Impostazioni › Generale) con il catalogo e i contenuti pronti per Live;
 - **il device** `m4l/ClusterSound.maxpat` + `ClusterSound.js`, che crea tracce MIDI e clip con le note via
   Live API;
 - **la Remote Script** `remote_script/ClusterSoundBridge` (Python 2.7 in Live 10), che carica i preset `.adg`

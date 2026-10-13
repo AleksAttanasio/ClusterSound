@@ -23,7 +23,7 @@ function onOutside(e) {
 }
 
 // buses: ui buses (id, label, color, melodic); counts: bus id -> number of layers (for the hint);
-// rack: {target: 'gruppo 3 · Kick', onAdd(similar, open)} for the Drum Rack section
+// rack: {target: 'Gruppo 3 · Kick', onAdd(similar, open)} for the Drum Rack section
 export function showSendMenu({ x, y, ref, buses, counts = {}, onPick, rack }) {
   closeSendMenu();
   const sug = suggestBus(buses, ref.cls);
@@ -36,16 +36,16 @@ export function showSendMenu({ x, y, ref, buses, counts = {}, onPick, rack }) {
   el.innerHTML = `<div class="send-title" title="${esc(ref.name)}">Invia · <b>${esc(ref.name)}</b></div>
     ${rack ? `<div class="send-sec">Drum Rack <span>${esc(rack.target)}</span></div>
     <div class="send-rack">
-      <wa-button size="xs" appearance="filled-outlined" data-rack="add" title="Mette il sample sul pad selezionato (o sul primo libero del gruppo)"><wa-icon slot="start" name="plus"></wa-icon>aggiungi</wa-button>
-      <wa-button size="xs" appearance="filled-outlined" data-rack="open" title="Aggiunge e passa alla scheda Drum Rack"><wa-icon slot="start" name="layout-grid"></wa-icon>aggiungi e apri</wa-button>
-      ${canSimilar ? `<wa-checkbox size="xs" class="send-sim" data-sim ${similar ? 'checked' : ''} title="Riempie tutto il gruppo con questo sample e i suoi simili">con i simili</wa-checkbox>` : ''}
+      <wa-button size="xs" appearance="filled-outlined" data-rack="add" title="Mette il sample sul pad selezionato (o sul primo libero del gruppo)"><wa-icon slot="start" name="plus"></wa-icon>Aggiungi</wa-button>
+      <wa-button size="xs" appearance="filled-outlined" data-rack="open" title="Aggiunge e passa alla scheda Drum Rack"><wa-icon slot="start" name="layout-grid"></wa-icon>Aggiungi e apri</wa-button>
+      ${canSimilar ? `<wa-checkbox size="xs" class="send-sim" data-sim ${similar ? 'checked' : ''} title="Riempie tutto il gruppo con questo sample e i suoi simili">Con i simili</wa-checkbox>` : ''}
     </div>` : ''}
     <div class="send-sec">Sequencer</div>
     ${ordered.map((b) => `<div class="send-row ${b.id === sug ? 'sug' : ''}" data-bus="${b.id}">
       <span class="dot" style="background:${b.color}"></span><span class="send-bus">${esc(b.label)}${b.id === sug ? ' <i>consigliato</i>' : ''}</span>
-      <span class="send-count">${counts[b.id] ? counts[b.id] + ' layer' : 'vuoto'}</span>
-      <wa-button size="xs" appearance="filled-outlined" data-mode="add" title="Aggiungi come nuovo layer del bus"><wa-icon slot="start" name="plus"></wa-icon>layer</wa-button>
-      <wa-button size="xs" appearance="filled-outlined" data-mode="replace" title="Sostituisci il layer selezionato (o il primo)" ${counts[b.id] ? '' : 'disabled'}>sostituisci</wa-button>
+      <span class="send-count">${counts[b.id] ? counts[b.id] + ' layer' : 'Vuoto'}</span>
+      <wa-button size="xs" appearance="filled-outlined" data-mode="add" title="Aggiungi come nuovo layer del bus"><wa-icon slot="start" name="plus"></wa-icon>Layer</wa-button>
+      <wa-button size="xs" appearance="filled-outlined" data-mode="replace" title="Sostituisci il layer selezionato (o il primo)" ${counts[b.id] ? '' : 'disabled'}>Sostituisci</wa-button>
     </div>`).join('')}`;
   document.body.appendChild(el);
   const W = window.innerWidth, H = window.innerHeight;

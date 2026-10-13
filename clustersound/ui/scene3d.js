@@ -67,7 +67,7 @@ const DOT_FRAG = `
 
 const FOCUS_MS = 750;
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
-const SPOKE = new THREE.Color(0x6ea8fe);
+const SPOKE = new THREE.Color(0x2fd1bd);
 const TRAIL = new THREE.Color(0xffb84d);
 
 export class Scene3D {
@@ -95,7 +95,7 @@ export class Scene3D {
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setPixelRatio(window.devicePixelRatio || 1);
-    this.renderer.setClearColor(0x0f1115, 1);
+    this.renderer.setClearColor(0x1c1c1c, 1);
     container.prepend(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
@@ -131,7 +131,7 @@ export class Scene3D {
     this.scene.add(this.trailDots);
 
     // faint reference grid
-    const grid = new THREE.GridHelper(120, 12, 0x232833, 0x1a1e27);
+    const grid = new THREE.GridHelper(120, 12, 0x333333, 0x262626);
     grid.position.y = -55;
     this.scene.add(grid);
 
