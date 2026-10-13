@@ -14,7 +14,7 @@ import soundfile as sf
 import soxr
 
 from ..online.downloads import safe_name, unique_path
-from ..paths import data_dir_path
+from ..paths import data_dir_path, torch_device
 from . import export as sampler_export
 from .session import SamplerSession
 
@@ -98,7 +98,7 @@ class _Demucs:
         self.torch = torch
         self.model.eval()
         self.samplerate = int(self.model.samplerate)
-        self.device = "mps" if torch.backends.mps.is_available() else "cpu"
+        self.device = torch_device(torch)
 
     def _run(self, wav, device: str):
         from demucs.apply import apply_model

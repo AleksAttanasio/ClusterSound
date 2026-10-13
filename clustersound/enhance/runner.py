@@ -31,7 +31,8 @@ def run(model: str, src: str, dst: str, on_progress: Callable[[float], None] | N
     with the worker's error. On cancel or error dst is removed."""
     env = {**os.environ, "PYTORCH_ENABLE_MPS_FALLBACK": "1"}  # ops MPS lacks run on the CPU instead of failing
     p = subprocess.Popen(cmd or command(model, src, dst), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                         stdin=subprocess.DEVNULL, text=True, env=env)
+                         stdin=subprocess.DEVNULL, text=True, env=env,
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))  # Windows: no console window
     lines: queue.Queue = queue.Queue()
     err_tail: deque = deque(maxlen=20)
 

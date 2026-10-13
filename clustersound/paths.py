@@ -63,3 +63,10 @@ def is_inside(path: str, root: str) -> bool:
     """path is root or below it (resolved; case-insensitive where the filesystem is, as on Windows)."""
     path, root = os.path.normcase(os.path.realpath(path)), os.path.normcase(os.path.realpath(root))
     return path == root or path.startswith(root.rstrip(os.sep) + os.sep)
+
+
+def torch_device(torch) -> str:
+    """The fastest PyTorch device here: CUDA (NVIDIA GPUs, Windows), MPS (Apple GPUs) or the CPU."""
+    if torch.cuda.is_available():
+        return "cuda"
+    return "mps" if torch.backends.mps.is_available() else "cpu"
