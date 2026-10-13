@@ -443,6 +443,7 @@ class Api:
         return {**self._sampler_state(), "supported": sampler_links.SUPPORTED,
                 "show_sources": False,  # file and link sources stay available but hidden: the tab is the Recorder
                 "recorder": {"devices": sampler_recorder.output_devices(), "formats": sampler_recorder.formats(),
+                             "hint": sampler_recorder.unavailable_hint(),
                              "rates": sampler_recorder.RATES, "channels": sampler_recorder.CHANNELS,
                              **self._recorder.status()},
                 "settings": self.get_settings()}

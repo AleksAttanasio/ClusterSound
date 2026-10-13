@@ -707,8 +707,7 @@ export class SamplerEditor {
     const box = $('#rc-devices');
     if (!box) return;
     if (!this.rec.devices.length) {
-      box.innerHTML = '<div class="hint">Nessuna uscita registrabile: serve macOS 14.2 o successivo '
-        + '(oppure l\'extra <code>capture</code> per il mix di tutte le uscite).</div>';
+      box.innerHTML = `<div class="hint">${this.rec.hint || 'Nessuna uscita registrabile.'}</div>`;
       return;
     }
     const sel = new Set(this._selectedDevices());
@@ -716,7 +715,7 @@ export class SamplerEditor {
     const shown = this.rec.devices.filter((d) => (this.rec.running ? tracks[d.id] : sel.has(d.id)));
     box.innerHTML = shown.map((d) => {
       const t = this.rec.running ? tracks[d.id] : null;
-      const meta = d.sample_rate ? `${d.channels} can · ${(d.sample_rate / 1000).toFixed(1).replace('.0', '')} kHz` : 'Tutto ciò che il Mac suona';
+      const meta = d.sample_rate ? `${d.channels} can · ${(d.sample_rate / 1000).toFixed(1).replace('.0', '')} kHz` : (d.note || '');
       return `<div class="rc-dev${t ? ' on' : ''}">
         <div class="rc-dev-name">${esc(d.name)}${d.default ? ' <span class="hint">· predefinita</span>' : ''}</div>
         <div class="rc-dev-meta hint">${t ? (t.error ? `<span class="error">${esc(t.error)}</span>`
@@ -730,7 +729,7 @@ export class SamplerEditor {
   _renderSetDevices() {
     const box = this._setBody.querySelector('#set-rc-devices');
     if (!this.rec.devices.length) {
-      box.innerHTML = '<span class="hint">Nessuna uscita registrabile: serve macOS 14.2 o successivo.</span>';
+      box.innerHTML = `<span class="hint">${this.rec.hint || 'Nessuna uscita registrabile.'}</span>`;
       return;
     }
     const sel = new Set(this._selectedDevices());
