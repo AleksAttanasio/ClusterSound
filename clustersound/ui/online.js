@@ -3,6 +3,7 @@
 // Views: home (provider strip, categories, featured rows) · results (sounds or packs, grid or list)
 // · pack page · provider page.
 import { svg } from './icons.js';
+import { setRow, savedFlash, openSettings } from './settings.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -17,6 +18,7 @@ const PRESETS = [
   ['808', ['sub808']], ['Cymbal', ['ride', 'crash', 'cymbal_other']], ['Perc', ['perc_other', 'shaker', 'tambourine', 'hand_drum', 'cowbell']],
   ['Bass', ['bass']], ['Synth', ['synth', 'pad']], ['FX', ['riser', 'impact', 'downlifter']], ['Vocal', ['vocal', 'spoken']],
 ];
+const SUSPECT_KEY = 'cs.store.suspect';
 const SORTS = [['relevance', 'Rilevanza'], ['downloads', 'Più scaricati'], ['rating', 'Voto'], ['newest', 'Più recenti'], ['duration', 'Durata']];
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const ANY_KEY = 'any'; // wa-option values cannot be empty
@@ -38,7 +40,7 @@ export class Online {
     this.p = {
       q: '', instruments: new Set(), sources: new Set(), licenses: new Set(), commercial: false,
       types: new Set(), dur_min: null, dur_max: null, bpm_min: null, bpm_max: null, key: '',
-      lossless: false, packs: 'all', include_suspect: false, sort: 'relevance',
+      lossless: false, packs: 'all', include_suspect: (() => { try { return localStorage.getItem(SUSPECT_KEY) === '1'; } catch { return false; } })(), sort: 'relevance',
     };
     this.groupBy = 'source';
     this.data = {};        // source -> response
@@ -165,7 +167,6 @@ export class Online {
         <wa-select size="s" id="o-packs" value="all" style="margin-top:8px">
           <wa-option value="all">File singoli e pack</wa-option><wa-option value="files">Solo file singoli</wa-option><wa-option value="packs">Solo pack</wa-option>
         </wa-select>
-        <wa-checkbox size="s" class="o-check" id="o-suspect" title="Pack di librerie commerciali (es. Big Fish Audio, Sound Ideas, Loopmasters) ricaricati con una licenza libera che probabilmente non hanno">Mostra pack sospetti di materiale commerciale</wa-checkbox>
       </div>
       <div class="filter-block">
         <div class="filter-title">Ordina <span data-srv="sort"></span></div>
@@ -185,7 +186,7 @@ export class Online {
     const counts = {
       src: b(p.sources.size !== this.meta.sources.length) + p.licenses.size + b(p.commercial),
       char: p.types.size + set(p.dur_min) + set(p.dur_max) + set(p.bpm_min) + set(p.bpm_max) + b(p.key),
-      fmt: b(p.lossless) + b(p.packs !== 'all') + b(p.include_suspect) + b(p.sort !== 'relevance'),
+      fmt: b(p.lossless) + b(p.packs !== 'all') + b(p.sort !== 'relevance'),
     };
     for (const [id, n] of Object.entries(counts)) {
       const el = document.querySelector(`[data-fg-count="${id}"]`);
@@ -252,7 +253,6 @@ export class Online {
     };
     bindVal('#o-commercial', 'commercial', 'change', (el) => el.checked);
     bindVal('#o-lossless', 'lossless', 'change', (el) => el.checked);
-    bindVal('#o-suspect', 'include_suspect', 'change', (el) => el.checked);
     bindVal('#o-dmin', 'dur_min', 'input');
     bindVal('#o-dmax', 'dur_max', 'input');
     bindVal('#o-bmin', 'bpm_min', 'input');
@@ -271,7 +271,6 @@ export class Online {
     $('#online-results').onclick = (e) => this._onResultsClick(e);
     $('#store-view').onclick = (e) => this._onResultsClick(e);
     $('#store-nav').onclick = (e) => this._onResultsClick(e);
-    $('#btn-settings').onclick = () => this.openSettings();
     $('#dl-open').onclick = () => this.api.open_download_dir();
     $('#dl-library').onclick = () => this.onLibrary?.(this.meta.settings.download_dir);
     $('#dl-toggle').onclick = () => $('#downloads').classList.toggle('collapsed');
@@ -486,7 +485,7 @@ export class Online {
     if (t.dataset.open) return this.api.open_url(t.dataset.open);
     if (t.dataset.more) return this.more(t.dataset.more);
     if (t.dataset.moreAll) return Promise.all([...this.p.sources].filter((s) => this.data[s]?.more).map((s) => this.more(s)));
-    if (t.dataset.settings) return this.openSettings();
+    if (t.dataset.settings) return openSettings('online');
     if (t.dataset.tag) { $('#online-q').value = t.dataset.tag; this.p.q = t.dataset.tag; this.kind = 'sounds'; return this.search(); }
     if (t.dataset.expand) return this.toggleExpand(t.dataset.expand);
     if (t.dataset.expandAll) { e.preventDefault(); return this.toggleExpand(t.dataset.expandAll, true); }
@@ -903,44 +902,47 @@ export class Online {
   }
 
   _renderKeyHint() {
-    const s = this.meta.settings;
-    $('#btn-settings').classList.toggle('attention', !s.freesound_key_set);
+    document.querySelector('.nav-item[data-tab="online"]')?.classList.toggle('attention', !this.meta.settings.freesound_key_set);
   }
 
-  openSettings() {
-    const s = this.meta.settings;
-    const m = $('#settings');
-    m.open = true;
-    $('#set-key').value = '';
-    $('#set-key').placeholder = s.freesound_key_set ? `impostata (${s.freesound_key_hint}) — lascia vuoto per mantenerla` : 'incolla qui la tua API key';
-    $('#set-dir').value = s.download_dir;
-    $('#set-cache').value = s.cache_mb;
-    $('#set-cache-used').textContent = `In uso: ${s.cache_used_mb} MB. I file oltre il limite vengono eliminati partendo dai meno usati; quelli del pattern aperto restano.`;
-    $('#set-cache-clear').onclick = async (e) => {
-      e.preventDefault();
-      this.meta.settings = await this.api.clear_cache();
-      $('#set-cache-used').textContent = `In uso: ${this.meta.settings.cache_used_mb} MB`;
-    };
-    $('#set-live-port').value = s.live_port;
-    $('#set-live-status').textContent = '';
-    this.api.live_status().then((st) => {
-      $('#set-live-status').textContent = st.running
-        ? `Attivo su 127.0.0.1:${st.port}. Preset per Live in ${st.stage}${st.stage_root === 'places' ? ' (aggiungi la cartella ai Places di Live)' : ''}`
-        : `Non attivo: ${st.error || 'riavvia l\'app'}`;
+  /** Settings changed elsewhere (the Settings page): keep the copy used for searches in step. */
+  onSettings(s) {
+    if (!this.meta) return;
+    const keyChanged = s.freesound_key_set !== this.meta.settings.freesound_key_set || s.freesound_key_hint !== this.meta.settings.freesound_key_hint;
+    this.meta.settings = s;
+    this._renderKeyHint();
+    if (keyChanged) this._refreshAfterKey();
+  }
+
+  /** Store section of the Settings page: Freesound key, download folder, suspect packs. */
+  async renderSettings(body) {
+    const s = await this.api.get_settings();
+    const keyHint = s.freesound_key_set ? `Impostata (${esc(s.freesound_key_hint)}). <a href="#" id="set-key-clear">Rimuovi chiave</a>` : 'Nessuna chiave: Freesound resta escluso dalle ricerche.';
+    body.innerHTML =
+      setRow('API key Freesound', `Gratuita: crea un account e <a href="#" id="set-getkey">richiedi una chiave</a>, poi incolla il valore "Client secret/Api key". Resta salvata solo su questo Mac. ${keyHint}`,
+        `<wa-input id="set-key" type="password" password-toggle size="s" autocomplete="off" label="API key" placeholder="${s.freesound_key_set ? 'Incolla per sostituirla' : 'Incolla qui la tua API key'}" style="width:260px"></wa-input>`)
+      + setRow('Cartella dei download', 'Ogni file va in una sottocartella per fonte, con accanto un file .license.txt.',
+        `<span class="set-path" title="${esc(s.download_dir)}">${esc(s.download_dir)}</span>
+         <wa-button id="set-pick" size="s" appearance="filled-outlined"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli…</wa-button>`)
+      + setRow('Pack sospetti', 'Mostra anche i pack di librerie commerciali (es. Big Fish Audio, Sound Ideas, Loopmasters) ricaricati con una licenza libera che probabilmente non hanno.',
+        `<wa-switch id="set-suspect" size="s" ${this.p.include_suspect ? 'checked' : ''}>Mostra</wa-switch>`);
+    const done = (ns) => { this.meta ? this.onSettings(ns) : null; savedFlash(body); return this.renderSettings(body); };
+    body.querySelector('#set-getkey').onclick = (e) => { e.preventDefault(); this.api.open_url('https://freesound.org/apiv2/apply'); };
+    const clear = body.querySelector('#set-key-clear');
+    if (clear) clear.onclick = async (e) => { e.preventDefault(); done(await this.api.set_setting('freesound_key', '')); };
+    body.querySelector('#set-key').addEventListener('change', async (e) => {
+      const key = (e.target.value || '').trim();
+      if (key) done(await this.api.set_setting('freesound_key', key));
     });
-    $('#set-cancel').onclick = () => { m.open = false; };
-    $('#set-getkey').onclick = (e) => { e.preventDefault(); this.api.open_url('https://freesound.org/apiv2/apply'); };
-    $('#set-pick').onclick = async () => { const p = await this.api.pick_folder(); if (p) $('#set-dir').value = p; };
-    $('#set-clear').onclick = async (e) => { e.preventDefault(); this.meta.settings = await this.api.set_setting('freesound_key', ''); m.open = false; this._renderKeyHint(); this._refreshAfterKey(); };
-    $('#set-save').onclick = async () => {
-      const key = ($('#set-key').value || '').trim();
-      if (key) this.meta.settings = await this.api.set_setting('freesound_key', key);
-      this.meta.settings = await this.api.set_setting('download_dir', ($('#set-dir').value || '').trim());
-      this.meta.settings = await this.api.set_setting('cache_mb', $('#set-cache').value);
-      this.meta.settings = await this.api.set_setting('live_port', $('#set-live-port').value);
-      m.open = false;
-      this._renderKeyHint();
-      if (key) this._refreshAfterKey();
+    body.querySelector('#set-pick').onclick = async () => {
+      const p = await this.api.pick_folder();
+      if (p) done(await this.api.set_setting('download_dir', p));
     };
+    body.querySelector('#set-suspect').addEventListener('change', (e) => {
+      this.p.include_suspect = e.target.checked;
+      try { localStorage.setItem(SUSPECT_KEY, e.target.checked ? '1' : '0'); } catch { /* private mode */ }
+      if (this.started && this.view.name === 'results') this.search();
+      savedFlash(body);
+    });
   }
 }

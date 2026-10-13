@@ -25,9 +25,6 @@
   <header class="page-head">
     <div class="crumb"><span id="crumb-title" class="crumb-title">Libreria</span><span id="crumb-sub" class="crumb-sub" hidden></span></div>
     <div class="head-tools" data-for="library">
-      <wa-button id="btn-folder" variant="brand" size="s"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli cartella…</wa-button>
-      <div id="folder-path" class="folder-path" title="">Nessuna cartella</div>
-      <wa-button id="btn-rescan" appearance="filled-outlined" size="s" disabled title="Rianalizza la cartella (i file invariati vengono letti dalla cache)"><wa-icon slot="start" name="refresh-cw"></wa-icon>Riscansiona</wa-button>
       <div class="progress-wrap" id="progress-wrap" hidden>
         <wa-progress-bar id="progress-bar" class="progress" value="0" label="Avanzamento analisi"></wa-progress-bar>
         <div id="progress-text" class="progress-text"></div>
@@ -37,7 +34,6 @@
         <wa-radio appearance="button" value="3d"><wa-icon name="box"></wa-icon>3D</wa-radio>
         <wa-radio appearance="button" value="list"><wa-icon name="list"></wa-icon>Lista</wa-radio>
       </wa-radio-group>
-      <wa-button id="btn-export" appearance="filled-outlined" size="s" disabled><wa-icon slot="start" name="file-down"></wa-icon>Esporta report</wa-button>
     </div>
     <div class="head-tools" data-for="online" hidden>
       <div class="online-search">
@@ -49,8 +45,8 @@
         <wa-radio appearance="button" value="source">Per fonte</wa-radio>
         <wa-radio appearance="button" value="instrument">Per strumento</wa-radio>
       </wa-radio-group>
-      <wa-button id="btn-settings" class="icon-btn" appearance="plain" size="s" title="Impostazioni: API key Freesound, cartella download"><wa-icon name="settings" label="Impostazioni"></wa-icon></wa-button>
     </div>
+    <wa-button id="head-more" class="icon-btn more-btn" appearance="plain" size="s" title="Impostazioni della sezione" data-settings-link=""><wa-icon name="ellipsis" label="Impostazioni della sezione"></wa-icon></wa-button>
   </header>
 
   <div class="layout" id="library">
@@ -104,6 +100,7 @@
           <div class="empty-sub">ClusterSound analizza ricorsivamente tutti i file audio (wav, aif, flac, ogg, mp3),
             li classifica (kick, snare, hat…) e li dispone in 3D per somiglianza.
             I file originali non vengono mai modificati.</div>
+          <wa-button id="btn-empty-folder" class="empty-cta" variant="brand" size="m"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli cartella…</wa-button>
           <div class="empty-store">Non hai ancora sample?
             <wa-button id="btn-empty-store" size="s" appearance="filled-outlined"><wa-icon slot="start" name="store"></wa-icon>Sfoglia lo Store gratuito</wa-button></div>
         </div>
@@ -145,29 +142,10 @@
 
   <div class="layout sampler-layout" id="sampler" hidden></div>
 
+  <div class="settings-layout" id="settings" hidden></div>
+
   </div>
 
-  <wa-dialog id="settings" label="Impostazioni online" light-dismiss style="--width: 540px">
-    <div class="settings-body">
-      <wa-input id="set-key" type="password" password-toggle size="s" autocomplete="off" label="API key Freesound">
-        <span slot="hint">Gratuita: crea un account e <a href="#" id="set-getkey">richiedi una chiave</a>, poi incolla il valore "Client secret/Api key".
-          Resta salvata solo su questo Mac. <a href="#" id="set-clear">Rimuovi chiave</a></span>
-      </wa-input>
-      <div class="field-row">
-        <wa-input id="set-dir" size="s" label="Cartella dei download"></wa-input>
-        <wa-button id="set-pick" size="s" appearance="filled-outlined"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli…</wa-button>
-      </div>
-      <span class="hint">Ogni file viene salvato in una sottocartella per fonte, con accanto un file .license.txt.</span>
-      <div class="field-row">
-        <wa-number-input id="set-cache" size="s" min="50" max="10000" step="50" label="Cache temporanea (anteprime e sample provati nel sequencer)"><span slot="end" class="hint">MB</span></wa-number-input>
-        <wa-button id="set-cache-clear" size="s" appearance="filled-outlined"><wa-icon slot="start" name="trash-2"></wa-icon>Svuota cache</wa-button>
-      </div>
-      <span class="hint" id="set-cache-used"></span>
-      <wa-number-input id="set-live-port" size="s" min="1024" max="65535" step="1" label="Bridge per Ableton Live (device Max for Live ClusterSound)" without-steppers><span slot="end" class="hint">porta</span></wa-number-input>
-      <span class="hint" id="set-live-status"></span>
-    </div>
-    <div slot="footer" class="modal-actions"><wa-button id="set-cancel" size="s" appearance="filled-outlined">Annulla</wa-button><wa-button id="set-save" size="s" variant="brand">Salva</wa-button></div>
-  </wa-dialog>
 
   <script type="module" src="app.js"></script>
 </body>

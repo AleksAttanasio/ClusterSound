@@ -9,6 +9,7 @@ import { SamplerEditor } from './sampler.js';
 import { showSendMenu } from './sendmenu.js';
 import { isTypingTarget } from './kit.js';
 import { Nav, TAB_LABELS } from './nav.js';
+import { Settings, generalSection, setRow } from './settings.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -19,7 +20,7 @@ const state = {
   data: null, version: -1,
   classOn: new Set(), typeOn: new Set(), minConf: 0, search: '',
   mask: null, selected: -1, scanning: false,
-  view: '3d', sort: { key: 'cls', dir: 1 }, rows: [], tab: 'library',
+  view: '3d', sort: { key: 'cls', dir: 1 }, rows: [], tab: 'library', folder: '',
   focus: null, // {center, items: [{id, sim}], trail: [id…]} while the similar-samples view is open
   lastTrail: [], // trail of the last similar-samples view (kept after closing it, for the Drum Rack)
   simK: (() => { try { return Math.min(60, Math.max(5, +localStorage.getItem('cs.simK') || 12)); } catch { return 12; } })(),
@@ -36,9 +37,9 @@ function whenApiReady() {
   });
 }
 
-let scene, panel, online, pattern, rack, compose, sampler, nav;
+let scene, panel, online, pattern, rack, compose, sampler, nav, settings;
 
-const TABS = ['library', 'online', 'pattern', 'rack', 'compose', 'sampler'];
+const TABS = ['library', 'online', 'pattern', 'rack', 'compose', 'sampler', 'settings'];
 
 async function main() {
   state.api = await whenApiReady();
@@ -75,6 +76,11 @@ async function main() {
   online.onLibrary = (path) => { setTab('library'); setFolder(path); };
   nav = new Nav($('#nav'), { onSelect: (tab) => setTab(tab) });
   window.__cs.nav = nav;
+  settings = new Settings($('#settings'));
+  settings.add('general', 'Generale', 'settings', generalSection(state.api, (s) => online.onSettings(s)));
+  settings.add('library', 'Libreria', 'library-big', renderLibrarySettings);
+  settings.add('online', 'Store', 'store', (body) => online.renderSettings(body));
+  window.addEventListener('cs:open-settings', (e) => setTab('settings', e.detail));
   buildSidebar();
   bindUi();
   if (init.last_folder) {
@@ -83,7 +89,7 @@ async function main() {
   }
   let last = 'library';
   try { last = localStorage.getItem('cs.tab') || 'library'; } catch { /* private mode */ }
-  setTab(TABS.includes(last) ? last : 'library');
+  setTab(TABS.includes(last) && last !== 'settings' ? last : 'library');
   poll();
 }
 
@@ -190,7 +196,6 @@ function showProgress(p) {
   $('#progress-text').textContent = p.phase === 'analysing'
     ? `${label} ${p.done}/${p.total} · ${p.message}` : `${label} ${p.message && p.phase !== 'analysing' ? '· ' + p.message : ''}`;
   if (p.phase === 'error') $('#progress-text').classList.add('error');
-  $('#btn-rescan').disabled = busy || !$('#folder-path').title;
   const badge = $('#layout-badge');
   badge.hidden = !state.data;
   badge.textContent = p.layout === 'pca' ? 'Layout rapido (PCA) · t-SNE in corso…' : p.layout === 'tsne' ? 'Layout t-SNE · punti vicini = suoni simili' : '';
@@ -203,7 +208,6 @@ async function loadResults() {
   if (d.cls.length !== state.data?.cls.length) { exitFocus(false); state.lastTrail = []; }
   state.data = d;
   $('#empty').hidden = true;
-  $('#btn-export').disabled = false;
   nav.setBadge('library', d.cls.length);
   scene.setData(d, state.classes.map((c) => c.color));
   applyFilters();
@@ -547,10 +551,41 @@ function highlightRow() {
 
 // ------------------------------------------------------------------ ui
 function setFolder(path, scan = true) {
-  $('#folder-path').textContent = path;
-  $('#folder-path').title = path;
-  $('#btn-rescan').disabled = false;
+  state.folder = path;
+  showCrumb();
   if (scan) startScan(path);
+}
+
+async function pickFolder() {
+  const p = await state.api.pick_folder();
+  if (p) { setTab('library'); setFolder(p); }
+}
+
+// Library section of the Settings page: the analysed folder and the report.
+async function renderLibrarySettings(body) {
+  const f = state.folder;
+  body.innerHTML =
+    setRow('Cartella dei sample', 'Analizzata ricorsivamente (wav, aif, flac, ogg, mp3, caf). I risultati restano in cache; i file originali non vengono mai modificati.',
+      `${f ? `<span class="set-path" title="${esc(f)}">${esc(f)}</span>` : '<span class="hint">Nessuna cartella</span>'}
+       <wa-button id="set-lib-pick" size="s" variant="brand"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli…</wa-button>`)
+    + setRow('Riscansiona', 'Rianalizza la cartella: i file invariati vengono letti dalla cache.',
+      `<wa-button id="set-lib-rescan" size="s" appearance="filled-outlined"${!f || state.scanning ? ' disabled' : ''}><wa-icon slot="start" name="refresh-cw"></wa-icon>Riscansiona</wa-button>`)
+    + setRow('Report', 'CSV o JSON con classe, confidenza, alternative, sottocluster e tipo di ogni sample. <span id="set-lib-report"></span>',
+      `<wa-button id="set-lib-export" size="s" appearance="filled-outlined"${state.data ? '' : ' disabled'}><wa-icon slot="start" name="file-down"></wa-icon>Esporta report</wa-button>`);
+  body.querySelector('#set-lib-pick').onclick = pickFolder;
+  body.querySelector('#set-lib-rescan').onclick = () => { setTab('library'); startScan(state.folder); };
+  body.querySelector('#set-lib-export').onclick = async () => {
+    const p = await state.api.export_report();
+    if (p) body.querySelector('#set-lib-report').textContent = `Salvato in ${p}.`;
+  };
+}
+
+// Breadcrumb of the page header: the analysed folder in the Library, a link to its settings.
+function showCrumb() {
+  const sub = $('#crumb-sub');
+  sub.hidden = state.tab !== 'library' || !state.folder;
+  sub.textContent = state.folder;
+  sub.title = `${state.folder}\nClic: cambia cartella nelle Impostazioni`;
 }
 
 async function startScan(path) {
@@ -587,9 +622,9 @@ async function sendLibraryItem(id, x, y) {
 }
 
 // One section at a time; the left navigation and the page header follow it.
-function setTab(tab) {
+function setTab(tab, section = '') {
   state.tab = tab;
-  try { localStorage.setItem('cs.tab', tab); } catch { /* private mode */ }
+  if (tab !== 'settings') { try { localStorage.setItem('cs.tab', tab); } catch { /* private mode */ } }
   player.stop();
   if (tab !== 'pattern' && pattern) pattern.hide();
   if (tab !== 'rack' && rack) rack.hide();
@@ -597,11 +632,15 @@ function setTab(tab) {
   if (tab !== 'sampler' && sampler) sampler.hide();
   nav.setActive(tab);
   $('#crumb-title').textContent = TAB_LABELS[tab] || '';
+  showCrumb();
+  $('#head-more').hidden = tab === 'settings';
+  $('#head-more').dataset.settingsLink = tab;
   for (const t of TABS) $('#' + t).hidden = t !== tab;
   document.querySelectorAll('.head-tools').forEach((el) => { el.hidden = el.dataset.for !== tab; });
   if (tab === 'online') online.show(); else if (tab === 'pattern') pattern.show();
   else if (tab === 'rack') rack.show(); else if (tab === 'compose') compose.show();
-  else if (tab === 'sampler') sampler.show(); else scene.resize();
+  else if (tab === 'sampler') sampler.show(); else if (tab === 'settings') settings.show(section);
+  else scene.resize();
 }
 
 // From the library: open the store on one instrument (the class of a sample)
@@ -618,15 +657,8 @@ function bindUi() {
     e.preventDefault();
     sendLibraryItem(+r.dataset.i, e.clientX, e.clientY);
   });
-  $('#btn-folder').onclick = async () => {
-    const p = await state.api.pick_folder();
-    if (p) setFolder(p);
-  };
-  $('#btn-rescan').onclick = () => startScan($('#folder-path').title);
-  $('#btn-export').onclick = async () => {
-    const p = await state.api.export_report();
-    if (p) { $('#progress-wrap').hidden = false; $('#progress-text').textContent = `Report salvato: ${p}`; }
-  };
+  $('#btn-empty-folder').onclick = pickFolder;
+  $('#crumb-sub').dataset.settingsLink = 'library';
   $('#view-toggle').addEventListener('change', (e) => { if (e.target.id === 'view-toggle') setView(e.target.value); });
   $('#search').oninput = (e) => { state.search = e.target.value || ''; applyFilters(); };
   $('#search').addEventListener('wa-clear', () => { state.search = ''; applyFilters(); });
