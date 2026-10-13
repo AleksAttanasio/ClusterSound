@@ -840,7 +840,7 @@ export class DrumRackEditor {
           <wa-option value="empty">Solo quelli vuoti</wa-option></wa-select>
       <wa-input size="s" class="pop-field" label="Solo dalla cartella / pack (facoltativo)" data-o="folder" value="${esc(o.folder)}" placeholder="Es. Cymatics"></wa-input>
       <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>Solo one-shot (niente loop)</wa-checkbox>
-      ${dynControls(o, 'gruppi')}
+      ${dynControls(o, 'groups')}
       <div class="pop-actions">${btn('Genera', { variant: 'brand', icon: 'dices', 'data-go': true })}</div>`);
     wireDynControls(pop);
     pop.querySelector('[data-go]').onclick = async () => {
@@ -870,7 +870,7 @@ export class DrumRackEditor {
       <wa-checkbox size="s" class="pop-check" data-o="keep" ${o.keep ? 'checked' : ''}>Mantieni la configurazione attuale</wa-checkbox>
       <wa-input size="s" class="pop-field" label="Solo dalla cartella / pack (facoltativo)" data-o="folder" value="${esc(o.folder)}" placeholder="Es. Cymatics"></wa-input>
       <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>Solo one-shot (niente loop)</wa-checkbox>
-      ${dynControls(o, 'gruppi')}
+      ${dynControls(o, 'groups')}
       <div class="pop-actions">${btn('Genera', { variant: 'brand', icon: 'dices', 'data-go': true })}</div>`);
     wireDynControls(pop);
     pop.querySelector('[data-go]').onclick = async () => {
