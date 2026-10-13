@@ -12,7 +12,7 @@ import webbrowser
 import numpy as np
 import soundfile as sf
 
-from . import classifier, dynamics, export, taxonomy
+from . import classifier, dynamics, export, i18n, taxonomy
 from .chords import export as chord_export
 from .chords import harmony as chord_harmony
 from .chords import melody as chord_melody
@@ -106,6 +106,7 @@ class Api:
         self._enh_job: dict = {"state": "idle", "progress": 0.0, "model": None, "result": None, "error": None}
         self._enh_source: sampler_session.SamplerSession | None = None  # what the last job enhanced
         self._enh_cancel = threading.Event()
+        i18n.set_language(self._settings().get("language"))
         threading.Thread(target=online_cache.prune, args=(self._cache_mb(),), daemon=True).start()
 
     # pywebview exposes public attributes too, so keep internals underscored
@@ -125,7 +126,7 @@ class Api:
     # ------------------------------------------------------------------ setup
     def init(self) -> dict:
         return {"classes": taxonomy.ui_classes(), "groups": taxonomy.GROUPS, "types": TYPES,
-                "last_folder": self._settings().get("last_folder")}
+                "last_folder": self._settings().get("last_folder"), "language": i18n.language()}
 
     def pick_folder(self) -> str | None:
         import webview
@@ -253,7 +254,8 @@ class Api:
     def get_settings(self) -> dict:
         s = self._settings()
         key = s.get("freesound_key") or ""
-        return {"freesound_key_set": bool(key), "cache_mb": self._cache_mb(),
+        return {"language": i18n.normalize(s.get("language")),
+                "freesound_key_set": bool(key), "cache_mb": self._cache_mb(),
                 "cache_used_mb": round(online_cache.size() / (1 << 20), 1),
                 "freesound_key_hint": (key[:4] + "…" + key[-3:]) if len(key) > 8 else "",
                 "download_dir": s.get("download_dir") or DEFAULT_DIR, "live_port": self._live_port(),
@@ -268,7 +270,10 @@ class Api:
 
     def set_setting(self, key: str, value) -> dict:
         if key not in ("freesound_key", "download_dir", "cache_mb", "live_port", "live_library", "sampler_dir",
-                       "sampler_max_seconds", "recorder_dir", "recorder_format"):
+                       "sampler_max_seconds", "recorder_dir", "recorder_format", "language"):
+            return self.get_settings()
+        if key == "language":
+            self._save_settings(language=i18n.set_language(value))
             return self.get_settings()
         if key == "sampler_max_seconds":
             try:

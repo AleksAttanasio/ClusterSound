@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it" class="wa-theme-default wa-palette-default wa-brand-blue wa-dark">
+<html lang="en" class="wa-theme-default wa-palette-default wa-brand-blue wa-dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,57 +13,57 @@
   <script type="module" src="vendor/webawesome/webawesome.loader.js"></script>
 </head>
 <body>
-  <nav id="nav" class="nav" aria-label="Sezioni">
+  <nav id="nav" class="nav" aria-label="Sections">
     <div class="nav-head">
       <div class="brand"><img class="brand-mark" src="assets/logo-mark.svg" alt=""><span class="brand-word">ClusterSound</span></div>
-      <button id="nav-toggle" class="nav-toggle" type="button" title="Riduci il pannello"><wa-icon name="panel-left-close" label="Riduci il pannello"></wa-icon></button>
+      <button id="nav-toggle" class="nav-toggle" type="button"></button>
     </div>
     <div id="nav-items" class="nav-items"></div>
   </nav>
 
   <div class="content">
   <header class="page-head">
-    <div class="crumb"><span id="crumb-title" class="crumb-title">Libreria</span><span id="crumb-sep" class="crumb-sep" hidden>/</span><span id="crumb-sub" class="crumb-sub" hidden></span></div>
+    <div class="crumb"><span id="crumb-title" class="crumb-title"></span><span id="crumb-sep" class="crumb-sep" hidden>/</span><span id="crumb-sub" class="crumb-sub" hidden></span></div>
     <div class="head-tools" data-for="library">
       <div class="progress-wrap" id="progress-wrap" hidden>
-        <wa-progress-bar id="progress-bar" class="progress" value="0" label="Avanzamento analisi"></wa-progress-bar>
+        <wa-progress-bar id="progress-bar" class="progress" value="0" label="Analysis progress" data-i18n-label="Analysis progress"></wa-progress-bar>
         <div id="progress-text" class="progress-text"></div>
       </div>
       <div class="spacer"></div>
-      <wa-radio-group id="view-toggle" class="seg" orientation="horizontal" size="s" value="3d" label="Vista">
+      <wa-radio-group id="view-toggle" class="seg" orientation="horizontal" size="s" value="3d" label="View" data-i18n-label="View">
         <wa-radio appearance="button" value="3d"><wa-icon name="box"></wa-icon>3D</wa-radio>
-        <wa-radio appearance="button" value="list"><wa-icon name="list"></wa-icon>Lista</wa-radio>
+        <wa-radio appearance="button" value="list"><wa-icon name="list"></wa-icon><span data-i18n="List">List</span></wa-radio>
       </wa-radio-group>
     </div>
     <div class="head-tools" data-for="online" hidden>
       <div class="online-search">
-        <wa-input id="online-q" class="search" type="search" size="s" placeholder="Cerca sample gratuiti (es. dusty, 909, vinyl)…" autocomplete="off"><wa-icon slot="start" name="search"></wa-icon></wa-input>
-        <wa-button id="online-go" variant="brand" size="s">Cerca</wa-button>
+        <wa-input id="online-q" class="search" type="search" size="s" placeholder="Search free samples (e.g. dusty, 909, vinyl)…" data-i18n-placeholder="Search free samples (e.g. dusty, 909, vinyl)…" autocomplete="off"><wa-icon slot="start" name="search"></wa-icon></wa-input>
+        <wa-button id="online-go" variant="brand" size="s" data-i18n="Search">Search</wa-button>
       </div>
       <div class="spacer"></div>
-      <wa-radio-group id="online-group" class="seg" orientation="horizontal" size="s" value="source" label="Raggruppa i risultati">
-        <wa-radio appearance="button" value="source">Per fonte</wa-radio>
-        <wa-radio appearance="button" value="instrument">Per strumento</wa-radio>
+      <wa-radio-group id="online-group" class="seg" orientation="horizontal" size="s" value="source" label="Group the results" data-i18n-label="Group the results">
+        <wa-radio appearance="button" value="source" data-i18n="By source">By source</wa-radio>
+        <wa-radio appearance="button" value="instrument" data-i18n="By instrument">By instrument</wa-radio>
       </wa-radio-group>
     </div>
-    <wa-button id="head-more" class="icon-btn more-btn" appearance="plain" size="s" title="Impostazioni della sezione" data-settings-link=""><wa-icon name="ellipsis" label="Impostazioni della sezione"></wa-icon></wa-button>
+    <wa-button id="head-more" class="icon-btn more-btn" appearance="plain" size="s" title="Section settings" data-i18n-title="Section settings" data-settings-link=""><wa-icon name="ellipsis" label="Section settings" data-i18n-label="Section settings"></wa-icon></wa-button>
   </header>
 
   <div class="layout" id="library">
     <aside class="sidebar">
-      <wa-input id="search" class="search" type="search" size="s" placeholder="Cerca per nome o cartella…" autocomplete="off" with-clear><wa-icon slot="start" name="search"></wa-icon></wa-input>
+      <wa-input id="search" class="search" type="search" size="s" placeholder="Search by name or folder…" data-i18n-placeholder="Search by name or folder…" autocomplete="off" with-clear><wa-icon slot="start" name="search"></wa-icon></wa-input>
       <div class="filter-block">
-        <div class="filter-title">Tipo</div>
+        <div class="filter-title" data-i18n="Type">Type</div>
         <div id="type-filters" class="chips"></div>
       </div>
       <div class="filter-block">
-        <div class="filter-title">Confidenza minima <span id="conf-value">0%</span></div>
-        <wa-slider id="conf" size="s" min="0" max="95" step="5" value="0" label="Confidenza minima"></wa-slider>
+        <div class="filter-title"><span data-i18n="Minimum confidence">Minimum confidence</span> <span id="conf-value">0%</span></div>
+        <wa-slider id="conf" size="s" min="0" max="95" step="5" value="0" label="Minimum confidence" data-i18n-label="Minimum confidence"></wa-slider>
       </div>
       <div class="filter-block classes-block">
         <div class="filter-title">
-          Classi
-          <span class="links"><a href="#" id="cls-all">Tutte</a> · <a href="#" id="cls-none">Nessuna</a></span>
+          <span data-i18n="Classes">Classes</span>
+          <span class="links"><a href="#" id="cls-all" data-i18n="All">All</a> · <a href="#" id="cls-none" data-i18n="None">None</a></span>
         </div>
         <div id="class-list"></div>
       </div>
@@ -76,33 +76,33 @@
         <div id="focus-labels" class="labels"></div>
         <div id="focus-bar" class="focus-bar" hidden>
           <div class="fb-row">
-            <span class="fb-title">Simili a <b id="fb-name"></b></span>
-            <span class="fb-k" title="Quanti sample simili mostrare">
-              <wa-slider id="fb-k" size="s" min="5" max="60" step="1" label="Quanti sample simili mostrare"></wa-slider><span id="fb-k-val"></span>
+            <span class="fb-title"><span data-i18n="Similar to">Similar to</span> <b id="fb-name"></b></span>
+            <span class="fb-k" title="How many similar samples to show" data-i18n-title="How many similar samples to show">
+              <wa-slider id="fb-k" size="s" min="5" max="60" step="1" label="How many similar samples to show" data-i18n-label="How many similar samples to show"></wa-slider><span id="fb-k-val"></span>
             </span>
-            <wa-button id="fb-trail" size="xs" appearance="filled-outlined" title="Inquadra tutto il percorso"><wa-icon slot="start" name="maximize-2"></wa-icon>Percorso</wa-button>
-            <wa-button id="fb-rack" size="xs" appearance="filled-outlined" title="Carica il percorso sul gruppo selezionato del Drum Rack"><wa-icon slot="start" name="layout-grid"></wa-icon>Drum Rack</wa-button>
-            <wa-button id="fb-exit" size="xs" appearance="filled-outlined" title="Torna alla mappa (Esc)"><wa-icon slot="start" name="x"></wa-icon>Esci</wa-button>
+            <wa-button id="fb-trail" size="xs" appearance="filled-outlined" title="Frame the whole trail" data-i18n-title="Frame the whole trail"><wa-icon slot="start" name="maximize-2"></wa-icon><span data-i18n="Trail">Trail</span></wa-button>
+            <wa-button id="fb-rack" size="xs" appearance="filled-outlined" title="Load the trail onto the selected Drum Rack group" data-i18n-title="Load the trail onto the selected Drum Rack group"><wa-icon slot="start" name="layout-grid"></wa-icon>Drum Rack</wa-button>
+            <wa-button id="fb-exit" size="xs" appearance="filled-outlined" title="Back to the map (Esc)" data-i18n-title="Back to the map (Esc)"><wa-icon slot="start" name="x"></wa-icon><span data-i18n="Exit">Exit</span></wa-button>
           </div>
           <div id="fb-crumbs" class="fb-crumbs" hidden></div>
-          <div class="fb-hint">Clic: ascolta · doppio clic: ricentra sul sample</div>
+          <div class="fb-hint" data-i18n="Click: listen · double-click: re-centre on the sample">Click: listen · double-click: re-centre on the sample</div>
         </div>
         <div id="tooltip" class="tooltip" hidden></div>
         <div class="scene-tools">
-          <wa-button id="btn-rotate" class="icon-btn" appearance="filled-outlined" size="s" title="Rotazione automatica"><wa-icon name="rotate-cw" label="Rotazione automatica"></wa-icon></wa-button>
-          <wa-button id="btn-reset" class="icon-btn" appearance="filled-outlined" size="s" title="Reimposta vista"><wa-icon name="house" label="Reimposta vista"></wa-icon></wa-button>
-          <wa-button id="btn-labels" class="icon-btn active" appearance="filled-outlined" size="s" title="Etichette delle classi"><wa-icon name="type" label="Etichette delle classi"></wa-icon></wa-button>
+          <wa-button id="btn-rotate" class="icon-btn" appearance="filled-outlined" size="s" title="Auto-rotate" data-i18n-title="Auto-rotate"><wa-icon name="rotate-cw" label="Auto-rotate" data-i18n-label="Auto-rotate"></wa-icon></wa-button>
+          <wa-button id="btn-reset" class="icon-btn" appearance="filled-outlined" size="s" title="Reset view" data-i18n-title="Reset view"><wa-icon name="house" label="Reset view" data-i18n-label="Reset view"></wa-icon></wa-button>
+          <wa-button id="btn-labels" class="icon-btn active" appearance="filled-outlined" size="s" title="Class labels" data-i18n-title="Class labels"><wa-icon name="type" label="Class labels" data-i18n-label="Class labels"></wa-icon></wa-button>
         </div>
         <div id="layout-badge" class="layout-badge" hidden></div>
         <div id="empty" class="empty">
           <img class="empty-logo" src="assets/logo-app.svg" alt="">
-          <div class="empty-title">Scegli una cartella di sample</div>
-          <div class="empty-sub">ClusterSound analizza ricorsivamente tutti i file audio (wav, aif, flac, ogg, mp3),
-            li classifica (kick, snare, hat…) e li dispone in 3D per somiglianza.
-            I file originali non vengono mai modificati.</div>
-          <wa-button id="btn-empty-folder" class="empty-cta" variant="brand" size="m"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli cartella…</wa-button>
-          <div class="empty-store">Non hai ancora sample?
-            <wa-button id="btn-empty-store" size="s" appearance="filled-outlined"><wa-icon slot="start" name="store"></wa-icon>Sfoglia lo Store gratuito</wa-button></div>
+          <div class="empty-title" data-i18n="Choose a sample folder">Choose a sample folder</div>
+          <div class="empty-sub" data-i18n="ClusterSound recursively analyses every audio file (wav, aif, flac, ogg, mp3), classifies it (kick, snare, hat…) and lays it out in 3D by similarity. The original files are never modified.">ClusterSound recursively analyses every audio file (wav, aif, flac, ogg, mp3),
+            classifies it (kick, snare, hat…) and lays it out in 3D by similarity.
+            The original files are never modified.</div>
+          <wa-button id="btn-empty-folder" class="empty-cta" variant="brand" size="m"><wa-icon slot="start" name="folder-open"></wa-icon><span data-i18n="Choose folder…">Choose folder…</span></wa-button>
+          <div class="empty-store"><span data-i18n="No samples yet?">No samples yet?</span>
+            <wa-button id="btn-empty-store" size="s" appearance="filled-outlined"><wa-icon slot="start" name="store"></wa-icon><span data-i18n="Browse the free Store">Browse the free Store</span></wa-button></div>
         </div>
       </div>
       <div id="viewlist" class="viewlist" hidden>
@@ -111,7 +111,7 @@
       </div>
 
       <aside id="panel" class="panel" aria-hidden="true">
-        <wa-button id="panel-close" class="panel-close" appearance="plain" size="s" title="Chiudi (Esc)"><wa-icon name="x" label="Chiudi"></wa-icon></wa-button>
+        <wa-button id="panel-close" class="panel-close" appearance="plain" size="s" title="Close (Esc)" data-i18n-title="Close (Esc)"><wa-icon name="x" label="Close" data-i18n-label="Close"></wa-icon></wa-button>
         <div id="panel-content"></div>
       </aside>
     </main>
@@ -121,14 +121,14 @@
     <aside class="sidebar" id="online-sidebar"></aside>
     <main class="online-main">
       <nav class="store-nav" id="store-nav"></nav>
-      <div class="online-presets" id="online-presets-bar"><span class="hint">Rapidi:</span> <span class="chips" id="online-presets"></span></div>
+      <div class="online-presets" id="online-presets-bar"><span class="hint" data-i18n="Quick:">Quick:</span> <span class="chips" id="online-presets"></span></div>
       <div id="store-view" class="store-view"></div>
       <div id="online-results" class="online-results" hidden></div>
       <div id="downloads" class="downloads" hidden>
-        <div class="dl-head"><button id="dl-toggle" class="link-btn">Download <span id="dl-count"></span></button>
-          <span class="dl-actions"><span id="dl-in-library" class="hint" hidden>La cartella dei download è nella libreria: i file vengono analizzati in automatico.</span>
-          <button id="dl-library" class="link-btn" data-to-library hidden title="Apre la cartella dei download nella Libreria e la analizza">Apri in libreria</button>
-          <button id="dl-open" class="link-btn">Apri cartella</button></span></div>
+        <div class="dl-head"><button id="dl-toggle" class="link-btn"><span data-i18n="Downloads">Downloads</span> <span id="dl-count"></span></button>
+          <span class="dl-actions"><span id="dl-in-library" class="hint" hidden data-i18n="The downloads folder is in the library: files are analysed automatically.">The downloads folder is in the library: files are analysed automatically.</span>
+          <button id="dl-library" class="link-btn" data-to-library hidden title="Opens the downloads folder in the Library and analyses it" data-i18n-title="Opens the downloads folder in the Library and analyses it" data-i18n="Open in library">Open in library</button>
+          <button id="dl-open" class="link-btn" data-i18n="Open folder">Open folder</button></span></div>
         <div id="downloads-list" class="downloads-list"></div>
       </div>
     </main>

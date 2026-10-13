@@ -3,6 +3,7 @@
 // every option is saved as soon as it changes. Anywhere in the UI, a "⋯" button made with
 // settingsLink(section) opens this page on that section.
 import { icon, iconBtn } from './kit.js';
+import { t, LANGUAGES, getLang } from './i18n.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -10,14 +11,14 @@ export function openSettings(section = '') {
   window.dispatchEvent(new CustomEvent('cs:open-settings', { detail: section }));
 }
 
-export const settingsLink = (section, title = 'Impostazioni') =>
+export const settingsLink = (section, title = t('Settings')) =>
   iconBtn('ellipsis', title, { 'data-settings-link': section, cls: 'more-btn' });
 
 // One option: label and hint on the left, the control on the right.
 export const setRow = (label, hint, control, { cls = '', id = '' } = {}) =>
   `<div class="set-row ${cls}"${id ? ` id="${id}"` : ''}><div class="set-text"><div class="set-label">${label}</div>${hint ? `<div class="set-hint">${hint}</div>` : ''}</div><div class="set-ctl">${control}</div></div>`;
 
-// "Salvato" next to the title of the section that contains el.
+// "Saved" next to the title of the section that contains el.
 export function savedFlash(el) {
   const s = el?.closest('.set-section')?.querySelector('.set-saved');
   if (!s) return;
@@ -58,13 +59,13 @@ export class Settings {
     this.index.innerHTML = this.sections.map((s) =>
       `<button type="button" class="set-link" data-sec="${s.id}">${icon(s.icon)}<span>${esc(s.title)}</span></button>`).join('');
     this.main.innerHTML = this.sections.map((s) => `<section class="set-section" id="set-${s.id}" data-sec="${s.id}">
-        <h2>${icon(s.icon)}<span>${esc(s.title)}</span><span class="set-saved">${icon('check')} Salvato</span></h2>
+        <h2>${icon(s.icon)}<span>${esc(s.title)}</span><span class="set-saved">${icon('check')} ${t('Saved')}</span></h2>
         <div class="set-card"></div></section>`).join('');
     await Promise.all(this.sections.map(async (s) => {
       const body = this.main.querySelector(`#set-${s.id} .set-card`);
       try { await s.render(body); } catch (err) {
         console.error(err);
-        body.innerHTML = setRow('Impostazioni non disponibili', esc(err?.message || err), '');
+        body.innerHTML = setRow(t('Settings not available'), esc(err?.message || err), '');
       }
     }));
     if (run === this._run) this.scrollTo(section || this.sections[0]?.id, false);
@@ -103,21 +104,29 @@ export class Settings {
 }
 
 // ------------------------------------------------------------------ Generale
-// App-wide options: the Ableton Live bridge and the temporary cache.
+// App-wide options: the interface language, the Ableton Live bridge and the temporary cache.
 export function generalSection(api, onSettings) {
   return async (body) => {
     const s = await api.get_settings();
+    const langs = Object.entries(LANGUAGES).map(([k, v]) => `<wa-option value="${k}">${v}</wa-option>`).join('');
     body.innerHTML =
-      setRow('Bridge per Ableton Live', 'Porta usata dal device Max for Live ClusterSound per ricevere kit, pattern e clip. <span id="set-live-status"></span>',
-        `<wa-number-input id="set-live-port" size="s" min="1024" max="65535" step="1" value="${s.live_port}" without-steppers label="Porta" style="width:110px"></wa-number-input>`)
-      + setRow('Cache temporanea', `Anteprime dello Store e sample provati nel Sequencer. In uso: <b id="set-cache-used">${s.cache_used_mb}</b> MB. Oltre il limite si eliminano i file usati meno di recente; quelli del pattern aperto restano.`,
-        `<wa-number-input id="set-cache" size="s" min="50" max="10000" step="50" value="${s.cache_mb}" label="Limite" style="width:150px"><span slot="end" class="hint">MB</span></wa-number-input>
-         <wa-button id="set-cache-clear" size="s" appearance="filled-outlined"><wa-icon slot="start" name="trash-2"></wa-icon>Svuota</wa-button>`);
+      setRow(t('Language'), t('Language of the interface. The app reloads to apply it.'),
+        `<wa-select id="set-lang" size="s" value="${getLang()}" style="width:150px">${langs}</wa-select>`)
+      + setRow(t('Ableton Live bridge'), t('Port used by the ClusterSound Max for Live device to receive kits, patterns and clips.') + ' <span id="set-live-status"></span>',
+        `<wa-number-input id="set-live-port" size="s" min="1024" max="65535" step="1" value="${s.live_port}" without-steppers label="${t('Port')}" style="width:110px"></wa-number-input>`)
+      + setRow(t('Temporary cache'), t('Store previews and samples tried in the Sequencer. In use: {used} MB. Beyond the limit the least recently used files are deleted; those of the open pattern are kept.', { used: `<b id="set-cache-used">${s.cache_used_mb}</b>` }),
+        `<wa-number-input id="set-cache" size="s" min="50" max="10000" step="50" value="${s.cache_mb}" label="${t('Limit')}" style="width:150px"><span slot="end" class="hint">MB</span></wa-number-input>
+         <wa-button id="set-cache-clear" size="s" appearance="filled-outlined"><wa-icon slot="start" name="trash-2"></wa-icon>${t('Clear')}</wa-button>`);
+    body.querySelector('#set-lang').addEventListener('change', async (e) => {
+      if (e.target.value === getLang()) return;
+      await api.set_setting('language', e.target.value);
+      location.reload();
+    });
     const status = body.querySelector('#set-live-status');
     api.live_status().then((st) => {
       status.textContent = st.running
-        ? `Attivo su 127.0.0.1:${st.port}. Preset per Live in ${st.stage}${st.stage_root === 'places' ? ' (aggiungi la cartella ai Places di Live).' : '.'}`
-        : `Non attivo: ${st.error || 'riavvia l\'app'}.`;
+        ? t('Active on 127.0.0.1:{port}. Live presets in {stage}', { port: st.port, stage: st.stage }) + (st.stage_root === 'places' ? t(" (add the folder to Live's Places).") : '.')
+        : t('Not active: {error}.', { error: st.error || t('restart the app') });
     });
     body.querySelector('#set-live-port').addEventListener('change', async (e) => {
       onSettings(await api.set_setting('live_port', e.target.value));
