@@ -102,7 +102,7 @@ export class Online {
   // ---------------------------------------------------------------- sidebar
   _srvHint(filter) {
     const srcs = (this.meta.server_filters[filter] || []).filter((s) => this.p.sources.has(s));
-    if (!srcs.length) return '<span class="srv" title="Filtrato localmente sui risultati">locale</span>';
+    if (!srcs.length) return '<span class="srv" title="Filtrato localmente sui risultati">Locale</span>';
     const names = srcs.map((s) => this.meta.sources.find((x) => x.id === s).label).join(', ');
     return `<span class="srv" title="Applicato direttamente da: ${esc(names)}. Sulle altre fonti è filtrato localmente.">${srcs.map((s) => SRC_ABBR[s]).join('·')}</span>`;
   }
@@ -126,7 +126,7 @@ export class Online {
         <div class="fg-body">`;
     sb.innerHTML = `
       <div class="filter-block">
-        <div class="filter-title">Strumento <span>${'<span data-srv="instrument"></span>'} <a href="#" id="o-ins-clear">tutti</a></span></div>
+        <div class="filter-title">Strumento <span>${'<span data-srv="instrument"></span>'} <a href="#" id="o-ins-clear">Tutti</a></span></div>
         <div id="o-ins-summary" class="hint"></div>
         <div id="o-ins-list" class="o-ins-list">${cls.join('')}</div>
       </div>
@@ -150,11 +150,11 @@ export class Online {
       </div>
       <div class="filter-block">
         <div class="filter-title">Durata (s) <span data-srv="duration"></span></div>
-        <div class="o-range"><wa-number-input size="s" without-steppers min="0" step="0.1" id="o-dmin" placeholder="min"></wa-number-input><span>–</span><wa-number-input size="s" without-steppers min="0" step="0.1" id="o-dmax" placeholder="max"></wa-number-input></div>
+        <div class="o-range"><wa-number-input size="s" without-steppers min="0" step="0.1" id="o-dmin" placeholder="Min"></wa-number-input><span>–</span><wa-number-input size="s" without-steppers min="0" step="0.1" id="o-dmax" placeholder="Max"></wa-number-input></div>
       </div>
       <div class="filter-block">
         <div class="filter-title">BPM <span data-srv="bpm"></span></div>
-        <div class="o-range"><wa-number-input size="s" without-steppers min="40" max="250" id="o-bmin" placeholder="min"></wa-number-input><span>–</span><wa-number-input size="s" without-steppers min="40" max="250" id="o-bmax" placeholder="max"></wa-number-input></div>
+        <div class="o-range"><wa-number-input size="s" without-steppers min="40" max="250" id="o-bmin" placeholder="Min"></wa-number-input><span>–</span><wa-number-input size="s" without-steppers min="40" max="250" id="o-bmax" placeholder="Max"></wa-number-input></div>
       </div>
       <div class="filter-block">
         <div class="filter-title">Tonalità <span data-srv="key"></span></div>
@@ -347,7 +347,7 @@ export class Online {
       if (el) {
         const d = (this.kind === 'packs' ? this.packData : this.data)[s.id];
         el.innerHTML = !results || !this.p.sources.has(s.id) ? '' : this.loading.has(s.id) ? SPIN
-          : d?.error ? (d.needs_key ? '<span class="error">chiave</span>' : '<span class="error">errore</span>') : d ? d.results.length : '';
+          : d?.error ? (d.needs_key ? '<span class="error">Chiave</span>' : '<span class="error">Errore</span>') : d ? d.results.length : '';
       }
     }
     $('#online-results').hidden = !list;
@@ -422,7 +422,7 @@ export class Online {
     return `<div class="o-row ${child ? 'child' : ''} ${r.suspect ? 'suspect' : ''}" data-uid="${esc(r.uid)}">
       ${r.is_pack && !child ? `<button class="o-btn o-expand" data-expand="${esc(r.uid)}" title="Mostra i file del pack">${svg(ex ? 'chevron-down' : 'chevron-right')}</button>`
         : `<button class="o-btn o-play" data-play="${esc(r.uid)}" ${playable ? '' : 'disabled'} title="Ascolta">${svg('play', 12)}</button>`}
-      <span class="dot" style="background:${c ? c.color : 'transparent'};${c ? '' : 'box-shadow:0 0 0 1px var(--line-2) inset'}" title="${esc(c ? c.label : 'strumento non determinato')}"></span>
+      <span class="dot" style="background:${c ? c.color : 'transparent'};${c ? '' : 'box-shadow:0 0 0 1px var(--line-2) inset'}" title="${esc(c ? c.label : 'Strumento non determinato')}"></span>
       <div class="o-main">
         <div class="o-title" title="${esc(r.title)}">${esc(r.title)} ${packInfo} ${r.suspect ? `<span class="warn" title="Probabile libreria commerciale ricaricata: verifica i diritti">${svg('triangle-alert', 11)} sospetto</span>` : ''}</div>
         <div class="o-sub">${sub}${tags ? ` <span class="tags">${tags}</span>` : ''}</div>
@@ -445,7 +445,7 @@ export class Online {
     const archives = (ex.archives || []).map((a) => `<wa-button size="xs" appearance="filled-outlined" data-dl-archive="${esc(a.url)}" data-pack="${esc(r.uid)}" title="Scarica l'archivio intero"><wa-icon slot="start" name="download"></wa-icon>${esc(a.name)} ${a.size ? '(' + fmtSize(a.size) + ')' : ''}</wa-button>`).join(' ');
     const filtered = ex.files.length < ex.total;
     return `<div class="o-children">
-      <div class="o-pack-bar">${ex.total} file nel pack${filtered ? ` · ${ex.files.length} corrispondono ai filtri <a href="#" data-expand-all="${esc(r.uid)}">mostra tutti</a>` : ''} ${archives}</div>
+      <div class="o-pack-bar">${ex.total} file nel pack${filtered ? ` · ${ex.files.length} corrispondono ai filtri <a href="#" data-expand-all="${esc(r.uid)}">Mostra tutti</a>` : ''} ${archives}</div>
       ${ex.files.slice(0, 400).map((f) => this._row(f, false, true)).join('')}
       ${ex.files.length > 400 ? `<div class="o-none">… altri ${ex.files.length - 400} file: restringi i filtri</div>` : ''}
       ${!ex.files.length && !ex.archives?.length ? '<div class="o-none">Nessun file audio consultabile (archivio RAR/7z?): apri la pagina della fonte.</div>' : ''}
@@ -613,7 +613,7 @@ export class Online {
         <div class="sc-title" title="${esc(c.title)}">${esc(c.title)}</div>
         <div class="sc-sub"><span>${esc(p.name)}</span>${c.count ? `<span>· ${c.count} file</span>` : ''}</div>
         <div class="sc-desc">${esc(c.description)}</div>
-        <div class="sc-meta">${this._licBadge(lic)}${c.note ? `<span class="sc-note" title="${esc(c.note)}">condizioni</span>` : ''}</div>
+        <div class="sc-meta">${this._licBadge(lic)}${c.note ? `<span class="sc-note" title="${esc(c.note)}">Condizioni</span>` : ''}</div>
         <div class="sc-actions"><wa-button size="xs" appearance="filled-outlined" data-open="${esc(c.url)}"><wa-icon slot="start" name="external-link"></wa-icon>Scarica dal sito</wa-button></div>
       </div>
     </div>`;
@@ -666,7 +666,7 @@ export class Online {
       ${this._shelf('Categorie', `<div class="cat-grid">${cats}</div>`)}
       ${this._shelf('Pack in evidenza su Freesound', this._featuredRow('freesound_packs', (r) => this._packCard(r), 'Nessun pack'), { link: fsLink })}
       ${this._shelf('Pack da Internet Archive', this._featuredRow('archive_packs', (r) => this._packCard(r), 'Nessun pack'), { link: '<a href="#" data-provider="archive">Tutti →</a>' })}
-      ${this._shelf('Nuovi suoni CC0', this._featuredRow('cc0_new', (r) => this._soundCard(r), 'Nessun suono'), { note: 'pubblico dominio, nessuna attribuzione' })}
+      ${this._shelf('Nuovi suoni CC0', this._featuredRow('cc0_new', (r) => this._soundCard(r), 'Nessun suono'), { note: 'Pubblico dominio, nessuna attribuzione' })}
       ${this._shelf('Vetrina gratuita', `<div class="sc-grid">${this.meta.curated.map((c) => this._curatedCard(c)).join('')}</div>`,
     { note: 'pack royalty-free da siti senza API: si scaricano dalla pagina ufficiale' })}`;
   }
@@ -737,7 +737,7 @@ export class Online {
         <div class="pk-info">
           <div class="pk-kicker">${this._logo(r.source, 's')} Pack · ${esc(p?.name || r.source_label)}</div>
           <h2>${esc(r.title)}</h2>
-          <div class="pk-author">di <b>${esc(r.author || 'autore sconosciuto')}</b></div>
+          <div class="pk-author">Di <b>${esc(r.author || 'Autore sconosciuto')}</b></div>
           <div class="sc-meta">${r.license !== 'unknown' ? this._licBadge(r) : ''}<span>${esc(facts)}</span></div>
           ${i.description ? `<div class="pk-desc">${esc(i.description)}</div>` : ''}
           <div class="pk-actions">
@@ -836,7 +836,7 @@ export class Online {
           <div class="pk-desc">${esc(p.description)}</div>
           <div class="sc-meta">${lic}</div>
           <div class="pk-actions"><wa-button size="s" appearance="filled-outlined" data-open="${esc(p.url)}"><wa-icon slot="start" name="external-link"></wa-icon>Visita il sito</wa-button>
-          ${p.kind === 'api' && this.p.q.trim() ? `<span class="hint">filtrato per «${esc(this.p.q.trim())}» e i filtri attivi</span>` : ''}</div>
+          ${p.kind === 'api' && this.p.q.trim() ? `<span class="hint">Filtrato per «${esc(this.p.q.trim())}» e i filtri attivi</span>` : ''}</div>
         </div>
       </div>${body}`;
   }
@@ -888,7 +888,7 @@ export class Online {
       const pct = j.total ? Math.min(100, (100 * j.bytes) / j.total) : (j.status === 'done' ? 100 : 0);
       return `<div class="dl-row ${j.status}" ${j.path ? `data-path="${esc(j.path)}" title="Mostra nel Finder"` : ''}>
         <span class="dl-name">${esc(j.title)}</span><span class="dl-src">${esc(j.source)}</span>
-        <span class="dl-state">${j.status === 'done' ? svg('check', 12) : j.status === 'error' ? `<span class="error" title="${esc(j.error)}">errore</span>` : `${Math.round(pct)}%`}</span>
+        <span class="dl-state">${j.status === 'done' ? svg('check', 12) : j.status === 'error' ? `<span class="error" title="${esc(j.error)}">Errore</span>` : `${Math.round(pct)}%`}</span>
         <span class="dl-bar"><span style="width:${pct}%"></span></span></div>`;
     }).join('');
     if (active || force) this._dlT = setTimeout(() => this._pollDownloads(), 700);

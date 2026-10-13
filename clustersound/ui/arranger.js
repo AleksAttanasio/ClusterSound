@@ -433,7 +433,7 @@ export class Arranger {
         <div class="sq-card-top"><span class="sq-num">${i + 1}</span><span class="sq-label">${esc(b.label)}</span>
           <button class="sq-ib" data-a="play-from" title="Suona da qui">${svg('play', 10)}</button></div>
         <canvas class="sq-thumb" data-i="${i}"></canvas>
-        <div class="sq-card-bot"><span class="sq-bars">batt. ${bar}–${bar + len - 1}</span>
+        <div class="sq-card-bot"><span class="sq-bars">Batt. ${bar}–${bar + len - 1}</span>
           <span class="sq-rep"><button class="sq-ib" data-a="rep-">${svg('minus', 10)}</button><b>×${b.repeat || 1}</b><button class="sq-ib" data-a="rep+">${svg('plus', 10)}</button></span>
           <span class="sq-tools"><button class="sq-ib" data-a="dup" title="Duplica">${svg('copy', 10)}</button><button class="sq-ib" data-a="ren" title="Rinomina">${svg('pencil', 10)}</button><button class="sq-ib danger" data-a="del" title="Elimina">${svg('x', 10)}</button></span></div>
       </div>`;

@@ -23,7 +23,7 @@ const DRAG_TYPE = 'application/x-clustersound-rack';
 const LS_RANDOM = 'clustersound.randomRack';
 const MAX_PER_BUS = 8;
 const PEDAL_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20h16M7 20l3-12h4l3 12M10 8l-1-4h6l-1 4"/></svg>';
-const ALT_LABELS = [['off', 'insieme (solo il 1° attivo)'], ['cycle', 'a giro'], ['random', 'casuale'], ['random_pass', 'casuale ogni giro']];
+const ALT_LABELS = [['off', 'Insieme (solo il 1° attivo)'], ['cycle', 'A giro'], ['random', 'Casuale'], ['random_pass', 'Casuale ogni giro']];
 
 const newRack = () => ({ name: 'Kit', geometry: 'cols8', mapping: 'launchpad', pads: new Array(64).fill(null), groups: {} });
 const newSpdRack = () => ({ device: 'spdsx', name: 'Kit SPD-SX', geometry: 'spd_kit', triggers: { trig1: true, trig2: false },
@@ -179,13 +179,13 @@ export class DrumRackEditor {
     const root = $('#rack');
     root.innerHTML = `
       <aside class="sidebar rk-browser">
-        <div class="filter-title">Sample <span class="links"><wa-checkbox size="xs" id="rk-follow" title="Il browser segue la famiglia del gruppo selezionato">segui gruppo</wa-checkbox></span></div>
+        <div class="filter-title">Sample <span class="links"><wa-checkbox size="xs" id="rk-follow" title="Il browser segue la famiglia del gruppo selezionato">Segui gruppo</wa-checkbox></span></div>
         <wa-select id="rk-bfam" size="s" class="rk-select"></wa-select>
         <wa-input id="rk-q" class="search" type="search" size="s" with-clear placeholder="Cerca per nome o cartella…" autocomplete="off"><wa-icon slot="start" name="search"></wa-icon></wa-input>
         <div class="hint">Clic: ascolta e usa come seed · doppio clic: riempi il gruppo · trascina su un pad</div>
         <div id="rk-blist" class="rk-blist"></div>
         <div class="rk-trail-box">
-          <div class="filter-title">Percorso dei simili <span class="links"><a href="#" id="rk-trail-use">usa sul gruppo</a></span></div>
+          <div class="filter-title">Percorso dei simili <span class="links"><a href="#" id="rk-trail-use">Usa sul gruppo</a></span></div>
           <div id="rk-trail" class="rk-trail"></div>
         </div>
       </aside>
@@ -407,7 +407,7 @@ export class DrumRackEditor {
       const color = ref ? this.classColor[ref.cls] || '#8a8f98' : '';
       const badge = ref ? KIND_BADGE[ref.kind] : '';
       html.push(`<div class="rk-pad ${ref ? 'full' : ''} ${p === this.pad ? 'sel' : ''}" data-p="${p}" draggable="${ref ? 'true' : 'false'}"
-        style="${at(r, c)};${ref ? `--pc:${color}` : ''}" title="${ref ? esc(ref.name) + (ref.sim != null && ref.sim < 1 ? ` · somiglianza ${Math.round(ref.sim * 100)}%` : '') : 'vuoto'}">
+        style="${at(r, c)};${ref ? `--pc:${color}` : ''}" title="${ref ? esc(ref.name) + (ref.sim != null && ref.sim < 1 ? ` · somiglianza ${Math.round(ref.sim * 100)}%` : '') : 'Vuoto'}">
         <span class="rk-note">${noteName(this.note(p))}</span>${badge ? `<span class="rk-badge">${badge}</span>` : ''}
         <span class="rk-pname">${ref ? esc(ref.name.replace(/\.[^.]+$/, '')) : ''}</span></div>`);
     }
@@ -498,7 +498,7 @@ export class DrumRackEditor {
         ${p < 9 ? `<span class="spd-num">${p + 1}</span><i class="spd-led"></i>` : ''}</div>`;
     };
     const trig = (p, key, label, icon) => `<div class="spd-trig ${t[key] ? '' : 'off'}">
-        ${t[key] ? cell(p, 'spd-tpad') : `<div class="spd-tpad spd-empty">${icon}<span>non collegato</span></div>`}
+        ${t[key] ? cell(p, 'spd-tpad') : `<div class="spd-tpad spd-empty">${icon}<span>Non collegato</span></div>`}
         <wa-checkbox size="s" class="rk-check" data-trig="${key}" ${t[key] ? 'checked' : ''}>${label}</wa-checkbox>
       </div>`;
     const grid = $('#rk-grid');
@@ -536,8 +536,8 @@ export class DrumRackEditor {
       <div class="rk-ihead"><span class="dot" style="background:${fam.color}"></span>
         <b>Gruppo ${g + 1}</b><span class="hint">${pads.length} pad · ${filled} pieni · ${esc(where)}</span></div>
       <wa-select size="s" class="rk-field" label="Famiglia" data-set="family" value="${s.family}">${this.meta.families.map(famOpt).join('')}</wa-select>
-      <wa-select size="s" class="rk-field" label="Choke group" data-set="choke" value="${s.choke || 0}" title="I pad con lo stesso choke group si zittiscono a vicenda (es. hat aperto/chiuso)"><wa-option value="0">nessuno</wa-option>${Array.from({ length: 16 }, (_, i) => `<wa-option value="${i + 1}">${i + 1}</wa-option>`).join('')}</wa-select>
-      <wa-checkbox size="s" class="rk-check" data-set="lock" ${s.lock ? 'checked' : ''} title="Casuale e Auto-riempi (Alt) non cambiano i gruppi bloccati">blocca gruppo</wa-checkbox>
+      <wa-select size="s" class="rk-field" label="Choke group" data-set="choke" value="${s.choke || 0}" title="I pad con lo stesso choke group si zittiscono a vicenda (es. hat aperto/chiuso)"><wa-option value="0">Nessuno</wa-option>${Array.from({ length: 16 }, (_, i) => `<wa-option value="${i + 1}">${i + 1}</wa-option>`).join('')}</wa-select>
+      <wa-checkbox size="s" class="rk-check" data-set="lock" ${s.lock ? 'checked' : ''} title="Casuale e Auto-riempi (Alt) non cambiano i gruppi bloccati">Blocca gruppo</wa-checkbox>
       <div class="rk-sep"></div>
       <div class="rk-seed">${seed
         ? `<button class="pt-ib" data-act="play-seed" title="Ascolta">${svg('play', 11)}</button><span class="dot" style="background:${this.classColor[seed.cls] || '#8a8f98'}"></span>
@@ -549,12 +549,12 @@ export class DrumRackEditor {
         <wa-slider size="s" min="0" max="1" step="0.05" value="${o.variation}" data-opt="variation" label="Variazione"></wa-slider></div>`);
     }
     html.push(`<wa-select size="s" class="rk-field" label="Simili tra" data-opt="filter" value="${o.filter}">
-        <wa-option value="class">stessa classe del seed</wa-option>
+        <wa-option value="class">Stessa classe del seed</wa-option>
         <wa-option value="family">famiglia del gruppo (${esc(fam.label)})</wa-option>
-        <wa-option value="none">tutta la libreria</wa-option>
+        <wa-option value="none">Tutta la libreria</wa-option>
       </wa-select>
-      <wa-checkbox size="s" class="rk-check" data-opt="oneshot" ${o.oneshot ? 'checked' : ''}>solo one-shot</wa-checkbox>
-      <wa-checkbox size="s" class="rk-check" data-opt="avoid" ${o.avoid ? 'checked' : ''}>evita sample già nel kit</wa-checkbox>`);
+      <wa-checkbox size="s" class="rk-check" data-opt="oneshot" ${o.oneshot ? 'checked' : ''}>Solo one-shot</wa-checkbox>
+      <wa-checkbox size="s" class="rk-check" data-opt="avoid" ${o.avoid ? 'checked' : ''}>Evita sample già nel kit</wa-checkbox>`);
     if (o.mode === 'manual') {
       html.push(`<div class="filter-title">Scegli i simili <span id="rk-pick-count">${this.manual.picked.length}/${pads.length - 1}</span></div>
         <div id="rk-cands" class="rk-cands">${similarOk ? '<div class="hint">Carico…</div>' : '<div class="hint">Serve un seed della Libreria.</div>'}</div>`);
@@ -788,7 +788,7 @@ export class DrumRackEditor {
   async sendTarget() {
     await this.ensure();
     const g = this.groupOf(this.pad);
-    return `gruppo ${g + 1} · ${this.famById[this.settings(g).family].label}`;
+    return `Gruppo ${g + 1} · ${this.famById[this.settings(g).family].label}`;
   }
 
   // From the Library / Online "Invia" menu: the sample alone on a pad, or with its similars on the group.
@@ -836,10 +836,10 @@ export class DrumRackEditor {
       <div class="pop-title">${svg('dices')} Kit casuale</div>
       <div class="hint">Ogni gruppo prende un gruppo di sample simili scelto a caso tra quelli della sua famiglia, e sample a caso da lì.
         I gruppi bloccati restano com'erano.</div>
-      <wa-select size="s" class="pop-field" label="Gruppi" data-o="scope" value="${o.scope}"><wa-option value="all">tutti (non bloccati)</wa-option>
-          <wa-option value="empty">solo quelli vuoti</wa-option></wa-select>
-      <wa-input size="s" class="pop-field" label="Solo dalla cartella / pack (facoltativo)" data-o="folder" value="${esc(o.folder)}" placeholder="es. Cymatics"></wa-input>
-      <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>solo one-shot (niente loop)</wa-checkbox>
+      <wa-select size="s" class="pop-field" label="Gruppi" data-o="scope" value="${o.scope}"><wa-option value="all">Tutti (non bloccati)</wa-option>
+          <wa-option value="empty">Solo quelli vuoti</wa-option></wa-select>
+      <wa-input size="s" class="pop-field" label="Solo dalla cartella / pack (facoltativo)" data-o="folder" value="${esc(o.folder)}" placeholder="Es. Cymatics"></wa-input>
+      <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>Solo one-shot (niente loop)</wa-checkbox>
       ${dynControls(o, 'gruppi')}
       <div class="pop-actions">${btn('Genera', { variant: 'brand', icon: 'dices', 'data-go': true })}</div>`);
     wireDynControls(pop);
@@ -867,9 +867,9 @@ export class DrumRackEditor {
       <div class="hint">Sceglie una configurazione suonabile a caso (al massimo pedale + 1 pad di kick, 3 di snare/clap)
         e riempie ogni gruppo con sample simili tra loro, ognuno da un gruppo di suoni diverso. Il pedale prende un kick.
         Con un gruppo bloccato la configurazione resta quella attuale.</div>
-      <wa-checkbox size="s" class="pop-check" data-o="keep" ${o.keep ? 'checked' : ''}>mantieni la configurazione attuale</wa-checkbox>
-      <wa-input size="s" class="pop-field" label="Solo dalla cartella / pack (facoltativo)" data-o="folder" value="${esc(o.folder)}" placeholder="es. Cymatics"></wa-input>
-      <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>solo one-shot (niente loop)</wa-checkbox>
+      <wa-checkbox size="s" class="pop-check" data-o="keep" ${o.keep ? 'checked' : ''}>Mantieni la configurazione attuale</wa-checkbox>
+      <wa-input size="s" class="pop-field" label="Solo dalla cartella / pack (facoltativo)" data-o="folder" value="${esc(o.folder)}" placeholder="Es. Cymatics"></wa-input>
+      <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>Solo one-shot (niente loop)</wa-checkbox>
       ${dynControls(o, 'gruppi')}
       <div class="pop-actions">${btn('Genera', { variant: 'brand', icon: 'dices', 'data-go': true })}</div>`);
     wireDynControls(pop);

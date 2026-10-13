@@ -258,7 +258,7 @@ export class SamplerEditor {
       : `<a href="#" data-folder="${esc(c.path)}">${esc(c.name)}</a>`).join(' › ');
     const body = `<div class="sp-lib">
         ${text(r.q, { id: 'sp-lib-q', placeholder: 'Cerca per nome o cartella in tutta la libreria', 'with-clear': true })}
-        <div class="sp-lib-crumbs">${crumbs}${r.q ? ' › <b>ricerca</b>' : ''}</div>
+        <div class="sp-lib-crumbs">${crumbs}${r.q ? ' › <b>Ricerca</b>' : ''}</div>
         <div class="sp-lib-rows">${rows.join('') || '<div class="hint">Nessun file audio qui.</div>'}</div>
         ${r.more ? `<div class="hint">… e altri ${r.more}: affina la ricerca.</div>` : ''}
       </div>`;
@@ -400,7 +400,7 @@ export class SamplerEditor {
       <span class="hint">${fmt(s.duration)} · ${s.sr} Hz · ${s.channels === 1 ? 'mono' : 'stereo'}${who}${
         s.truncated ? ' · aperti solo i primi 20 minuti' : ''}</span>${page}
       ${s.origin === 'capture' ? `<span class="hint sp-note-inline">${icon('triangle-alert')} solo uso personale</span>` : ''}
-      ${src?.suspect ? `<span class="sp-badge warn" title="Sembra materiale commerciale ricaricato con una licenza libera">verifica i diritti</span>` : ''}`;
+      ${src?.suspect ? `<span class="sp-badge warn" title="Sembra materiale commerciale ricaricato con una licenza libera">Verifica i diritti</span>` : ''}`;
     const a = box.querySelector('.sp-page');
     if (a) a.onclick = (e) => { e.preventDefault(); this.api.open_url(a.dataset.url); };
   }

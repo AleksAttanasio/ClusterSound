@@ -25,12 +25,13 @@ const FLATS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 const PC = Object.fromEntries([...SHARPS.map((n, i) => [n, i]), ...FLATS.map((n, i) => [n, i])]);
 const FLAT_KEYS = { major: [1, 3, 5, 6, 8, 10], minor: [0, 2, 3, 5, 7, 10] };
 const FUNC_COLOR = { T: '#4caf50', S: '#6ea8fe', D: '#ff9f43', C: '#c77dff' };
-const FUNC_LABEL = { T: 'tonica', S: 'sottodominante', D: 'dominante', C: 'colore / prestito modale' };
+const FUNC_LABEL = { T: 'Tonica', S: 'Sottodominante', D: 'Dominante', C: 'Colore / prestito modale' };
 const SNAPS = [[16, '1 battuta'], [8, '1/2'], [4, '1/4'], [2, '1/8'], [1, '1/16']];
 const VERSION_NAMES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const STYLE_BADGE = { block: '▤', strum: '⟋', arp: '⋰' };
 const NO_PRESET = '_'; // wa-option values cannot be empty
 const xs = (label, o = {}) => btn(label, { size: 'xs', ...o });
+const cap = (t) => (t ? t[0].toUpperCase() + t.slice(1) : t); // backend reasons are lowercase phrases
 // Tools living inside the active tab: vary (with an explanatory tooltip), duplicate, delete.
 // `attr` is the action attribute the bar's click handler reads (data-act / data-mact).
 const tabTools = (attr, id, tip, { dupTitle, addTitle, delTitle, canDel }) =>
@@ -56,12 +57,12 @@ const MEL = -1;       // clip index of melody events in the transport
 const ROLE_PRESET = { lead: 'lead', riff: 'lead', arp: 'pluck', bass: 'bass', pad: 'pad', keys: 'ep' };
 const ROLE_COLOR = { lead: '#ffb84d', bass: '#5aa9e6', arp: '#7bc96f', riff: '#ef7b6b', pad: '#b096e0', keys: '#e3cf5d' };
 const GEN_HINT = {
-  lead: "note dell'accordo sui tempi forti, la scala in mezzo",
-  bass: 'fondamentale sul primo tempo, ottave/quinte/passaggi, nota di avvicinamento al prossimo accordo',
-  arp: "le note dell'accordo in sequenza",
-  riff: 'una cellula di una battuta che segue gli accordi',
-  pad: 'accordi tenuti, voicing legati',
-  keys: 'accordi ritmati (comping)',
+  lead: "Note dell'accordo sui tempi forti, la scala in mezzo",
+  bass: 'Fondamentale sul primo tempo, ottave/quinte/passaggi, nota di avvicinamento al prossimo accordo',
+  arp: "Le note dell'accordo in sequenza",
+  riff: 'Una cellula di una battuta che segue gli accordi',
+  pad: 'Accordi tenuti, voicing legati',
+  keys: 'Accordi ritmati (comping)',
 };
 const PARTS = [['both', 'Accordi + melodia'], ['chords', 'Solo accordi'], ['melody', 'Solo melodia']];
 
@@ -499,7 +500,7 @@ export class ComposeEditor {
           <wa-radio-group id="cp-keymode" class="seg" orientation="horizontal" size="s" value="locked" label="Tonalità" title="Bloccata: solo accordi della tonalità, cambiare tonalità traspone tutto. Libera: accordi da qualunque tonalità, trasponibili uno per uno.">
             <wa-radio appearance="button" value="locked"><wa-icon name="lock"></wa-icon>Tonalità</wa-radio><wa-radio appearance="button" value="free"><wa-icon name="lock-open"></wa-icon>Libera</wa-radio></wa-radio-group>
           <wa-select id="cp-tonic" size="s" class="cp-select cp-key" title="Tonalità della progressione">${tonics(true)}</wa-select>
-          <wa-select id="cp-mode" size="s" class="cp-select cp-kmode"><wa-option value="major">maggiore</wa-option><wa-option value="minor">minore</wa-option></wa-select>
+          <wa-select id="cp-mode" size="s" class="cp-select cp-kmode"><wa-option value="major">Maggiore</wa-option><wa-option value="minor">Minore</wa-option></wa-select>
           <div class="spacer"></div>
           <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-melmute" title="Melodia: on / muta"><wa-icon name="music" label="Melodia"></wa-icon></wa-button>
           <wa-button class="cp-play" variant="brand" size="s" id="cp-play" title="Play / stop (Spazio)"><wa-icon name="play" label="Play"></wa-icon></wa-button>
@@ -534,7 +535,7 @@ export class ComposeEditor {
         </div>
         <div class="cp-bottom">
           <section class="cp-suggest">
-            <div class="cp-sec-title"><span id="cp-sug-title">Prossimo accordo</span><span class="hint">clic: ascolta · + o doppio clic: aggiungi</span></div>
+            <div class="cp-sec-title"><span id="cp-sug-title">Prossimo accordo</span><span class="hint">Clic: ascolta · + o doppio clic: aggiungi</span></div>
             <div id="cp-sug" class="cp-sug"></div>
           </section>
           <section class="cp-inspector" id="cp-insp"></section>
@@ -1011,8 +1012,8 @@ export class ComposeEditor {
         <div class="cp-sug-head"><span class="cp-deg" style="--fc:${FUNC_COLOR[it.func]}">${esc(it.degree)}</span><b>${esc(it.chord.name)}</b>
           <button class="cp-add" data-add title="Aggiungi dopo">${svg('plus', 12)}</button></div>
         <div class="cp-score"><i style="width:${Math.round(it.score * 100)}%"></i></div>
-        <div class="cp-reasons">${esc(it.reasons.join(' · ') || FUNC_LABEL[it.func])}</div>
-        ${it.alts.length ? `<div class="cp-alts">${it.alts.map((a, j) => `<span class="chip" data-alt="${j}" title="clic: ascolta · doppio clic: aggiungi">${esc(a.name)}</span>`).join('')}</div>` : ''}
+        <div class="cp-reasons">${esc(cap(it.reasons.join(' · ')) || FUNC_LABEL[it.func])}</div>
+        ${it.alts.length ? `<div class="cp-alts">${it.alts.map((a, j) => `<span class="chip" data-alt="${j}" title="Clic: ascolta · doppio clic: aggiungi">${esc(a.name)}</span>`).join('')}</div>` : ''}
       </div>`).join('') || '<div class="cp-empty">Nessun suggerimento: controlla la cartella del chord pack.</div>';
   }
 
@@ -1446,7 +1447,7 @@ export class ComposeEditor {
     const mode = this.mode;
     if (!c) {
       const st = { play: mergeStyle(this.meta.styles.defaultPlay, mode.play), swing: mode.swing };
-      box.innerHTML = `<div class="cp-sec-title"><span>Modalità <b>${esc(mode.name)}</b>: come si suona</span><span class="hint">vale per tutti gli accordi senza esecuzione propria</span></div>
+      box.innerHTML = `<div class="cp-sec-title"><span>Modalità <b>${esc(mode.name)}</b>: come si suona</span><span class="hint">Vale per tutti gli accordi senza esecuzione propria</span></div>
         ${this._playEditor(st, { swing: true })}`;
       this._bindPlayEditor(box, st, (n) => this.edit(() => { mode.play = n.play; mode.swing = n.swing; }));
       return;
@@ -1476,10 +1477,10 @@ export class ComposeEditor {
       <div class="cp-sec-title"><span>Esecuzione</span>
         <wa-checkbox size="s" class="cp-own" data-own ${own ? 'checked' : ''}>propria${multi ? ' (tutti i selezionati)' : ''}</wa-checkbox></div>
       ${own ? `<div class="cp-srow"><span>Ritmica</span><wa-select size="xs" class="cp-select cp-rsel" data-rsel value="${esc(rsel)}">
-          <wa-option value="inherit">quella della modalità</wa-option>
-          <wa-option value="sustain">tenuto (un colpo)</wa-option>
+          <wa-option value="inherit">Quella della modalità</wa-option>
+          <wa-option value="sustain">Tenuto (un colpo)</wa-option>
           ${this.meta.styles.presets.map(([k, l]) => `<wa-option value="preset:${k}">${esc(l)}</wa-option>`).join('')}
-          ${rsel === 'preset:' ? '<wa-option value="preset:">personalizzata</wa-option>' : ''}</wa-select></div>
+          ${rsel === 'preset:' ? '<wa-option value="preset:">Personalizzata</wa-option>' : ''}</wa-select></div>
         ${this._playEditor(st, { swing: false })}`
         : `<div class="hint">Suona come la modalità <b>${esc(mode.name)}</b>. Attiva "propria" per suonare questo accordo diversamente (altro strum, arpeggio, tenuto…).</div>`}`;
     box.querySelectorAll('[data-p]').forEach((b) => {
@@ -1556,8 +1557,8 @@ export class ComposeEditor {
       ${row('Accenti', range('play.humanize.accent', 0, 40, 5, h.accent, '%', 'Più forte sul primo e sui battere, più leggero in levare'))}
       <div class="cp-subtitle">Dinamica e alternanza</div>
       ${row('Dinamica', sel('play.velCurve', m.velCurves, p.velCurve))}
-      ${row('Alterna', `${sel('play.alternate.every', [['off', 'no'], ['hit', 'a ogni colpo'], ['bar', 'a ogni battuta']], p.alternate.every)}
-        ${p.alternate.every !== 'off' ? `<span class="cp-tokens">${p.alternate.tokens.map((t, i) => chipBtn(`data-tokdel="${i}" title="Rimuovi"`, `${esc(tokLabel[t] || t)}<wa-icon slot="end" name="x"></wa-icon>`, true)).join('') || '<span class="hint">aggiungi:</span>'}</span>
+      ${row('Alterna', `${sel('play.alternate.every', [['off', 'No'], ['hit', 'A ogni colpo'], ['bar', 'A ogni battuta']], p.alternate.every)}
+        ${p.alternate.every !== 'off' ? `<span class="cp-tokens">${p.alternate.tokens.map((t, i) => chipBtn(`data-tokdel="${i}" title="Rimuovi"`, `${esc(tokLabel[t] || t)}<wa-icon slot="end" name="x"></wa-icon>`, true)).join('') || '<span class="hint">Aggiungi:</span>'}</span>
           <span class="cp-tokadd">${m.tokens.filter(([t]) => p.alternate.every === 'bar' || t !== 'arp').map(([t, l]) => chipBtn(`data-tokadd="${t}"`, `<wa-icon slot="start" name="plus"></wa-icon>${esc(l)}`)).join('')}</span>` : ''}`)}
     </div>`;
   }
@@ -1764,7 +1765,7 @@ export class ComposeEditor {
 
   _miniGrid(mode) {
     const g = mode.rhythm;
-    if (!g.on) return '<div class="cp-minigrid"><span class="hint">accordi tenuti</span></div>';
+    if (!g.on) return '<div class="cp-minigrid"><span class="hint">Accordi tenuti</span></div>';
     return `<div class="cp-minigrid">${g.vel.map((v, j) => `<i class="${j % 4 === 0 ? 'beat' : ''}" style="opacity:${v ? 0.35 + 0.65 * v / 127 : 0.08}"></i>`).join('')}</div>`;
   }
 
@@ -1856,7 +1857,7 @@ export class ComposeEditor {
         ${this.layers.length > 1 ? `<button class="cp-lbtn" data-ldel title="Elimina il layer">${svg('x', 11)}</button>` : ''}</span>`).join('')}
       ${xs('Layer', { icon: 'plus', 'with-caret': true, 'data-mel': 'add', title: "Un'altra linea sugli stessi accordi: basso, arpeggio, riff, pad, keys…" })}
       <span class="cp-sep"></span>
-      <span class="hint">${n ? `${n} note` : 'vuoto'}${this.melSel.size ? ` · ${this.melSel.size} selezionate` : ''}</span>
+      <span class="hint">${n ? `${n} note` : 'Vuoto'}${this.melSel.size ? ` · ${this.melSel.size} selezionate` : ''}</span>
       ${xs('Importa', { icon: 'upload', 'with-caret': true, 'data-mel': 'import', title: 'Da file MIDI, da una clip di Ableton o dalla tastiera MIDI' })}
       <wa-button-group label="Ottava">
         ${xs('−8va', { 'data-mel': 'down', disabled: !n, title: "Un'ottava sotto (selezione o tutto il layer)" })}${xs('+8va', { 'data-mel': 'up', disabled: !n, title: "Un'ottava sopra (selezione o tutto il layer)" })}
@@ -2140,17 +2141,17 @@ export class ComposeEditor {
         <label class="cp-field">Densità ${sel('data-g="density"', g.density, opts(M.densities))}</label>
         ${R.shapes.length ? `<label class="cp-field">${esc(R.shapeLabel)} ${sel('data-g="contour"', g.contour, opts(R.shapes))}</label>` : ''}
         <label class="cp-field">Da ${sel('data-g="lo"', g.lo, pitches(), 'cp-pitch')} a ${sel('data-g="hi"', g.hi, pitches(), 'cp-pitch')}</label>
-        <wa-checkbox size="s" class="cp-own" data-g="sel" ${g.sel ? 'checked' : ''} title="Seleziona uno o più accordi sulla corsia: il resto della melodia resta com'è">solo sugli accordi selezionati</wa-checkbox>
+        <wa-checkbox size="s" class="cp-own" data-g="sel" ${g.sel ? 'checked' : ''} title="Seleziona uno o più accordi sulla corsia: il resto della melodia resta com'è">Solo sugli accordi selezionati</wa-checkbox>
         ${xs('Genera', { variant: 'brand', icon: 'dices', 'data-gen': true })}
       </div>
       <div class="cp-vlist" data-glist>${this._genList()}</div>`;
     const keyLabel = `Tonalità della versione (${keyName(this.seq.key)})`;
     $('#cp-mharm').innerHTML = `
-      <div class="cp-sec-title"><span>Accordi dalla melodia</span><span class="hint">ogni accordo contiene le note della melodia, concatenati come i suggerimenti</span></div>
+      <div class="cp-sec-title"><span>Accordi dalla melodia</span><span class="hint">Ogni accordo contiene le note della melodia, concatenati come i suggerimenti</span></div>
       <div class="cp-mform">
         <label class="cp-field">Ritmo armonico ${sel('data-h="rate"', h.rate, opts(M.rates))}</label>
         <label class="cp-field">Tonalità ${sel('data-h="key"', h.key, opts([['seq', keyLabel], ['auto', 'Rileva dalla melodia']]))}</label>
-        <wa-checkbox size="s" class="cp-own" data-h="related" ${h.related ? 'checked' : ''}>anche accordi in prestito (tonalità vicine)</wa-checkbox>
+        <wa-checkbox size="s" class="cp-own" data-h="related" ${h.related ? 'checked' : ''}>Anche accordi in prestito (tonalità vicine)</wa-checkbox>
         ${xs('Armonizza', { variant: 'brand', icon: 'music', 'data-harm': true })}
       </div>
       <div class="cp-vlist" data-hlist>${this._harmList()}</div>`;

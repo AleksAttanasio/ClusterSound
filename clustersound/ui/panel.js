@@ -79,7 +79,7 @@ export class Panel {
 
       <div>
         <div class="section-title">Dinamica
-          <span class="legend-inline"><span style="color:#8a8a8a">onda</span><span style="color:#ececec">RMS dB</span></span>
+          <span class="legend-inline"><span style="color:#8a8a8a">Onda</span><span style="color:#ececec">RMS dB</span></span>
         </div>
         ${dyn.error ? `<div class="error">${esc(dyn.error)}</div>` : '<canvas class="wave" id="cv-wave"></canvas><canvas class="mel" id="cv-mel"></canvas>'}
       </div>

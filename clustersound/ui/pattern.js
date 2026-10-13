@@ -12,7 +12,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const LS_KEY = 'clustersound.pattern';
 const KIND_BADGE = { library: 'LIB', online: 'WEB', file: 'FILE' };
-const ALT_MODES = [['off', 'insieme'], ['cycle', 'a giro'], ['random', 'casuale'], ['random_pass', 'casuale ogni giro']];
+const ALT_MODES = [['off', 'Insieme'], ['cycle', 'A giro'], ['random', 'Casuale'], ['random_pass', 'Casuale ogni giro']];
 // buses where alternating samples makes no sense by default (one kick, one FX, a melodic bass)
 export const NO_ALT = new Set(['kick', 'fx', 'bass']);
 export const newSeed = () => Math.floor(Math.random() * 2 ** 32) >>> 0;
@@ -24,7 +24,7 @@ export const dynControls = (o, what = 'bus') => `
       <wa-checkbox size="s" class="pop-check" data-o="dyn" ${o.dyn ? 'checked' : ''} title="Attacco, decay e coda simili, relativi allo strumento: un kit tutto secco o tutto ambientale">dinamica simile tra i ${what}</wa-checkbox>
       <div class="pop-field" data-dyn-margin ${o.dyn ? '' : 'hidden'}><span class="pop-row"><span>Margine di similarità</span><span data-dyn-v>${Math.round((o.margin ?? 0.3) * 100)}%</span></span>
         <wa-slider size="s" min="0.05" max="1" step="0.05" value="${o.margin ?? 0.3}" data-o="margin" label="Margine di similarità"></wa-slider>
-        <span class="pop-scale"><span>stretto</span><span>largo</span></span></div>`;
+        <span class="pop-scale"><span>Stretto</span><span>Largo</span></span></div>`;
 export function wireDynControls(pop) {
   const box = pop.querySelector('[data-o=dyn]'), field = pop.querySelector('[data-dyn-margin]');
   box.onchange = () => {
@@ -238,8 +238,8 @@ export class PatternEditor {
       <div class="pop-title">${svg('dices')} Kit casuale</div>
       <div class="hint">Per ogni bus non bloccato (lucchetto chiuso) sceglie a caso un gruppo di sample simili delle sue classi e ne prende sample a caso. Il groove non cambia.</div>
       <wa-select size="s" class="pop-field" label="Sample per bus" data-o="variants" value="${o.variants}">${[1, 2, 4].map((n) => `<wa-option value="${n}">${n}${n > 1 ? ' (alternati a caso)' : ''}</wa-option>`).join('')}</wa-select>
-      <wa-input size="s" class="pop-field" label="Solo dalla cartella / pack (facoltativo)" data-o="folder" value="${esc(o.folder)}" placeholder="es. Cymatics"></wa-input>
-      <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>solo one-shot (niente loop)</wa-checkbox>
+      <wa-input size="s" class="pop-field" label="Solo dalla cartella / pack (facoltativo)" data-o="folder" value="${esc(o.folder)}" placeholder="Es. Cymatics"></wa-input>
+      <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>Solo one-shot (niente loop)</wa-checkbox>
       ${dynControls(o)}
       <div class="pop-actions">${btn('Genera', { variant: 'brand', icon: 'dices', 'data-go': true })}</div>`);
     wireDynControls(pop);
@@ -590,7 +590,7 @@ export class PatternEditor {
     return `<div class="pt-layer ${sel ? 'sel' : ''}" data-bus="${id}" data-layer="${j}">
       <div class="pt-lhead">
         <span class="pt-lbadge ${l.ref?.kind || ''}" title="${esc(l.ref?.kind === 'online' ? (l.ref.source_label || '') : (l.ref?.path || ''))}">${badge}</span>
-        <span class="pt-lname" data-act="select-layer" title="${esc(l.name)} — clic per selezionarlo come layer da sostituire">${esc(l.name || 'vuoto')}${lic}</span>
+        <span class="pt-lname" data-act="select-layer" title="${esc(l.name)} — clic per selezionarlo come layer da sostituire">${esc(l.name || 'Vuoto')}${lic}</span>
         <button class="pt-ib" data-act="audition" title="Ascolta">${svg('play', 11)}</button>
         <button class="pt-ib" data-act="next" title="Prossimo candidato della classe">${svg('refresh-cw', 11)}</button>
         <button class="pt-ib" data-act="choose" title="Scegli sample…">${svg('search', 11)}</button>
@@ -599,7 +599,7 @@ export class PatternEditor {
         <label title="Volume layer"><wa-slider size="xs" min="0" max="1.5" step="0.01" value="${l.volume}" data-lfield="volume" label="Volume layer"></wa-slider></label>
         <label title="Pitch (semitoni)">± <wa-number-input size="xs" without-steppers min="-24" max="24" step="1" value="${l.pitch}" data-lfield="pitch"></wa-number-input></label>
         <label title="Offset (ms) per allineare i transienti">ms <wa-number-input size="xs" without-steppers min="-50" max="200" step="1" value="${l.offset_ms}" data-lfield="offset_ms"></wa-number-input></label>
-        ${id === 'bass' ? `<label title="Nota del sample (radice), per l'intonazione">root <wa-number-input size="xs" without-steppers min="0" max="127" value="${l.root ?? ''}" placeholder="auto" data-lfield="root"></wa-number-input></label>`
+        ${id === 'bass' ? `<label title="Nota del sample (radice), per l'intonazione">Root <wa-number-input size="xs" without-steppers min="0" max="127" value="${l.root ?? ''}" placeholder="Auto" data-lfield="root"></wa-number-input></label>`
           : `<button class="pt-ib ${l.steps ? 'on' : ''}" data-act="own-steps" title="Step propri per questo layer">${svg('layout-grid', 11)}</button>`}
         <button class="pt-ib danger" data-act="del-layer" title="Rimuovi layer">${svg('x', 11)}</button>
       </div>
@@ -621,7 +621,7 @@ export class PatternEditor {
         rows.push(`<div class="pt-bus bass" data-bus="${id}">
           <div class="pt-head"><span class="caret" data-act="expand">${svg(open ? 'chevron-down' : 'chevron-right')}</span>
             <span class="dot" style="background:${bdef.color}"></span><span class="pt-name">${bdef.label}</span>
-            <span class="pt-nl">${nl ? `${nl} layer` : 'nessun sample'}</span>${this._lock(id, b)}${this._mix(id, b)}</div>
+            <span class="pt-nl">${nl ? `${nl} layer` : 'Nessun sample'}</span>${this._lock(id, b)}${this._mix(id, b)}</div>
           ${this._roll(b, n)}
           ${open ? `<div class="pt-layers">${b.layers.map((l, j) => this._layerRow(id, b, l, j)).join('')}
             ${btn('layer', { size: 'xs', icon: 'plus', cls: 'pt-add', 'data-act': 'add-layer', 'data-bus': id })}</div>` : ''}
