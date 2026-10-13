@@ -1,39 +1,39 @@
-# Modelli AI
+# AI models
 
-ClusterSound usa quattro modelli, tutti **in locale**: l'audio non lascia mai il computer e nessun servizio esterno
-viene interpellato (la rete serve solo a scaricare una volta i pesi degli extra).
+ClusterSound uses four models, all **local**: the audio never leaves the computer and no external service is
+contacted (the network is only used to download the weights of the extras once).
 
-| Modello | Funzione | Runtime | Peso | Sempre presente |
+| Model | Function | Runtime | Size | Always present |
 |---|---|---|---|---|
-| [YAMNet](yamnet.md) (Google, MobileNet v1 su AudioSet) | embedding 1024-d e score su 521 classi | **numpy puro** | 6,9 MB (float16) | sì |
-| [Head MLP](classificatore.md) base + di libreria | classificazione nelle 34 classi | numpy | 0,6 MB + addestrata al volo | sì |
-| [Demucs](demucs.md) `htdemucs_6s` (Meta) | separazione in 6 stem | PyTorch (extra `stems`) | ~55 MB | no |
-| [Apollo](apollo.md) (Li & Luo, 2024) | restauro di audio compresso | PyTorch (extra `enhance`) | 66 MB | no |
+| [YAMNet](yamnet.md) (Google, MobileNet v1 on AudioSet) | 1024-d embedding and scores on 521 classes | **pure numpy** | 6.9 MB (float16) | yes |
+| [MLP head](classifier.md) base + library | classification into the 34 classes | numpy | 0.6 MB + trained on the fly | yes |
+| [Demucs](demucs.md) `htdemucs_6s` (Meta) | separation into 6 stems | PyTorch (`stems` extra) | ~55 MB | no |
+| [Apollo](apollo.md) (Li & Luo, 2024) | restoration of compressed audio | PyTorch (`enhance` extra) | 66 MB | no |
 
 ```mermaid
 flowchart LR
   W["Audio"] --> Y["YAMNet<br/>(numpy)"]
-  W --> F["Feature<br/>acustiche"]
-  N["Nome e cartelle"] --> C
-  Y --> C["Classificatore<br/>(fusione + MLP)"]
+  W --> F["Acoustic<br/>features"]
+  N["Name and folders"] --> C
+  Y --> C["Classifier<br/>(fusion + MLP)"]
   F --> C
-  Y --> M["Mappa 3D<br/>e simili"]
+  Y --> M["3D map<br/>and similar"]
   C --> M
 ```
 
-## Scelte architetturali
+## Architectural choices
 
-- **Niente framework per l'analisi.** YAMNet è riscritto in numpy (convoluzioni come matmul BLAS, BatchNorm fuso
-  nei pesi). Rispetto a TensorFlow o a onnxruntime (~70 MB da solo) l'app resta piccola, parte in fretta e non ha
-  dipendenze native da distribuire.
-- **Un modello generico + una piccola rete addestrata sui tuoi dati.** YAMNet non conosce "closed hat" o "808":
-  le sue rappresentazioni però separano bene questi suoni. Una head MLP trasforma l'embedding nelle 34 classi; una
-  seconda head si **auto-addestra su ogni libreria** usando come etichette i nomi dei file (e le tue correzioni).
-- **Fusione esplicita, non una scatola nera.** Nome, zero-shot di YAMNet, regole acustiche e head sono sommati in
-  log-probabilità con pesi fissi e tarati con `tools/evaluate.py`: ogni segnale è ispezionabile e il sistema
-  degrada bene quando uno manca (es. file senza nome).
-- **Modelli pesanti isolati.** PyTorch è un extra; Apollo gira in un **processo separato** che termina a fine
-  lavoro restituendo tutta la memoria; Demucs viene importato solo quando parte una separazione. Entrambi
-  lavorano **a blocchi** con dissolvenza incrociata, per avere memoria costante, avanzamento e annullamento.
-- **Device automatico.** `paths.torch_device()` sceglie CUDA, poi Apple MPS, poi CPU; se un'operazione manca
-  sulla GPU, il lavoro prosegue su CPU.
+- **No framework for the analysis.** YAMNet is rewritten in numpy (convolutions as BLAS matmuls, BatchNorm folded
+  into the weights). Compared to TensorFlow or onnxruntime (~70 MB on its own) the app stays small, starts fast and
+  has no native dependencies to ship.
+- **A generic model + a small network trained on your data.** YAMNet does not know "closed hat" or "808": its
+  representations, however, separate these sounds well. An MLP head turns the embedding into the 34 classes; a
+  second head **self-trains on every library** using the file names (and your corrections) as labels.
+- **Explicit fusion, not a black box.** Name, YAMNet zero-shot, acoustic rules and heads are summed in
+  log-probability with fixed weights tuned with `tools/evaluate.py`: every signal can be inspected and the system
+  degrades gracefully when one is missing (e.g. files without a name).
+- **Heavy models isolated.** PyTorch is an extra; Apollo runs in a **separate process** that ends when the job is
+  done, giving all the memory back; Demucs is imported only when a separation starts. Both work **in blocks** with a
+  crossfade, for constant memory, progress and cancellation.
+- **Automatic device.** `paths.torch_device()` picks CUDA, then Apple MPS, then CPU; if an operation is missing on
+  the GPU, the job goes on on the CPU.
