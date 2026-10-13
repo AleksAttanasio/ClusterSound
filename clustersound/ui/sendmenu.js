@@ -1,5 +1,7 @@
-// Popup "Invia": route a sample (library, online or file) to a sequencer bus (as a new layer or replacing
+// "Send" popup: route a sample (library, online or file) to a sequencer bus (as a new layer or replacing
 // the current one) or to the Drum Rack. Used from the 3D view, the list, the detail panel and the Online tab.
+
+import { t } from './i18n.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const LS_SIMILAR = 'clustersound.sendSimilar';
@@ -23,7 +25,7 @@ function onOutside(e) {
 }
 
 // buses: ui buses (id, label, color, melodic); counts: bus id -> number of layers (for the hint);
-// rack: {target: 'Gruppo 3 · Kick', onAdd(similar, open)} for the Drum Rack section
+// rack: {target: 'Group 3 · Kick', onAdd(similar, open)} for the Drum Rack section
 export function showSendMenu({ x, y, ref, buses, counts = {}, onPick, rack }) {
   closeSendMenu();
   const sug = suggestBus(buses, ref.cls);
@@ -33,19 +35,19 @@ export function showSendMenu({ x, y, ref, buses, counts = {}, onPick, rack }) {
   const canSimilar = ref.kind === 'library';
   const el = document.createElement('div');
   el.className = 'send-menu';
-  el.innerHTML = `<div class="send-title" title="${esc(ref.name)}">Invia · <b>${esc(ref.name)}</b></div>
+  el.innerHTML = `<div class="send-title" title="${esc(ref.name)}">${t('Send')} · <b>${esc(ref.name)}</b></div>
     ${rack ? `<div class="send-sec">Drum Rack <span>${esc(rack.target)}</span></div>
     <div class="send-rack">
-      <wa-button size="xs" appearance="filled-outlined" data-rack="add" title="Mette il sample sul pad selezionato (o sul primo libero del gruppo)"><wa-icon slot="start" name="plus"></wa-icon>Aggiungi</wa-button>
-      <wa-button size="xs" appearance="filled-outlined" data-rack="open" title="Aggiunge e passa alla scheda Drum Rack"><wa-icon slot="start" name="layout-grid"></wa-icon>Aggiungi e apri</wa-button>
-      ${canSimilar ? `<wa-checkbox size="xs" class="send-sim" data-sim ${similar ? 'checked' : ''} title="Riempie tutto il gruppo con questo sample e i suoi simili">Con i simili</wa-checkbox>` : ''}
+      <wa-button size="xs" appearance="filled-outlined" data-rack="add" title="${t('Puts the sample on the selected pad (or on the first free one of the group)')}"><wa-icon slot="start" name="plus"></wa-icon>${t('Add')}</wa-button>
+      <wa-button size="xs" appearance="filled-outlined" data-rack="open" title="${t('Adds it and switches to the Drum Rack tab')}"><wa-icon slot="start" name="layout-grid"></wa-icon>${t('Add and open')}</wa-button>
+      ${canSimilar ? `<wa-checkbox size="xs" class="send-sim" data-sim ${similar ? 'checked' : ''} title="${t('Fills the whole group with this sample and its similar ones')}">${t('With similar ones')}</wa-checkbox>` : ''}
     </div>` : ''}
     <div class="send-sec">Sequencer</div>
     ${ordered.map((b) => `<div class="send-row ${b.id === sug ? 'sug' : ''}" data-bus="${b.id}">
-      <span class="dot" style="background:${b.color}"></span><span class="send-bus">${esc(b.label)}${b.id === sug ? ' <i>consigliato</i>' : ''}</span>
-      <span class="send-count">${counts[b.id] ? counts[b.id] + ' layer' : 'Vuoto'}</span>
-      <wa-button size="xs" appearance="filled-outlined" data-mode="add" title="Aggiungi come nuovo layer del bus"><wa-icon slot="start" name="plus"></wa-icon>Layer</wa-button>
-      <wa-button size="xs" appearance="filled-outlined" data-mode="replace" title="Sostituisci il layer selezionato (o il primo)" ${counts[b.id] ? '' : 'disabled'}>Sostituisci</wa-button>
+      <span class="dot" style="background:${b.color}"></span><span class="send-bus">${esc(b.label)}${b.id === sug ? ` <i>${t('suggested')}</i>` : ''}</span>
+      <span class="send-count">${counts[b.id] ? (counts[b.id] === 1 ? t('1 layer') : t('{n} layers', { n: counts[b.id] })) : t('Empty')}</span>
+      <wa-button size="xs" appearance="filled-outlined" data-mode="add" title="${t('Add as a new layer of the bus')}"><wa-icon slot="start" name="plus"></wa-icon>Layer</wa-button>
+      <wa-button size="xs" appearance="filled-outlined" data-mode="replace" title="${t('Replace the selected layer (or the first one)')}" ${counts[b.id] ? '' : 'disabled'}>${t('Replace')}</wa-button>
     </div>`).join('')}`;
   document.body.appendChild(el);
   const W = window.innerWidth, H = window.innerHeight;

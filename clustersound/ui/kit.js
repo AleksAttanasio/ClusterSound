@@ -14,8 +14,8 @@ registerIconLibrary('default', { resolver: (name) => new URL(`${name}.svg`, ICON
 // Platform words for hints and tooltips: shortcuts (⌘ on the Mac, Ctrl on Windows) and the file manager.
 export const IS_MAC = /Mac/i.test(navigator.platform || navigator.userAgent);
 export const MOD = IS_MAC ? '⌘' : 'Ctrl+';
-export const SHIFT_MOD = IS_MAC ? '⇧⌘' : 'Ctrl+Maiusc+';
-export const FILE_MANAGER = IS_MAC ? 'Finder' : 'Esplora file';
+export const SHIFT_MOD = IS_MAC ? '⇧⌘' : 'Ctrl+Shift+';
+export const FILE_MANAGER = IS_MAC ? 'Finder' : 'File Explorer';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
