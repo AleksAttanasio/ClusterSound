@@ -38,7 +38,8 @@ in parallel, for Apple Silicon, Intel and Windows x64, with all the extras (`mid
     ```
 
 The workflow stops if the tag is not on `main` or differs from the version in `pyproject.toml`. Run by hand from
-the *Actions* tab, it only builds and leaves the zips as workflow artifacts.
+the *Actions* tab, it only builds (all platforms, or just `macos` or `windows`) and leaves the zips as
+workflow artifacts.
 
 The app is signed ad hoc, not notarized: on first launch macOS asks to open it with right-click › **Open** (or
 `xattr -cr ClusterSound.app`). The Windows exe is not signed: SmartScreen asks for *More info* › **Run

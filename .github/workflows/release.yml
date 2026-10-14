@@ -1,18 +1,25 @@
 name: release
 
 # A vX.Y.Z tag on main builds, in parallel, ClusterSound.app for Apple Silicon and Intel and ClusterSound.exe for
-# Windows x64, and publishes the three zips as a GitHub Release. Run by hand (workflow_dispatch) it only builds and
-# keeps the zips as workflow artifacts.
+# Windows x64, and publishes the three zips as a GitHub Release. Run by hand (workflow_dispatch) it only builds, for
+# all platforms or just macOS or Windows, and keeps the zips as workflow artifacts.
 on:
   push:
     tags: ["v*.*.*"]
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: Platforms to build
+        type: choice
+        options: [all, macos, windows]
+        default: all
 
 permissions:
   contents: write
 
 jobs:
   build:
+    if: inputs.platforms != 'windows'  # empty on a tag push: always built
     strategy:
       fail-fast: false
       matrix:
@@ -81,6 +88,7 @@ jobs:
           if-no-files-found: error
 
   build-windows:
+    if: inputs.platforms != 'macos'
     runs-on: windows-latest
     defaults:
       run:

@@ -38,7 +38,8 @@ su GitHub l'app per Apple Silicon, Intel e Windows x64, con tutti gli extra (`mi
     ```
 
 Il workflow si ferma se il tag non è su `main` o non coincide con la versione in `pyproject.toml`. Lanciato a mano
-dalla scheda *Actions*, costruisce soltanto e lascia gli zip come artifact del workflow.
+dalla scheda *Actions*, costruisce soltanto (tutte le piattaforme, o solo `macos` o `windows`) e lascia gli zip come
+artifact del workflow.
 
 L'app è firmata ad hoc, non notarizzata: al primo avvio macOS chiede di aprirla con tasto destro › **Apri** (o
 `xattr -cr ClusterSound.app`). L'exe per Windows non è firmato: SmartScreen chiede *Ulteriori informazioni* ›
