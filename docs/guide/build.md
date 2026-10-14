@@ -21,3 +21,23 @@ PyInstaller only builds for the system it runs on.
 
 Demucs and PyTorch are included only if installed in the build environment. Details on the spec and the native
 helper in [Development and tests](../technical/development.md#packaging).
+
+## Automatic releases
+
+Pushing a `vX.Y.Z` tag runs the `release` workflow (`.github/workflows/release.yml`): it builds the app on GitHub
+for Apple Silicon and Intel, with all the extras (`midi`, `capture`, `stems`, `enhance`), and publishes
+`ClusterSound-X.Y.Z-macos-arm64.zip` and `ClusterSound-X.Y.Z-macos-x86_64.zip` as a
+[GitHub Release](https://github.com/AleksAttanasio/ClusterSound/releases).
+
+1. Set `version` in `pyproject.toml` (the bundle reads it from there) and merge `develop` into `main`.
+2. Tag the merge on `main` and push the tag:
+
+    ```bash
+    git tag -a vX.Y.Z -m "ClusterSound X.Y.Z" && git push origin vX.Y.Z
+    ```
+
+The workflow stops if the tag is not on `main` or differs from the version in `pyproject.toml`. Run by hand from
+the *Actions* tab, it only builds and leaves the zips as workflow artifacts.
+
+The app is signed ad hoc, not notarized: on first launch macOS asks to open it with right-click › **Open** (or
+`xattr -cr ClusterSound.app`).

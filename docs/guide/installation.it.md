@@ -21,6 +21,12 @@
 
 Senza `uv` su macOS: `python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"`.
 
+## App pronta (macOS)
+
+Scarica lo zip per il tuo Mac (`arm64` per Apple Silicon, `x86_64` per Intel) dalla pagina
+[Releases](https://github.com/AleksAttanasio/ClusterSound/releases): contiene `ClusterSound.app` con tutti gli
+extra. L'app non è notarizzata: la prima volta aprila con tasto destro › **Apri**.
+
 ## Extra opzionali
 
 Le funzioni pesanti sono extra, da installare solo se servono:
