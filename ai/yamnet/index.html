@@ -1,12 +1,12 @@
 
 <!doctype html>
-<html lang="it" class="no-js">
+<html lang="en" class="no-js">
   <head>
     
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Classifica, esplora in 3D e mette al lavoro una libreria di sample audio.">
+        <meta name="description" content="Classify, explore in 3D and put to work a library of audio samples.">
       
       
       
@@ -16,7 +16,7 @@
         <link rel="prev" href="../">
       
       
-        <link rel="next" href="../classificatore/">
+        <link rel="next" href="../classifier/">
       
       
       <link rel="icon" href="../../assets/favicon.svg">
@@ -79,7 +79,7 @@
       
         
         <a href="#yamnet" class="md-skip">
-          Vai al contenuto
+          Skip to content
         </a>
       
     </div>
@@ -91,7 +91,7 @@
       
 
 <header class="md-header" data-md-component="header">
-  <nav class="md-header__inner md-grid" aria-label="Intestazione">
+  <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="ClusterSound" class="md-header__button md-logo" aria-label="ClusterSound" data-md-component="logo">
       
   <img src="../../assets/logo.svg" alt="logo">
@@ -124,9 +124,9 @@
     
     
     
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Tema chiaro"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Light theme"  type="radio" name="__palette" id="__palette_0">
     
-      <label class="md-header__button md-icon" title="Tema chiaro" for="__palette_1" hidden>
+      <label class="md-header__button md-icon" title="Light theme" for="__palette_1" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
       </label>
     
@@ -134,9 +134,9 @@
     
     
     
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Tema scuro"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Dark theme"  type="radio" name="__palette" id="__palette_1">
     
-      <label class="md-header__button md-icon" title="Tema scuro" for="__palette_0" hidden>
+      <label class="md-header__button md-icon" title="Dark theme" for="__palette_0" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
       </label>
     
@@ -148,6 +148,32 @@
       <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
     
     
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../../it/ai/yamnet/" hreflang="it" class="md-select__link">
+              Italiano
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
     
       <label class="md-header__button md-icon" for="__search">
         
@@ -157,16 +183,16 @@
   <label class="md-search__overlay" for="__search"></label>
   <div class="md-search__inner" role="search">
     <form class="md-search__form" name="search">
-      <input type="text" class="md-search__input" name="query" aria-label="Cerca" placeholder="Cerca" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
       <label class="md-search__icon md-icon" for="__search">
         
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
         
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
       </label>
-      <nav class="md-search__options" aria-label="Cerca">
+      <nav class="md-search__options" aria-label="Search">
         
-        <button type="reset" class="md-search__icon md-icon" title="Cancella" aria-label="Cancella" tabindex="-1">
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
           
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
@@ -179,7 +205,7 @@
       <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
         <div class="md-search-result" data-md-component="search-result">
           <div class="md-search-result__meta">
-            Inizializza la ricerca
+            Initializing search
           </div>
           <ol class="md-search-result__list" role="presentation"></ol>
         </div>
@@ -190,7 +216,7 @@
     
     
       <div class="md-header__source">
-        <a href="https://github.com/AleksAttanasio/ClusterSound" title="Apri repository" class="md-source" data-md-component="source">
+        <a href="https://github.com/AleksAttanasio/ClusterSound" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
@@ -239,12 +265,12 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../guida/" class="md-tabs__link">
+        <a href="../../guide/" class="md-tabs__link">
           
   
     
   
-  Guida rapida
+  Quick start
 
         </a>
       </li>
@@ -259,12 +285,12 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../manuale/" class="md-tabs__link">
+        <a href="../../manual/" class="md-tabs__link">
           
   
     
   
-  Manuale
+  Manual
 
         </a>
       </li>
@@ -279,12 +305,12 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../tecnica/" class="md-tabs__link">
+        <a href="../../technical/" class="md-tabs__link">
           
   
     
   
-  Tecnica
+  Technical
 
         </a>
       </li>
@@ -306,7 +332,7 @@
   
     
   
-  Modelli AI
+  AI models
 
         </a>
       </li>
@@ -321,12 +347,12 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../algoritmi/" class="md-tabs__link">
+        <a href="../../algorithms/" class="md-tabs__link">
           
   
     
   
-  Algoritmi
+  Algorithms
 
         </a>
       </li>
@@ -341,12 +367,12 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../riferimento/classi/" class="md-tabs__link">
+        <a href="../../reference/classes/" class="md-tabs__link">
           
   
     
   
-  Riferimento
+  Reference
 
         </a>
       </li>
@@ -374,7 +400,7 @@
   
 
 
-<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigazione" data-md-level="0">
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="ClusterSound" class="md-nav__button md-logo" aria-label="ClusterSound" data-md-component="logo">
       
@@ -385,7 +411,7 @@
   </label>
   
     <div class="md-nav__source">
-      <a href="https://github.com/AleksAttanasio/ClusterSound" title="Apri repository" class="md-source" data-md-component="source">
+      <a href="https://github.com/AleksAttanasio/ClusterSound" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
@@ -458,11 +484,11 @@
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../guida/" class="md-nav__link ">
+            <a href="../../guide/" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
-    Guida rapida
+    Quick start
   </span>
   
 
@@ -478,7 +504,7 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
-            Guida rapida
+            Quick start
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -491,11 +517,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guida/installazione/" class="md-nav__link">
+      <a href="../../guide/installation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Installazione
+    Installation
   </span>
   
 
@@ -512,11 +538,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guida/primo-avvio/" class="md-nav__link">
+      <a href="../../guide/first-launch/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Primo avvio
+    First launch
   </span>
   
 
@@ -533,7 +559,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guida/ableton-live/" class="md-nav__link">
+      <a href="../../guide/ableton-live/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -554,11 +580,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guida/build/" class="md-nav__link">
+      <a href="../../guide/build/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Build dell'app
+    Building the app
   </span>
   
 
@@ -575,11 +601,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guida/risoluzione-problemi/" class="md-nav__link">
+      <a href="../../guide/troubleshooting/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Risoluzione problemi
+    Troubleshooting
   </span>
   
 
@@ -644,11 +670,11 @@
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../manuale/" class="md-nav__link ">
+            <a href="../../manual/" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
-    Manuale
+    Manual
   </span>
   
 
@@ -664,7 +690,7 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
-            Manuale
+            Manual
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -677,11 +703,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../manuale/interfaccia/" class="md-nav__link">
+      <a href="../../manual/interface/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Interfaccia
+    Interface
   </span>
   
 
@@ -698,11 +724,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../manuale/libreria/" class="md-nav__link">
+      <a href="../../manual/library/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Libreria
+    Library
   </span>
   
 
@@ -719,7 +745,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../manuale/store/" class="md-nav__link">
+      <a href="../../manual/store/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -740,7 +766,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../manuale/recorder/" class="md-nav__link">
+      <a href="../../manual/recorder/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -761,7 +787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../manuale/sequencer/" class="md-nav__link">
+      <a href="../../manual/sequencer/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -782,7 +808,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../manuale/drum-rack/" class="md-nav__link">
+      <a href="../../manual/drum-rack/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -803,7 +829,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../manuale/compose/" class="md-nav__link">
+      <a href="../../manual/compose/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -824,11 +850,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../manuale/melodia/" class="md-nav__link">
+      <a href="../../manual/melody/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Melodia
+    Melody
   </span>
   
 
@@ -845,7 +871,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../manuale/max-for-live/" class="md-nav__link">
+      <a href="../../manual/max-for-live/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -908,11 +934,11 @@
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../tecnica/" class="md-nav__link ">
+            <a href="../../technical/" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
-    Tecnica
+    Technical
   </span>
   
 
@@ -928,7 +954,7 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
-            Tecnica
+            Technical
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -941,11 +967,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tecnica/architettura/" class="md-nav__link">
+      <a href="../../technical/architecture/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Architettura
+    Architecture
   </span>
   
 
@@ -962,7 +988,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tecnica/backend/" class="md-nav__link">
+      <a href="../../technical/backend/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -983,7 +1009,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tecnica/frontend/" class="md-nav__link">
+      <a href="../../technical/frontend/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1004,11 +1030,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tecnica/dati-e-persistenza/" class="md-nav__link">
+      <a href="../../technical/data-and-persistence/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Dati e persistenza
+    Data and persistence
   </span>
   
 
@@ -1025,11 +1051,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tecnica/integrazione-live/" class="md-nav__link">
+      <a href="../../technical/live-integration/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Integrazione con Live
+    Live integration
   </span>
   
 
@@ -1046,11 +1072,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tecnica/sviluppo/" class="md-nav__link">
+      <a href="../../technical/development/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Sviluppo e test
+    Development and tests
   </span>
   
 
@@ -1114,7 +1140,7 @@
               
   
   <span class="md-ellipsis">
-    Modelli AI
+    AI models
   </span>
   
 
@@ -1130,7 +1156,7 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
-            Modelli AI
+            AI models
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -1175,7 +1201,7 @@
       
         
 
-<nav class="md-nav md-nav--secondary" aria-label="Indice">
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
   
   
   
@@ -1184,41 +1210,41 @@
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
-      Indice
+      Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#front-end-log-mel-frontendpy" class="md-nav__link">
+  <a href="#log-mel-front-end-frontendpy" class="md-nav__link">
     <span class="md-ellipsis">
-      Front-end log-mel (frontend.py)
+      Log-mel front end (frontend.py)
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#rete-yamnet_nppy" class="md-nav__link">
+  <a href="#network-yamnet_nppy" class="md-nav__link">
     <span class="md-ellipsis">
-      Rete (yamnet_np.py)
+      Network (yamnet_np.py)
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#pooling-sulle-patch-embedderpy" class="md-nav__link">
+  <a href="#pooling-over-the-patches-embedderpy" class="md-nav__link">
     <span class="md-ellipsis">
-      Pooling sulle patch (embedder.py)
+      Pooling over the patches (embedder.py)
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#come-vengono-usati" class="md-nav__link">
+  <a href="#how-they-are-used" class="md-nav__link">
     <span class="md-ellipsis">
-      Come vengono usati
+      How they are used
     </span>
   </a>
   
@@ -1240,11 +1266,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../classificatore/" class="md-nav__link">
+      <a href="../classifier/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Classificatore
+    Classifier
   </span>
   
 
@@ -1265,7 +1291,7 @@
         
   
   <span class="md-ellipsis">
-    Demucs (stem)
+    Demucs (stems)
   </span>
   
 
@@ -1286,7 +1312,7 @@
         
   
   <span class="md-ellipsis">
-    Apollo (Migliora)
+    Apollo (Enhance)
   </span>
   
 
@@ -1351,11 +1377,11 @@
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../algoritmi/" class="md-nav__link ">
+            <a href="../../algorithms/" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
-    Algoritmi
+    Algorithms
   </span>
   
 
@@ -1371,7 +1397,7 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
-            Algoritmi
+            Algorithms
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -1384,11 +1410,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algoritmi/analisi-audio/" class="md-nav__link">
+      <a href="../../algorithms/audio-analysis/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Analisi audio
+    Audio analysis
   </span>
   
 
@@ -1405,11 +1431,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algoritmi/classificazione/" class="md-nav__link">
+      <a href="../../algorithms/classification/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Classificazione
+    Classification
   </span>
   
 
@@ -1426,11 +1452,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algoritmi/clustering-e-mappa/" class="md-nav__link">
+      <a href="../../algorithms/clustering-and-map/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Clustering e mappa 3D
+    Clustering and 3D map
   </span>
   
 
@@ -1447,11 +1473,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algoritmi/drum-rack/" class="md-nav__link">
+      <a href="../../algorithms/drum-rack/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Scelta dei sample nei Drum Rack
+    Choosing the Drum Rack samples
   </span>
   
 
@@ -1468,11 +1494,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algoritmi/sequencer/" class="md-nav__link">
+      <a href="../../algorithms/sequencer/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Sequencer e groove
+    Sequencer and groove
   </span>
   
 
@@ -1489,11 +1515,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algoritmi/armonia/" class="md-nav__link">
+      <a href="../../algorithms/harmony/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Armonia e accordi
+    Harmony and chords
   </span>
   
 
@@ -1510,11 +1536,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algoritmi/melodia/" class="md-nav__link">
+      <a href="../../algorithms/melody/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Melodia
+    Melody
   </span>
   
 
@@ -1531,11 +1557,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algoritmi/recorder-e-slicing/" class="md-nav__link">
+      <a href="../../algorithms/recorder-and-slicing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Recorder e slicing
+    Recorder and slicing
   </span>
   
 
@@ -1552,7 +1578,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algoritmi/store/" class="md-nav__link">
+      <a href="../../algorithms/store/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1607,7 +1633,7 @@
             
   
   <span class="md-ellipsis">
-    Riferimento
+    Reference
   </span>
   
 
@@ -1617,7 +1643,7 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
-            Riferimento
+            Reference
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -1628,11 +1654,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../riferimento/classi/" class="md-nav__link">
+      <a href="../../reference/classes/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Classi
+    Classes
   </span>
   
 
@@ -1649,11 +1675,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../riferimento/impostazioni/" class="md-nav__link">
+      <a href="../../reference/settings/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Impostazioni
+    Settings
   </span>
   
 
@@ -1670,11 +1696,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../riferimento/scorciatoie/" class="md-nav__link">
+      <a href="../../reference/shortcuts/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Scorciatoie
+    Shortcuts
   </span>
   
 
@@ -1704,7 +1730,7 @@
                   <div class="md-sidebar__inner">
                     
 
-<nav class="md-nav md-nav--secondary" aria-label="Indice">
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
   
   
   
@@ -1713,41 +1739,41 @@
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
-      Indice
+      Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#front-end-log-mel-frontendpy" class="md-nav__link">
+  <a href="#log-mel-front-end-frontendpy" class="md-nav__link">
     <span class="md-ellipsis">
-      Front-end log-mel (frontend.py)
+      Log-mel front end (frontend.py)
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#rete-yamnet_nppy" class="md-nav__link">
+  <a href="#network-yamnet_nppy" class="md-nav__link">
     <span class="md-ellipsis">
-      Rete (yamnet_np.py)
+      Network (yamnet_np.py)
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#pooling-sulle-patch-embedderpy" class="md-nav__link">
+  <a href="#pooling-over-the-patches-embedderpy" class="md-nav__link">
     <span class="md-ellipsis">
-      Pooling sulle patch (embedder.py)
+      Pooling over the patches (embedder.py)
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#come-vengono-usati" class="md-nav__link">
+  <a href="#how-they-are-used" class="md-nav__link">
     <span class="md-ellipsis">
-      Come vengono usati
+      How they are used
     </span>
   </a>
   
@@ -1772,96 +1798,96 @@
 
 
 <h1 id="yamnet">YAMNet<a class="headerlink" href="#yamnet" title="Permanent link">&para;</a></h1>
-<p><a href="https://github.com/tensorflow/models/tree/master/research/audioset/yamnet">YAMNet</a> è una MobileNet v1 di Google
-addestrata su <strong>AudioSet</strong> (521 classi di eventi sonori). In ClusterSound fornisce due cose:</p>
+<p><a href="https://github.com/tensorflow/models/tree/master/research/audioset/yamnet">YAMNet</a> is a Google MobileNet v1
+trained on <strong>AudioSet</strong> (521 sound event classes). In ClusterSound it provides two things:</p>
 <ul>
-<li>un <strong>embedding a 1024 dimensioni</strong> per ogni sample: la base di somiglianza, sottocluster, mappa 3D e della head
-  di classificazione;</li>
-<li><strong>score su 521 classi AudioSet</strong>, usati come segnale <em>zero-shot</em> (es. <em>Snare drum</em>, <em>Hi-hat</em>, <em>Clapping</em>).</li>
+<li>a <strong>1024-dimensional embedding</strong> for every sample: the basis of similarity, subclusters, 3D map and of the
+  classification head;</li>
+<li><strong>scores on 521 AudioSet classes</strong>, used as a <em>zero-shot</em> signal (e.g. <em>Snare drum</em>, <em>Hi-hat</em>, <em>Clapping</em>).</li>
 </ul>
-<h2 id="front-end-log-mel-frontendpy">Front-end log-mel (<code>frontend.py</code>)<a class="headerlink" href="#front-end-log-mel-frontendpy" title="Permanent link">&para;</a></h2>
-<p>Riproduce esattamente le feature del modello originale, in numpy:</p>
+<h2 id="log-mel-front-end-frontendpy">Log-mel front end (<code>frontend.py</code>)<a class="headerlink" href="#log-mel-front-end-frontendpy" title="Permanent link">&para;</a></h2>
+<p>It reproduces exactly the features of the original model, in numpy:</p>
 <table>
 <thead>
 <tr>
-<th>Parametro</th>
-<th>Valore</th>
+<th>Parameter</th>
+<th>Value</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Frequenza</td>
+<td>Sample rate</td>
 <td>16 kHz mono</td>
 </tr>
 <tr>
-<td>Finestra / hop</td>
-<td>25 ms (400 campioni) / 10 ms (160), Hann periodica, FFT 512</td>
+<td>Window / hop</td>
+<td>25 ms (400 samples) / 10 ms (160), periodic Hann, FFT 512</td>
 </tr>
 <tr>
 <td>Mel</td>
-<td>64 bande HTK, 125–7500 Hz, <code>log(mel + 0.001)</code></td>
+<td>64 HTK bands, 125–7500 Hz, <code>log(mel + 0.001)</code></td>
 </tr>
 <tr>
 <td>Patch</td>
-<td>96 frame × 64 bande (0,96 s), hop di 48 frame (0,48 s)</td>
+<td>96 frames × 64 bands (0.96 s), hop of 48 frames (0.48 s)</td>
 </tr>
 </tbody>
 </table>
-<p>Il segnale viene prima normalizzato a picco 0,9 e tagliato a 10 s; il padding garantisce almeno una patch.</p>
-<h2 id="rete-yamnet_nppy">Rete (<code>yamnet_np.py</code>)<a class="headerlink" href="#rete-yamnet_nppy" title="Permanent link">&para;</a></h2>
-<p>MobileNet v1 in layout NHWC con padding "SAME" di TensorFlow:</p>
+<p>The signal is first normalised to a 0.9 peak and cut at 10 s; padding guarantees at least one patch.</p>
+<h2 id="network-yamnet_nppy">Network (<code>yamnet_np.py</code>)<a class="headerlink" href="#network-yamnet_nppy" title="Permanent link">&para;</a></h2>
+<p>MobileNet v1 in NHWC layout with TensorFlow "SAME" padding:</p>
 <ol>
-<li>conv 3×3 standard, 32 canali, stride 2 (implementata come <em>im2col</em> + matmul);</li>
-<li>13 blocchi <strong>depthwise-separable</strong>: depthwise 3×3 (nove shift moltiplicati e sommati) + pointwise 1×1
-   (matmul BLAS), ReLU dopo ciascuno; stride <code>[2,1,2,1,2,1,2,1,1,1,1,1,2,1]</code> sui 14 layer;</li>
-<li><em>global average pooling</em> → embedding 1024-d;</li>
-<li>layer lineare 1024 → 521 e sigmoide → score.</li>
+<li>standard 3×3 conv, 32 channels, stride 2 (implemented as <em>im2col</em> + matmul);</li>
+<li>13 <strong>depthwise-separable</strong> blocks: 3×3 depthwise (nine shifts multiplied and summed) + 1×1 pointwise
+   (BLAS matmul), ReLU after each; strides <code>[2,1,2,1,2,1,2,1,1,1,1,1,2,1]</code> on the 14 layers;</li>
+<li><em>global average pooling</em> → 1024-d embedding;</li>
+<li>linear layer 1024 → 521 and sigmoid → scores.</li>
 </ol>
-<p>La BatchNorm è <strong>fusa nei pesi</strong> in fase di conversione (scala = 1/√(var + 1e-4)), quindi a runtime ci sono solo
-moltiplicazioni e somme. I 70 array sono salvati in <strong>float16</strong> (<code>models/yamnet.npz</code>, 6,9 MB) e convertiti in
-float32 al caricamento; il modello è un singleton caricato alla prima analisi e protetto da un lock.</p>
-<p>La conversione dai pesi Keras originali (<code>yamnet.h5</code>) è in <code>tools/build_yamnet_npz.py</code>.</p>
-<h2 id="pooling-sulle-patch-embedderpy">Pooling sulle patch (<code>embedder.py</code>)<a class="headerlink" href="#pooling-sulle-patch-embedderpy" title="Permanent link">&para;</a></h2>
-<p>Un sample produce N patch (elaborate a gruppi di 16). Per non far pesare il silenzio o la coda:</p>
+<p>BatchNorm is <strong>folded into the weights</strong> at conversion time (scale = 1/√(var + 1e-4)), so at runtime there are only
+multiplications and sums. The 70 arrays are saved in <strong>float16</strong> (<code>models/yamnet.npz</code>, 6.9 MB) and converted to
+float32 on load; the model is a singleton loaded at the first analysis and protected by a lock.</p>
+<p>The conversion from the original Keras weights (<code>yamnet.h5</code>) is in <code>tools/build_yamnet_npz.py</code>.</p>
+<h2 id="pooling-over-the-patches-embedderpy">Pooling over the patches (<code>embedder.py</code>)<a class="headerlink" href="#pooling-over-the-patches-embedderpy" title="Permanent link">&para;</a></h2>
+<p>A sample produces N patches (processed in groups of 16). So that silence or the tail do not weigh in:</p>
 <ul>
-<li>ogni patch ha un peso <code>softmax(energia log-mel media)</code>: le patch forti contano di più;</li>
-<li><strong>embedding</strong> e <code>scores_mean</code> = medie pesate; <code>scores_max</code> = massimo sulle patch.</li>
+<li>every patch has a weight <code>softmax(mean log-mel energy)</code>: loud patches count more;</li>
+<li><strong>embedding</strong> and <code>scores_mean</code> = weighted means; <code>scores_max</code> = maximum over the patches.</li>
 </ul>
-<p>Embedding, score e profilo mel vengono salvati in float16 nella cache.</p>
-<h2 id="come-vengono-usati">Come vengono usati<a class="headerlink" href="#come-vengono-usati" title="Permanent link">&para;</a></h2>
+<p>Embedding, scores and mel profile are saved in float16 in the cache.</p>
+<h2 id="how-they-are-used">How they are used<a class="headerlink" href="#how-they-are-used" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Uso</th>
-<th>Cosa</th>
-<th>Dove</th>
+<th>Use</th>
+<th>What</th>
+<th>Where</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>Zero-shot</td>
-<td><code>0,5·max + 0,5·mean</code> degli score, mappati sulle classi con pesi (es. Kick ← <em>Bass drum</em> 1,0, <em>Thump</em> 0,6)</td>
-<td><a href="../classificatore/">Classificatore</a></td>
+<td><code>0.5·max + 0.5·mean</code> of the scores, mapped onto the classes with weights (e.g. Kick ← <em>Bass drum</em> 1.0, <em>Thump</em> 0.6)</td>
+<td><a href="../classifier/">Classifier</a></td>
 </tr>
 <tr>
-<td>Classificazione</td>
-<td>embedding L2-normalizzato come input delle head MLP</td>
-<td><a href="../classificatore/">Classificatore</a></td>
+<td>Classification</td>
+<td>L2-normalised embedding as the input of the MLP heads</td>
+<td><a href="../classifier/">Classifier</a></td>
 </tr>
 <tr>
-<td>Somiglianza</td>
-<td>coseno tra embedding normalizzati (<em>Trova simili</em>, Drum Rack)</td>
-<td><a href="../../algoritmi/clustering-e-mappa/">Clustering</a></td>
+<td>Similarity</td>
+<td>cosine between normalised embeddings (<em>Find similar</em>, Drum Rack)</td>
+<td><a href="../../algorithms/clustering-and-map/">Clustering</a></td>
 </tr>
 <tr>
-<td>Struttura</td>
-<td>sottocluster k-means e mappa t-SNE</td>
-<td><a href="../../algoritmi/clustering-e-mappa/">Clustering</a></td>
+<td>Structure</td>
+<td>k-means subclusters and t-SNE map</td>
+<td><a href="../../algorithms/clustering-and-map/">Clustering</a></td>
 </tr>
 <tr>
-<td>Profilo</td>
-<td>spettro d'attacco, del corpo e inviluppo ricavati dal log-mel (144 valori)</td>
-<td><a href="../../algoritmi/analisi-audio/">Analisi audio</a></td>
+<td>Profile</td>
+<td>attack spectrum, body spectrum and envelope derived from the log-mel (144 values)</td>
+<td><a href="../../algorithms/audio-analysis/">Audio analysis</a></td>
 </tr>
 </tbody>
 </table>
@@ -1890,7 +1916,7 @@ float32 al caricamento; il modello è un singleton caricato alla prima analisi e
           <button type="button" class="md-top md-icon" data-md-component="top" hidden>
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
-  Torna su
+  Back to top
 </button>
         
       </main>
@@ -1899,33 +1925,33 @@ float32 al caricamento; il modello è un singleton caricato alla prima analisi e
   
     
       
-      <nav class="md-footer__inner md-grid" aria-label="Piede" >
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../" class="md-footer__link md-footer__link--prev" aria-label="Precedente: Modelli AI">
+          <a href="../" class="md-footer__link md-footer__link--prev" aria-label="Previous: AI models">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
             </div>
             <div class="md-footer__title">
               <span class="md-footer__direction">
-                Precedente
+                Previous
               </span>
               <div class="md-ellipsis">
-                Modelli AI
+                AI models
               </div>
             </div>
           </a>
         
         
           
-          <a href="../classificatore/" class="md-footer__link md-footer__link--next" aria-label="Successivo: Classificatore">
+          <a href="../classifier/" class="md-footer__link md-footer__link--next" aria-label="Next: Classifier">
             <div class="md-footer__title">
               <span class="md-footer__direction">
-                Successivo
+                Next
               </span>
               <div class="md-ellipsis">
-                Classificatore
+                Classifier
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -1963,7 +1989,7 @@ float32 al caricamento; il modello è un singleton caricato alla prima analisi e
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.indexes", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copiato", "clipboard.copy": "Copia", "search.result.more.one": "1 altro in questa pagina", "search.result.more.other": "# altri in questa pagina", "search.result.none": "Nessun documento trovato", "search.result.one": "1 documento trovato", "search.result.other": "# documenti trovati", "search.result.placeholder": "Scrivi per iniziare a cercare", "search.result.term.missing": "Non presente", "select.version": "Seleziona la versione"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.indexes", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
       <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
