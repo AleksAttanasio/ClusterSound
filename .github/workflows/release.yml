@@ -1,17 +1,25 @@
 name: release
 
-# A vX.Y.Z tag on main builds ClusterSound.app for Apple Silicon and Intel and publishes both zips as a GitHub
-# Release. Run by hand (workflow_dispatch) it only builds and keeps the zips as workflow artifacts.
+# A vX.Y.Z tag on main builds, in parallel, ClusterSound.app for Apple Silicon and Intel and ClusterSound.exe for
+# Windows x64, and publishes the three zips as a GitHub Release. Run by hand (workflow_dispatch) it only builds, for
+# all platforms or just macOS or Windows, and keeps the zips as workflow artifacts.
 on:
   push:
     tags: ["v*.*.*"]
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: Platforms to build
+        type: choice
+        options: [all, macos, windows]
+        default: all
 
 permissions:
   contents: write
 
 jobs:
   build:
+    if: inputs.platforms != 'windows'  # empty on a tag push: always built
     strategy:
       fail-fast: false
       matrix:
@@ -79,8 +87,69 @@ jobs:
           path: ${{ steps.zip.outputs.name }}
           if-no-files-found: error
 
+  build-windows:
+    if: inputs.platforms != 'macos'
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: version
+        run: echo "version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')" >> "$GITHUB_OUTPUT"
+
+      - name: Check tag against main and pyproject
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+            || { echo "::error::$GITHUB_REF_NAME is not on main"; exit 1; }
+          [ "$GITHUB_REF_NAME" = "v${{ steps.version.outputs.version }}" ] \
+            || { echo "::error::tag $GITHUB_REF_NAME != pyproject version ${{ steps.version.outputs.version }}"; exit 1; }
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        # PyTorch from PyPI is CPU-only on Windows (a CUDA build would make the zip over 2 GB);
+        # `capture` is macOS-only and skipped by its marker
+        run: |
+          python -m venv .venv
+          .venv/Scripts/python -m pip install --upgrade pip
+          .venv/Scripts/python -m pip install ".[dev,midi,capture,stems,enhance]"
+
+      - name: Build ClusterSound.exe
+        run: pwsh -File tools/build_app.ps1
+
+      - name: Smoke test
+        # a windowed exe returns at once: wait for it and check its exit code
+        shell: pwsh
+        run: |
+          $tmp = New-Item -ItemType Directory -Path (Join-Path $env:RUNNER_TEMP "smoke")
+          $p = Start-Process dist\ClusterSound\ClusterSound.exe -ArgumentList "--headless", "`"$tmp`"" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "ClusterSound.exe --headless exited with $($p.ExitCode)"; exit 1 }
+
+      - name: Zip
+        id: zip
+        run: |
+          name="ClusterSound-${{ steps.version.outputs.version }}-windows-x64.zip"
+          (cd dist && 7z a -tzip -mx=5 "../$name" ClusterSound >/dev/null)
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ClusterSound-windows-x64
+          path: ${{ steps.zip.outputs.name }}
+          if-no-files-found: error
+
   release:
-    needs: build
+    needs: [build, build-windows]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
@@ -94,10 +163,15 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           cat > notes.md <<'EOF'
-          **Download**: `macos-arm64` for Apple Silicon (M1 and later), `macos-x86_64` for Intel Macs.
+          **Download**: `macos-arm64` for Apple Silicon (M1 and later), `macos-x86_64` for Intel Macs,
+          `windows-x64` for Windows 10/11.
 
-          The app is not notarized: on first launch right-click ClusterSound.app → **Open**, or run
+          **macOS**: the app is not notarized: on first launch right-click ClusterSound.app → **Open**, or run
           `xattr -cr ClusterSound.app` once.
+
+          **Windows**: unzip and run `ClusterSound\ClusterSound.exe` (keep the whole folder). The exe is not signed:
+          if SmartScreen stops it, click **More info** → **Run anyway**. It needs the Edge WebView2 runtime, already
+          on Windows 11. *Extract stems* and *Enhance* run on the CPU.
           EOF
           gh release create "$GITHUB_REF_NAME" ClusterSound-*.zip \
             --title "ClusterSound ${GITHUB_REF_NAME#v}" --notes-file notes.md --generate-notes --verify-tag

@@ -21,11 +21,21 @@
 
 Senza `uv` su macOS: `python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"`.
 
-## App pronta (macOS)
+## App pronta
 
-Scarica lo zip per il tuo Mac (`arm64` per Apple Silicon, `x86_64` per Intel) dalla pagina
-[Releases](https://github.com/AleksAttanasio/ClusterSound/releases): contiene `ClusterSound.app` con tutti gli
-extra. L'app non è notarizzata: la prima volta aprila con tasto destro › **Apri**.
+Dalla pagina [Releases](https://github.com/AleksAttanasio/ClusterSound/releases), con tutti gli extra:
+
+=== "macOS"
+
+    Scarica lo zip per il tuo Mac (`arm64` per Apple Silicon, `x86_64` per Intel): contiene `ClusterSound.app`.
+    L'app non è notarizzata: la prima volta aprila con tasto destro › **Apri**.
+
+=== "Windows"
+
+    Scarica `ClusterSound-X.Y.Z-windows-x64.zip`, scompattalo e avvia `ClusterSound\ClusterSound.exe` (tieni
+    l'intera cartella). L'exe non è firmato: se SmartScreen lo blocca, *Ulteriori informazioni* › **Esegui
+    comunque**. Serve il runtime Edge WebView2 (già presente su Windows 11). *Estrai stem* e *Migliora* girano
+    su CPU.
 
 ## Extra opzionali
 
