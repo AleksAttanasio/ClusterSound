@@ -2,12 +2,14 @@
 # windowed). PyInstaller only builds for the system it runs on.
 #   pyinstaller --noconfirm ClusterSound.spec
 import sys
+import tomllib
 from pathlib import Path
 
 WIN = sys.platform == "win32"
 
 root = Path(SPECPATH)
 pkg = root / "clustersound"
+version = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
 
 datas = [
     (str(pkg / "models" / "yamnet.npz"), "clustersound/models"),
@@ -69,7 +71,8 @@ if not WIN:
         icon=str(root / "brand" / "ClusterSound.icns"),
         bundle_identifier="com.clustersound.app",
         info_plist={
-            "CFBundleShortVersionString": "1.0.0",
+            "CFBundleShortVersionString": version,
+            "CFBundleVersion": version,
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "12.0",
             "NSAudioCaptureUsageDescription": "Il Recorder registra l'audio in uscita dal Mac solo quando premi Registra.",
