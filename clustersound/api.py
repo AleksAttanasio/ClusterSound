@@ -184,6 +184,8 @@ class Api:
     def results(self) -> dict:
         """Columnar payload: compact enough for tens of thousands of points."""
         lib = self._lib
+        if any("cls" not in it for it in lib.items):  # mid-scan: analysed, not classified yet
+            return {"version": lib.version, "pending": True}
         items = lib.public_items()
         cls_index = {c["id"]: i for i, c in enumerate(taxonomy.ui_classes())}
         return {
