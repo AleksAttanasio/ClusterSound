@@ -102,6 +102,8 @@ async function main() {
 }
 
 // ------------------------------------------------------------------ sidebar
+const LS_CLS_COLLAPSED = 'cs.clsCollapsed';
+
 function buildSidebar() {
   $('#type-filters').innerHTML = state.types.map((ty, i) => `<wa-button size="xs" pill class="chip on" data-type="${i}">${esc(ty)}</wa-button>`).join('');
   $('#type-filters').onclick = (e) => {
@@ -112,10 +114,13 @@ function buildSidebar() {
     applyFilters();
   };
 
+  let collapsed = new Set();
+  try { collapsed = new Set(JSON.parse(localStorage.getItem(LS_CLS_COLLAPSED) || '[]')); } catch { /* private mode */ }
   const html = [];
   for (const g of state.groups) {
     const members = state.classes.map((c, i) => [c, i]).filter(([c]) => c.group === g);
-    html.push(`<div class="group" data-group="${esc(g)}"><div class="group-title" data-group="${esc(g)}"><span>${esc(t(g))}</span><span class="cls-count" data-gcount="${esc(g)}"></span></div>`);
+    html.push(`<div class="group ${collapsed.has(g) ? 'collapsed' : ''}" data-group="${esc(g)}"><div class="group-title" data-group="${esc(g)}" title="${t('Click: show/hide the whole group')}">
+      <span class="group-name"><span class="caret" data-collapse title="${t('Expand / collapse')}">${svg('chevron-down', 12)}</span>${esc(t(g))}</span><span class="cls-count" data-gcount="${esc(g)}"></span></div>`);
     for (const [c, i] of members) {
       html.push(`<div class="cls-row" data-cls="${i}" title="${t('Click: show/hide · Alt+click: only this class')}">
         <span class="dot" style="background:${c.color}"></span><span class="cls-name">${esc(c.label)}</span><span class="cls-count" data-count="${i}">0</span></div>`);
@@ -124,6 +129,14 @@ function buildSidebar() {
   }
   $('#class-list').innerHTML = html.join('');
   $('#class-list').onclick = (e) => {
+    const caret = e.target.closest('[data-collapse]');
+    if (caret) {
+      const grp = caret.closest('.group');
+      grp.classList.toggle('collapsed');
+      collapsed[grp.classList.contains('collapsed') ? 'add' : 'delete'](grp.dataset.group);
+      try { localStorage.setItem(LS_CLS_COLLAPSED, JSON.stringify([...collapsed])); } catch { /* private mode */ }
+      return;
+    }
     const row = e.target.closest('.cls-row');
     const gt = e.target.closest('.group-title');
     if (row) {
