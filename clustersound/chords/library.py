@@ -12,12 +12,13 @@ import threading
 from collections import Counter
 
 from ..patterns.midi import read_note_spans
+from ..i18n import N_
 from . import theory
 
 PPQ = 480
 STEP = PPQ // 4  # one sixteenth
 DEFAULT_DIR = os.path.expanduser("~/Documents/Unison MIDI Chord Pack")
-CATEGORIES = [("triad", "Triadi"), ("extended", "Estesi"), ("borrowed", "Prestito & modali"), ("progression", "Progressioni")]
+CATEGORIES = [("triad", N_("Triads")), ("extended", N_("Extended")), ("borrowed", N_("Borrowed & modal")), ("progression", N_("Progressions"))]
 _KEY_DIR = re.compile(r"^\s*\d*\s*-?\s*([A-G][b#]?)\s+Major\s*-\s*([A-G][b#]?)\s+Minor", re.I)
 
 

@@ -1,69 +1,71 @@
-# Apollo (Migliora)
+# Apollo (Enhance)
 
-[Apollo](https://github.com/JusperLee/Apollo) (Kai Li, Yi Luo, 2024; licenza **CC BY-SA 4.0**) è una rete per il
-**restauro di musica compressa**: ricostruisce le alte frequenze tagliate dai codec e attenua gli artefatti di MP3 e
-streaming. Circa **16,6 M parametri**, 66 MB di pesi.
+[Apollo](https://github.com/JusperLee/Apollo) (Kai Li, Yi Luo, 2024; **CC BY-SA 4.0** licence) is a network for the
+**restoration of compressed music**: it rebuilds the high frequencies cut by the codecs and softens the artefacts of
+MP3 and streaming. About **16.6 M parameters**, 66 MB of weights.
 
-## Architettura (`enhance/apollo_net.py`)
+## Architecture (`enhance/apollo_net.py`)
 
-Apollo lavora nel dominio tempo-frequenza con un approccio **band-split**:
+Apollo works in the time-frequency domain with a **band-split** approach:
 
 ```mermaid
 flowchart LR
-  A["STFT<br/>20 ms"] --> B["80 sotto-bande<br/>→ 256 canali"]
+  A["STFT<br/>20 ms"] --> B["80 sub-bands<br/>→ 256 channels"]
   B --> C["6 × BSNet<br/>Roformer + ICB"]
-  C --> D["Maschera complessa<br/>per banda"] --> E["iSTFT"]
+  C --> D["Complex mask<br/>per band"] --> E["iSTFT"]
 ```
 
-1. **STFT** a 44,1 kHz con finestra di 20 ms (882 campioni, hop 441).
-2. **Band split**: lo spettro è diviso in 80 sotto-bande; per ognuna parte reale/immaginaria normalizzate e
-   log-potenza passano da RMSNorm e da una Conv1d verso 256 canali.
-3. **6 blocchi BSNet**, ciascuno con:
-    - un **Roformer** non causale *tra le bande* (attenzione con RoPE, 8 teste, finestra 100, MLP con gate SiLU),
-      che modella le relazioni tra regioni dello spettro (come ricostruire le alte dalle basse);
-    - un **ICB** *lungo il tempo*: 3 blocchi residui con conv depthwise k=7, RMSNorm, 1×1 con espansione ×4, SiLU.
-4. Per ogni banda RMSNorm → Conv → GLU producono una **maschera/stima complessa**; l'iSTFT ricostruisce l'audio.
+1. **STFT** at 44.1 kHz with a 20 ms window (882 samples, hop 441).
+2. **Band split**: the spectrum is split into 80 sub-bands; for each one the normalised real/imaginary parts and the
+   log-power go through RMSNorm and a Conv1d to 256 channels.
+3. **6 BSNet blocks**, each with:
+    - a non-causal **Roformer** *across the bands* (attention with RoPE, 8 heads, window 100, MLP with SiLU gate),
+      which models the relations between regions of the spectrum (how to rebuild the highs from the lows);
+    - an **ICB** *along time*: 3 residual blocks with depthwise conv k=7, RMSNorm, 1×1 with ×4 expansion, SiLU.
+4. For every band RMSNorm → Conv → GLU produce a **complex mask/estimate**; the iSTFT rebuilds the audio.
 
-Il codice è un adattamento autonomo dell'originale: il checkpoint viene caricato con
-`torch.load(weights_only=True)` e degli stub inerti per le classi di configurazione serializzate, senza eseguire
-codice arbitrario dal file.
+The code is a self-contained adaptation of the original: the checkpoint is loaded with
+`torch.load(weights_only=True)` and inert stubs for the serialised configuration classes, without running
+arbitrary code from the file.
 
-## Esecuzione isolata
+## Isolated execution
 
 ```mermaid
 sequenceDiagram
   participant App
-  participant W as Worker (processo)
+  participant W as Worker (process)
   App->>W: python -m clustersound.enhance.worker IN OUT
-  W-->>App: {"progress": 0.3} (una riga JSON per evento)
+  W-->>App: {"progress": 0.3} (one JSON line per event)
   W-->>App: {"done": "OUT"}
-  Note over W: esce e libera tutta la memoria
+  Note over W: exits and frees all the memory
 ```
 
-- `runner.py` lancia un **processo separato** (l'app congelata rilancia sé stessa con `--enhance-worker`) e legge
-  JSON riga per riga da stdout: `progress`, `done`, `error`. *Annulla* termina il processo (kill dopo 5 s) e
-  cancella il file parziale.
-- L'app **non importa mai PyTorch**: la memoria del modello (~1,6 GB di picco) torna al sistema a fine lavoro.
+- `runner.py` launches a **separate process** (the frozen app launches itself again with `--enhance-worker`) and
+  reads JSON line by line from stdout: `progress`, `done`, `error`. *Cancel* ends the process (kill after 5 s) and
+  deletes the partial file.
+- The app **never imports PyTorch**: the memory of the model (~1.6 GB peak) goes back to the system when the job
+  ends.
 
-## Elaborazione (`enhance/worker.py`)
+## Processing (`enhance/worker.py`)
 
-| Aspetto | Scelta |
+| Aspect | Choice |
 |---|---|
-| Ricampionamento | a 44,1 kHz con soxr VHQ |
-| Blocchi | **2 s**, con **0,5 s** di contesto per lato (scartato) e **50 ms** di dissolvenza lineare |
-| Canali | uno alla volta (memoria dimezzata) |
-| Memoria GPU | cache di MPS/CUDA svuotata dopo ogni blocco |
-| Fallback | se un'operazione fallisce sulla GPU, il resto del lavoro va su CPU |
-| Uscita | frequenza = max(sorgente, 44,1 kHz); picchi oltre 0,999 scalati (niente clipping); WAV 24 bit |
+| Resampling | to 44.1 kHz with soxr VHQ |
+| Blocks | **2 s**, with **0.5 s** of context per side (discarded) and a **50 ms** linear crossfade |
+| Channels | one at a time (half the memory) |
+| GPU memory | MPS/CUDA cache emptied after every block |
+| Fallback | if an operation fails on the GPU, the rest of the job goes to the CPU |
+| Output | sample rate = max(source, 44.1 kHz); peaks above 0.999 scaled down (no clipping); 24-bit WAV |
 
-Il risultato è un nuovo file `… (migliorato).wav` accanto ai sample, con la stessa nota di licenza o provenienza.
+The result is a new `… (enhanced).wav` file next to the samples (`… (migliorato).wav` with the Italian interface),
+with the same licence or provenance note.
 
-## Costi misurati
+## Measured costs
 
-Apple Silicon (MPS), 30 s di audio stereo:
+Apple Silicon (MPS), 30 s of stereo audio:
 
 | | |
 |---|---|
-| Disco | 66 MB di pesi |
-| RAM, solo durante il lavoro | ~1,6 GB di picco |
-| Tempo | ~13 s, di cui ~2 s per caricare il modello |
+| Disk | 66 MB of weights |
+| RAM, only during the job | ~1.6 GB peak |
+| Time | ~13 s, of which ~2 s to load the model |

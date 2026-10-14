@@ -3,6 +3,7 @@ import threading
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
+from ..i18n import tr
 from . import archive, ccmixter, freesound, openverse
 from . import instruments as inst
 from .base import LICENSE_GROUPS, OnlineResult, SourceError
@@ -112,7 +113,7 @@ def search_source(name: str, p: dict, page: int, settings: dict, packs: bool = F
                 "page": page, "error": str(e), "needs_key": "API key" in str(e)}
     except Exception as e:  # unexpected payloads must not break the other sources
         return {"source": name, "label": LABELS[name], "results": [], "total": 0, "more": False,
-                "page": page, "error": f"risposta inattesa ({type(e).__name__})", "needs_key": False}
+                "page": page, "error": tr("unexpected response ({error})", error=type(e).__name__), "needs_key": False}
     results = [enrich(r) for r in results]
     remember(results)
     kept = [r for r in results if passes(r, p)]
@@ -131,7 +132,7 @@ def search(p: dict, settings: dict) -> dict:
 def expand(uid: str, p: dict) -> dict:
     parent = get(uid)
     if parent is None or parent.source != "archive":
-        return {"error": "pack non trovato", "files": [], "archives": []}
+        return {"error": tr("pack not found"), "files": [], "archives": []}
     try:
         files, archives = archive.expand(parent)
     except SourceError as e:
@@ -180,7 +181,7 @@ def pack(uid: str, page: int, settings: dict) -> dict:
                     "total": total, "more": more, "page": page, "archives": [],
                     "others": [_pack_card(o) for o in others]}
         if parent is None or not parent.is_pack:
-            return {"error": "pack non trovato"}
+            return {"error": tr("pack not found")}
         if parent.source == "archive":
             files, archives = archive.expand(parent)
             files = [enrich(f) for f in files]
@@ -227,7 +228,7 @@ def featured(settings: dict) -> dict:
     has_key = bool((settings or {}).get("freesound_key"))
     jobs = {
         "freesound_packs": lambda: search_source("freesound", {"sort": "downloads"}, 1, settings, packs=True)
-        if has_key else {"results": [], "error": "API key mancante", "needs_key": True},
+        if has_key else {"results": [], "error": tr("API key missing"), "needs_key": True},
         "archive_packs": lambda: search_source("archive", {"sort": "downloads"}, 1, settings),
         "cc0_new": lambda: search_source("freesound" if has_key else "openverse",
                                          {"licenses": ["cc0"], "sort": "newest"}, 1, settings),

@@ -10,13 +10,13 @@ def headless(folder: str, out: str | None) -> int:
 
     import os
     if not os.path.isdir(folder):
-        print(f"cartella non trovata: {folder}", file=sys.stderr)
+        print(f"folder not found: {folder}", file=sys.stderr)
         return 2
     lib = Library()
     lib.scan(folder)
     counts = Counter(it["cls"] for it in lib.items)
-    print(f"{len(lib.items)} sample analizzati, {len(lib.errors)} errori "
-          f"(head: {lib.stats.get('head_classes')} classi su {lib.stats.get('head_samples')} esempi)")
+    print(f"{len(lib.items)} samples analysed, {len(lib.errors)} errors "
+          f"(head: {lib.stats.get('head_classes')} classes on {lib.stats.get('head_samples')} examples)")
     for cls, n in counts.most_common():
         print(f"  {cls:14s} {n}")
     for e in lib.errors[:10]:
@@ -33,9 +33,9 @@ def main(argv=None) -> int:
         from .enhance import worker
         return worker.main(args[1:])
     ap = argparse.ArgumentParser(prog="clustersound")
-    ap.add_argument("--headless", metavar="DIR", help="analizza DIR senza GUI")
-    ap.add_argument("--out", help="file di report .csv o .json (con --headless)")
-    ap.add_argument("--debug", action="store_true", help="apre gli strumenti web inspector")
+    ap.add_argument("--headless", metavar="DIR", help="analyse DIR without the GUI")
+    ap.add_argument("--out", help="report file, .csv or .json (with --headless)")
+    ap.add_argument("--debug", action="store_true", help="open the web inspector tools")
     args, _ = ap.parse_known_args(argv)
     if args.headless:
         return headless(args.headless, args.out)

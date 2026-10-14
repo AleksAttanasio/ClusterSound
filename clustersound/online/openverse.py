@@ -1,6 +1,7 @@
 """Openverse audio API (anonymous): aggregates Freesound, Wikimedia Commons and Jamendo."""
 from concurrent.futures import ThreadPoolExecutor
 
+from ..i18n import tr
 from . import instruments as inst
 from .base import OnlineResult, clean_tags, http_get, normalize_license
 
@@ -56,7 +57,7 @@ def parse(data: dict) -> list[OnlineResult]:
             license_url=a.get("license_url") or "",
             duration=dur / 1000.0 if dur else None, tags=clean_tags(a.get("tags")),
             preview_url=a.get("url"), download_url=a.get("url"),
-            download_note="anteprima mp3 di Freesound" if sub == "freesound" else "",
+            download_note=tr("Freesound mp3 preview") if sub == "freesound" else "",
             page_url=a.get("foreign_landing_url") or "", format=a.get("filetype") or "",
             samplerate=a.get("sample_rate"), filesize=a.get("filesize"),
             extra={"attribution": a.get("attribution")}))

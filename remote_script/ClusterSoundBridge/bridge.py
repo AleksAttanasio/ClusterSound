@@ -31,7 +31,7 @@ class ClusterSoundBridge(ControlSurface):
         except socket.error as e:
             self._sock = None
             self.log_message("ClusterSoundBridge: cannot bind %d: %s" % (protocol.IN_PORT, e))
-            self.show_message("ClusterSoundBridge: porta %d occupata" % protocol.IN_PORT)
+            self.show_message("ClusterSoundBridge: port %d in use" % protocol.IN_PORT)
 
     def disconnect(self):
         if self._sock is not None:
@@ -95,7 +95,7 @@ class ClusterSoundBridge(ControlSurface):
         elif cmd == "load_audio":
             self._load_audio(msg, 0)
         else:
-            self._reply(msg, False, error="comando sconosciuto: %s" % cmd)
+            self._reply(msg, False, error="unknown command: %s" % cmd)
 
     def _find(self, msg, tries, retry, what="preset"):
         """The browser item at msg["path"]; None after scheduling retry(tries + 1) (a file just written takes
@@ -108,7 +108,7 @@ class ClusterSoundBridge(ControlSurface):
                 self.schedule_message(RETRY_TICKS, lambda: retry(msg, tries + 1))
             else:
                 where = "User Library" if msg.get("root") == "user_library" else "Places"
-                self._reply(msg, False, error="%s non trovato in %s: %s" % (what, where, path))
+                self._reply(msg, False, error="%s not found in %s: %s" % (what, where, path))
             return None
         if tries:
             self._log("found %s after %d retries" % (path, tries))
@@ -118,7 +118,7 @@ class ClusterSoundBridge(ControlSurface):
         tracks = list(self.song().tracks)
         idx = int(msg.get("track", -1))
         if not -len(tracks) <= idx < len(tracks):
-            self._reply(msg, False, error="traccia %d inesistente" % idx)
+            self._reply(msg, False, error="track %d does not exist" % idx)
             return
         item = self._find(msg, tries, self._load)
         if item is None:
@@ -134,15 +134,15 @@ class ClusterSoundBridge(ControlSurface):
         """An audio file from the browser into an empty clip slot of an audio track (the Recorder's audio)."""
         track = self._track(msg)
         if track is None:
-            self._reply(msg, False, error="traccia %s inesistente" % msg.get("track"))
+            self._reply(msg, False, error="track %s does not exist" % msg.get("track"))
             return
         if track.has_midi_input:
-            self._reply(msg, False, error=u"«%s» non è una traccia audio" % track.name)
+            self._reply(msg, False, error=u"«%s» is not an audio track" % track.name)
             return
         slots = list(track.clip_slots)
         slot = int(msg.get("slot", 0))
         if not 0 <= slot < len(slots) or slots[slot].has_clip:
-            self._reply(msg, False, error="slot %d non disponibile" % slot)
+            self._reply(msg, False, error="slot %d not available" % slot)
             return
         item = self._find(msg, tries, self._load_audio, "file audio")
         if item is None:
@@ -165,7 +165,7 @@ class ClusterSoundBridge(ControlSurface):
         """Loading an instrument on an audio track makes Live create a new MIDI track: refuse instead."""
         if track.has_midi_input:
             return True
-        self._reply(msg, False, error=u"«%s» non è una traccia MIDI" % track.name)
+        self._reply(msg, False, error=u"«%s» is not a MIDI track" % track.name)
         return False
 
     def _categories(self, msg):
@@ -188,7 +188,7 @@ class ClusterSoundBridge(ControlSurface):
             self._items[self._next_id] = item
             out.append({"id": self._next_id, "name": protocol.display_name(item.name), "folder": folder})
         if not pool:
-            self._reply(msg, False, error="nessuno strumento in questa categoria")
+            self._reply(msg, False, error="no instruments in this category")
             return
         self._reply(msg, True, key=key, total=len(pool), offset=offset, items=out)
 
@@ -196,7 +196,7 @@ class ClusterSoundBridge(ControlSurface):
         track = self._track(msg)
         item = self._items.get(int(msg.get("item", 0)))
         if track is None or item is None:
-            self._reply(msg, False, error="traccia o strumento non validi")
+            self._reply(msg, False, error="invalid track or instrument")
             return
         if not self._midi(track, msg):
             return
@@ -232,7 +232,7 @@ class ClusterSoundBridge(ControlSurface):
         """Replace what a Drum Rack pad plays (a sample or a Simpler preset) through the browser's hotswap."""
         rack = next((d for d in track.devices if d.can_have_drum_pads), None)
         if rack is None:
-            self._reply(msg, False, error="nessun Drum Rack su «%s»" % track.name)
+            self._reply(msg, False, error=u"no Drum Rack on «%s»" % track.name)
             return False
         pad = rack.drum_pads[note]
         self.song().view.select_device(rack)

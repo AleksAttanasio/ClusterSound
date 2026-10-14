@@ -2,6 +2,7 @@
 pack's own progressions make the same move."""
 from collections import Counter
 
+from ..i18n import N_, tr
 from . import theory
 from .perform import voicing
 
@@ -14,20 +15,20 @@ _FLOW = {
 }
 # (mode, from interval, to interval, minor-from, minor-to | None = any) -> (bonus, label)
 _CADENCES = [
-    (None, 7, 0, None, None, .6, "cadenza perfetta"),
-    (None, 11, 0, True, None, .3, "sensibile → tonica"),
-    (None, 5, 0, False, None, .35, "cadenza plagale"),
-    ("major", 5, 0, True, False, .4, "plagale minore (iv → I)"),
-    ("minor", 5, 0, True, True, .3, "plagale"),
+    (None, 7, 0, None, None, .6, N_("perfect cadence")),
+    (None, 11, 0, True, None, .3, N_("leading tone → tonic")),
+    (None, 5, 0, False, None, .35, N_("plagal cadence")),
+    ("major", 5, 0, True, False, .4, N_("minor plagal (iv → I)")),
+    ("minor", 5, 0, True, True, .3, N_("plagal")),
     (None, 2, 7, None, None, .45, "ii → V"),
-    ("major", 7, 9, False, True, .35, "cadenza d'inganno"),
-    ("minor", 7, 8, False, False, .35, "cadenza d'inganno"),
+    ("major", 7, 9, False, True, .35, N_("deceptive cadence")),
+    ("minor", 7, 8, False, False, .35, N_("deceptive cadence")),
     ("major", 8, 10, False, False, .35, "bVI → bVII"),
-    ("major", 10, 0, False, False, .35, "cadenza mixolidia"),
+    ("major", 10, 0, False, False, .35, N_("mixolydian cadence")),
     ("minor", 8, 10, False, False, .35, "VI → VII"),
     ("minor", 10, 0, False, True, .3, "VII → i"),
-    ("major", 1, 0, False, False, .3, "napoletana → I"),
-    (None, 0, 5, False, None, .15, "verso la sottodominante"),
+    ("major", 1, 0, False, False, .3, N_("Neapolitan → I")),
+    (None, 0, 5, False, None, .15, N_("towards the subdominant")),
 ]
 
 
@@ -65,38 +66,38 @@ def transition(a: dict, b: dict, key: dict, bigrams: Counter, big_max: float) ->
     for m, x, y, qa, qb, bonus, name in _CADENCES:
         if (m in (None, mode)) and da == x and db == y and qa in (None, ma) and qb in (None, mb):
             s += bonus
-            why.append(name)
+            why.append(tr(name))
             break
     iv = (b["root"] - a["root"]) % 12
     if iv == 5:
         s += .35
-        why.append("basso scende di quinta")
+        why.append(tr("bass falls a fifth"))
     elif iv == 7:
         s += .15
     elif iv in (1, 2, 10, 11):
         s += .15
-        why.append("moto per grado")
+        why.append(tr("stepwise motion"))
     elif iv == 6:
         s -= .3
     elif iv == 0:
         s -= .3 if a["quality"] != b["quality"] else .7
         if a["quality"] != b["quality"]:
-            why.append("stesso basso, colore diverso")
+            why.append(tr("same bass, different colour"))
     common = len(a["pcs"] & b["pcs"])
     s += .08 * min(common, 3)
     if common >= 2 and iv != 0:
-        why.append(f"{common} note comuni")
+        why.append(tr("{n} common notes", n=common))
     vl = voice_distance(a["notes"], b["notes"])
     s += max(0.0, .3 - .03 * vl)
     if vl <= 2.0 and iv != 0:
-        why.append("voice leading fluido")
+        why.append(tr("smooth voice leading"))
     if big_max:
         w = bigrams.get((theory.degree_key(a["root"], a["quality"], t), theory.degree_key(b["root"], b["quality"], t)), 0) / big_max
         s += .6 * w
         if w >= .25:
-            why.append("frequente nel pack")
+            why.append(tr("common in the pack"))
     if fb == "C":
-        why.append("prestito modale")
+        why.append(tr("modal borrowing"))
     return s, why
 
 
@@ -107,11 +108,11 @@ def _start_score(b: dict, key: dict) -> tuple[float, list[str]]:
     why = []
     if (b["root"] - t) % 12 == 0 and f == "T":
         s += .4
-        why.append("tonica: apre la progressione")
+        why.append(tr("tonic: opens the progression"))
     elif f == "T":
-        why.append("funzione di tonica")
+        why.append(tr("tonic function"))
     elif f == "S":
-        why.append("partenza sospesa (sottodominante)")
+        why.append(tr("suspended start (subdominant)"))
     return s, why
 
 

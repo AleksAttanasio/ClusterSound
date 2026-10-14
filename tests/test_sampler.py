@@ -106,7 +106,7 @@ def test_export_file_origin(tmp_path):
     paths = sampler_export.export(s, [{"start": 0.2, "end": 0.6}, {"start": 0.7, "end": 1.1, "name": "snare/1"}],
                                   root=str(tmp_path))
     assert [os.path.basename(p) for p in paths] == ["Break - 01.wav", "snare 1.wav"]
-    assert all(os.path.dirname(p) == str(tmp_path / "Da file" / "Break") for p in paths)
+    assert all(os.path.dirname(p) == str(tmp_path / "From file" / "Break") for p in paths)
     info = sf.info(paths[0])
     assert info.subtype == "PCM_24" and abs(info.duration - 0.4) < 0.01
     assert not os.path.exists(paths[0] + ".license.txt")
@@ -123,11 +123,11 @@ def test_export_link_and_capture_sidecars(tmp_path):
     p = sampler_export.export(link, [{"start": 0, "end": 99}], root=str(tmp_path), max_s=1.0)[0]
     assert sf.info(p).duration <= 1.0 + 1e-3
     lic = open(p + ".license.txt").read()
-    assert "CC BY" in lic and "Attribuzione richiesta" in lic and "Regione: 0.000–1.000 s" in lic
+    assert "CC BY" in lic and "Attribution required" in lic and "Region: 0.000–1.000 s" in lic
     assert "Internet Archive" in p
     cap = S.from_array(x, SR, origin="capture", title="Cattura", meta={"captured_at": "2026-10-12 10:00"})
     p = sampler_export.export(cap, [{"start": 0, "end": 1}], root=str(tmp_path))[0]
-    assert "uso personale" in open(p + ".source.txt").read()
+    assert "personal use" in open(p + ".source.txt").read()
 
 
 # ---------------------------------------------------------------- links
@@ -153,12 +153,12 @@ def test_classify_supported(url, expected):
     ("https://soundcloud.com/a/b", "SoundCloud"),
 ])
 def test_classify_refuses_streaming(url, name):
-    with pytest.raises(SourceError, match=name + " non consente"):
+    with pytest.raises(SourceError, match=name + " does not allow"):
         links.classify(url)
 
 
 def test_classify_unknown():
-    with pytest.raises(SourceError, match="non riconosciuto"):
+    with pytest.raises(SourceError, match="not recognised"):
         links.classify("https://example.com/a.wav")
     with pytest.raises(SourceError):
         links.classify("https://freesound.org/browse/")
@@ -256,7 +256,7 @@ def test_library_browse_folders_files_search(lib_api):
 def test_open_library_item(lib_api):
     r = lib_api.sampler_open_library(3)
     assert r["error"] is None and r["session"]["title"] == "Snare" and r["session"]["origin"] == "file"
-    assert lib_api.sampler_open_library(99)["error"] == "sample non trovato"
+    assert lib_api.sampler_open_library(99)["error"] == "sample not found"
 
 
 def test_drop_from_finder(lib_api, tmp_path):
@@ -272,4 +272,4 @@ def test_drop_from_finder(lib_api, tmp_path):
     txt = tmp_path / "notes.txt"
     txt.write_text("x")
     lib_api._on_drop({"dataTransfer": {"files": [{"name": "notes.txt", "pywebviewFullPath": str(txt)}]}})
-    assert "trascina un file audio" in calls[-1] and lib_api._sampler.path == wav
+    assert "drop an audio file" in calls[-1] and lib_api._sampler.path == wav

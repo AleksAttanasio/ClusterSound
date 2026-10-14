@@ -1,9 +1,10 @@
 """Chord progression (and its melody) -> Standard MIDI File: drag it onto MIDI tracks in Ableton.
 
-One track -> type 0; more -> type 1: the chords ("Accordi") and one track per melody layer (its name)."""
+One track -> type 0; more -> type 1: the chords ("Chords") and one track per melody layer (its name)."""
 import struct
 
 from ..patterns.midi import _track
+from ..i18n import tr
 from . import melody
 from .perform import BAR, PPQ, render
 
@@ -31,7 +32,7 @@ def write(path: str, seq: dict, pure: bool = False, parts: str = "both") -> None
     parts: both | chords | melody (every melody layer that isn't muted; both without a melody = chords only)."""
     length = int(seq.get("bars", 4)) * BAR
     bpm = float(seq.get("bpm", 120))
-    name = seq.get("name") or "Accordi"
+    name = seq.get("name") or tr("Chords")
     tracks = []
     if parts in ("both", "chords"):
         tracks.append(_track(name, events(seq, pure), bpm, length))

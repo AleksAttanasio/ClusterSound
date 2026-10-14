@@ -1,4 +1,4 @@
-"""How a chord progression is played: the "Modalità" (a rhythm grid + a way of playing every strike) and the
+"""How a chord progression is played: the "Mode" (a rhythm grid + a way of playing every strike) and the
 per-chord overrides.
 
     mode = {"name", "swing": 50..75,
@@ -15,6 +15,7 @@ import copy
 import math
 import zlib
 
+from ..i18n import N_
 from ..patterns.model import alt_hash
 
 PPQ = 480
@@ -36,22 +37,22 @@ def _bar(hits, bars=1):
 
 # rhythm presets: label, bars, strikes (step, length in steps or 0 = until the next one, velocity, strum dir)
 RHYTHM_PRESETS = {
-    "quarters": ("Semiminime", 1, [(0, 0, 100, ""), (4, 0, 80, ""), (8, 0, 92, ""), (12, 0, 80, "")]),
-    "eighths": ("Ottavi", 1, [(i * 2, 0, 100 if i % 2 == 0 else 78, "") for i in range(8)]),
+    "quarters": (N_("Quarter notes"), 1, [(0, 0, 100, ""), (4, 0, 80, ""), (8, 0, 92, ""), (12, 0, 80, "")]),
+    "eighths": (N_("Eighth notes"), 1, [(i * 2, 0, 100 if i % 2 == 0 else 78, "") for i in range(8)]),
     "offbeat": ("Offbeat / skank", 1, [(2, 2, 95, "u"), (6, 2, 85, "u"), (10, 2, 95, "u"), (14, 2, 85, "u")]),
     "charleston": ("Charleston", 1, [(0, 3, 100, ""), (6, 2, 85, "")]),
     "tresillo": ("Tresillo 3-3-2", 1, [(0, 3, 100, ""), (3, 3, 85, ""), (6, 2, 90, ""), (8, 3, 95, ""), (11, 3, 85, ""), (14, 2, 90, "")]),
-    "syncopated": ("Sincopato house", 1, [(0, 3, 100, ""), (3, 3, 82, ""), (6, 4, 90, ""), (10, 2, 80, ""), (12, 4, 88, "")]),
-    "half": ("Minime", 1, [(0, 8, 100, ""), (8, 8, 85, "")]),
+    "syncopated": (N_("Syncopated house"), 1, [(0, 3, 100, ""), (3, 3, 82, ""), (6, 4, 90, ""), (10, 2, 80, ""), (12, 4, 88, "")]),
+    "half": (N_("Half notes"), 1, [(0, 8, 100, ""), (8, 8, 85, "")]),
     "pulse": ("Pulse 1/16", 1, [(i, 1, 100 if i % 4 == 0 else 70 if i % 2 == 0 else 58, "") for i in range(16)]),
-    "pop": ("Chitarra pop D-DU-UDU", 1, [(0, 0, 110, "d"), (4, 0, 90, "d"), (6, 0, 75, "u"), (10, 0, 80, "u"), (12, 0, 95, "d"), (14, 0, 75, "u")]),
-    "folk": ("Chitarra folk D-D-DU-DU", 1, [(0, 0, 110, "d"), (4, 0, 90, "d"), (8, 0, 100, "d"), (10, 0, 72, "u"), (12, 0, 92, "d"), (14, 0, 72, "u")]),
-    "reggae": ("Reggae (chop sul 2 e 4)", 1, [(4, 1, 105, "u"), (12, 1, 105, "u")]),
-    "funk": ("Funk a sedicesimi", 1, [(0, 1, 112, "d"), (1, 1, 40, "u"), (2, 1, 60, "d"), (3, 1, 100, "u"), (5, 1, 90, "u"),
+    "pop": (N_("Pop guitar D-DU-UDU"), 1, [(0, 0, 110, "d"), (4, 0, 90, "d"), (6, 0, 75, "u"), (10, 0, 80, "u"), (12, 0, 95, "d"), (14, 0, 75, "u")]),
+    "folk": (N_("Folk guitar D-D-DU-DU"), 1, [(0, 0, 110, "d"), (4, 0, 90, "d"), (8, 0, 100, "d"), (10, 0, 72, "u"), (12, 0, 92, "d"), (14, 0, 72, "u")]),
+    "reggae": (N_("Reggae (chop on 2 and 4)"), 1, [(4, 1, 105, "u"), (12, 1, 105, "u")]),
+    "funk": (N_("Sixteenth-note funk"), 1, [(0, 1, 112, "d"), (1, 1, 40, "u"), (2, 1, 60, "d"), (3, 1, 100, "u"), (5, 1, 90, "u"),
                                       (6, 1, 45, "d"), (8, 1, 110, "d"), (9, 1, 40, "u"), (11, 1, 95, "u"), (12, 1, 60, "d"),
                                       (14, 1, 90, "d"), (15, 1, 45, "u")]),
     "ballad": ("Ballad", 1, [(0, 8, 105, "d"), (8, 4, 85, "d"), (12, 4, 78, "u")]),
-    "bossa": ("Bossa nova (2 battute)", 2, [(0, 2, 100, ""), (3, 2, 85, ""), (6, 3, 90, ""), (10, 2, 85, ""), (13, 3, 90, ""),
+    "bossa": (N_("Bossa nova (2 bars)"), 2, [(0, 2, 100, ""), (3, 2, 85, ""), (6, 3, 90, ""), (10, 2, 85, ""), (13, 3, 90, ""),
                                            (18, 3, 85, ""), (22, 2, 90, ""), (24, 2, 95, ""), (28, 3, 85, "")]),
 }
 
@@ -62,7 +63,7 @@ def preset_grid(pid: str) -> dict:
 
 
 PLAY_TYPES = [("block", "Block"), ("strum", "Strum"), ("arp", "Arpeggio")]
-TOKENS = [("block", "Block"), ("strum_up", "Strum dal basso"), ("strum_down", "Strum dall'alto"), ("arp", "Arp")]
+TOKENS = [("block", "Block"), ("strum_up", N_("Strum from the bottom")), ("strum_down", N_("Strum from the top")), ("arp", "Arp")]
 DEFAULT_PLAY = {
     "type": "block",
     "gate": 1.0,
@@ -75,18 +76,18 @@ DEFAULT_PLAY = {
     "alternate": {"every": "off", "tokens": []},
 }
 DEFAULT_RHYTHM = {"on": False, "bars": 1, "preset": None, **_bar([], 1)}
-DEFAULT_MODE = {"name": "Modalità 1", "swing": 50, "rhythm": DEFAULT_RHYTHM, "play": DEFAULT_PLAY}
+DEFAULT_MODE = {"name": N_("Mode 1"), "swing": 50, "rhythm": DEFAULT_RHYTHM, "play": DEFAULT_PLAY}
 
 
 def meta() -> dict:
     return {"types": PLAY_TYPES, "tokens": TOKENS, "rates": list(RATES), "strumUnits": list(STRUM_UNITS),
             "presets": [(k, v[0], v[1]) for k, v in RHYTHM_PRESETS.items()],
             "presetGrids": {k: preset_grid(k) for k in RHYTHM_PRESETS},
-            "arpModes": [("up", "Su"), ("down", "Giù"), ("updown", "Su-giù"), ("random", "Casuale")],
-            "strumDirs": [("guitar", "Chitarra (giù in battere, su in levare)"), ("grid", "Frecce della ritmica"),
-                          ("up", "Sempre dal basso"), ("down", "Sempre dall'alto"), ("alt", "Alternato")],
-            "strumCurves": [("linear", "Regolare"), ("accel", "Accelera"), ("decel", "Rallenta")],
-            "velCurves": [("flat", "Piatta"), ("cresc", "Crescendo"), ("decresc", "Decrescendo"), ("bass", "Accento sul basso")],
+            "arpModes": [("up", N_("Up")), ("down", N_("Down")), ("updown", N_("Up-down")), ("random", N_("Random"))],
+            "strumDirs": [("guitar", N_("Guitar (down on the beat, up off the beat)")), ("grid", N_("Rhythm grid arrows")),
+                          ("up", N_("Always from the bottom")), ("down", N_("Always from the top")), ("alt", N_("Alternate"))],
+            "strumCurves": [("linear", N_("Even")), ("accel", N_("Speeds up")), ("decel", N_("Slows down"))],
+            "velCurves": [("flat", N_("Flat")), ("cresc", "Crescendo"), ("decresc", "Decrescendo"), ("bass", N_("Bass accent"))],
             "defaultMode": DEFAULT_MODE, "defaultPlay": DEFAULT_PLAY}
 
 
@@ -132,7 +133,7 @@ def _legacy_style(st: dict) -> tuple[dict, dict | str]:
 
 
 def mode_of(seq: dict) -> dict:
-    """The Modalità of a sequence (v1 sequences: built from defaultStyle)."""
+    """The Mode of a sequence (v1 sequences: built from defaultStyle)."""
     if seq.get("mode"):
         m = _merge(DEFAULT_MODE, seq["mode"])
     else:

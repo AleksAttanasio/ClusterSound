@@ -864,7 +864,7 @@
       180,
       16
      ],
-     "text": "Da ClusterSound",
+     "text": "From ClusterSound",
      "fontsize": 11.0,
      "fontname": "Ableton Sans Bold",
      "textcolor": [
@@ -1070,7 +1070,7 @@
       64,
       18
      ],
-     "text": "Aggiorna",
+     "text": "Refresh",
      "mode": 0,
      "rounded": 6,
      "fontname": "Ableton Sans Bold",
@@ -1218,7 +1218,7 @@
       130,
       22
      ],
-     "text": "Importa",
+     "text": "Import",
      "mode": 0,
      "rounded": 6,
      "fontname": "Ableton Sans Bold",
@@ -1367,8 +1367,8 @@
       20
      ],
      "mode": 1,
-     "text": "Nuove tracce",
-     "texton": "Nuove tracce",
+     "text": "New tracks",
+     "texton": "New tracks",
      "fontname": "Ableton Sans Bold",
      "fontsize": 10.0,
      "rounded": 6,
@@ -1474,7 +1474,7 @@
       20
      ],
      "presentation": 0,
-     "text": "Nuove tracce",
+     "text": "New tracks",
      "fontname": "Ableton Sans Bold",
      "fontsize": 10.0,
      "textcolor": [
@@ -1717,8 +1717,8 @@
       20
      ],
      "mode": 1,
-     "text": "Ricevi",
-     "texton": "Ricevi",
+     "text": "Receive",
+     "texton": "Receive",
      "fontname": "Ableton Sans Bold",
      "fontsize": 10.0,
      "rounded": 6,
@@ -1824,7 +1824,7 @@
       20
      ],
      "presentation": 0,
-     "text": "Ricevi",
+     "text": "Receive",
      "fontname": "Ableton Sans Bold",
      "fontsize": 10.0,
      "textcolor": [
@@ -1895,7 +1895,7 @@
       260,
       16
      ],
-     "text": "Strumenti di Live",
+     "text": "Live instruments",
      "fontsize": 11.0,
      "fontname": "Ableton Sans Bold",
      "textcolor": [
@@ -1930,7 +1930,7 @@
       56,
       18
      ],
-     "text": "Traccia",
+     "text": "Track",
      "fontname": "Ableton Sans Bold",
      "fontsize": 10.0,
      "textcolor": [
@@ -2048,7 +2048,7 @@
       56,
       18
      ],
-     "text": "Tipo",
+     "text": "Type",
      "fontname": "Ableton Sans Bold",
      "fontsize": 10.0,
      "textcolor": [
@@ -2166,7 +2166,7 @@
       56,
       18
      ],
-     "text": "Strumento",
+     "text": "Instrument",
      "fontname": "Ableton Sans Bold",
      "fontsize": 10.0,
      "textcolor": [
@@ -2208,7 +2208,7 @@
      ],
      "items": [],
      "parameter_enable": 0,
-     "hint": "Scegli uno strumento: si carica e la clip suona in loop.",
+     "hint": "Choose an instrument: it loads and the clip plays in a loop.",
      "rounded": 6,
      "arrow": 1,
      "fontname": "Ableton Sans Bold",
@@ -2292,7 +2292,7 @@
      ],
      "text": "◀",
      "mode": 0,
-     "hint": "Strumento precedente / successivo",
+     "hint": "Previous / next instrument",
      "rounded": 6,
      "fontname": "Ableton Sans Bold",
      "fontsize": 10.0,
@@ -2439,9 +2439,9 @@
       120,
       20
      ],
-     "text": "Prova ▶",
+     "text": "Try ▶",
      "mode": 0,
-     "hint": "Carica lo strumento scelto e suona la clip in loop. Doppio clic: vai alla traccia.",
+     "hint": "Loads the chosen instrument and plays the clip in a loop. Double-click: go to the track.",
      "rounded": 6,
      "fontname": "Ableton Sans Bold",
      "fontsize": 10.0,
@@ -2590,7 +2590,7 @@
      ],
      "text": "▶",
      "mode": 0,
-     "hint": "Strumento precedente / successivo",
+     "hint": "Previous / next instrument",
      "rounded": 6,
      "fontname": "Ableton Sans Bold",
      "fontsize": 10.0,
@@ -2875,7 +2875,7 @@
      ],
      "presentation": 0,
      "linecount": 2,
-     "text": "Scegli uno strumento o usa ◀ ▶: si carica e la clip suona in loop. Doppio clic su Prova: vai alla traccia.",
+     "text": "Choose an instrument or use ◀ ▶: it loads and the clip plays in a loop. Double-click on Try: go to the track.",
      "fontname": "Ableton Sans Bold",
      "fontsize": 10.0,
      "textcolor": [
@@ -2910,7 +2910,7 @@
       536,
       18
      ],
-     "text": "Avvio…",
+     "text": "Starting…",
      "linecount": 1,
      "fontname": "Ableton Sans Medium",
      "fontsize": 10.0,
@@ -2951,7 +2951,7 @@
       130,
       22
      ],
-     "text": "Clip → Melodia",
+     "text": "Clip → Melody",
      "mode": 0,
      "rounded": 6,
      "fontname": "Ableton Sans Bold",

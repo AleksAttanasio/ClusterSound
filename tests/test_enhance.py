@@ -83,7 +83,7 @@ def test_worker_main_reports_errors(tmp_path, monkeypatch, capsys):
     sf.write(src, _tones(0.5), SR)
     monkeypatch.setattr(models, "ready", lambda key: False)
     assert worker.main(["--model", "apollo", str(src), str(tmp_path / "out.wav")]) == 1
-    assert "non scaricato" in json.loads(capsys.readouterr().out.splitlines()[-1])["error"]
+    assert "not downloaded" in json.loads(capsys.readouterr().out.splitlines()[-1])["error"]
 
 
 def _fake_worker(tmp_path, body):
@@ -183,20 +183,20 @@ def api(tmp_path, monkeypatch):
 
 def test_api_region_job_and_open(api, tmp_path):
     from clustersound.sampler import session as S
-    assert api.enhance_start()["error"] == "nessun audio aperto"
+    assert api.enhance_start()["error"] == "no audio open"
     api._sampler = S.from_array(_tones(2.0, sr=22050), 22050, origin="capture", title="Rec", meta={"device": "Cuffie"})
-    assert api.enhance_start("region")["error"] == "nessuna regione selezionata"
-    assert api.enhance_start("region", 0.5, 1.5, "nope")["error"] == "modello sconosciuto: nope"
+    assert api.enhance_start("region")["error"] == "no region selected"
+    assert api.enhance_start("region", 0.5, 1.5, "nope")["error"] == "unknown model: nope"
     assert api.enhance_start("region", 0.5, 1.5)["error"] is None
     job = api.wait()
     assert job["state"] == "done" and job["model"] == "apollo", job
     path = job["result"]["path"]
-    assert path.startswith(str(tmp_path / "samples")) and path.endswith("(migliorato).wav")
+    assert path.startswith(str(tmp_path / "samples")) and path.endswith("(enhanced).wav")
     assert os.path.isfile(path + ".source.txt")  # the capture's provenance follows the file
     y, sr = sf.read(path)
     assert job["result"]["sr"] == sr and abs(len(y) / sr - 1.0) < 1e-3  # just the region
     r = api.enhance_open()
-    assert r["error"] is None and r["session"]["title"] == "Rec · migliorato" and r["session"]["origin"] == "capture"
+    assert r["error"] is None and r["session"]["title"] == "Rec · enhanced" and r["session"]["origin"] == "capture"
     assert api._sampler.meta["device"] == "Cuffie"
     # a second run never overwrites the first result
     api._sampler = S.from_array(_tones(2.0, sr=22050), 22050, origin="capture", title="Rec")
@@ -208,4 +208,4 @@ def test_api_reports_missing_model(api, monkeypatch):
     from clustersound.sampler import session as S
     monkeypatch.setattr(models, "ready", lambda key: False)
     api._sampler = S.from_array(_tones(1.0), SR, title="x")
-    assert "non scaricato" in api.enhance_start("all")["error"]
+    assert "not downloaded" in api.enhance_start("all")["error"]

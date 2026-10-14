@@ -84,7 +84,7 @@ if sys.argv[1] == "list":
     sys.exit(0)
 dev = sys.argv[sys.argv.index("--device") + 1]
 if dev == "broken":
-    sys.stderr.write(json.dumps({{"error": "dispositivo non trovato: broken", "code": 0}}) + "\n")
+    sys.stderr.write(json.dumps({{"error": "device not found: broken", "code": 0}}) + "\n")
     sys.exit(1)
 out = sys.stdout.buffer
 out.write(b'{{"sample_rate": 48000.0, "channels": 2}}\n'); out.flush()
@@ -119,7 +119,7 @@ def test_tap_backend_streams_blocks(fake_tap):
 
 
 def test_tap_backend_reports_helper_error(fake_tap):
-    with pytest.raises(CaptureError, match="dispositivo non trovato"):
+    with pytest.raises(CaptureError, match="device not found"):
         R.TapBackend("broken", lambda b: None, binary=fake_tap).start()
 
 
@@ -141,7 +141,7 @@ class FakeBackend:
 
 def test_recorder_two_devices_one_file_each(tmp_path):
     rec = R.Recorder(lambda d, cb: FakeBackend(d, cb, fail=d["id"] == "bad"))
-    devices = [{"id": "all", "name": "Tutte le uscite (mix)"}, {"id": "spk", "name": "Speakers"},
+    devices = [{"id": "all", "name": "All outputs (mix)"}, {"id": "spk", "name": "Speakers"},
                {"id": "bad", "name": "Cuffie"}]
     st = rec.start(devices, {"format": "flac"}, str(tmp_path))
     assert st["running"] and [t["error"] for t in st["tracks"]] == [None, None, "permesso negato"]
@@ -149,8 +149,8 @@ def test_recorder_two_devices_one_file_each(tmp_path):
     assert not done["running"] and len(done["recordings"]) == 2
     for r in done["recordings"]:
         assert r["path"].endswith(".flac") and abs(sf.info(r["path"]).duration - 0.5) < 0.01
-        assert "uso personale" in open(r["path"] + ".source.txt").read()
-    assert {r["device"] for r in done["recordings"]} == {"Tutte le uscite (mix)", "Speakers"}
+        assert "personal use" in open(r["path"] + ".source.txt").read()
+    assert {r["device"] for r in done["recordings"]} == {"All outputs (mix)", "Speakers"}
 
 
 def test_recorder_all_devices_failing(tmp_path):

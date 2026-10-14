@@ -18,7 +18,7 @@ class SoundClass:
     audioset: dict[int, float] = field(default_factory=dict)
 
 
-GROUPS = ["Drums", "Percussion", "Melodic/Bass", "Vocal", "FX & altro"]
+GROUPS = ["Drums", "Percussion", "Melodic/Bass", "Vocal", "FX & other"]
 
 CLASSES: list[SoundClass] = [
     # ---- Drums: reds / oranges / yellows ---------------------------------------
@@ -127,22 +127,22 @@ CLASSES: list[SoundClass] = [
                {0: 1.0, 1: 1.0, 2: 1.0, 3: 1.0, 5: 1.0, 6: 0.9, 9: 0.9, 27: 0.8, 28: 0.8,
                 13: 0.7}),
     # ---- FX & other: cyans / greys / brown ----------------------------------------
-    SoundClass("riser", "Riser / Sweep", "FX & altro", "#22d3ee",
+    SoundClass("riser", "Riser / Sweep", "FX & other", "#22d3ee",
                ("riser", "rise", "uplifter", "uplift", "sweep", "sweepup", "buildup", "build",
                 "whoosh", "swoosh", "risers", "sweeps"),
                {453: 1.0, 497: 0.5, 390: 0.4, 482: 0.4}),
-    SoundClass("impact", "Impact / Hit", "FX & altro", "#0fa3b1",
+    SoundClass("impact", "Impact / Hit", "FX & other", "#0fa3b1",
                ("impact", "hit", "hits", "slam", "thud", "braam", "impacts", "crashfx"),
                {460: 1.0, 420: 1.0, 430: 0.7, 462: 0.8, 463: 0.6, 454: 0.4, 478: 0.7, 421: 0.6}),
-    SoundClass("downlifter", "Downlifter", "FX & altro", "#a5f3fc",
+    SoundClass("downlifter", "Downlifter", "FX & other", "#a5f3fc",
                ("downlifter", "downer", "down", "fall", "sweepdown", "downsweep"),
                {453: 0.7, 497: 0.4}),
-    SoundClass("noise", "Noise / Texture / Ambience", "FX & altro", "#94a3b8",
+    SoundClass("noise", "Noise / Texture / Ambience", "FX & other", "#94a3b8",
                ("noise", "texture", "ambience", "ambient", "atmo", "atmos", "atmosphere",
                 "field", "vinyl", "crackle", "room", "textures", "soundscape"),
                {507: 1.0, 514: 1.0, 515: 1.0, 509: 0.9, 508: 0.9, 277: 0.8, 283: 0.8,
                 282: 0.6, 288: 0.8, 520: 0.8, 505: 0.4, 510: 0.8, 490: 0.7, 241: 0.4, 293: 0.6}),
-    SoundClass("foley", "Foley", "FX & altro", "#b08968",
+    SoundClass("foley", "Foley", "FX & other", "#b08968",
                ("foley", "fol", "footstep", "footsteps", "door", "glass", "metal", "paper",
                 "water", "cloth", "keys_jangle", "zip"),
                {48: 1.0, 348: 1.0, 352: 0.8, 435: 1.0, 436: 0.9, 358: 0.9, 372: 1.0, 373: 1.0,
@@ -150,7 +150,7 @@ CLASSES: list[SoundClass] = [
                 439: 0.8, 378: 0.8, 380: 0.8}),
 ]
 
-UNSORTED = SoundClass("unsorted", "Unsorted", "FX & altro", "#8a8f98")
+UNSORTED = SoundClass("unsorted", "Unsorted", "FX & other", "#8a8f98")
 
 CLASS_IDS = [c.id for c in CLASSES]
 CLASS_INDEX = {c.id: i for i, c in enumerate(CLASSES)}

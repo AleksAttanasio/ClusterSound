@@ -5,6 +5,7 @@
 import { svg } from './icons.js';
 import { FILE_MANAGER } from './kit.js';
 import { setRow, savedFlash, openSettings } from './settings.js';
+import { t, getLang } from './i18n.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -12,7 +13,7 @@ const fmtDur = (s) => (s === null || s === undefined ? '' : s < 1 ? `${Math.roun
 const fmtSize = (b) => (!b ? '' : b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`);
 
 const SRC_ABBR = { freesound: 'FS', openverse: 'OV', archive: 'IA', ccmixter: 'CC' };
-const LICENSE_FILTERS = [['cc0', 'CC0 / PD'], ['by', 'BY'], ['by-sa', 'BY-SA'], ['nc', 'Non commerciale'], ['nd', 'No derivate'], ['unknown', 'Non dichiarata']];
+const LICENSE_FILTERS = [['cc0', 'CC0 / PD'], ['by', 'BY'], ['by-sa', 'BY-SA'], ['nc', 'Non-commercial'], ['nd', 'No derivatives'], ['unknown', 'Not declared']];
 const LIC_CLASS = { cc0: 'free', pd: 'free', by: 'attr', 'by-sa': 'attr', 'by-nd': 'restr', 'by-nc': 'restr', 'by-nc-sa': 'restr', 'by-nc-nd': 'restr', 'sampling+': 'restr', rf: 'free', unknown: 'unk' };
 const PRESETS = [
   ['Kick', ['kick']], ['Snare', ['snare']], ['Hat', ['closed_hat', 'open_hat']], ['Clap', ['clap']],
@@ -20,15 +21,16 @@ const PRESETS = [
   ['Bass', ['bass']], ['Synth', ['synth', 'pad']], ['FX', ['riser', 'impact', 'downlifter']], ['Vocal', ['vocal', 'spoken']],
 ];
 const SUSPECT_KEY = 'cs.store.suspect';
-const SORTS = [['relevance', 'Rilevanza'], ['downloads', 'Più scaricati'], ['rating', 'Voto'], ['newest', 'Più recenti'], ['duration', 'Durata']];
+const SORTS = [['relevance', 'Relevance'], ['downloads', 'Most downloaded'], ['rating', 'Rating'], ['newest', 'Newest'], ['duration', 'Duration']];
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const ANY_KEY = 'any'; // wa-option values cannot be empty
 const chip = (attrs, label) => `<wa-button size="xs" pill class="chip" ${attrs}>${label}</wa-button>`;
 const SPIN = '<wa-spinner class="spin"></wa-spinner>';
-const KIND_LABEL = { api: 'Ricerca live', curated: 'Vetrina' };
+const KIND_LABEL = { api: 'Live search', curated: 'Showcase' }; // English source text: t() where shown
 const hue = (text) => { let h = 0; for (const c of String(text)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
-const nSounds = (n) => `${n} suon${n === 1 ? 'o' : 'i'}`;
-const fmtNum = (n) => (n === null || n === undefined ? '' : n >= 1e6 ? `${(n / 1e6).toFixed(1)} M` : n >= 1e4 ? `${Math.round(n / 1e3)} k` : n.toLocaleString('it-IT'));
+const nSounds = (n) => (n === 1 ? t('1 sound') : t('{n} sounds', { n }));
+const fmtInt = (n) => n.toLocaleString(getLang());
+const fmtNum = (n) => (n === null || n === undefined ? '' : n >= 1e6 ? `${(n / 1e6).toFixed(1)} M` : n >= 1e4 ? `${Math.round(n / 1e3)} k` : fmtInt(n));
 
 export class Online {
   constructor({ api, player, classes, groups, types }) {
@@ -103,9 +105,9 @@ export class Online {
   // ---------------------------------------------------------------- sidebar
   _srvHint(filter) {
     const srcs = (this.meta.server_filters[filter] || []).filter((s) => this.p.sources.has(s));
-    if (!srcs.length) return '<span class="srv" title="Filtrato localmente sui risultati">Locale</span>';
+    if (!srcs.length) return `<span class="srv" title="${t('Filtered locally on the results')}">${t('Local')}</span>`;
     const names = srcs.map((s) => this.meta.sources.find((x) => x.id === s).label).join(', ');
-    return `<span class="srv" title="Applicato direttamente da: ${esc(names)}. Sulle altre fonti è filtrato localmente.">${srcs.map((s) => SRC_ABBR[s]).join('·')}</span>`;
+    return `<span class="srv" title="${esc(t('Applied directly by: {names}. On the other sources it is filtered locally.', { names }))}">${srcs.map((s) => SRC_ABBR[s]).join('·')}</span>`;
   }
 
   _buildSidebar() {
@@ -114,43 +116,43 @@ export class Online {
     for (const g of this.groups) {
       const members = this.classes.filter((c) => c.group === g);
       if (!members.length) continue;
-      cls.push(`<div class="group-title" data-ogroup="${esc(g)}"><span>${esc(g)}</span></div>`);
+      cls.push(`<div class="group-title" data-ogroup="${esc(g)}"><span>${esc(t(g))}</span></div>`);
       for (const c of members) {
-        cls.push(`<div class="cls-row o-cls" data-cls="${c.id}" title="Clic: aggiungi/togli · Alt+clic: solo questo">
+        cls.push(`<div class="cls-row o-cls" data-cls="${c.id}" title="${t('Click: add/remove · Alt+click: only this one')}">
           <span class="dot" style="background:${c.color}"></span><span class="cls-name">${esc(c.label)}</span></div>`);
       }
     }
-    const keyOpts = [`<wa-option value="${ANY_KEY}">Qualsiasi</wa-option>`]
+    const keyOpts = [`<wa-option value="${ANY_KEY}">${t('Any')}</wa-option>`]
       .concat(NOTES.flatMap((n) => [`<wa-option value="${n} major">${n} major</wa-option>`, `<wa-option value="${n} minor">${n} minor</wa-option>`])).join('');
     const grp = (id, title) => `<div class="filter-group collapsed" data-group="${id}">
         <div class="fg-head"><span class="caret">${svg('chevron-down', 12)}</span><span>${title}</span><wa-badge pill variant="brand" class="fg-count" data-fg-count="${id}"></wa-badge></div>
         <div class="fg-body">`;
     sb.innerHTML = `
       <div class="filter-block">
-        <div class="filter-title">Strumento <span>${'<span data-srv="instrument"></span>'} <a href="#" id="o-ins-clear">Tutti</a></span></div>
+        <div class="filter-title">${t('Instrument')} <span>${'<span data-srv="instrument"></span>'} <a href="#" id="o-ins-clear">${t('All')}</a></span></div>
         <div id="o-ins-summary" class="hint"></div>
         <div id="o-ins-list" class="o-ins-list">${cls.join('')}</div>
       </div>
-      ${grp('src', 'Fonti e licenza')}
+      ${grp('src', t('Sources and licence'))}
       <div class="filter-block">
-        <div class="filter-title">Fonti</div>
+        <div class="filter-title">${t('Sources')}</div>
         <div id="o-sources">${this.meta.sources.map((s) => `
           <div class="o-src"><wa-checkbox size="s" class="o-src-name" data-src="${s.id}" checked>${esc(s.label)}</wa-checkbox>
           <span class="o-src-status" data-src-status="${s.id}"></span></div>`).join('')}
         </div>
       </div>
       <div class="filter-block">
-        <div class="filter-title">Licenza <span data-srv="license"></span></div>
-        <div class="chips" id="o-lic">${LICENSE_FILTERS.map(([k, l]) => chip(`data-lic="${k}"`, l)).join('')}</div>
-        <wa-checkbox size="s" class="o-check" id="o-commercial">Solo uso commerciale (no NC/ND) <span data-srv="commercial"></span></wa-checkbox>
+        <div class="filter-title">${t('Licence')} <span data-srv="license"></span></div>
+        <div class="chips" id="o-lic">${LICENSE_FILTERS.map(([k, l]) => chip(`data-lic="${k}"`, t(l))).join('')}</div>
+        <wa-checkbox size="s" class="o-check" id="o-commercial">${t('Commercial use only (no NC/ND)')} <span data-srv="commercial"></span></wa-checkbox>
       </div></div></div>
-      ${grp('char', 'Tipo e caratteristiche')}
+      ${grp('char', t('Type and features'))}
       <div class="filter-block">
-        <div class="filter-title">Tipo <span data-srv="type"></span></div>
-        <div class="chips" id="o-types">${this.types.map((t) => chip(`data-type="${esc(t)}"`, esc(t))).join('')}</div>
+        <div class="filter-title">${t('Type')} <span data-srv="type"></span></div>
+        <div class="chips" id="o-types">${this.types.map((ty) => chip(`data-type="${esc(ty)}"`, esc(ty))).join('')}</div>
       </div>
       <div class="filter-block">
-        <div class="filter-title">Durata (s) <span data-srv="duration"></span></div>
+        <div class="filter-title">${t('Duration (s)')} <span data-srv="duration"></span></div>
         <div class="o-range"><wa-number-input size="s" without-steppers min="0" step="0.1" id="o-dmin" placeholder="Min"></wa-number-input><span>–</span><wa-number-input size="s" without-steppers min="0" step="0.1" id="o-dmax" placeholder="Max"></wa-number-input></div>
       </div>
       <div class="filter-block">
@@ -158,20 +160,20 @@ export class Online {
         <div class="o-range"><wa-number-input size="s" without-steppers min="40" max="250" id="o-bmin" placeholder="Min"></wa-number-input><span>–</span><wa-number-input size="s" without-steppers min="40" max="250" id="o-bmax" placeholder="Max"></wa-number-input></div>
       </div>
       <div class="filter-block">
-        <div class="filter-title">Tonalità <span data-srv="key"></span></div>
+        <div class="filter-title">${t('Key')} <span data-srv="key"></span></div>
         <wa-select size="s" id="o-key" value="${ANY_KEY}">${keyOpts}</wa-select>
       </div></div></div>
-      ${grp('fmt', 'Formato, pack e ordine')}
+      ${grp('fmt', t('Format, packs and order'))}
       <div class="filter-block">
-        <div class="filter-title">Formato e pack <span data-srv="lossless"></span></div>
-        <wa-checkbox size="s" class="o-check" id="o-lossless">Solo lossless (wav / aiff / flac)</wa-checkbox>
+        <div class="filter-title">${t('Format and packs')} <span data-srv="lossless"></span></div>
+        <wa-checkbox size="s" class="o-check" id="o-lossless">${t('Lossless only (wav / aiff / flac)')}</wa-checkbox>
         <wa-select size="s" id="o-packs" value="all" style="margin-top:8px">
-          <wa-option value="all">File singoli e pack</wa-option><wa-option value="files">Solo file singoli</wa-option><wa-option value="packs">Solo pack</wa-option>
+          <wa-option value="all">${t('Single files and packs')}</wa-option><wa-option value="files">${t('Single files only')}</wa-option><wa-option value="packs">${t('Packs only')}</wa-option>
         </wa-select>
       </div>
       <div class="filter-block">
-        <div class="filter-title">Ordina <span data-srv="sort"></span></div>
-        <wa-select size="s" id="o-sort" value="relevance">${SORTS.map(([k, l]) => `<wa-option value="${k}">${l}</wa-option>`).join('')}</wa-select>
+        <div class="filter-title">${t('Sort')} <span data-srv="sort"></span></div>
+        <wa-select size="s" id="o-sort" value="relevance">${SORTS.map(([k, l]) => `<wa-option value="${k}">${t(l)}</wa-option>`).join('')}</wa-select>
       </div></div></div>`;
     sb.onclick = (e) => {
       const h = e.target.closest('.fg-head'); if (!h) return;
@@ -199,7 +201,7 @@ export class Online {
     document.querySelectorAll('#online-sidebar [data-srv]').forEach((el) => { el.innerHTML = this._srvHint(el.dataset.srv); });
     this._refreshGroupCounts();
     const n = this.p.instruments.size;
-    $('#o-ins-summary').textContent = n ? `${n} selezionat${n === 1 ? 'o' : 'i'}` : 'Tutti gli strumenti';
+    $('#o-ins-summary').textContent = n ? (n === 1 ? t('1 selected') : t('{n} selected', { n })) : t('All instruments');
     document.querySelectorAll('.o-cls').forEach((r) => r.classList.toggle('on', this.p.instruments.has(r.dataset.cls)));
     $('#o-ins-list').classList.toggle('has-sel', n > 0);
     document.querySelectorAll('#online-presets .chip').forEach((b) => {
@@ -332,11 +334,10 @@ export class Online {
   // ---------------------------------------------------------------- render
   _statusLine(s) {
     const d = this.data[s];
-    if (this.loading.has(s) && !d?.results?.length) return `${SPIN} ricerca…`;
+    if (this.loading.has(s) && !d?.results?.length) return `${SPIN} ${t('searching…')}`;
     if (!d) return '';
     if (d.error) return `<span class="error">${esc(d.error)}</span>`;
-    const tot = d.total ? ` di ${d.total.toLocaleString('it-IT')}` : '';
-    return `${d.results.length} risultati${tot}`;
+    return d.total ? t('{n} results of {total}', { n: d.results.length, total: fmtInt(d.total) }) : t('{n} results', { n: d.results.length });
   }
 
   render() {
@@ -348,7 +349,7 @@ export class Online {
       if (el) {
         const d = (this.kind === 'packs' ? this.packData : this.data)[s.id];
         el.innerHTML = !results || !this.p.sources.has(s.id) ? '' : this.loading.has(s.id) ? SPIN
-          : d?.error ? (d.needs_key ? '<span class="error">Chiave</span>' : '<span class="error">Errore</span>') : d ? d.results.length : '';
+          : d?.error ? `<span class="error">${d.needs_key ? t('Key') : t('Error')}</span>` : d ? d.results.length : '';
       }
     }
     $('#online-results').hidden = !list;
@@ -367,7 +368,7 @@ export class Online {
   _renderList() {
     const box = $('#online-results');
     const active = this.meta.sources.filter((s) => this.p.sources.has(s.id));
-    if (!active.length) { box.innerHTML = '<div class="o-empty">Seleziona almeno una fonte.</div>'; return; }
+    if (!active.length) { box.innerHTML = `<div class="o-empty">${t('Select at least one source.')}</div>`; return; }
     const html = [];
     if (this.groupBy === 'source') {
       for (const s of active) {
@@ -377,10 +378,10 @@ export class Online {
         html.push(`<section class="o-section">
           <header class="o-sec-head" data-collapse="${s.id}"><span class="caret">${svg(open ? 'chevron-down' : 'chevron-right', 14)}</span>
             <span class="o-sec-title">${esc(s.label)}</span><span class="o-sec-status">${this._statusLine(s.id)}</span>
-            ${d?.needs_key ? '<wa-button size="xs" variant="brand" data-settings="1"><wa-icon slot="start" name="settings"></wa-icon>Inserisci API key</wa-button>' : ''}</header>
+            ${d?.needs_key ? `<wa-button size="xs" variant="brand" data-settings="1"><wa-icon slot="start" name="settings"></wa-icon>${t('Enter API key')}</wa-button>` : ''}</header>
           ${open ? `<div class="o-rows">${rows.map((r) => this._row(r)).join('')}</div>
-            ${d?.more ? `<wa-button size="s" appearance="filled-outlined" class="o-more" data-more="${s.id}" ${this.loading.has(s.id) ? 'loading disabled' : ''}>Carica altri</wa-button>` : ''}
-            ${d && !d.error && !rows.length && !this.loading.has(s.id) ? `<div class="o-none">Nessun risultato con questi filtri${d.fetched ? ` (${d.fetched} scartati dai filtri)` : ''}.</div>` : ''}` : ''}
+            ${d?.more ? `<wa-button size="s" appearance="filled-outlined" class="o-more" data-more="${s.id}" ${this.loading.has(s.id) ? 'loading disabled' : ''}>${t('Load more')}</wa-button>` : ''}
+            ${d && !d.error && !rows.length && !this.loading.has(s.id) ? `<div class="o-none">${this._noResults(d)}</div>` : ''}` : ''}
         </section>`);
       }
     } else {
@@ -395,37 +396,42 @@ export class Online {
         const key = `ins:${cid}`;
         const open = !this.collapsed.has(key);
         html.push(`<section class="o-section"><header class="o-sec-head" data-collapse="${key}"><span class="caret">${svg(open ? 'chevron-down' : 'chevron-right', 14)}</span>
-          ${c ? `<span class="dot" style="background:${c.color}"></span>` : ''}<span class="o-sec-title">${esc(c ? c.label : 'Strumento non determinato / pack misti')}</span>
+          ${c ? `<span class="dot" style="background:${c.color}"></span>` : ''}<span class="o-sec-title">${esc(c ? c.label : t('Instrument not determined / mixed packs'))}</span>
           <span class="o-sec-status">${rows.length}</span></header>
           ${open ? `<div class="o-rows">${rows.map((r) => this._row(r, true)).join('')}</div>` : ''}</section>`);
       }
       const loadingAny = active.some((s) => this.loading.has(s.id));
-      if (loadingAny) html.push(`<div class="o-none">${SPIN} ricerca in corso…</div>`);
+      if (loadingAny) html.push(`<div class="o-none">${SPIN} ${t('searching…')}</div>`);
       const moreSrc = active.filter((s) => this.data[s.id]?.more);
-      if (moreSrc.length && !loadingAny) html.push('<wa-button size="s" appearance="filled-outlined" class="o-more" data-more-all="1">Carica altri da tutte le fonti</wa-button>');
+      if (moreSrc.length && !loadingAny) html.push(`<wa-button size="s" appearance="filled-outlined" class="o-more" data-more-all="1">${t('Load more from every source')}</wa-button>`);
     }
     box.innerHTML = html.join('');
   }
 
+  _noResults(d) {
+    return d.fetched ? t('No results with these filters ({n} discarded by the filters).', { n: d.fetched }) : t('No results with these filters.');
+  }
+
   _licBadge(r) {
-    return `<span class="lic lic-${LIC_CLASS[r.license] || 'unk'}" title="${esc(r.license_label)} · uso commerciale come sample: ${r.commercial_ok ? 'sì' : 'no / da verificare'}">${esc(r.license_label)}</span>`;
+    const use = t('commercial use as a sample: {v}', { v: r.commercial_ok ? t('yes') : t('no / to be checked') });
+    return `<span class="lic lic-${LIC_CLASS[r.license] || 'unk'}" title="${esc(r.license_label)} · ${esc(use)}">${esc(r.license_label)}</span>`;
   }
 
   _row(r, showSource = false, child = false) {
     const c = r.instrument ? this.byId[r.instrument] : null;
     const meta = [r.bpm ? `${Math.round(r.bpm)} BPM` : '', r.key || '', r.format ? r.format.toUpperCase() : '',
       r.samplerate ? `${(r.samplerate / 1000).toFixed(1)}k` : ''].filter(Boolean).join(' · ');
-    const tags = child ? '' : (r.tags || []).slice(0, 6).map((t) => `<button class="tag" data-tag="${esc(t)}">${esc(t)}</button>`).join('');
+    const tags = child ? '' : (r.tags || []).slice(0, 6).map((tag) => `<button class="tag" data-tag="${esc(tag)}">${esc(tag)}</button>`).join('');
     const sub = child ? esc(r.path) : [r.author ? esc(r.author) : '', showSource ? esc(r.source_label) : '', r.type ? esc(r.type) : ''].filter(Boolean).join(' · ');
     const ex = this.expanded[r.uid];
     const packInfo = r.is_pack ? `<span class="pack-badge">PACK${r.filesize ? ' · ' + fmtSize(r.filesize) : ''}</span>` : '';
     const playable = !r.is_pack || r.preview_url;
     return `<div class="o-row ${child ? 'child' : ''} ${r.suspect ? 'suspect' : ''}" data-uid="${esc(r.uid)}">
-      ${r.is_pack && !child ? `<button class="o-btn o-expand" data-expand="${esc(r.uid)}" title="Mostra i file del pack">${svg(ex ? 'chevron-down' : 'chevron-right')}</button>`
-        : `<button class="o-btn o-play" data-play="${esc(r.uid)}" ${playable ? '' : 'disabled'} title="Ascolta">${svg('play', 12)}</button>`}
-      <span class="dot" style="background:${c ? c.color : 'transparent'};${c ? '' : 'box-shadow:0 0 0 1px var(--line-2) inset'}" title="${esc(c ? c.label : 'Strumento non determinato')}"></span>
+      ${r.is_pack && !child ? `<button class="o-btn o-expand" data-expand="${esc(r.uid)}" title="${t('Show the files of the pack')}">${svg(ex ? 'chevron-down' : 'chevron-right')}</button>`
+        : `<button class="o-btn o-play" data-play="${esc(r.uid)}" ${playable ? '' : 'disabled'} title="${t('Listen')}">${svg('play', 12)}</button>`}
+      <span class="dot" style="background:${c ? c.color : 'transparent'};${c ? '' : 'box-shadow:0 0 0 1px var(--line-2) inset'}" title="${esc(c ? c.label : t('Instrument not determined'))}"></span>
       <div class="o-main">
-        <div class="o-title" title="${esc(r.title)}">${esc(r.title)} ${packInfo} ${r.suspect ? `<span class="warn" title="Probabile libreria commerciale ricaricata: verifica i diritti">${svg('triangle-alert', 11)} sospetto</span>` : ''}</div>
+        <div class="o-title" title="${esc(r.title)}">${esc(r.title)} ${packInfo} ${r.suspect ? `<span class="warn" title="${t('Probably a re-uploaded commercial library: check the rights')}">${svg('triangle-alert', 11)} ${t('suspect')}</span>` : ''}</div>
         <div class="o-sub">${sub}${tags ? ` <span class="tags">${tags}</span>` : ''}</div>
       </div>
       <div class="o-wave">${r.waveform_img ? `<img src="${esc(r.waveform_img)}" alt="" loading="lazy">` : ''}</div>
@@ -433,23 +439,23 @@ export class Online {
       <div class="num o-dur">${fmtDur(r.duration)}</div>
       <div class="o-meta" title="${esc(meta)}">${esc(meta)}</div>
       <div class="o-actions">
-        ${playable && (r.preview_url || r.download_url) ? `<button class="o-btn" data-send="${esc(r.uid)}" title="Invia al Sequencer o al Drum Rack (file temporaneo, nessun download)">${svg('arrow-right')}</button>` : ''}
-        ${r.download_url ? `<button class="o-btn" data-dl="${esc(r.uid)}" title="Scarica${r.download_note ? ' — ' + esc(r.download_note) : ''}${r.filesize ? ' (' + fmtSize(r.filesize) + ')' : ''}">${svg('download')}</button>` : ''}
-        ${r.page_url ? `<button class="o-btn" data-open="${esc(r.page_url)}" title="Apri la pagina della fonte">${svg('external-link')}</button>` : ''}
+        ${playable && (r.preview_url || r.download_url) ? `<button class="o-btn" data-send="${esc(r.uid)}" title="${t('Send to the Sequencer or the Drum Rack (temporary file, no download)')}">${svg('arrow-right')}</button>` : ''}
+        ${r.download_url ? `<button class="o-btn" data-dl="${esc(r.uid)}" title="${t('Download')}${r.download_note ? ' — ' + esc(r.download_note) : ''}${r.filesize ? ' (' + fmtSize(r.filesize) + ')' : ''}">${svg('download')}</button>` : ''}
+        ${r.page_url ? `<button class="o-btn" data-open="${esc(r.page_url)}" title="${t('Open the source page')}">${svg('external-link')}</button>` : ''}
       </div>
     </div>${ex ? this._expansion(r, ex) : ''}`;
   }
 
   _expansion(r, ex) {
-    if (ex.loading) return `<div class="o-children"><div class="o-none">${SPIN} lettura del pack…</div></div>`;
+    if (ex.loading) return `<div class="o-children"><div class="o-none">${SPIN} ${t('reading the pack…')}</div></div>`;
     if (ex.error) return `<div class="o-children"><div class="o-none error">${esc(ex.error)}</div></div>`;
-    const archives = (ex.archives || []).map((a) => `<wa-button size="xs" appearance="filled-outlined" data-dl-archive="${esc(a.url)}" data-pack="${esc(r.uid)}" title="Scarica l'archivio intero"><wa-icon slot="start" name="download"></wa-icon>${esc(a.name)} ${a.size ? '(' + fmtSize(a.size) + ')' : ''}</wa-button>`).join(' ');
+    const archives = (ex.archives || []).map((a) => `<wa-button size="xs" appearance="filled-outlined" data-dl-archive="${esc(a.url)}" data-pack="${esc(r.uid)}" title="${t('Download the whole archive')}"><wa-icon slot="start" name="download"></wa-icon>${esc(a.name)} ${a.size ? '(' + fmtSize(a.size) + ')' : ''}</wa-button>`).join(' ');
     const filtered = ex.files.length < ex.total;
     return `<div class="o-children">
-      <div class="o-pack-bar">${ex.total} file nel pack${filtered ? ` · ${ex.files.length} corrispondono ai filtri <a href="#" data-expand-all="${esc(r.uid)}">Mostra tutti</a>` : ''} ${archives}</div>
+      <div class="o-pack-bar">${t('{n} files in the pack', { n: ex.total })}${filtered ? ` · ${t('{n} match the filters', { n: ex.files.length })} <a href="#" data-expand-all="${esc(r.uid)}">${t('Show all')}</a>` : ''} ${archives}</div>
       ${ex.files.slice(0, 400).map((f) => this._row(f, false, true)).join('')}
-      ${ex.files.length > 400 ? `<div class="o-none">… altri ${ex.files.length - 400} file: restringi i filtri</div>` : ''}
-      ${!ex.files.length && !ex.archives?.length ? '<div class="o-none">Nessun file audio consultabile (archivio RAR/7z?): apri la pagina della fonte.</div>' : ''}
+      ${ex.files.length > 400 ? `<div class="o-none">${t('… {n} more files: narrow the filters', { n: ex.files.length - 400 })}</div>` : ''}
+      ${!ex.files.length && !ex.archives?.length ? `<div class="o-none">${t('No browsable audio file (RAR/7z archive?): open the source page.')}</div>` : ''}
     </div>`;
   }
 
@@ -530,7 +536,7 @@ export class Online {
 
   _viewLabel(v) {
     if (v.name === 'home') return 'Store';
-    if (v.name === 'results') return this.p.q ? `«${esc(this.p.q)}»` : 'Risultati';
+    if (v.name === 'results') return this.p.q ? `«${esc(this.p.q)}»` : t('Results');
     if (v.name === 'pack') return esc(v.title || 'Pack');
     if (v.name === 'provider') return esc(this.prov[v.id]?.name || v.id);
     return '';
@@ -544,10 +550,10 @@ export class Online {
     const results = this.view.name === 'results';
     const seg = (attr, items, cur) => `<span class="sn-seg">${items.map(([v, l, ic]) => `<button class="${v === cur ? 'on' : ''}" data-${attr}="${v}">${ic ? svg(ic, 13) : ''}${l}</button>`).join('')}</span>`;
     $('#store-nav').innerHTML = `
-      ${this.view.name !== 'home' ? `<button class="o-btn sn-back" data-back title="Indietro">${svg('arrow-left', 14)}</button>` : `<span class="sn-icon">${svg('store', 16)}</span>`}
+      ${this.view.name !== 'home' ? `<button class="o-btn sn-back" data-back title="${t('Back')}">${svg('arrow-left', 14)}</button>` : `<span class="sn-icon">${svg('store', 16)}</span>`}
       <span class="sn-crumbs">${crumbs.join('<span class="sn-sep">›</span>')}</span>
       <span class="spacer"></span>
-      ${results ? seg('kind', [['sounds', 'Suoni', 'music'], ['packs', 'Pack', 'package']], this.kind) : ''}
+      ${results ? seg('kind', [['sounds', t('Sounds'), 'music'], ['packs', 'Pack', 'package']], this.kind) : ''}
       ${results && this.kind === 'sounds' ? seg('layout', [['grid', '', 'layout-grid'], ['list', '', 'list']], this.layout) : ''}`;
   }
 
@@ -566,7 +572,7 @@ export class Online {
     return `<div class="sc-cover ${big ? 'big' : ''}" style="background:${bg}">
       ${r.waveform_img ? `<img class="sc-wave" src="${esc(r.waveform_img)}" alt="" loading="lazy">` : ''}
       ${icon ? `<span class="sc-icon">${svg(icon, big ? 40 : 26)}</span>` : ''}
-      ${r.preview_url ? `<button class="sc-play" data-play="${esc(r.uid)}" title="Ascolta">${svg('play', 16)}</button>` : ''}
+      ${r.preview_url ? `<button class="sc-play" data-play="${esc(r.uid)}" title="${t('Listen')}">${svg('play', 16)}</button>` : ''}
     </div>`;
   }
 
@@ -580,9 +586,9 @@ export class Online {
         <div class="sc-sub">${this._logo(r.source, 's')}<span>${esc(r.author || r.source_label)}</span></div>
         <div class="sc-meta">${this._licBadge(r)}${c ? `<span class="sc-cls"><span class="dot" style="background:${c.color}"></span>${esc(c.label)}</span>` : ''}<span class="num">${esc(meta)}</span></div>
         <div class="sc-actions">
-          ${r.preview_url || r.download_url ? `<button class="o-btn" data-send="${esc(r.uid)}" title="Invia al Sequencer o al Drum Rack (file temporaneo)">${svg('arrow-right')}</button>` : ''}
-          ${r.download_url ? `<button class="o-btn" data-dl="${esc(r.uid)}" title="Scarica${r.download_note ? ' — ' + esc(r.download_note) : ''}">${svg('download')}</button>` : ''}
-          ${r.page_url ? `<button class="o-btn" data-open="${esc(r.page_url)}" title="Apri la pagina della fonte">${svg('external-link')}</button>` : ''}
+          ${r.preview_url || r.download_url ? `<button class="o-btn" data-send="${esc(r.uid)}" title="${t('Send to the Sequencer or the Drum Rack (temporary file)')}">${svg('arrow-right')}</button>` : ''}
+          ${r.download_url ? `<button class="o-btn" data-dl="${esc(r.uid)}" title="${t('Download')}${r.download_note ? ' — ' + esc(r.download_note) : ''}">${svg('download')}</button>` : ''}
+          ${r.page_url ? `<button class="o-btn" data-open="${esc(r.page_url)}" title="${t('Open the source page')}">${svg('external-link')}</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -591,16 +597,16 @@ export class Online {
   _packCard(r) {
     const i = r.info || {};
     // grouped search cards only know how many sounds match; the pack page has the full count
-    const count = i.num_sounds ? nSounds(i.num_sounds) : i.matching ? `${nSounds(i.matching)} corrispondent${i.matching === 1 ? 'e' : 'i'}` : r.filesize ? fmtSize(r.filesize) : '';
-    const matching = i.matching && i.num_sounds && i.matching < i.num_sounds ? ` · ${i.matching} corrispondono` : '';
+    const count = i.num_sounds ? nSounds(i.num_sounds) : i.matching ? (i.matching === 1 ? t('1 matching sound') : t('{n} matching sounds', { n: i.matching })) : r.filesize ? fmtSize(r.filesize) : '';
+    const matching = i.matching && i.num_sounds && i.matching < i.num_sounds ? ` · ${t('{n} match', { n: i.matching })}` : '';
     const dls = i.downloads ? `${svg('download', 11)} ${fmtNum(i.downloads)}` : '';
-    return `<div class="sc-card pack ${r.suspect ? 'suspect' : ''}" data-pack="${esc(r.uid)}" data-title="${esc(r.title)}" title="Apri il pack">
+    return `<div class="sc-card pack ${r.suspect ? 'suspect' : ''}" data-pack="${esc(r.uid)}" data-title="${esc(r.title)}" title="${t('Open the pack')}">
       ${this._cover(r, { icon: 'package' })}
       <div class="sc-body">
         <div class="sc-title" title="${esc(r.title)}">${esc(r.title)}</div>
         <div class="sc-sub">${this._logo(r.source, 's')}<span>${esc(r.author || r.source_label)}</span></div>
         <div class="sc-meta">${r.license !== 'unknown' ? this._licBadge(r) : ''}<span>${esc(count)}${matching}</span><span class="sc-dl">${dls}</span></div>
-        ${r.suspect ? `<div class="warn">${svg('triangle-alert', 11)} probabile materiale commerciale</div>` : ''}
+        ${r.suspect ? `<div class="warn">${svg('triangle-alert', 11)} ${t('probably commercial material')}</div>` : ''}
       </div>
     </div>`;
   }
@@ -612,10 +618,10 @@ export class Online {
       <div class="sc-cover" style="background:linear-gradient(135deg, ${p.color}66, hsl(${hue(c.title)} 35% 13%))">${this._logo(c.provider, 'l')}</div>
       <div class="sc-body">
         <div class="sc-title" title="${esc(c.title)}">${esc(c.title)}</div>
-        <div class="sc-sub"><span>${esc(p.name)}</span>${c.count ? `<span>· ${c.count} file</span>` : ''}</div>
+        <div class="sc-sub"><span>${esc(p.name)}</span>${c.count ? `<span>· ${t('{n} files', { n: c.count })}</span>` : ''}</div>
         <div class="sc-desc">${esc(c.description)}</div>
-        <div class="sc-meta">${this._licBadge(lic)}${c.note ? `<span class="sc-note" title="${esc(c.note)}">Condizioni</span>` : ''}</div>
-        <div class="sc-actions"><wa-button size="xs" appearance="filled-outlined" data-open="${esc(c.url)}"><wa-icon slot="start" name="external-link"></wa-icon>Scarica dal sito</wa-button></div>
+        <div class="sc-meta">${this._licBadge(lic)}${c.note ? `<span class="sc-note" title="${esc(c.note)}">${t('Terms')}</span>` : ''}</div>
+        <div class="sc-actions"><wa-button size="xs" appearance="filled-outlined" data-open="${esc(c.url)}"><wa-icon slot="start" name="external-link"></wa-icon>${t('Download from the site')}</wa-button></div>
       </div>
     </div>`;
   }
@@ -640,8 +646,8 @@ export class Online {
 
   _featuredRow(key, card, empty) {
     const f = this.featured?.[key];
-    if (!f) return `<div class="o-none">${SPIN} caricamento…</div>`;
-    if (f.needs_key) return `<div class="sc-keycta">${this._logo('freesound', 'm')}<div><b>Sblocca i pack di Freesound</b><br><span class="hint">Serve una API key gratuita: oltre 600.000 suoni, organizzati in pack.</span></div><wa-button size="s" variant="brand" data-settings="1"><wa-icon slot="start" name="settings"></wa-icon>Inserisci API key</wa-button></div>`;
+    if (!f) return `<div class="o-none">${SPIN} ${t('loading…')}</div>`;
+    if (f.needs_key) return `<div class="sc-keycta">${this._logo('freesound', 'm')}<div><b>${t('Unlock the Freesound packs')}</b><br><span class="hint">${t('It needs a free API key: over 600,000 sounds, organised in packs.')}</span></div><wa-button size="s" variant="brand" data-settings="1"><wa-icon slot="start" name="settings"></wa-icon>${t('Enter API key')}</wa-button></div>`;
     if (f.error) return `<div class="o-none error">${esc(f.error)}</div>`;
     return this._rowOf(f.results.slice(0, 16).map(card), empty);
   }
@@ -651,25 +657,25 @@ export class Online {
       <div class="pv-card" data-provider="${p.id}" title="${esc(p.description)}">
         ${this._logo(p.id, 'l')}
         <div class="pv-name">${esc(p.name)}</div>
-        <div class="pv-kind ${p.kind}">${KIND_LABEL[p.kind]}</div>
+        <div class="pv-kind ${p.kind}">${t(KIND_LABEL[p.kind])}</div>
       </div>`).join('');
     const cats = PRESETS.map(([label, ids]) => {
       const c = this.byId[ids[0]];
       return `<div class="cat-tile" data-cat='${JSON.stringify(ids)}' style="--cc:${c?.color || '#888'}"><span>${esc(label)}</span></div>`;
     }).join('');
-    const fsLink = '<a href="#" data-provider="freesound">Tutti →</a>';
+    const fsLink = `<a href="#" data-provider="freesound">${t('All →')}</a>`;
     $('#store-view').innerHTML = `
       <div class="store-hero">
-        <div><h2>Sample gratuiti, pronti per la libreria</h2>
-          <div class="hint">Solo fonti libere: pubblico dominio, Creative Commons e pack royalty-free. Ogni download arriva con il suo .license.txt.</div></div>
+        <div><h2>${t('Free samples, ready for the library')}</h2>
+          <div class="hint">${t('Free sources only: public domain, Creative Commons and royalty-free packs. Every download comes with its .license.txt.')}</div></div>
       </div>
-      ${this._shelf('Provider', `<div class="pv-strip">${providers}</div>`)}
-      ${this._shelf('Categorie', `<div class="cat-grid">${cats}</div>`)}
-      ${this._shelf('Pack in evidenza su Freesound', this._featuredRow('freesound_packs', (r) => this._packCard(r), 'Nessun pack'), { link: fsLink })}
-      ${this._shelf('Pack da Internet Archive', this._featuredRow('archive_packs', (r) => this._packCard(r), 'Nessun pack'), { link: '<a href="#" data-provider="archive">Tutti →</a>' })}
-      ${this._shelf('Nuovi suoni CC0', this._featuredRow('cc0_new', (r) => this._soundCard(r), 'Nessun suono'), { note: 'Pubblico dominio, nessuna attribuzione' })}
-      ${this._shelf('Vetrina gratuita', `<div class="sc-grid">${this.meta.curated.map((c) => this._curatedCard(c)).join('')}</div>`,
-    { note: 'pack royalty-free da siti senza API: si scaricano dalla pagina ufficiale' })}`;
+      ${this._shelf(t('Providers'), `<div class="pv-strip">${providers}</div>`)}
+      ${this._shelf(t('Categories'), `<div class="cat-grid">${cats}</div>`)}
+      ${this._shelf(t('Featured packs on Freesound'), this._featuredRow('freesound_packs', (r) => this._packCard(r), t('No packs')), { link: fsLink })}
+      ${this._shelf(t('Packs from Internet Archive'), this._featuredRow('archive_packs', (r) => this._packCard(r), t('No packs')), { link: `<a href="#" data-provider="archive">${t('All →')}</a>` })}
+      ${this._shelf(t('New CC0 sounds'), this._featuredRow('cc0_new', (r) => this._soundCard(r), t('No sounds')), { note: t('Public domain, no attribution') })}
+      ${this._shelf(t('Free showcase'), `<div class="sc-grid">${this.meta.curated.map((c) => this._curatedCard(c)).join('')}</div>`,
+    { note: t('royalty-free packs from sites without an API: they are downloaded from the official page') })}`;
   }
 
   // ---------------------------------------------------------------- store: results grid
@@ -678,17 +684,17 @@ export class Online {
     const store = packs ? this.packData : this.data;
     const active = this.meta.sources.filter((s) => this._activeSources().includes(s.id));
     const html = [];
-    if (!active.length) html.push(`<div class="o-empty">${packs ? 'Nessuna fonte selezionata offre pack (Freesound, Internet Archive, ccMixter).' : 'Seleziona almeno una fonte.'}</div>`);
+    if (!active.length) html.push(`<div class="o-empty">${packs ? t('None of the selected sources offers packs (Freesound, Internet Archive, ccMixter).') : t('Select at least one source.')}</div>`);
     for (const s of active) {
       const d = store[s.id];
       const rows = d?.results || [];
-      const status = this.loading.has(s.id) && !rows.length ? `${SPIN} ricerca…` : !d ? '' : d.error ? `<span class="error">${esc(d.error)}</span>`
-        : `${rows.length}${d.total ? ` di ${d.total.toLocaleString('it-IT')}` : ''}`;
+      const status = this.loading.has(s.id) && !rows.length ? `${SPIN} ${t('searching…')}` : !d ? '' : d.error ? `<span class="error">${esc(d.error)}</span>`
+        : d.total ? t('{n} of {total}', { n: rows.length, total: fmtInt(d.total) }) : `${rows.length}`;
       html.push(`<section class="shelf"><header class="shelf-head">${this._logo(s.id, 's')}<h3>${esc(s.label)}</h3><span class="hint">${status}</span><span class="spacer"></span>
-        ${d?.needs_key ? '<wa-button size="xs" variant="brand" data-settings="1"><wa-icon slot="start" name="settings"></wa-icon>Inserisci API key</wa-button>' : ''}</header>
+        ${d?.needs_key ? `<wa-button size="xs" variant="brand" data-settings="1"><wa-icon slot="start" name="settings"></wa-icon>${t('Enter API key')}</wa-button>` : ''}</header>
         ${rows.length ? `<div class="sc-grid">${rows.map((r) => (r.is_pack ? this._packCard(r) : this._soundCard(r))).join('')}</div>` : ''}
-        ${d && !d.error && !rows.length && !this.loading.has(s.id) ? `<div class="o-none">Nessun risultato con questi filtri${d.fetched ? ` (${d.fetched} scartati dai filtri)` : ''}.</div>` : ''}
-        ${d?.more ? `<wa-button size="s" appearance="filled-outlined" class="o-more" data-more="${s.id}" ${this.loading.has(s.id) ? 'loading disabled' : ''}>Carica altri</wa-button>` : ''}
+        ${d && !d.error && !rows.length && !this.loading.has(s.id) ? `<div class="o-none">${this._noResults(d)}</div>` : ''}
+        ${d?.more ? `<wa-button size="s" appearance="filled-outlined" class="o-more" data-more="${s.id}" ${this.loading.has(s.id) ? 'loading disabled' : ''}>${t('Load more')}</wa-button>` : ''}
       </section>`);
     }
     $('#store-view').innerHTML = html.join('');
@@ -722,40 +728,40 @@ export class Online {
   _renderPack() {
     const pg = this.packPage;
     const box = $('#store-view');
-    if (!pg || pg.loading) { box.innerHTML = `<div class="o-none">${SPIN} apertura del pack…</div>`; return; }
+    if (!pg || pg.loading) { box.innerHTML = `<div class="o-none">${SPIN} ${t('opening the pack…')}</div>`; return; }
     if (pg.error) { box.innerHTML = `<div class="o-none error">${esc(pg.error)}</div>`; return; }
     const r = pg.pack;
     const i = r.info || {};
     const p = this.prov[r.source];
-    const facts = [i.num_sounds ? nSounds(i.num_sounds) : `${pg.total} file`, i.downloads ? `${fmtNum(i.downloads)} download` : '',
+    const facts = [i.num_sounds ? nSounds(i.num_sounds) : t('{n} files', { n: pg.total }), i.downloads ? t('{n} downloads', { n: fmtNum(i.downloads) }) : '',
       r.filesize ? fmtSize(r.filesize) : '', i.created ? new Date(i.created).getFullYear() : ''].filter(Boolean).join(' · ');
     const playable = pg.files.some((f) => f.preview_url);
-    const archives = (pg.archives || []).map((a) => `<wa-button size="s" appearance="filled-outlined" data-dl-archive="${esc(a.url)}" data-pack="${esc(r.uid)}" title="Scarica l'archivio intero"><wa-icon slot="start" name="download"></wa-icon>${esc(a.name)} ${a.size ? '(' + fmtSize(a.size) + ')' : ''}</wa-button>`).join(' ');
-    const fsNote = r.source === 'freesound' ? '<div class="hint">Da qui si scaricano le anteprime MP3 HQ; gli originali (WAV/AIFF) si scaricano dalla pagina Freesound.</div>' : '';
+    const archives = (pg.archives || []).map((a) => `<wa-button size="s" appearance="filled-outlined" data-dl-archive="${esc(a.url)}" data-pack="${esc(r.uid)}" title="${t('Download the whole archive')}"><wa-icon slot="start" name="download"></wa-icon>${esc(a.name)} ${a.size ? '(' + fmtSize(a.size) + ')' : ''}</wa-button>`).join(' ');
+    const fsNote = r.source === 'freesound' ? `<div class="hint">${t('From here you download the HQ MP3 previews; the originals (WAV/AIFF) are downloaded from the Freesound page.')}</div>` : '';
     box.innerHTML = `
       <div class="pk-head">
         ${this._cover(r, { icon: 'package', big: true })}
         <div class="pk-info">
           <div class="pk-kicker">${this._logo(r.source, 's')} Pack · ${esc(p?.name || r.source_label)}</div>
           <h2>${esc(r.title)}</h2>
-          <div class="pk-author">Di <b>${esc(r.author || 'Autore sconosciuto')}</b></div>
+          <div class="pk-author">${t('By')} <b>${esc(r.author || t('Unknown author'))}</b></div>
           <div class="sc-meta">${r.license !== 'unknown' ? this._licBadge(r) : ''}<span>${esc(facts)}</span></div>
           ${i.description ? `<div class="pk-desc">${esc(i.description)}</div>` : ''}
           <div class="pk-actions">
-            ${playable ? `<wa-button size="s" variant="brand" data-play-all><wa-icon slot="start" name="play"></wa-icon>Ascolta tutto</wa-button>` : ''}
-            ${pg.files.length ? `<wa-button size="s" appearance="filled-outlined" data-dl-pack="${esc(r.uid)}"><wa-icon slot="start" name="download"></wa-icon>Scarica pack</wa-button>` : ''}
+            ${playable ? `<wa-button size="s" variant="brand" data-play-all><wa-icon slot="start" name="play"></wa-icon>${t('Listen to all')}</wa-button>` : ''}
+            ${pg.files.length ? `<wa-button size="s" appearance="filled-outlined" data-dl-pack="${esc(r.uid)}"><wa-icon slot="start" name="download"></wa-icon>${t('Download pack')}</wa-button>` : ''}
             ${archives}
-            ${r.page_url ? `<wa-button size="s" appearance="filled-outlined" data-open="${esc(r.page_url)}"><wa-icon slot="start" name="external-link"></wa-icon>Apri su ${esc(p?.name || 'sito')}</wa-button>` : ''}
+            ${r.page_url ? `<wa-button size="s" appearance="filled-outlined" data-open="${esc(r.page_url)}"><wa-icon slot="start" name="external-link"></wa-icon>${t('Open on {site}', { site: esc(p?.name || t('site')) })}</wa-button>` : ''}
           </div>
           ${fsNote}
-          ${r.suspect ? `<div class="warn">${svg('triangle-alert', 11)} Probabile libreria commerciale ricaricata: verifica i diritti prima dell'uso.</div>` : ''}
+          ${r.suspect ? `<div class="warn">${svg('triangle-alert', 11)} ${t('Probably a re-uploaded commercial library: check the rights before using it.')}</div>` : ''}
         </div>
       </div>
-      ${this._shelf('Tracce', `<div class="o-rows pk-tracks">${pg.files.slice(0, 600).map((f) => this._row(f, false, true)).join('')}</div>
-        ${pg.more ? `<wa-button size="s" appearance="filled-outlined" class="o-more" data-pack-more ${pg.loadingMore ? 'loading disabled' : ''}>Carica altre tracce</wa-button>` : ''}
-        ${!pg.files.length ? '<div class="o-none">Nessun file audio consultabile: usa gli archivi o apri la pagina della fonte.</div>' : ''}`,
-    { note: pg.total ? `${pg.files.length} di ${pg.total}` : '' })}
-      ${pg.others?.length ? this._shelf(`Altri pack di ${esc(r.author)}`, this._rowOf(pg.others.map((o) => this._packCard(o)))) : ''}`;
+      ${this._shelf(t('Tracks'), `<div class="o-rows pk-tracks">${pg.files.slice(0, 600).map((f) => this._row(f, false, true)).join('')}</div>
+        ${pg.more ? `<wa-button size="s" appearance="filled-outlined" class="o-more" data-pack-more ${pg.loadingMore ? 'loading disabled' : ''}>${t('Load more tracks')}</wa-button>` : ''}
+        ${!pg.files.length ? `<div class="o-none">${t('No browsable audio file: use the archives or open the source page.')}</div>` : ''}`,
+    { note: pg.total ? t('{n} of {total}', { n: pg.files.length, total: pg.total }) : '' })}
+      ${pg.others?.length ? this._shelf(t('More packs by {author}', { author: esc(r.author) }), this._rowOf(pg.others.map((o) => this._packCard(o)))) : ''}`;
   }
 
   async downloadPack(uid) {
@@ -812,32 +818,32 @@ export class Online {
     const p = this.prov[this.view.id];
     const d = this.provData || {};
     const curated = this.meta.curated.filter((c) => c.provider === p.id);
-    const lic = (p.licenses || []).map((k) => `<span class="lic lic-${LIC_CLASS[k] || (k === 'nc' ? 'restr' : 'free')}">${esc(this.meta.licenses[k] || (k === 'nc' ? 'Non commerciale' : k))}</span>`).join(' ');
+    const lic = (p.licenses || []).map((k) => `<span class="lic lic-${LIC_CLASS[k] || (k === 'nc' ? 'restr' : 'free')}">${esc(this.meta.licenses[k] || (k === 'nc' ? t('Non-commercial') : k))}</span>`).join(' ');
     const section = (res, title, card) => {
       if (!res) return '';
-      if (res.needs_key) return this._shelf(title, `<div class="sc-keycta">${this._logo('freesound', 'm')}<div><b>Serve una API key gratuita</b></div><wa-button size="s" variant="brand" data-settings="1">Inserisci API key</wa-button></div>`);
+      if (res.needs_key) return this._shelf(title, `<div class="sc-keycta">${this._logo('freesound', 'm')}<div><b>${t('A free API key is needed')}</b></div><wa-button size="s" variant="brand" data-settings="1">${t('Enter API key')}</wa-button></div>`);
       if (res.error) return this._shelf(title, `<div class="o-none error">${esc(res.error)}</div>`);
-      return this._shelf(title, res.results.length ? `<div class="sc-grid">${res.results.map(card).join('')}</div>` : '<div class="o-none">Nessun risultato.</div>');
+      return this._shelf(title, res.results.length ? `<div class="sc-grid">${res.results.map(card).join('')}</div>` : `<div class="o-none">${t('No results.')}</div>`);
     };
     let body = '';
-    if (p.kind === 'curated') body = this._shelf('Pack in vetrina', `<div class="sc-grid">${curated.map((c) => this._curatedCard(c)).join('')}</div>`);
-    else if (d.loading) body = `<div class="o-none">${SPIN} caricamento…</div>`;
+    if (p.kind === 'curated') body = this._shelf(t('Showcase packs'), `<div class="sc-grid">${curated.map((c) => this._curatedCard(c)).join('')}</div>`);
+    else if (d.loading) body = `<div class="o-none">${SPIN} ${t('loading…')}</div>`;
     else {
       // packs already have their own shelf (Internet Archive only returns packs)
       const sounds = d.sounds && !d.sounds.error && !d.sounds.needs_key ? { ...d.sounds, results: d.sounds.results.filter((r) => !r.is_pack) } : d.sounds;
       body = section(d.packs, 'Pack', (r) => this._packCard(r))
-        + (d.packs && sounds && !sounds.error && !sounds.results.length ? '' : section(sounds, 'Suoni', (r) => this._soundCard(r)));
+        + (d.packs && sounds && !sounds.error && !sounds.results.length ? '' : section(sounds, t('Sounds'), (r) => this._soundCard(r)));
     }
     $('#store-view').innerHTML = `
       <div class="pv-head" style="--pc:${p.color}">
         ${this._logo(p.id, 'xl')}
         <div class="pk-info">
-          <div class="pk-kicker">${KIND_LABEL[p.kind]}</div>
+          <div class="pk-kicker">${t(KIND_LABEL[p.kind])}</div>
           <h2>${esc(p.name)}</h2>
           <div class="pk-desc">${esc(p.description)}</div>
           <div class="sc-meta">${lic}</div>
-          <div class="pk-actions"><wa-button size="s" appearance="filled-outlined" data-open="${esc(p.url)}"><wa-icon slot="start" name="external-link"></wa-icon>Visita il sito</wa-button>
-          ${p.kind === 'api' && this.p.q.trim() ? `<span class="hint">Filtrato per «${esc(this.p.q.trim())}» e i filtri attivi</span>` : ''}</div>
+          <div class="pk-actions"><wa-button size="s" appearance="filled-outlined" data-open="${esc(p.url)}"><wa-icon slot="start" name="external-link"></wa-icon>${t('Visit the site')}</wa-button>
+          ${p.kind === 'api' && this.p.q.trim() ? `<span class="hint">${t('Filtered by «{q}» and the active filters', { q: esc(this.p.q.trim()) })}</span>` : ''}</div>
         </div>
       </div>${body}`;
   }
@@ -853,7 +859,7 @@ export class Online {
     try { buf = await this.player.load(uid, (id) => this.api.online_preview(id)); } catch (err) { console.warn(err); }
     btn.classList.remove('busy');
     btn.innerHTML = svg('play', btn.classList.contains('sc-play') ? 16 : 12);
-    if (!buf) { btn.innerHTML = svg('x', 12); btn.dataset.failed = '1'; btn.title = 'Anteprima non disponibile'; return; }
+    if (!buf) { btn.innerHTML = svg('x', 12); btn.dataset.failed = '1'; btn.title = t('Preview not available'); return; }
     if (this.pending === uid) this.player.play(uid, buf);
   }
 
@@ -882,14 +888,14 @@ export class Online {
     const box = $('#downloads');
     if (jobs.length) box.hidden = false;
     const active = jobs.filter((j) => j.status === 'queued' || j.status === 'downloading').length;
-    $('#dl-count').textContent = active ? `${active} in corso` : `${jobs.length} completati`;
+    $('#dl-count').textContent = active ? t('{n} in progress', { n: active }) : t('{n} completed', { n: jobs.length });
     $('#dl-library').hidden = !jobs.length || this.inLibrary !== false;
     $('#dl-in-library').hidden = !jobs.length || this.inLibrary !== true;
     $('#downloads-list').innerHTML = jobs.slice().reverse().map((j) => {
       const pct = j.total ? Math.min(100, (100 * j.bytes) / j.total) : (j.status === 'done' ? 100 : 0);
-      return `<div class="dl-row ${j.status}" ${j.path ? `data-path="${esc(j.path)}" title="Mostra in ${FILE_MANAGER}"` : ''}>
+      return `<div class="dl-row ${j.status}" ${j.path ? `data-path="${esc(j.path)}" title="${t('Show in {app}', { app: FILE_MANAGER })}"` : ''}>
         <span class="dl-name">${esc(j.title)}</span><span class="dl-src">${esc(j.source)}</span>
-        <span class="dl-state">${j.status === 'done' ? svg('check', 12) : j.status === 'error' ? `<span class="error" title="${esc(j.error)}">Errore</span>` : `${Math.round(pct)}%`}</span>
+        <span class="dl-state">${j.status === 'done' ? svg('check', 12) : j.status === 'error' ? `<span class="error" title="${esc(j.error)}">${t('Error')}</span>` : `${Math.round(pct)}%`}</span>
         <span class="dl-bar"><span style="width:${pct}%"></span></span></div>`;
     }).join('');
     if (active || force) this._dlT = setTimeout(() => this._pollDownloads(), 700);
@@ -918,15 +924,15 @@ export class Online {
   /** Store section of the Settings page: Freesound key, download folder, suspect packs. */
   async renderSettings(body) {
     const s = await this.api.get_settings();
-    const keyHint = s.freesound_key_set ? `Impostata (${esc(s.freesound_key_hint)}). <a href="#" id="set-key-clear">Rimuovi chiave</a>` : 'Nessuna chiave: Freesound resta escluso dalle ricerche.';
+    const keyHint = s.freesound_key_set ? `${t('Set ({hint}).', { hint: esc(s.freesound_key_hint) })} <a href="#" id="set-key-clear">${t('Remove key')}</a>` : t('No key: Freesound stays out of the searches.');
     body.innerHTML =
-      setRow('API key Freesound', `Gratuita: crea un account e <a href="#" id="set-getkey">richiedi una chiave</a>, poi incolla il valore "Client secret/Api key". Resta salvata solo su questo computer. ${keyHint}`,
-        `<wa-input id="set-key" type="password" password-toggle size="s" autocomplete="off" label="API key" placeholder="${s.freesound_key_set ? 'Incolla per sostituirla' : 'Incolla qui la tua API key'}" style="width:260px"></wa-input>`)
-      + setRow('Cartella dei download', 'Ogni file va in una sottocartella per fonte, con accanto un file .license.txt.',
+      setRow(t('Freesound API key'), `${t('Free: create an account and <a href="#" id="set-getkey">request a key</a>, then paste the "Client secret/Api key" value. It is saved only on this computer.')} ${keyHint}`,
+        `<wa-input id="set-key" type="password" password-toggle size="s" autocomplete="off" label="API key" placeholder="${s.freesound_key_set ? t('Paste to replace it') : t('Paste your API key here')}" style="width:260px"></wa-input>`)
+      + setRow(t('Downloads folder'), t('Every file goes into a subfolder per source, with a .license.txt file next to it.'),
         `<span class="set-path" title="${esc(s.download_dir)}">${esc(s.download_dir)}</span>
-         <wa-button id="set-pick" size="s" appearance="filled-outlined"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli…</wa-button>`)
-      + setRow('Pack sospetti', 'Mostra anche i pack di librerie commerciali (es. Big Fish Audio, Sound Ideas, Loopmasters) ricaricati con una licenza libera che probabilmente non hanno.',
-        `<wa-switch id="set-suspect" size="s" ${this.p.include_suspect ? 'checked' : ''}>Mostra</wa-switch>`);
+         <wa-button id="set-pick" size="s" appearance="filled-outlined"><wa-icon slot="start" name="folder-open"></wa-icon>${t('Choose…')}</wa-button>`)
+      + setRow(t('Suspect packs'), t('Also show packs of commercial libraries (e.g. Big Fish Audio, Sound Ideas, Loopmasters) re-uploaded with a free licence they probably do not have.'),
+        `<wa-switch id="set-suspect" size="s" ${this.p.include_suspect ? 'checked' : ''}>${t('Show')}</wa-switch>`);
     const done = (ns) => { this.meta ? this.onSettings(ns) : null; savedFlash(body); return this.renderSettings(body); };
     body.querySelector('#set-getkey').onclick = (e) => { e.preventDefault(); this.api.open_url('https://freesound.org/apiv2/apply'); };
     const clear = body.querySelector('#set-key-clear');

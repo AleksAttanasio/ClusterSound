@@ -1,31 +1,33 @@
-# Demucs (Estrai stem)
+# Demucs (Extract stems)
 
-[Demucs](https://github.com/adefossez/demucs) di Meta separa un brano nelle sue sorgenti. ClusterSound usa
-**`htdemucs_6s`**, la variante *Hybrid Transformer* a 6 sorgenti: **batteria, basso, chitarra, piano, voce, altro**.
+Meta's [Demucs](https://github.com/adefossez/demucs) separates a track into its sources. ClusterSound uses
+**`htdemucs_6s`**, the 6-source *Hybrid Transformer* variant: **drums, bass, guitar, piano, vocals, other**.
 
-## Il modello
+## The model
 
-*Hybrid Transformer Demucs* combina due rami U-Net, uno sulla forma d'onda e uno sullo spettrogramma, con un
-**Transformer cross-domain** al centro che fa dialogare i due rappresentazioni. Il ramo temporale preserva i
-transienti (batteria), quello spettrale le parti tonali; l'uscita è la somma dei due rami per ogni sorgente.
+*Hybrid Transformer Demucs* combines two U-Net branches, one on the waveform and one on the spectrogram, with a
+**cross-domain Transformer** in the middle that makes the two representations talk to each other. The time branch
+preserves the transients (drums), the spectral one the tonal parts; the output is the sum of the two branches for
+every source.
 
-## Come viene usato (`sampler/stems.py`)
+## How it is used (`sampler/stems.py`)
 
-| Aspetto | Scelta |
+| Aspect | Choice |
 |---|---|
-| Installazione | extra `stems` (`demucs>=4.0.1`, `torch>=2.1`) |
-| Pesi | ~55 MB scaricati al primo uso in `models/demucs` nella cartella dati (Hugging Face per demucs ≥ 4.1, `torch.hub` reindirizzato per la 4.0), con un marcatore `.ready`; poi solo da disco, senza rete |
-| Device | CUDA → MPS → CPU; se un'operazione manca sulla GPU il lavoro continua su CPU |
-| Processo | nel processo dell'app, in un thread; PyTorch importato solo all'avvio della separazione |
-| Blocchi | **60 s** con **2 s** di sovrapposizione e dissolvenza lineare; dentro ogni blocco `apply_model(split=True, overlap=0.25)` |
-| Normalizzazione | media e deviazione standard del riferimento mono, ripristinate in uscita |
-| Mono | duplicato in stereo per il modello, poi rimediato |
-| Uscita | un WAV 24 bit per stem; annullabile tra un blocco e l'altro (i file parziali vengono rimossi) |
+| Installation | `stems` extra (`demucs>=4.0.1`, `torch>=2.1`) |
+| Weights | ~55 MB downloaded on first use into `models/demucs` in the data folder (Hugging Face for demucs ≥ 4.1, redirected `torch.hub` for 4.0), with a `.ready` marker; afterwards only from disk, no network |
+| Device | CUDA → MPS → CPU; if an operation is missing on the GPU the job goes on on the CPU |
+| Process | inside the app process, in a thread; PyTorch imported only when the separation starts |
+| Blocks | **60 s** with **2 s** of overlap and a linear crossfade; inside every block `apply_model(split=True, overlap=0.25)` |
+| Normalisation | mean and standard deviation of the mono reference, restored at the output |
+| Mono | duplicated to stereo for the model, then averaged back |
+| Output | one 24-bit WAV per stem; can be cancelled between blocks (partial files are removed) |
 
-## Stem scelti e "Altro"
+## Chosen stems and "Other"
 
-L'utente spunta solo gli stem che gli servono; tutte le sorgenti non scelte vengono **sommate in "Altro"**. Così i
-file prodotti sommati restituiscono sempre l'originale (a meno dell'errore del modello) e niente va perso.
+The user ticks only the stems they need; all the sources that are not chosen are **summed into "Other"**. This way
+the files produced always add up to the original (up to the model's error) and nothing is lost.
 
-Gli stem della registrazione intera vanno in `<registrazione> - stem/`, quelli di una regione in
-`ClusterSound Samples/…/stem/`, con la stessa nota di provenienza della sorgente.
+The stems of the whole recording go into `<recording> - stem/`, those of a region into
+`ClusterSound Samples/…/stem/`, with the same provenance note as the source. The stem names in the files follow the
+interface language.

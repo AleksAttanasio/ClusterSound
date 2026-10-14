@@ -200,13 +200,13 @@ def test_search_isolates_failing_source(monkeypatch):
                              license="cc0", duration=0.5)], 1, False
 
     def boom(p, page, settings):
-        raise SourceError("non raggiungibile")
+        raise SourceError("unreachable")
 
     monkeypatch.setattr(openverse, "search", ok)
     monkeypatch.setattr(ccmixter, "search", boom)
     res = S.search({"sources": ["openverse", "ccmixter"], "instruments": ["kick"]}, {})
     assert res["openverse"]["results"][0]["instrument"] == "kick"
-    assert res["ccmixter"]["error"] == "non raggiungibile" and res["ccmixter"]["results"] == []
+    assert res["ccmixter"]["error"] == "unreachable" and res["ccmixter"]["results"] == []
 
 
 def test_client_filters():
@@ -291,7 +291,7 @@ def test_download_paths_and_license(tmp_path):
     p2 = downloads.target_path(str(tmp_path), r, "https://archive.org/download/x/k.wav")
     assert p2 != p1 and "(2)" in p2
     text = downloads.license_text(r, "https://archive.org/download/x/k.wav")
-    assert "CC BY" in text and "Attribuzione richiesta" in text and "Me" in text
+    assert "CC BY" in text and "Attribution required" in text and "Me" in text
     assert downloads.safe_name('a/b:c*?"d') == "a b c d"
 
 

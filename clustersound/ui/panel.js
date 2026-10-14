@@ -1,6 +1,7 @@
 // Detail drawer: class, actions, dynamics (waveform + RMS envelope + ADSR), spectrogram, metrics.
 
 import { btn, FILE_MANAGER } from './kit.js';
+import { t } from './i18n.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (v, d = 1, unit = '') => (v === null || v === undefined || Number.isNaN(v) ? '—' : `${Number(v).toFixed(d)}${unit}`);
@@ -40,14 +41,14 @@ export class Panel {
       ${this._classHeader(cls, item.conf, item.user)}
       <div class="p-name">${esc(item.name)}</div>
       <div class="p-path">${esc(item.rel)}</div>
-      <div class="hint">Analisi della dinamica…</div>`;
+      <div class="hint">${t('Analysing the dynamics…')}</div>`;
   }
 
   _classHeader(cls, conf, user) {
     return `<div class="p-class">
       <span class="p-badge" style="background:${cls.color}26;color:${cls.color}"><span class="dot" style="background:${cls.color}"></span>${esc(cls.label)}</span>
-      <span class="p-conf">${user ? '' : `${Math.round(conf * 100)}% confidenza`}</span>
-      ${user ? '<span class="p-user"><wa-icon name="check"></wa-icon> etichetta manuale</span>' : ''}
+      <span class="p-conf">${user ? '' : t('{p}% confidence', { p: Math.round(conf * 100) })}</span>
+      ${user ? `<span class="p-user"><wa-icon name="check"></wa-icon> ${t('manual label')}</span>` : ''}
     </div>`;
   }
 
@@ -59,7 +60,7 @@ export class Panel {
     const info = d.info || {};
     const byId = Object.fromEntries(this.classes.map((c) => [c.id, c]));
     const alts = (d.alts || []).filter((x) => x.cls !== d.cls).slice(0, 3);
-    const options = this.groups.map((g, k) => `${k ? '<wa-divider></wa-divider>' : ''}<small>${esc(g)}</small>${this.classes.filter((c) => c.group === g)
+    const options = this.groups.map((g, k) => `${k ? '<wa-divider></wa-divider>' : ''}<small>${esc(t(g))}</small>${this.classes.filter((c) => c.group === g)
       .map((c) => `<wa-option value="${c.id}" ${c.id === d.cls ? 'selected' : ''}><span slot="start" class="dot" style="background:${c.color}"></span>${esc(c.label)}</wa-option>`).join('')}`).join('');
     const bit = (info.subtype || '').replace('PCM_', '').replace('FLOAT', '32f').replace('DOUBLE', '64f');
 
@@ -71,22 +72,22 @@ export class Panel {
       </div>
       <div class="p-actions">
         ${btn(playLabel(playing), { variant: 'brand', 'data-act': 'play' })}
-        ${btn('Mostra nella cartella', { icon: 'folder-open', 'data-act': 'reveal', title: `Apre ${FILE_MANAGER} con il file selezionato` })}
-        ${btn('Trova simili', { icon: 'sparkles', 'data-act': 'similar' })}
-        ${btn('Invia', { 'data-act': 'send', 'with-caret': true, title: 'Aggiungi il sample a un bus del Sequencer o al Drum Rack' })}
-        ${btn('Altri nello Store', { icon: 'store', 'data-act': 'store', title: `Cerca sample gratuiti di tipo «${cls.label}» nello Store` })}
+        ${btn(t('Show in folder'), { icon: 'folder-open', 'data-act': 'reveal', title: t('Opens {app} with the file selected', { app: FILE_MANAGER }) })}
+        ${btn(t('Find similar'), { icon: 'sparkles', 'data-act': 'similar' })}
+        ${btn(t('Send'), { 'data-act': 'send', 'with-caret': true, title: t('Add the sample to a Sequencer bus or to the Drum Rack') })}
+        ${btn(t('More in the Store'), { icon: 'store', 'data-act': 'store', title: t('Search the Store for free «{cls}» samples', { cls: cls.label }) })}
       </div>
 
       <div>
-        <div class="section-title">Dinamica
-          <span class="legend-inline"><span style="color:#8a8a8a">Onda</span><span style="color:#ececec">RMS dB</span></span>
+        <div class="section-title">${t('Dynamics')}
+          <span class="legend-inline"><span style="color:#8a8a8a">${t('Wave')}</span><span style="color:#ececec">RMS dB</span></span>
         </div>
         ${dyn.error ? `<div class="error">${esc(dyn.error)}</div>` : '<canvas class="wave" id="cv-wave"></canvas><canvas class="mel" id="cv-mel"></canvas>'}
       </div>
 
       <div class="metrics">
         ${[
-          ['Durata', fmtTime(info.duration ?? dyn.duration)],
+          [t('Duration'), fmtTime(info.duration ?? dyn.duration)],
           ['Peak', fmt(dyn.peak_dbfs, 1, ' dBFS')],
           ['RMS', fmt(dyn.rms_dbfs, 1, ' dBFS')],
           ['Crest', fmt(dyn.crest_db, 1, ' dB')],
@@ -95,24 +96,24 @@ export class Panel {
           ['Sustain', fmt(a.sustain_db, 1, ' dB')],
           ['Release', fmt(a.release_ms, 0, ' ms')],
           ['T60', fmtTime(dyn.t60)],
-          ['Formato', `${info.samplerate ? (info.samplerate / 1000).toFixed(1) + ' kHz' : '—'}`],
-          ['Canali / bit', `${info.channels ?? '—'} / ${bit || '—'}`],
-          ['Tipo', esc(d.type || '—')],
-          ['Centroide', fmt(d.features?.centroid, 0, ' Hz')],
-          ['Armonicità', fmt(d.features?.harmonicity, 2)],
-          ['Sottocluster', `#${d.sub}`],
+          [t('Format'), `${info.samplerate ? (info.samplerate / 1000).toFixed(1) + ' kHz' : '—'}`],
+          [t('Channels / bit'), `${info.channels ?? '—'} / ${bit || '—'}`],
+          [t('Type'), esc(d.type || '—')],
+          [t('Centroid'), fmt(d.features?.centroid, 0, ' Hz')],
+          [t('Harmonicity'), fmt(d.features?.harmonicity, 2)],
+          [t('Subcluster'), `#${d.sub}`],
         ].map(([k, v]) => `<div class="metric"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}
       </div>
 
       <div>
-        <div class="section-title">Classe</div>
+        <div class="section-title">${t('Class')}</div>
         <wa-select size="s" class="cls-select" id="cls-select" value="${esc(d.cls)}">${options}</wa-select>
-        ${alts.length ? `<div class="hint" style="margin:8px 0 6px">Alternative</div><div class="alts">${alts.map((x) => {
+        ${alts.length ? `<div class="hint" style="margin:8px 0 6px">${t('Alternatives')}</div><div class="alts">${alts.map((x) => {
           const c = byId[x.cls];
           return `<wa-button size="xs" pill appearance="outlined" class="alt" data-cls="${c.id}"><span slot="start" class="dot" style="background:${c.color}"></span>${esc(c.label)} ${Math.round(x.p * 100)}%</wa-button>`;
         }).join('')}</div>` : ''}
-        ${d.user ? '<div style="margin-top:8px"><a href="#" id="clear-label">Rimuovi etichetta manuale</a></div>' : ''}
-        <div class="hint" style="margin-top:8px">Le correzioni entrano nel training: le altre classificazioni si aggiornano in pochi secondi.</div>
+        ${d.user ? `<div style="margin-top:8px"><a href="#" id="clear-label">${t('Remove manual label')}</a></div>` : ''}
+        <div class="hint" style="margin-top:8px">${t('Corrections go into the training: the other classifications update in a few seconds.')}</div>
       </div>`;
 
     this.content.querySelector('[data-act=play]').onclick = () => this.cb.onPlayToggle();

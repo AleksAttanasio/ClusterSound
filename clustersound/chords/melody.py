@@ -13,20 +13,21 @@ import math
 import random
 import uuid
 
+from ..i18n import N_, tr
 from . import harmony, theory
 from .perform import BAR, MIN_LEN, PPQ, STEP, _swing, mode_of
 from .variations import _fit, bake
 
-DENSITIES = [("low", "Rada"), ("mid", "Media"), ("high", "Fitta"), ("mixed", "Mista")]
-CONTOURS = [("arch", "Arco"), ("up", "Sale"), ("down", "Scende"), ("wave", "Onda"), ("free", "Libero")]
-RATES = [("bar", "1 accordo per battuta"), ("half", "2 per battuta"), ("auto", "Segue la melodia")]
-ARP_SHAPES = [("up", "Sale"), ("down", "Scende"), ("updown", "Sale e scende"), ("random", "Casuale")]
-BASS_SHAPES = [("root", "Fondamentali"), ("octave", "Ottave"), ("fifth", "Quinte"), ("walk", "Passaggi")]
+DENSITIES = [("low", N_("Sparse")), ("mid", N_("Medium")), ("high", N_("Dense")), ("mixed", N_("Mixed"))]
+CONTOURS = [("arch", N_("Arch")), ("up", N_("Rising")), ("down", N_("Falling")), ("wave", N_("Wave")), ("free", N_("Free"))]
+RATES = [("bar", N_("1 chord per bar")), ("half", N_("2 per bar")), ("auto", N_("Follows the melody"))]
+ARP_SHAPES = [("up", N_("Rising")), ("down", N_("Falling")), ("updown", N_("Up and down")), ("random", N_("Random"))]
+BASS_SHAPES = [("root", N_("Roots")), ("octave", N_("Octaves")), ("fifth", N_("Fifths")), ("walk", N_("Walking"))]
 # role -> label, default range, shapes for the "contour" option (and their label)
 ROLES = {
-    "lead": {"label": "Melodia", "lo": 60, "hi": 81, "shapes": CONTOURS, "shapeLabel": "Contorno"},
-    "bass": {"label": "Basso", "lo": 36, "hi": 55, "shapes": BASS_SHAPES, "shapeLabel": "Stile"},
-    "arp": {"label": "Arpeggio", "lo": 55, "hi": 79, "shapes": ARP_SHAPES, "shapeLabel": "Direzione"},
+    "lead": {"label": N_("Melody"), "lo": 60, "hi": 81, "shapes": CONTOURS, "shapeLabel": N_("Contour")},
+    "bass": {"label": N_("Bass"), "lo": 36, "hi": 55, "shapes": BASS_SHAPES, "shapeLabel": N_("Style")},
+    "arp": {"label": N_("Arpeggio"), "lo": 55, "hi": 79, "shapes": ARP_SHAPES, "shapeLabel": N_("Direction")},
     "riff": {"label": "Riff", "lo": 55, "hi": 76, "shapes": [], "shapeLabel": ""},
     "pad": {"label": "Pad", "lo": 52, "hi": 72, "shapes": [], "shapeLabel": ""},
     "keys": {"label": "Keys", "lo": 52, "hi": 74, "shapes": [], "shapeLabel": ""},
@@ -54,7 +55,7 @@ def layers_of(seq: dict) -> list[dict]:
     if "layers" in m:
         return m["layers"] or []
     notes = m.get("notes") or []
-    return [{"id": "L1", "name": "Melodia", "role": "lead", "notes": notes, "vol": 1, "mute": False}] if notes else []
+    return [{"id": "L1", "name": tr("Melody"), "role": "lead", "notes": notes, "vol": 1, "mute": False}] if notes else []
 
 
 def active_layer(seq: dict) -> dict | None:
@@ -74,7 +75,7 @@ def notes_of(seq: dict, layer_id: str | None = None) -> list[dict]:
 # ------------------------------------------------------------------ render
 def render(seq: dict, layer_id: str | None = None) -> list[tuple[int, int, int, int]]:
     """[(start tick, end tick, pitch, velocity)] of a layer (default: all the layers that aren't muted) with
-    the swing of the Modalità, cut at the sequence length."""
+    the swing of the Mode, cut at the sequence length."""
     if layer_id:
         notes = notes_of(seq, layer_id)
     else:
@@ -627,7 +628,7 @@ def harmonize(seq: dict, pool: list[dict], key: dict, bigrams, opts: dict | None
         new["bars"] = bars
         new["clips"] = _clips(path, segs, cands, notes, key)
         degrees = " – ".join(c["degree"] for c in new["clips"])
-        out.append({"label": f"Armonia {len(out) + 1}: {degrees}", "seq": new})
+        out.append({"label": tr("Harmony {n}: {degrees}", n=len(out) + 1, degrees=degrees), "seq": new})
     return out
 
 

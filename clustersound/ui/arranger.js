@@ -4,6 +4,7 @@ import { toast } from './sendmenu.js';
 import { sendToLive } from './live.js';
 import { btn, setPlayButton } from './kit.js';
 import { svg } from './icons.js';
+import { t } from './i18n.js';
 
 // Drum notes in exported MIDI: 'drumrack' (C1… as an Ableton Drum Rack) or 'gm' (General MIDI).
 // Chosen in Settings › Sequencer; pattern and song export read it from here.
@@ -43,7 +44,7 @@ export class Arranger {
   constructor(editor) {
     this.ed = editor;
     this.api = editor.api;
-    this.seq = { name: 'Sequenza', blocks: [] };
+    this.seq = { name: t('Sequence'), blocks: [] };
     this.editing = null;   // index of the block shown in the grid (null = free pattern)
     this.free = null;      // the free pattern kept aside while a block is edited
     this.playing = false;
@@ -61,20 +62,20 @@ export class Arranger {
     this.root = root;
     root.innerHTML = `
       <div class="sq-head">
-        <button class="sq-toggle" data-a="toggle" title="Mostra/nascondi la sequenza">${svg('chevron-down')}</button>
-        <span class="sq-title">Sequenza</span>
-        <wa-input id="sq-name" class="sq-name" size="s" value="" title="Nome della sequenza (usato nell'export)"></wa-input>
+        <button class="sq-toggle" data-a="toggle" title="${t('Show/hide the sequence')}">${svg('chevron-down')}</button>
+        <span class="sq-title">${t('Sequence')}</span>
+        <wa-input id="sq-name" class="sq-name" size="s" value="" title="${t('Name of the sequence (used in the export)')}"></wa-input>
         <span id="sq-info" class="sq-info"></span>
-        ${btn('<wa-icon slot="start" name="play"></wa-icon>Play sequenza', { variant: 'brand', id: 'sq-play', 'data-a': 'play', title: 'Suona tutta la sequenza' })}
-        <wa-checkbox size="s" class="sq-follow" id="sq-follow" checked title="Durante la riproduzione la griglia mostra il blocco che sta suonando">Segui</wa-checkbox>
+        ${btn(`<wa-icon slot="start" name="play"></wa-icon>${t('Play sequence')}`, { variant: 'brand', id: 'sq-play', 'data-a': 'play', title: t('Plays the whole sequence') })}
+        <wa-checkbox size="s" class="sq-follow" id="sq-follow" checked title="${t('While playing, the grid shows the block that is playing')}">${t('Follow')}</wa-checkbox>
         <div class="spacer"></div>
-        ${btn('Pattern corrente', { icon: 'plus', 'data-a': 'add-current', title: 'Aggiunge in fondo il pattern che vedi nella griglia (con le tue modifiche)' })}
-        ${btn('Salva…', { icon: 'save', 'data-a': 'save' })}
-        <wa-select id="sq-open" class="sq-open" size="s" placeholder="Apri…" title="Apri una sequenza salvata"></wa-select>
-        ${btn('Svuota', { icon: 'trash-2', 'data-a': 'clear' })}
-        <span class="sq-exp">Esporta sequenza:</span>
-        <wa-button-group label="Esporta sequenza">
-          ${btn('MIDI', { 'data-a': 'exp-midi' })}${btn('WAV', { 'data-a': 'exp-wav' })}${btn('Live', { 'data-a': 'exp-live', title: 'Crea in Live le tracce della sequenza (serve il device ClusterSound nel set)' })}
+        ${btn(t('Current pattern'), { icon: 'plus', 'data-a': 'add-current', title: t('Appends the pattern you see in the grid (with your changes)') })}
+        ${btn(t('Save…'), { icon: 'save', 'data-a': 'save' })}
+        <wa-select id="sq-open" class="sq-open" size="s" placeholder="${t('Open…')}" title="${t('Open a saved sequence')}"></wa-select>
+        ${btn(t('Clear'), { icon: 'trash-2', 'data-a': 'clear' })}
+        <span class="sq-exp">${t('Export sequence:')}</span>
+        <wa-button-group label="${t('Export sequence')}">
+          ${btn('MIDI', { 'data-a': 'exp-midi' })}${btn('WAV', { 'data-a': 'exp-wav' })}${btn('Live', { 'data-a': 'exp-live', title: t('Creates the tracks of the sequence in Live (needs the ClusterSound device in the set)') })}
         </wa-button-group>
         ${btn('Ableton', { variant: 'brand', icon: 'file-down', 'data-a': 'exp-abl' })}
       </div>
@@ -83,7 +84,7 @@ export class Arranger {
         <div id="sq-banner" class="sq-banner" hidden></div>
       </div>`;
     root.addEventListener('click', (e) => this._onClick(e));
-    $('#sq-name').oninput = (e) => { this.seq.name = e.target.value || 'Sequenza'; this._save(); };
+    $('#sq-name').oninput = (e) => { this.seq.name = e.target.value || t('Sequence'); this._save(); };
     $('#sq-follow').onchange = (e) => { this.follow = e.target.checked; };
     $('#sq-open').onchange = (e) => this._openSaved(e.target.value);
     const track = $('#sq-track');
@@ -152,17 +153,17 @@ export class Arranger {
       const b = await this._blockFrom(payload);
       if (!b) return;
       this.seq.blocks.splice(at, 0, b);
-      toast(`Aggiunto alla sequenza: ${b.label}`);
+      toast(t('Added to the sequence: {label}', { label: b.label }));
     }
     this._changed();
   }
 
   addCurrent() {
     const p = this.ed.p;
-    const label = this.editing !== null ? `${this.seq.blocks[this.editing].label} (copia)` : this.labelFor(p.genre, p.name);
+    const label = this.editing !== null ? `${this.seq.blocks[this.editing].label} (${t('copy')})` : this.labelFor(p.genre, p.name);
     this.seq.blocks.push({ id: uid(), label, source: { ...(this.ed.source || {}) }, repeat: 1, groove: grooveOf(p) });
     this._changed();
-    toast(`Aggiunto alla sequenza: ${label}`);
+    toast(t('Added to the sequence: {label}', { label }));
   }
 
   _changed() {
@@ -222,7 +223,7 @@ export class Arranger {
 
   // ---------------------------------------------------------------- playback
   async play(fromBlock = 0) {
-    if (!this.seq.blocks.length) { toast('La sequenza è vuota: trascina qui qualche variante'); return; }
+    if (!this.seq.blocks.length) { toast(t('The sequence is empty: drag some variants here')); return; }
     this.ed.stop();
     const flat = await this.api.sequence_flatten(this.ed.p, this.seq);
     if (flat.error) { toast(flat.error); return; }
@@ -233,7 +234,7 @@ export class Arranger {
     const sec = flat.sections.find((s) => s.index === fromBlock) || flat.sections[0];
     this.ed.seq.start(sec.start_bar * 16);
     this.playing = true;
-    setPlayButton($('#sq-play'), true, 'Play sequenza');
+    setPlayButton($('#sq-play'), true, t('Play sequence'));
     this.ed._meterLoop();
   }
 
@@ -242,7 +243,7 @@ export class Arranger {
   onStopped() {
     this.playing = false;
     const b = $('#sq-play');
-    setPlayButton(b, false, 'Play sequenza');
+    setPlayButton(b, false, t('Play sequence'));
     this._cursor(null);
     document.querySelectorAll('.sq-card.now').forEach((c) => c.classList.remove('now'));
   }
@@ -284,22 +285,22 @@ export class Arranger {
 
   // ---------------------------------------------------------------- export
   async _export(kind) {
-    if (!this.seq.blocks.length) { toast('La sequenza è vuota'); return; }
+    if (!this.seq.blocks.length) { toast(t('The sequence is empty')); return; }
     const flat = await this.api.sequence_flatten(this.ed.p, this.seq);
     if (flat.error) { toast(flat.error); return; }
     if (kind === 'midi') {
       const p = await this.api.export_midi(flat, midiMap());
-      if (p) toast(`MIDI della sequenza salvato: ${p.split('/').pop()}`);
+      if (p) toast(t('Sequence MIDI saved: {file}', { file: p.split('/').pop() }));
     } else if (kind === 'wav') {
-      toast('Rendering della sequenza…');
+      toast(t('Rendering the sequence…'));
       const p = await this.api.export_wav(flat);
-      if (p) toast(`WAV salvato: ${p.split('/').pop()}`);
+      if (p) toast(t('WAV saved: {file}', { file: p.split('/').pop() }));
     } else if (kind === 'live') {
       await sendToLive(this.api, 'sequence', flat);
     } else {
-      toast('Preparazione pacchetto Ableton…');
+      toast(t('Preparing the Ableton package…'));
       const r = await this.api.export_ableton(flat);
-      if (r.error) alert(r.error); else if (r.folder) toast(`Pacchetto creato: ${r.folder.split('/').pop()}`);
+      if (r.error) alert(r.error); else if (r.folder) toast(t('Package created: {folder}', { folder: r.folder.split('/').pop() }));
     }
   }
 
@@ -307,12 +308,12 @@ export class Arranger {
   async _refreshSaved() {
     const list = await this.api.list_sequences();
     this.saved = list;
-    $('#sq-open').innerHTML = list.length ? list.map((s) => `<wa-option value="${esc(s.id)}">${esc(s.name)} (${s.blocks.length} blocchi)</wa-option>`).join('')
-      : '<wa-option value="none" disabled>Nessuna sequenza salvata</wa-option>';
+    $('#sq-open').innerHTML = list.length ? list.map((s) => `<wa-option value="${esc(s.id)}">${esc(s.name)} (${t('{n} blocks', { n: s.blocks.length })})</wa-option>`).join('')
+      : `<wa-option value="none" disabled>${t('No saved sequences')}</wa-option>`;
   }
 
   async _saveAs() {
-    const name = prompt('Nome della sequenza', this.seq.name || 'Sequenza');
+    const name = prompt(t('Name of the sequence'), this.seq.name || t('Sequence'));
     if (!name) return;
     this.seq.name = name;
     // the kit (samples, layers, mix) goes with the saved copy, so the Max for Live device can import it as heard
@@ -321,14 +322,14 @@ export class Arranger {
     this._save();
     this.render();
     this._refreshSaved();
-    toast(`Sequenza "${name}" salvata`);
+    toast(t('Sequence "{name}" saved', { name }));
   }
 
   _openSaved(id) {
     $('#sq-open').value = '';
     const s = (this.saved || []).find((x) => x.id === id);
     if (!s) return;
-    if (this.seq.blocks.length && !confirm('Sostituire la sequenza attuale?')) return;
+    if (this.seq.blocks.length && !confirm(t('Replace the current sequence?'))) return;
     this.backToFree();
     this.seq = clone(s);
     delete this.seq.kit;  // the editor keeps its own kit; the saved one is for Live
@@ -384,14 +385,14 @@ export class Arranger {
       case 'add-current': this.addCurrent(); return;
       case 'save': this._saveAs(); return;
       case 'clear':
-        if (this.seq.blocks.length && confirm('Svuotare la sequenza?')) { this.backToFree(); this.seq.blocks = []; this._changed(); }
+        if (this.seq.blocks.length && confirm(t('Clear the sequence?'))) { this.backToFree(); this.seq.blocks = []; this._changed(); }
         return;
       case 'back': this.backToFree(); return;
       case 'rep-': b.repeat = Math.max(1, (b.repeat || 1) - 1); break;
       case 'rep+': b.repeat = Math.min(32, (b.repeat || 1) + 1); break;
       case 'dup': this.seq.blocks.splice(k + 1, 0, { ...clone(b), id: uid() }); break;
       case 'ren': {
-        const name = prompt('Nome del blocco', b.label);
+        const name = prompt(t('Name of the block'), b.label);
         if (!name) return;
         b.label = name;
         break;
@@ -416,39 +417,38 @@ export class Arranger {
     const bars = this.seq.blocks.reduce((s, b) => s + b.groove.bars * (b.repeat || 1), 0);
     const secs = (bars * 4 * 60) / (this.ed.p?.bpm || 120);
     const el = $('#sq-info');
-    if (el) el.textContent = this.seq.blocks.length ? `${this.seq.blocks.length} blocchi · ${bars} battute · ${fmtTime(secs)} a ${Math.round(this.ed.p?.bpm || 120)} BPM` : '';
+    if (el) el.textContent = this.seq.blocks.length ? t('{n} blocks · {bars} bars · {time} at {bpm} BPM', { n: this.seq.blocks.length, bars, time: fmtTime(secs), bpm: Math.round(this.ed.p?.bpm || 120) }) : '';
   }
 
   render() {
     if (!this.root) return;
     this.root.classList.toggle('closed', !this.open);
     $('.sq-toggle', this.root).innerHTML = svg(this.open ? 'chevron-down' : 'chevron-right');
-    $('#sq-name').value = this.seq.name || 'Sequenza';
+    $('#sq-name').value = this.seq.name || t('Sequence');
     this._info();
     const track = $('#sq-track');
     let bar = 1;
     const cards = this.seq.blocks.map((b, i) => {
       const len = b.groove.bars * (b.repeat || 1);
-      const html = `<div class="sq-card ${this.editing === i ? 'editing' : ''}" draggable="true" data-i="${i}" style="width:${130 + len * PX_PER_BAR}px" title="Clic: mostra e modifica nella griglia · trascina per spostare">
+      const html = `<div class="sq-card ${this.editing === i ? 'editing' : ''}" draggable="true" data-i="${i}" style="width:${130 + len * PX_PER_BAR}px" title="${t('Click: show and edit in the grid · drag to move')}">
         <div class="sq-card-top"><span class="sq-num">${i + 1}</span><span class="sq-label">${esc(b.label)}</span>
-          <button class="sq-ib" data-a="play-from" title="Suona da qui">${svg('play', 10)}</button></div>
+          <button class="sq-ib" data-a="play-from" title="${t('Play from here')}">${svg('play', 10)}</button></div>
         <canvas class="sq-thumb" data-i="${i}"></canvas>
-        <div class="sq-card-bot"><span class="sq-bars">Batt. ${bar}–${bar + len - 1}</span>
+        <div class="sq-card-bot"><span class="sq-bars">${t('Bars {a}–{b}', { a: bar, b: bar + len - 1 })}</span>
           <span class="sq-rep"><button class="sq-ib" data-a="rep-">${svg('minus', 10)}</button><b>×${b.repeat || 1}</b><button class="sq-ib" data-a="rep+">${svg('plus', 10)}</button></span>
-          <span class="sq-tools"><button class="sq-ib" data-a="dup" title="Duplica">${svg('copy', 10)}</button><button class="sq-ib" data-a="ren" title="Rinomina">${svg('pencil', 10)}</button><button class="sq-ib danger" data-a="del" title="Elimina">${svg('x', 10)}</button></span></div>
+          <span class="sq-tools"><button class="sq-ib" data-a="dup" title="${t('Duplicate')}">${svg('copy', 10)}</button><button class="sq-ib" data-a="ren" title="${t('Rename')}">${svg('pencil', 10)}</button><button class="sq-ib danger" data-a="del" title="${t('Delete')}">${svg('x', 10)}</button></span></div>
       </div>`;
       bar += len;
       return html;
     });
-    track.innerHTML = (cards.length ? cards.join('') : `<div class="sq-empty">Trascina qui le varianti (i chip sopra, anche di generi diversi: cambia genere dal menu) per comporre la sequenza.
-      Doppio clic su un chip = aggiungi in fondo · "+ Pattern corrente" = aggiungi quello che vedi nella griglia.</div>`)
+    track.innerHTML = (cards.length ? cards.join('') : `<div class="sq-empty">${t('Drag the variants here (the chips above, of different genres too: change genre from the menu) to build the sequence. Double-click on a chip = append · "+ Current pattern" = add what you see in the grid.')}</div>`)
       + '<div id="sq-marker" class="sq-marker" style="display:none"></div><div id="sq-cursor" class="sq-cursor" style="display:none"></div>';
     this.seq.blocks.forEach((_, i) => this._drawCard(i));
     const banner = $('#sq-banner');
     if (this.editing !== null && this.seq.blocks[this.editing]) {
       banner.hidden = false;
-      banner.innerHTML = `${svg('pencil', 12)} <span>Nella griglia stai modificando il <b>blocco ${this.editing + 1}</b> · ${esc(this.seq.blocks[this.editing].label)} — ogni modifica aggiorna il blocco.</span>
-        ${btn('Torna al pattern libero', { size: 'xs', 'data-a': 'back' })}`;
+      banner.innerHTML = `${svg('pencil', 12)} <span>${t('In the grid you are editing <b>block {n}</b> · {label} — every change updates the block.', { n: this.editing + 1, label: esc(this.seq.blocks[this.editing].label) })}</span>
+        ${btn(t('Back to the free pattern'), { size: 'xs', 'data-a': 'back' })}`;
     } else banner.hidden = true;
   }
 

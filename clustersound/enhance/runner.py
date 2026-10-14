@@ -65,7 +65,7 @@ def run(model: str, src: str, dst: str, on_progress: Callable[[float], None] | N
             raise RuntimeError(last["error"])
         if p.returncode != 0 or "done" not in last:
             tail = "".join(err_tail).strip().splitlines()
-            raise RuntimeError(tail[-1] if tail else f"il processo è terminato con codice {p.returncode}")
+            raise RuntimeError(tail[-1] if tail else f"the process exited with code {p.returncode}")
         return last
     except BaseException:
         if p.poll() is None:

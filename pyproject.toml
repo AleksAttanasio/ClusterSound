@@ -1,7 +1,7 @@
 [project]
 name = "clustersound"
 version = "1.0.0"
-description = "Classifica e raggruppa in 3D una libreria di sample audio (kick, snare, hat, …)."
+description = "Classify and cluster a library of audio samples in 3D (kick, snare, hat, …)."
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",
@@ -16,7 +16,7 @@ dev = ["pytest", "pyinstaller>=6.0", "h5py"]
 midi = ["python-rtmidi>=1.5"]  # Compose: record a melody from a MIDI keyboard
 # Recorder: stem separation (drums, bass, guitar, vocals) with Demucs, on this computer (CUDA, MPS or CPU)
 stems = ["demucs>=4.0.1", "torch>=2.1"]
-# Recorder: "Migliora" (AI restoration of samples) with Apollo, on this computer (CUDA, MPS or CPU)
+# Recorder: "Enhance" (AI restoration of samples) with Apollo, on this computer (CUDA, MPS or CPU)
 enhance = ["torch>=2.1", "huggingface_hub>=0.20"]
 # Recorder: "all outputs" through ScreenCaptureKit when the cs-tap helper (macOS 14.2+) is missing
 capture = ["pyobjc-framework-ScreenCaptureKit>=10; sys_platform == 'darwin'",
@@ -29,7 +29,7 @@ clustersound = "clustersound.__main__:main"
 include = ["clustersound*"]
 
 [tool.setuptools.package-data]
-clustersound = ["models/*", "ui/*", "ui/vendor/*", "ui/vendor/**/*", "ui/assets/*"]
+clustersound = ["models/*", "ui/*", "ui/locales/*", "ui/vendor/*", "ui/vendor/**/*", "ui/assets/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

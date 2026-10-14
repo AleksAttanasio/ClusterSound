@@ -8,6 +8,7 @@ import html
 import re
 import urllib.parse
 
+from ..i18n import N_, tr
 from ..online import archive, ccmixter, freesound, openverse
 from ..online.base import OnlineResult, SourceError, http_get, normalize_license
 
@@ -20,12 +21,12 @@ BLOCKED = {
     "deezer.com": "Deezer", "soundcloud.com": "SoundCloud", "music.amazon.com": "Amazon Music",
     "amazon.com": "Amazon Music", "qobuz.com": "Qobuz", "pandora.com": "Pandora",
 }
-BLOCKED_MESSAGE = (
-    "{name} non consente di scaricare l'audio: i suoi termini lo vietano e spesso il flusso è protetto "
-    "da DRM, quindi estrarre sample da qui non è legale, nemmeno per pochi secondi. "
-    "Per un uso personale puoi usare «Cattura audio» mentre ascolti; per un uso pubblico serve una "
-    "licenza (o un sample già libero: prova lo Store).")
-SUPPORTED = "Freesound, Internet Archive, ccMixter, Openverse e Wikimedia Commons"
+BLOCKED_MESSAGE = N_(
+    "{name} does not allow downloading its audio: its terms forbid it and the stream is often DRM "
+    "protected, so extracting samples from it is not legal, not even for a few seconds. "
+    "For personal use you can use «Audio capture» while listening; for public use you need a "
+    "licence (or a sample that is already free: try the Store).")
+SUPPORTED = "Freesound, Internet Archive, ccMixter, Openverse, Wikimedia Commons"
 
 
 def _host(url: str) -> str:
@@ -45,7 +46,7 @@ def classify(url: str) -> tuple[str, str]:
     path = urllib.parse.unquote(urllib.parse.urlparse(url).path)
     for domain, name in BLOCKED.items():
         if _matches(host, domain):
-            raise SourceError(BLOCKED_MESSAGE.format(name=name))
+            raise SourceError(tr(BLOCKED_MESSAGE, name=name))
     if _matches(host, "freesound.org"):
         m = re.search(r"/sounds/(\d+)", path) or re.match(r"/s/(\d+)", path)
         if m:
@@ -68,7 +69,7 @@ def classify(url: str) -> tuple[str, str]:
             return "commons", m.group(1)
         if host == "upload.wikimedia.org":
             return "commons", "File:" + path.rsplit("/", 1)[-1]
-    raise SourceError(f"link non riconosciuto: incolla la pagina di un suono su {SUPPORTED}")
+    raise SourceError(tr("link not recognised: paste the page of a sound on {sites}", sites=SUPPORTED))
 
 
 # ------------------------------------------------------------------ providers
@@ -92,12 +93,12 @@ def _archive(key: str) -> list[OnlineResult]:
     ident, _, file = key.partition("/")
     meta = http_get(archive.META.format(id=ident))
     if not meta.get("metadata"):
-        raise SourceError("elemento Internet Archive non trovato")
+        raise SourceError(tr("Internet Archive item not found"))
     files, _ = archive.expand(archive_parent(meta, ident))
     if file:
         files = [f for f in files if f.path == file] or files
     if not files:
-        raise SourceError("nessun file audio in questo elemento di Internet Archive")
+        raise SourceError(tr("no audio file in this Internet Archive item"))
     return files
 
 
@@ -141,7 +142,7 @@ def _commons(title: str) -> list[OnlineResult]:
                                   "iiprop": "url|size|mediatype|extmetadata"})
     out = parse_commons(data)
     if not out:
-        raise SourceError("file audio non trovato su Wikimedia Commons")
+        raise SourceError(tr("audio file not found on Wikimedia Commons"))
     return out
 
 
@@ -152,5 +153,5 @@ def resolve(url: str, settings: dict) -> list[OnlineResult]:
                "ccmixter": lambda: _ccmixter(key), "openverse": lambda: _openverse(key),
                "commons": lambda: _commons(key)}[provider]()
     if not results:
-        raise SourceError("nessun file audio scaricabile per questo link")
+        raise SourceError(tr("no downloadable audio file for this link"))
     return results

@@ -10,6 +10,7 @@ import numpy as np
 
 from . import audio_io, classifier, clustering, embedder, features, projection, snapshot
 from .cache import Cache, unpack
+from .i18n import tr
 from .paths import data_dir
 
 EMBED_SECONDS = 10.0
@@ -101,25 +102,25 @@ class Library:
         root = os.path.abspath(os.path.expanduser(root))
         listing = self._list(root)
         if self._load_snapshot(root, listing):
-            self._set_progress("layout", 0, 0, "Layout 3D…")
+            self._set_progress("layout", 0, 0, tr("3D layout…"))
             self.compute_layout()
             n = len(self.items)
-            self._set_progress("done", n, n, f"{n} sample, {len(self.errors)} errori · da snapshot")
+            self._set_progress("done", n, n, tr("{n} samples, {errors} errors · from snapshot", n=n, errors=len(self.errors)))
             return
         if snapshot_only:
-            self._set_progress("stale", message="Nessuno snapshot aggiornato per questa cartella: premi Riscansiona")
+            self._set_progress("stale", message=tr("No up-to-date snapshot for this folder: press Rescan"))
             return
         if not self.scan_analysis_only(root, listing):
             return
-        self._set_progress("classifying", 0, 0, "Classificazione…")
+        self._set_progress("classifying", 0, 0, tr("Classification…"))
         self.reclassify()
-        self._set_progress("layout", 0, 0, "Layout 3D…")
+        self._set_progress("layout", 0, 0, tr("3D layout…"))
         self.compute_layout()
         n = len(self.items)
-        self._set_progress("done", n, n, f"{n} sample, {len(self.errors)} errori")
+        self._set_progress("done", n, n, tr("{n} samples, {errors} errors", n=n, errors=len(self.errors)))
 
     def _list(self, root: str) -> list[tuple[str, os.stat_result | None]]:
-        self._set_progress("scanning", message="Ricerca file audio…")
+        self._set_progress("scanning", message=tr("Finding audio files…"))
         listing = []
         for p in scan_files(root):
             try:
@@ -180,7 +181,7 @@ class Library:
         rows = self.cache.get_many(root)
         for i, (p, st) in enumerate(listing):
             if st is None:
-                errors.append({"path": p, "error": "file non leggibile"})
+                errors.append({"path": p, "error": tr("unreadable file")})
                 continue
             row = rows.get(p)
             if row is not None and row[0] == st.st_mtime and row[1] == st.st_size:
@@ -189,7 +190,7 @@ class Library:
             else:
                 todo.append((i, p, st))
         del rows
-        self._set_progress("analysing", done, total, f"{done} in cache")
+        self._set_progress("analysing", done, total, tr("{n} in cache", n=done))
 
         def work(job):
             i, p, st = job
@@ -218,7 +219,7 @@ class Library:
                     self.cache.commit()
         self.cache.commit()
         if self._cancel.is_set():
-            self._set_progress("idle", message="Scansione annullata")
+            self._set_progress("idle", message=tr("Scan cancelled"))
             return False
 
         items, embs, profs = [], [], []
@@ -313,7 +314,7 @@ class Library:
         self.version += 1
 
         def prog(f):
-            self._set_progress("layout", int(f * 100), 100, "Layout 3D (t-SNE)…")
+            self._set_progress("layout", int(f * 100), 100, tr("3D layout (t-SNE)…"))
 
         xyz = projection.layout(Xl, progress=prog)
         self.cache.put_projection(key, xyz)

@@ -136,7 +136,7 @@ def test_layers_become_tracks_and_midi_tracks(tmp_path):
     a = {"bars": 1, "clips": clips, "melody": {"layers": [lead, bass, pad], "active": "l"}}
     b = {"bars": 1, "clips": clips, "melody": {"layers": [bass]}}
     out = payload.compose({"name": "P", "bpm": 90, "order": ["A", "B"], "versions": {"A": a, "B": b}})
-    assert [(t["name"], t["role"]) for t in out["tracks"]] == [("Accordi – P", "chords"), ("Melodia – P", "melody"),
+    assert [(t["name"], t["role"]) for t in out["tracks"]] == [("Chords – P", "chords"), ("Melodia – P", "melody"),
                                                                ("Basso – P", "bass")]
     assert [c["name"] for c in out["tracks"][1]["clips"]] == ["Melodia A", ""]
     assert [c["name"] for c in out["tracks"][2]["clips"]] == ["Basso A", "Basso B"]
@@ -238,3 +238,14 @@ def test_generate_keeps_only_the_target_layer(tmp_path):
     seq["melody"] = {"layers": [lead], "active": "l"}
     out = melody.generate(seq, C_MAJ, {"role": "bass", "fromBar": 1, "layer": None}, seed=1)
     assert all(n["pitch"] < 60 for item in out for n in item["melody"]["notes"])
+
+
+def test_api_keeps_midi_and_audio_recorders_apart():
+    from clustersound.api import Api
+    from clustersound.chords import midi_in
+    from clustersound.sampler import recorder as sampler_recorder
+    a = Api()
+    assert isinstance(a._midi_recorder, midi_in.Recorder)
+    assert isinstance(a._recorder, sampler_recorder.Recorder)
+    r = a.compose_midi_inputs()  # used to fail: the audio recorder has no available()
+    assert set(r) >= {"available", "ports"}

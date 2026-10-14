@@ -4,20 +4,47 @@
     {
       "name": "clustersound-dev",
       "runtimeExecutable": ".venv/bin/python",
-      "runtimeArgs": ["tools/devserver.py", "--port", "8765"],
+      "runtimeArgs": [
+        "tools/devserver.py",
+        "--port",
+        "8765"
+      ],
       "port": 8765
     },
     {
       "name": "clustersound-compose",
       "runtimeExecutable": ".venv/bin/python",
-      "runtimeArgs": ["tools/devserver.py", "--port", "8766"],
+      "runtimeArgs": [
+        "tools/devserver.py",
+        "--port",
+        "8766"
+      ],
       "port": 8766
     },
     {
       "name": "clustersound-sampler",
       "runtimeExecutable": ".venv/bin/python",
-      "runtimeArgs": ["tools/devserver.py", "--port", "8767"],
+      "runtimeArgs": [
+        "tools/devserver.py",
+        "--port",
+        "8767"
+      ],
       "port": 8767
+    },
+    {
+      "name": "docs",
+      "runtimeExecutable": "uvx",
+      "runtimeArgs": [
+        "--with",
+        "mkdocs-material==9.5.39",
+        "--with",
+        "mkdocs-static-i18n==1.2.3",
+        "mkdocs",
+        "serve",
+        "-a",
+        "127.0.0.1:8000"
+      ],
+      "port": 8000
     }
   ]
 }

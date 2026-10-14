@@ -1,16 +1,17 @@
-"""Variations, deterministic for a given seed: harmony (a chord, the whole progression) and Modalità
+"""Variations, deterministic for a given seed: harmony (a chord, the whole progression) and Mode
 (rhythm grid and way of playing), kept apart."""
 import copy
 import math
 import random
 
+from ..i18n import N_, tr
 from . import harmony, theory
 from . import perform
 from .perform import voicing
 
-CLIP_KINDS = [("voicing", "Voicing"), ("color", "Colore"), ("substitute", "Sostituzione")]
-PROG_KINDS = [("reharm", "Riarmonizzazione"), ("rhythm", "Ritmo armonico"), ("voicing", "Voice leading"),
-              ("richer", "Più ricca"), ("sparser", "Più scarna"), ("ending", "Finale")]
+CLIP_KINDS = [("voicing", "Voicing"), ("color", N_("Colour")), ("substitute", N_("Substitution"))]
+PROG_KINDS = [("reharm", N_("Reharmonisation")), ("rhythm", N_("Harmonic rhythm")), ("voicing", "Voice leading"),
+              ("richer", N_("Richer")), ("sparser", N_("Sparser")), ("ending", N_("Ending"))]
 _ENDINGS = {
     "major": [((5, False), (7, False), "IV → V"), ((8, False), (10, False), "bVI → bVII"),
               ((5, False), (5, True), "IV → iv"), ((2, True), (7, False), "ii → V")],
@@ -84,7 +85,7 @@ def _voicings(clip: dict) -> list[tuple[str, list[list[int]]]]:
     ps = [p for p, _ in base]
     vel = {p: v for p, v in base}
     out = []
-    for inv, name in ((1, "1ª inversione"), (2, "2ª inversione"), (-1, "rivolto verso il basso")):
+    for inv, name in ((1, tr("1st inversion")), (2, tr("2nd inversion")), (-1, tr("inverted downwards"))):
         out.append((name, voicing(dict(clip, inversion=int(clip.get("inversion", 0) or 0) + inv))))
     if len(ps) >= 4:
         top = sorted(ps)
@@ -93,12 +94,12 @@ def _voicings(clip: dict) -> list[tuple[str, list[list[int]]]]:
     if len(ps) >= 3:
         s = sorted(ps)
         op = sorted([s[0], s[1] + 12] + s[2:])
-        out.append(("aperto (open voicing)", [[p, vel.get(p, vel.get(p - 12, 100))] for p in op]))
+        out.append((tr("open voicing"), [[p, vel.get(p, vel.get(p - 12, 100))] for p in op]))
         bass = s[0]
         close = sorted({bass} | {bass + ((p - bass) % 12 or 12) for p in s[1:]})
-        out.append(("stretto (close voicing)", [[p, 100] for p in close]))
+        out.append((tr("close voicing"), [[p, 100] for p in close]))
     if ps and min(ps) >= 36:
-        out.append(("basso raddoppiato all'ottava", sorted(base + [[min(ps) - 12, vel[min(ps)]]])))
+        out.append((tr("bass doubled at the octave"), sorted(base + [[min(ps) - 12, vel[min(ps)]]])))
     seen, uniq = {tuple(ps)}, []
     for name, notes in out:
         k = tuple(sorted(p for p, _ in notes))
@@ -126,7 +127,7 @@ def vary_clip(seq: dict, clip_id: str, kinds: list[str], seed: int, pool: list[d
         if prev:
             fit = _fit(bake(clip), _pitches(prev), _pitches(clip))
             if _pitches(fit) != _pitches(clip):
-                vs.insert(0, ("voice leading minimo dal precedente", fit["notes"]))
+                vs.insert(0, (tr("minimal voice leading from the previous chord"), fit["notes"]))
         for name, notes in vs[:4]:
             c = bake(clip)
             c["notes"] = notes
@@ -169,7 +170,7 @@ def _reharm(seq, amount, rng, pool, key, bigrams):
         r = ranked[min(int(rng.random() ** 2 * len(ranked)), len(ranked) - 1)]
         changes.append(f"{_deg(clips[i], key)} → {r['degree']}")
         clips[i] = _swap(clips[i], r["chord"])
-    return (clips, "Riarmonizzata: " + ", ".join(changes)) if changes else None
+    return (clips, tr("Reharmonised: {changes}", changes=", ".join(changes))) if changes else None
 
 
 def _rhythm(seq, amount, rng, pool, key, bigrams):
@@ -191,7 +192,7 @@ def _rhythm(seq, amount, rng, pool, key, bigrams):
                 a["len"] -= 2
                 b["start"] -= 2
                 b["len"] += 2
-                changes.append(f"anticipo di un ottavo su {b.get('name', '')}")
+                changes.append(tr("eighth-note anticipation on {name}", name=b.get("name", "")))
         elif op == "longshort" and pairs:
             i = rng.choice(pairs)
             a, b = clips[i - 1], clips[i]
@@ -200,7 +201,7 @@ def _rhythm(seq, amount, rng, pool, key, bigrams):
                 a["len"] = L + L // 2
                 b["start"] = a["start"] + a["len"]
                 b["len"] = L // 2
-                changes.append(f"{a.get('name', '')} lungo, {b.get('name', '')} corto")
+                changes.append(tr("{a} long, {b} short", a=a.get("name", ""), b=b.get("name", "")))
         elif op == "split":
             cand = [j for j, c in enumerate(clips) if c["len"] >= 16 and c["len"] % 2 == 0]
             if not cand:
@@ -216,8 +217,8 @@ def _rhythm(seq, amount, rng, pool, key, bigrams):
             new = _swap(dict(c, id=f"{c['id']}s{rng.randrange(1 << 20)}", start=c["start"] + half), ranked[0]["chord"])
             clips.insert(j + 1, new)
             pairs = [i for i in range(1, len(clips)) if clips[i - 1]["start"] + clips[i - 1]["len"] == clips[i]["start"]]
-            changes.append(f"{c.get('name', '')} diviso con {new['name']}")
-    return (clips, "Ritmo armonico: " + "; ".join(changes)) if changes else None
+            changes.append(tr("{a} split with {b}", a=c.get("name", ""), b=new["name"]))
+    return (clips, tr("Harmonic rhythm: {changes}", changes="; ".join(changes))) if changes else None
 
 
 def _revoice(seq, amount, rng, pool, key, bigrams):
@@ -230,7 +231,7 @@ def _revoice(seq, amount, rng, pool, key, bigrams):
     if [_pitches(c) for c in out] == [_pitches(c) for c in clips]:
         return None
     moved = sum(harmony.voice_distance(_pitches(a), _pitches(b)) for a, b in zip(out, out[1:]))
-    return out, f"Voice leading minimo (movimento medio {moved / (len(out) - 1):.1f} semitoni)"
+    return out, tr("Minimal voice leading (average movement {n} semitones)", n=f"{moved / (len(out) - 1):.1f}")
 
 
 def _density(seq, amount, rng, pool, key, bigrams, richer: bool):
@@ -253,7 +254,7 @@ def _density(seq, amount, rng, pool, key, bigrams, richer: bool):
         clips[i] = _swap(c, ch)
     if not changes:
         return None
-    return clips, ("Più ricca: " if richer else "Più scarna: ") + ", ".join(changes)
+    return clips, tr("Richer: {changes}" if richer else "Sparser: {changes}", changes=", ".join(changes))
 
 
 def _ending(seq, amount, rng, pool, key, bigrams):
@@ -274,7 +275,7 @@ def _ending(seq, amount, rng, pool, key, bigrams):
             picks.append(m[0])
         if len(picks) == 2 and [p["root"] for p in picks] != [_desc(clips[-2])["root"], _desc(clips[-1])["root"]]:
             clips[-2], clips[-1] = _swap(clips[-2], picks[0]), _swap(clips[-1], picks[1])
-            return clips, f"Finale: {name} ({picks[0]['name']} → {picks[1]['name']})"
+            return clips, tr("Ending: {name} ({a} → {b})", name=name, a=picks[0]["name"], b=picks[1]["name"])
     return None
 
 
@@ -307,13 +308,13 @@ def vary_progression(seq: dict, kinds: list[str], amount: float, seed: int, pool
     return out
 
 
-# ------------------------------------------------------------------ Modalità (rhythm + playing)
-MODE_KINDS = [("density", "Densità"), ("syncopation", "Sincope"), ("accents", "Accenti"), ("preset", "Altra ritmica"),
-              ("play", "Modo di suonare"), ("strum", "Strum"), ("feel", "Feel / humanize")]
+# ------------------------------------------------------------------ Mode (rhythm + playing)
+MODE_KINDS = [("density", N_("Density")), ("syncopation", N_("Syncopation")), ("accents", N_("Accents")), ("preset", N_("Another rhythm")),
+              ("play", N_("Playing style")), ("strum", "Strum"), ("feel", "Feel / humanize")]
 
 
 def _colpi(n: int) -> str:
-    return f"{n} colpo" if n == 1 else f"{n} colpi"
+    return tr("{n} hit", n=n) if n == 1 else tr("{n} hits", n=n)
 
 
 def _hits(g: dict) -> list[int]:
@@ -324,7 +325,7 @@ def _m_density(m, amount, rng):
     g = m["rhythm"]
     if not g["on"] or not _hits(g):
         m["rhythm"] = perform.preset_grid(rng.choice(["quarters", "eighths", "pop"]))
-        return m, f"Ritmica: {perform.RHYTHM_PRESETS[m['rhythm']['preset']][0]}"
+        return m, tr("Rhythm: {name}", name=tr(perform.RHYTHM_PRESETS[m["rhythm"]["preset"]][0]))
     n = max(1, round(amount * 4))
     hits = _hits(g)
     if rng.random() < .5 or len(hits) <= 2:
@@ -333,13 +334,13 @@ def _m_density(m, amount, rng):
         add = empty[:n]
         for j in add:
             g["vel"][j], g["len"][j], g["dir"][j] = (88 if j % 4 == 0 else 72), 0, "d" if j % 4 == 0 else "u"
-        label = f"Più densa: +{_colpi(len(add))}"
+        label = tr("Denser: +{hits}", hits=_colpi(len(add)))
     else:
         rem = [j for j in hits if j % 16 != 0]
         rng.shuffle(rem)
         for j in rem[:n]:
             g["vel"][j] = 0
-        label = f"Più rada: −{_colpi(len(rem[:n]))}"
+        label = tr("Sparser: −{hits}", hits=_colpi(len(rem[:n])))
     g["preset"] = None
     return m, label
 
@@ -355,7 +356,7 @@ def _m_syncopation(m, amount, rng):
         g["vel"][j - 1], g["len"][j - 1], g["dir"][j - 1] = g["vel"][j], g["len"][j], "u"
         g["vel"][j] = 0
     g["preset"] = None
-    return m, f"Sincopata: {_colpi(len(moved))} anticipat{'o' if len(moved) == 1 else 'i'} di un sedicesimo"
+    return m, tr("Syncopated: {hits} a sixteenth early", hits=_colpi(len(moved)))
 
 
 def _m_accents(m, amount, rng):
@@ -364,15 +365,15 @@ def _m_accents(m, amount, rng):
     if not hits:
         return None
     name, fn = rng.choice([
-        ("accento sui battere", lambda j: 115 if j % 4 == 0 else 72),
-        ("accento in levare", lambda j: 112 if j % 4 == 2 else 78),
-        ("accento sul primo della battuta", lambda j: 120 if j % 16 == 0 else 80),
-        ("ghost notes sui sedicesimi", lambda j: 45 if j % 2 else 100),
-        ("onda dinamica", lambda j: round(80 + 30 * math.cos(j / len(g["vel"]) * 2 * math.pi))),
+        (tr("accent on the beats"), lambda j: 115 if j % 4 == 0 else 72),
+        (tr("accent on the offbeats"), lambda j: 112 if j % 4 == 2 else 78),
+        (tr("accent on the downbeat"), lambda j: 120 if j % 16 == 0 else 80),
+        (tr("ghost notes on the sixteenths"), lambda j: 45 if j % 2 else 100),
+        (tr("dynamic wave"), lambda j: round(80 + 30 * math.cos(j / len(g["vel"]) * 2 * math.pi))),
     ])
     for j in hits:
         g["vel"][j] = max(1, min(127, round(g["vel"][j] * (1 - amount) + fn(j) * amount)))
-    return m, f"Accenti: {name}"
+    return m, tr("Accents: {name}", name=name)
 
 
 def _m_preset(m, amount, rng):
@@ -381,7 +382,7 @@ def _m_preset(m, amount, rng):
     others.sort(key=lambda k: abs(len(perform.RHYTHM_PRESETS[k][2]) / perform.RHYTHM_PRESETS[k][1] - count) * (1 - amount) + rng.random() * 4 * amount)
     k = others[0]
     m["rhythm"] = perform.preset_grid(k)
-    return m, f"Ritmica: {perform.RHYTHM_PRESETS[k][0]}"
+    return m, tr("Rhythm: {name}", name=tr(perform.RHYTHM_PRESETS[k][0]))
 
 
 def _m_play(m, amount, rng):
@@ -393,7 +394,7 @@ def _m_play(m, amount, rng):
         return m, f"Arpeggio {p['arp']['rate']} ({p['arp']['mode']})"
     if p["type"] == "strum":
         p["strum"]["dir"] = "guitar"
-        return m, "Strum (pennate chitarra)"
+        return m, tr("Strum (guitar strokes)")
     return m, "Block"
 
 
@@ -413,7 +414,7 @@ def _m_strum(m, amount, rng):
         g["dir"] = ["d" if j % 4 == 0 or (rng.random() < .3 and j % 2 == 0) else "u" if v else "" for j, v in enumerate(g["vel"])]
     meta = perform.meta()
     dirs, curves = dict(meta["strumDirs"]), dict(meta["strumCurves"])
-    return m, f"Strum {st['spread']} ms, {dirs[st['dir']].lower()}, {curves[st['curve']].lower()}" + (f", pennate su sulle {st['upNotes']} note alte" if st["upNotes"] else "")
+    return m, f"Strum {st['spread']} ms, {tr(dirs[st['dir']]).lower()}, {tr(curves[st['curve']]).lower()}" + (tr(", upstrokes on the top {n} notes", n=st["upNotes"]) if st["upNotes"] else "")
 
 
 def _m_feel(m, amount, rng):
@@ -422,7 +423,7 @@ def _m_feel(m, amount, rng):
              drift=rng.choice([0, 30, 60, 85]), vel=round(rng.uniform(4, 16) * amount + 2),
              feel=rng.choice([-10, -5, 0, 5, 10, 15]), accent=rng.choice([0, 10, 20]), seed=rng.randrange(1, 1 << 30))
     m["swing"] = rng.choice([50, 50, 54, 58, 62])
-    who = "in ritardo" if h["feel"] > 0 else "in anticipo" if h["feel"] < 0 else "a tempo"
+    who = tr("behind the beat") if h["feel"] > 0 else tr("ahead of the beat") if h["feel"] < 0 else tr("on the beat")
     return m, f"Feel {who} ({h['feel']:+d} ms), humanize ±{h['timing']} ms, swing {m['swing']}"
 
 
@@ -431,7 +432,7 @@ _MODE_GEN = {"density": _m_density, "syncopation": _m_syncopation, "accents": _m
 
 
 def vary_mode(mode: dict, kinds: list[str], amount: float, seed: int, count: int = 4) -> list[dict]:
-    """Alternative Modalità (same harmony): [{kind, label, mode}]."""
+    """Alternative Mode (same harmony): [{kind, label, mode}]."""
     base = perform.mode_of({"mode": mode})
     kinds = [k for k in kinds if k in _MODE_GEN] or ["density"]
     amount = max(.05, min(1.0, float(amount)))
@@ -449,6 +450,6 @@ def vary_mode(mode: dict, kinds: list[str], amount: float, seed: int, count: int
         if sig in seen or m == base:
             continue
         seen.add(sig)
-        m["name"] = base.get("name", "Modalità")
+        m["name"] = base.get("name", tr("Mode"))
         out.append({"kind": kind, "label": label, "mode": m})
     return out

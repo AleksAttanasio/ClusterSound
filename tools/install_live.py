@@ -20,7 +20,7 @@ from clustersound.live.payload import LIBRARY_FOLDER, USER_LIBRARY  # noqa: E402
 def main(argv: list[str]) -> int:
     lib = Path(argv[0] if argv else USER_LIBRARY)
     if not lib.is_dir():
-        print(f"User Library non trovata: {lib} (passala come argomento)", file=sys.stderr)
+        print(f"User Library not found: {lib} (pass it as an argument)", file=sys.stderr)
         return 1
     dev = lib / "Presets" / "MIDI Effects" / "Max MIDI Effect" / "ClusterSound"
     print("Device:        ", build_amxd.build(dev))
@@ -31,8 +31,8 @@ def main(argv: list[str]) -> int:
     print("Remote Script: ", rs)
     racks = lib / LIBRARY_FOLDER
     racks.mkdir(exist_ok=True)
-    print("Rack per Live: ", racks)
-    print("Riavvia Live se la Remote Script è cambiata.")
+    print("Live racks:    ", racks)
+    print("Restart Live if the Remote Script changed.")
     return 0
 
 

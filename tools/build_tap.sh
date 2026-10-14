@@ -13,4 +13,4 @@ if [ -z "$SDKROOT" ]; then
 fi
 swiftc -O -swift-version 5 -target "$(uname -m)-apple-macos14.2" -o clustersound/bin/cs-tap clustersound/native/cs_tap.swift
 codesign --force --sign - clustersound/bin/cs-tap
-echo "Pronto: clustersound/bin/cs-tap"
+echo "Ready: clustersound/bin/cs-tap"

@@ -9,6 +9,8 @@ import urllib.parse
 import urllib.request
 from dataclasses import asdict, dataclass, field
 
+from ..i18n import N_, tr
+
 # ccMixter repeats the whole JSON body in an "X-JSON" response header, which exceeds
 # http.client's default 64 KB header-line limit.
 http.client._MAXLINE = max(getattr(http.client, "_MAXLINE", 65536), 1 << 24)
@@ -58,7 +60,7 @@ class OnlineResult:
     def to_dict(self) -> dict:
         d = asdict(self)
         d["commercial_ok"] = self.commercial_ok
-        d["license_label"] = LICENSES.get(self.license, LICENSES["unknown"])["label"]
+        d["license_label"] = tr(LICENSES.get(self.license, LICENSES["unknown"])["label"])
         extra = d.pop("extra", None) or {}
         d["info"] = {k: extra[k] for k in INFO_KEYS if extra.get(k) is not None}
         return d
@@ -71,7 +73,7 @@ INFO_KEYS = ("pack_id", "pack_title", "num_sounds", "downloads", "rating", "desc
 # commercial = usable in a commercial production as a sample (no NC, no ND).
 LICENSES = {
     "cc0": {"label": "CC0", "commercial": True},
-    "pd": {"label": "Pubblico dominio", "commercial": True},
+    "pd": {"label": N_("Public domain"), "commercial": True},
     "by": {"label": "CC BY", "commercial": True},
     "by-sa": {"label": "CC BY-SA", "commercial": True},
     "by-nd": {"label": "CC BY-ND", "commercial": False},
@@ -80,7 +82,7 @@ LICENSES = {
     "by-nc-nd": {"label": "CC BY-NC-ND", "commercial": False},
     "sampling+": {"label": "Sampling+", "commercial": False},
     "rf": {"label": "Royalty-free", "commercial": True},  # site licence (curated packs), not CC
-    "unknown": {"label": "Non dichiarata", "commercial": False},
+    "unknown": {"label": N_("Not declared"), "commercial": False},
 }
 # filter groups shown in the UI
 LICENSE_GROUPS = {
@@ -148,12 +150,12 @@ def http_get(url: str, params: dict | None = None, headers: dict | None = None,
             body = r.read()
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
-            raise SourceError("accesso negato (API key mancante o non valida)") from e
+            raise SourceError(tr("access denied (API key missing or invalid)")) from e
         if e.code == 429:
-            raise SourceError("troppe richieste: riprova tra qualche minuto") from e
-        raise SourceError(f"errore HTTP {e.code}") from e
+            raise SourceError(tr("too many requests: try again in a few minutes")) from e
+        raise SourceError(tr("HTTP error {code}", code=e.code)) from e
     except (urllib.error.URLError, TimeoutError, OSError) as e:
-        raise SourceError(f"non raggiungibile ({getattr(e, 'reason', e)})") from e
+        raise SourceError(tr("unreachable ({reason})", reason=getattr(e, "reason", e))) from e
     # some sources (ccMixter) mix in latin-1 bytes: never let one bad character drop a whole page
     text = body.decode("utf-8", "replace")
     data = json.loads(text) if as_json else text

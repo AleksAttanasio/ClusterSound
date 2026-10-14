@@ -5,75 +5,77 @@ official page to download (no scraping). Only royalty-free sources usable in com
 """
 import os
 
+from ..i18n import N_
+
 LOGO_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ui", "assets", "providers")
 
 # kind: "api" = searched live by the store; "curated" = static showcase linking to the official page
 PROVIDERS = [
     {"id": "freesound", "name": "Freesound", "kind": "api", "url": "https://freesound.org",
      "color": "#e04a3f", "licenses": ["cc0", "by", "nc"],
-     "description": "Oltre 600.000 suoni caricati dalla community, organizzati in pack. Richiede una API key gratuita."},
+     "description": N_("Over 600,000 sounds uploaded by the community, organised in packs. Needs a free API key.")},
     {"id": "openverse", "name": "Openverse", "kind": "api", "url": "https://openverse.org",
      "color": "#ffe033", "licenses": ["cc0", "by", "by-sa"],
-     "description": "Motore di ricerca di WordPress per opere con licenza aperta: indicizza Freesound e Wikimedia Commons."},
+     "description": N_("WordPress search engine for openly licensed works: indexes Freesound and Wikimedia Commons.")},
     {"id": "archive", "name": "Internet Archive", "kind": "api", "url": "https://archive.org",
      "color": "#cfcfcf", "licenses": ["cc0", "pd", "by"],
-     "description": "Biblioteca digitale no-profit: interi sample pack e drum kit sfogliabili file per file."},
+     "description": N_("Non-profit digital library: whole sample packs and drum kits, browsable file by file.")},
     {"id": "ccmixter", "name": "ccMixter", "kind": "api", "url": "https://ccmixter.org",
      "color": "#7fb3d5", "licenses": ["cc0", "by", "nc"],
-     "description": "Community di remix: sample, stem e a cappella con licenza Creative Commons."},
+     "description": N_("Remix community: samples, stems and a cappellas under Creative Commons licences.")},
     {"id": "kenney", "name": "Kenney", "kind": "curated", "url": "https://kenney.nl/assets/category:Audio",
      "color": "#f5a623", "licenses": ["cc0"],
-     "description": "Pack audio CC0 (pubblico dominio) pensati per i giochi: impatti, UI, sci-fi, foley."},
+     "description": N_("CC0 (public domain) audio packs made for games: impacts, UI, sci-fi, foley.")},
     {"id": "sonniss", "name": "Sonniss", "kind": "curated", "url": "https://sonniss.com/gameaudiogdc",
      "color": "#d0021b", "licenses": ["rf"],
-     "description": "GameAudioGDC: ogni anno decine di GB di effetti professionali royalty-free, senza attribuzione."},
+     "description": N_("GameAudioGDC: every year tens of GB of professional royalty-free effects, no attribution.")},
     {"id": "99sounds", "name": "99Sounds", "kind": "curated", "url": "https://99sounds.org",
      "color": "#2ecc71", "licenses": ["rf"],
-     "description": "Sample pack gratuiti curati da sound designer: drum, texture cinematiche, dub."},
+     "description": N_("Free sample packs curated by sound designers: drums, cinematic textures, dub.")},
     {"id": "sampleradar", "name": "SampleRadar", "kind": "curated",
      "url": "https://www.musicradar.com/news/tech/free-music-samples-download-loops-hits-and-multis-627820",
      "color": "#e2001a", "licenses": ["rf"],
-     "description": "Decine di migliaia di loop e one-shot di Computer Music e Future Music, royalty-free."},
+     "description": N_("Tens of thousands of loops and one-shots from Computer Music and Future Music, royalty-free.")},
 ]
 
-_NO_REDIST = "Royalty-free anche per uso commerciale; vietato ridistribuire i file così come sono."
+_NO_REDIST = N_("Royalty-free, commercial use included; redistributing the files as they are is not allowed.")
 
 # instruments: class ids of clustersound.taxonomy (used for the store's category tiles)
 CURATED_PACKS = [
     {"id": "kenney-impact", "provider": "kenney", "title": "Impact Sounds", "count": 130, "license": "cc0",
      "instruments": ["impact", "foley"], "url": "https://kenney.nl/assets/impact-sounds",
-     "description": "Colpi, passi e impatti su materiali diversi."},
+     "description": N_("Hits, footsteps and impacts on different materials.")},
     {"id": "kenney-scifi", "provider": "kenney", "title": "Sci-fi Sounds", "count": None, "license": "cc0",
      "instruments": ["riser", "noise"], "url": "https://kenney.nl/assets/sci-fi-sounds",
-     "description": "Laser, motori, computer e sweep fantascientifici."},
+     "description": N_("Sci-fi lasers, engines, computers and sweeps.")},
     {"id": "kenney-interface", "provider": "kenney", "title": "Interface Sounds", "count": None, "license": "cc0",
      "instruments": ["perc_other"], "url": "https://kenney.nl/assets/interface-sounds",
-     "description": "Click, bip e conferme: ottimi come micro-percussioni."},
+     "description": N_("Clicks, beeps and confirmations: great as micro-percussion.")},
     {"id": "kenney-digital", "provider": "kenney", "title": "Digital Audio", "count": None, "license": "cc0",
      "instruments": ["synth", "riser"], "url": "https://kenney.nl/assets/digital-audio",
-     "description": "Suoni sintetici chiptune, zap e power-up."},
+     "description": N_("Chiptune synth sounds, zaps and power-ups.")},
     {"id": "kenney-jingles", "provider": "kenney", "title": "Music Jingles", "count": None, "license": "cc0",
      "instruments": ["synth", "keys"], "url": "https://kenney.nl/assets/music-jingles",
-     "description": "Brevi jingle musicali in più stili."},
+     "description": N_("Short musical jingles in several styles.")},
     {"id": "sonniss-gdc", "provider": "sonniss", "title": "GameAudioGDC Bundle (2015–2024)", "count": None,
      "license": "rf", "instruments": ["impact", "foley", "riser", "noise"],
      "url": "https://sonniss.com/gameaudiogdc",
-     "description": "Archivio annuale di effetti sonori professionali, in WAV ad alta risoluzione.",
-     "note": "Royalty-free, senza attribuzione; vietati ridistribuzione e addestramento AI/ML."},
+     "description": N_("Yearly archive of professional sound effects, in high-resolution WAV."),
+     "note": N_("Royalty-free, no attribution; redistribution and AI/ML training are not allowed.")},
     {"id": "99sounds-drums", "provider": "99sounds", "title": "99 Drum Samples I + II", "count": 209,
      "license": "rf", "instruments": ["kick", "snare", "closed_hat", "clap", "perc_other"],
      "url": "https://99sounds.org/drum-samples/",
-     "description": "One-shot hip-hop, trap, lo-fi e synthwave in WAV 24 bit.", "note": _NO_REDIST},
+     "description": N_("Hip-hop, trap, lo-fi and synthwave one-shots in 24-bit WAV."), "note": _NO_REDIST},
     {"id": "99sounds-dub", "provider": "99sounds", "title": "Dub Reggae Sounds", "count": None, "license": "rf",
      "instruments": ["bass", "perc_other", "riser"], "url": "https://99sounds.org/dub-reggae-sounds/",
-     "description": "Siren, delay e percussioni dub.", "note": _NO_REDIST},
+     "description": N_("Dub sirens, delays and percussion."), "note": _NO_REDIST},
     {"id": "99sounds-cinematic", "provider": "99sounds", "title": "Cinematic Textures", "count": None,
      "license": "rf", "instruments": ["pad", "noise"], "url": "https://99sounds.org/cinematic-textures/",
-     "description": "Atmosfere e texture per colonne sonore.", "note": _NO_REDIST},
-    {"id": "sampleradar-hub", "provider": "sampleradar", "title": "SampleRadar: tutti i pack", "count": None,
+     "description": N_("Atmospheres and textures for soundtracks."), "note": _NO_REDIST},
+    {"id": "sampleradar-hub", "provider": "sampleradar", "title": N_("SampleRadar: all packs"), "count": None,
      "license": "rf", "instruments": ["kick", "snare", "bass", "synth", "vocal"],
      "url": "https://www.musicradar.com/news/tech/free-music-samples-download-loops-hits-and-multis-627820",
-     "description": "Indice alfabetico di centinaia di pack per genere: hip-hop, techno, breakbeat, synth classici…",
+     "description": N_("Alphabetical index of hundreds of packs by genre: hip-hop, techno, breakbeat, classic synths…"),
      "note": _NO_REDIST},
 ]
 

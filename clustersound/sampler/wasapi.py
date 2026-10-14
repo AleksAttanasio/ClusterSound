@@ -9,6 +9,7 @@ import sys
 import threading
 import warnings
 
+from ..i18n import tr
 from .capture import CaptureError
 
 RATE = 48000  # shared-mode WASAPI converts to any rate; the Recorder resamples to the chosen one
@@ -46,8 +47,8 @@ def output_devices(mix_id: str) -> list[dict]:
     devices.sort(key=lambda d: (not d["default"], d["name"].lower()))
     if not devices:
         return []
-    mix = {"id": mix_id, "name": "Uscita predefinita", "channels": 2, "sample_rate": None, "default": False,
-           "backend": "wasapi", "note": "Tutto ciò che suona sull'uscita predefinita di Windows"}
+    mix = {"id": mix_id, "name": tr("Default output"), "channels": 2, "sample_rate": None, "default": False,
+           "backend": "wasapi", "note": tr("Everything that plays on the Windows default output")}
     return [mix] + devices
 
 
@@ -57,7 +58,7 @@ class LoopbackBackend:
     def __init__(self, device: str | None, on_block, timeout: float = 10.0):
         self.sc = _soundcard()
         if self.sc is None:
-            raise CaptureError("registrazione non disponibile: installa il pacchetto «soundcard»")
+            raise CaptureError(tr("recording not available: install the «soundcard» package"))
         self.device, self.on_block, self.timeout = device, on_block, timeout  # device None: the default output
         self.sr, self.channels = RATE, 0
         self.error: str | None = None
@@ -75,7 +76,7 @@ class LoopbackBackend:
         self._thread.start()
         if not self._ready.wait(self.timeout):
             self._stop.set()
-            raise CaptureError("il dispositivo non risponde")
+            raise CaptureError(tr("the device is not responding"))
         if self.error:
             raise CaptureError(self.error)
 

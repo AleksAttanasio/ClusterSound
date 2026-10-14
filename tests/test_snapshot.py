@@ -32,7 +32,7 @@ def scan(tmp_path):
 
 
 def from_snapshot(lib):
-    return lib.progress["message"].endswith("da snapshot")
+    return lib.progress["message"].endswith("from snapshot")
 
 
 def test_reopen_uses_snapshot(folder, monkeypatch):
