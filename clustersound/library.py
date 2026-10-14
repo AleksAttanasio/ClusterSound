@@ -29,6 +29,23 @@ def scan_files(root: str) -> list[str]:
     return out
 
 
+def normalize_roots(roots) -> list[str]:
+    """Absolute, existing, de-duplicated folders, sorted; a folder inside another selected one is dropped."""
+    if isinstance(roots, str):
+        roots = [roots]
+    out = sorted({os.path.abspath(os.path.expanduser(r)) for r in roots or [] if r})
+    out = [r for r in out if os.path.isdir(r)]
+    return [r for r in out if not any(o != r and _inside(r, o) for o in out)]
+
+
+def _inside(path: str, root: str) -> bool:
+    return path.startswith(root.rstrip("/" + os.sep) + os.sep)
+
+
+def roots_key(roots: list[str]) -> str:
+    return "\n".join(roots)
+
+
 def analyse_file(path: str) -> tuple[dict, dict]:
     """Decode + features + YAMNet. Returns (arrays, meta) ready for the cache."""
     inf = audio_io.info(path)
@@ -63,7 +80,7 @@ def head_features(emb: np.ndarray, prof: np.ndarray, feats: list[dict]) -> np.nd
 class Library:
     def __init__(self, cache: Cache | None = None):
         self.cache = cache or Cache(data_dir() / "cache.sqlite")
-        self.root: str | None = None
+        self.roots: list[str] = []
         self.items: list[dict] = []
         self.X: np.ndarray = np.zeros((0, 0), np.float32)
         self.emb: np.ndarray = np.zeros((0, 1024), np.float32)
@@ -78,30 +95,38 @@ class Library:
         self._cancel = threading.Event()
         self._files_sig: str | None = None  # snapshot signature of the scanned folder
 
+    @property
+    def root(self) -> str | None:
+        """The analysed folder when there is just one (None with several or none)."""
+        return self.roots[0] if len(self.roots) == 1 else None
+
     # ------------------------------------------------------------------ scanning
-    def start_scan(self, root: str, snapshot_only: bool = False) -> None:
+    def start_scan(self, roots, snapshot_only: bool = False) -> None:
         if self._scan_thread and self._scan_thread.is_alive():
             self._cancel.set()
             self._scan_thread.join()
         self._cancel.clear()
-        self._scan_thread = threading.Thread(target=self.scan, args=(root, snapshot_only), daemon=True)
+        self._scan_thread = threading.Thread(target=self.scan, args=(roots, snapshot_only), daemon=True)
         self._scan_thread.start()
 
     def _set_progress(self, phase, done=0, total=0, message=""):
         self.progress = {"phase": phase, "done": done, "total": total, "message": message}
 
-    def scan(self, root: str, snapshot_only: bool = False) -> None:
-        """Full scan; with snapshot_only, just restore an up-to-date snapshot (phase 'stale' if none)."""
+    def scan(self, roots, snapshot_only: bool = False) -> None:
+        """Full scan of one folder or the union of several; with snapshot_only, just restore an
+        up-to-date snapshot (phase 'stale' if none)."""
         try:
-            self._scan(root, snapshot_only)
+            self._scan(normalize_roots(roots), snapshot_only)
         except Exception as e:  # surface to the UI instead of dying silently
             self._set_progress("error", message=f"{type(e).__name__}: {e}")
             raise
 
-    def _scan(self, root: str, snapshot_only: bool = False) -> None:
-        root = os.path.abspath(os.path.expanduser(root))
-        listing = self._list(root)
-        if self._load_snapshot(root, listing):
+    def _scan(self, roots: list[str], snapshot_only: bool = False) -> None:
+        if not roots:
+            self._clear()
+            return
+        listing = self._list(roots)
+        if self._load_snapshot(roots, listing):
             self._set_progress("layout", 0, 0, tr("3D layout…"))
             self.compute_layout()
             n = len(self.items)
@@ -110,7 +135,7 @@ class Library:
         if snapshot_only:
             self._set_progress("stale", message=tr("No up-to-date snapshot for this folder: press Rescan"))
             return
-        if not self.scan_analysis_only(root, listing):
+        if not self.scan_analysis_only(roots, listing):
             return
         self._set_progress("classifying", 0, 0, tr("Classification…"))
         self.reclassify()
@@ -119,26 +144,42 @@ class Library:
         n = len(self.items)
         self._set_progress("done", n, n, tr("{n} samples, {errors} errors", n=n, errors=len(self.errors)))
 
-    def _list(self, root: str) -> list[tuple[str, os.stat_result | None]]:
+    def _clear(self) -> None:
+        """No folder selected: an empty library."""
+        with self._lock:
+            self.roots, self.items, self.errors, self.stats = [], [], [], {}
+            self.emb = np.zeros((0, 1024), np.float32)
+            self.prof = np.zeros((0, 144), np.float32)
+            self.X = self._head_features()
+            self.xyz = np.zeros((0, 3), np.float32)
+            self.probs = None
+            self.layout_kind = "none"
+            self._files_sig = None
+            self.version += 1
+        self._set_progress("idle")
+
+    def _list(self, roots: list[str]) -> list[tuple[str, os.stat_result | None]]:
         self._set_progress("scanning", message=tr("Finding audio files…"))
         listing = []
-        for p in scan_files(root):
-            try:
-                listing.append((p, os.stat(p)))
-            except OSError:
-                listing.append((p, None))
+        for root in roots:
+            for p in scan_files(root):
+                try:
+                    listing.append((p, os.stat(p)))
+                except OSError:
+                    listing.append((p, None))
         return listing
 
-    def _load_snapshot(self, root: str, listing) -> bool:
-        files_sig = snapshot.files_signature(root, listing)
+    def _load_snapshot(self, roots: list[str], listing) -> bool:
+        key = roots_key(roots)
+        files_sig = snapshot.files_signature(key, listing)
         paths = [p for p, _ in listing]
-        snap = snapshot.load(self._snapshot_dir(), root,
+        snap = snapshot.load(self._snapshot_dir(), key,
                              snapshot.fingerprint(files_sig, paths, self.cache.labels()))
         if snap is None:
             return False
         a = snap["arrays"]
         with self._lock:
-            self.root = root
+            self.roots = roots
             self.items = snap["items"]
             self.errors = snap["errors"]
             self.stats = snap["stats"]
@@ -154,12 +195,12 @@ class Library:
         return self.cache.path.parent / "snapshots"
 
     def _save_snapshot(self) -> None:
-        if not self._files_sig or self.root is None:
+        if not self._files_sig or not self.roots:
             return
         try:
             paths = [it["path"] for it in self.items] + [e["path"] for e in self.errors]
             fp = snapshot.fingerprint(self._files_sig, paths, self.cache.labels())
-            snapshot.save(self._snapshot_dir(), self.root, fp, self.items, {
+            snapshot.save(self._snapshot_dir(), roots_key(self.roots), fp, self.items, {
                 "emb": self.emb, "prof": self.prof, "probs": self.probs,
                 "scores_max": np.array([it["scores_max"] for it in self.items]).reshape(len(self.items), -1),
                 "scores_mean": np.array([it["scores_mean"] for it in self.items]).reshape(len(self.items), -1),
@@ -167,18 +208,20 @@ class Library:
         except Exception as e:  # a missing snapshot only costs speed next time
             print("snapshot not saved:", type(e).__name__, e)
 
-    def scan_analysis_only(self, root: str, listing=None) -> bool:
-        """Walk + analyse (with cache). Returns False if cancelled."""
-        root = os.path.abspath(os.path.expanduser(root))
+    def scan_analysis_only(self, roots, listing=None) -> bool:
+        """Walk + analyse (with cache) one folder or several. Returns False if cancelled."""
+        roots = normalize_roots(roots)
         if listing is None:
-            listing = self._list(root)
+            listing = self._list(roots)
         total = len(listing)
         self._set_progress("analysing", 0, total)
         results: list[tuple[str, dict, dict] | None] = [None] * total
         errors = []
         done = 0
         todo = []
-        rows = self.cache.get_many(root)
+        rows = {}
+        for root in roots:
+            rows |= self.cache.get_many(root)
         for i, (p, st) in enumerate(listing):
             if st is None:
                 errors.append({"path": p, "error": tr("unreadable file")})
@@ -227,7 +270,10 @@ class Library:
             if r is None:
                 continue
             p, arrays, meta = r
+            root = next(r for r in roots if _inside(p, r))
             rel = os.path.relpath(p, root)
+            if len(roots) > 1:  # several folders: the folder name keeps the paths apart
+                rel = os.path.join(os.path.basename(root), rel)
             items.append({
                 "id": len(items), "path": p, "rel": rel.replace(os.sep, "/"),
                 "name": os.path.basename(p), "feats": meta["feats"], "info": meta["info"],
@@ -237,7 +283,7 @@ class Library:
             embs.append(arrays["embedding"].astype(np.float32))
             profs.append(arrays["profile"].astype(np.float32))
         with self._lock:
-            self.root = root
+            self.roots = roots
             self.items = items
             self.errors = errors
             self.emb = np.array(embs, np.float32).reshape(-1, 1024)
@@ -245,7 +291,7 @@ class Library:
                          else np.zeros((0, 144), np.float32))
             self.X = self._head_features()
             self.probs = None
-            self._files_sig = snapshot.files_signature(root, listing)
+            self._files_sig = snapshot.files_signature(roots_key(roots), listing)
         return True
 
     def _head_features(self) -> np.ndarray:
@@ -294,7 +340,7 @@ class Library:
 
     def _layout_key(self) -> str:
         h = hashlib.sha1()
-        h.update((self.root or "").encode())
+        h.update(roots_key(self.roots).encode())
         for it in self.items:
             h.update(it["path"].encode())
         return h.hexdigest()
@@ -344,4 +390,4 @@ class Library:
         return [{"id": int(i), "sim": float(s)} for i, s in zip(ids, sims)]
 
 
-__all__ = ["Library", "scan_files", "analyse_file", "Path"]
+__all__ = ["Library", "scan_files", "normalize_roots", "analyse_file", "Path"]
