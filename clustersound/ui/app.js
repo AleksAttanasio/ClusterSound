@@ -66,7 +66,6 @@ async function main() {
     onRelabel: relabel, onReveal: (id) => state.api.reveal(id), onSimilar: showSimilar,
     onPlayToggle: togglePlay, onSeek: seek, onClose: closePanel,
     onSend: (id, x, y) => sendLibraryItem(id, x, y),
-    onStore: (cls) => openStore([cls]),
   });
 
   online = new Online({ api: state.api, player, classes: state.classes, groups: state.groups, types: state.types });
