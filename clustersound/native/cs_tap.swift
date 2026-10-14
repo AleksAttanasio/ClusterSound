@@ -122,12 +122,12 @@ final class Recording {
         let mainUID: String
         let desc: CATapDescription
         if let uid = deviceUID {
-            guard deviceByUID(uid) != nil else { fail("dispositivo non trovato: \(uid)") }
+            guard deviceByUID(uid) != nil else { fail("device not found: \(uid)") }
             mainUID = uid
             desc = CATapDescription(excludingProcesses: excluded, deviceUID: uid, stream: 0)
         } else {
             guard let def = defaultOutput(), let uid = getString(def, kAudioDevicePropertyDeviceUID) else {
-                fail("nessun dispositivo di uscita predefinito")
+                fail("no default output device")
             }
             mainUID = uid
             desc = CATapDescription(stereoGlobalTapButExcludeProcesses: excluded)
@@ -136,7 +136,7 @@ final class Recording {
         desc.isPrivate = true
         desc.muteBehavior = .unmuted
         desc.name = "ClusterSound Recorder"
-        check(AudioHardwareCreateProcessTap(desc, &tapID), "impossibile creare il tap audio")
+        check(AudioHardwareCreateProcessTap(desc, &tapID), "cannot create the audio tap")
 
         let aggregate: [String: Any] = [
             kAudioAggregateDeviceNameKey: "ClusterSound Recorder",
@@ -150,13 +150,13 @@ final class Recording {
                                                kAudioSubTapUIDKey: desc.uuid.uuidString]],
         ]
         check(AudioHardwareCreateAggregateDevice(aggregate as CFDictionary, &aggregateID),
-              "impossibile creare il dispositivo aggregato")
+              "cannot create the aggregate device")
 
         guard let fmt = getValue(tapID, kAudioTapPropertyFormat, AudioStreamBasicDescription()) else {
-            fail("formato del tap non disponibile")
+            fail("tap format not available")
         }
         guard fmt.mFormatID == kAudioFormatLinearPCM, fmt.mFormatFlags & kAudioFormatFlagIsFloat != 0,
-              fmt.mBitsPerChannel == 32 else { fail("formato del tap non supportato") }
+              fmt.mBitsPerChannel == 32 else { fail("tap format not supported") }
         channels = Int(fmt.mChannelsPerFrame)
         interleaved = fmt.mFormatFlags & kAudioFormatFlagIsNonInterleaved == 0
         // The IOProc runs at the aggregate's rate (its main device): a global tap reports 48 kHz even when the
@@ -169,8 +169,8 @@ final class Recording {
         let queue = DispatchQueue(label: "cs-tap.io", qos: .userInteractive)
         check(AudioDeviceCreateIOProcIDWithBlock(&procID, aggregateID, queue) { [unowned self] _, input, _, _, _ in
             self.deliver(input)
-        }, "impossibile leggere dal tap")
-        check(AudioDeviceStart(aggregateID, procID), "impossibile avviare la registrazione")
+        }, "cannot read from the tap")
+        check(AudioDeviceStart(aggregateID, procID), "cannot start the recording")
     }
 
     func deliver(_ input: UnsafePointer<AudioBufferList>) {
@@ -251,5 +251,5 @@ case "record":
     }
     dispatchMain()
 default:
-    fail("uso: cs-tap list | cs-tap record --device <uid|all> [--exclude-pid <pid>]")
+    fail("usage: cs-tap list | cs-tap record --device <uid|all> [--exclude-pid <pid>]")
 }

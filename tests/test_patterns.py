@@ -165,7 +165,7 @@ def test_ableton_package(tmp_path, samples):
     p = with_samples(genres.build("dnb_rollers", 0), samples)
     folder = ableton.export_package(p, str(tmp_path), lambda r: r.get("path"), lambda r: None, "Test DnB")
     files = os.listdir(folder)
-    for f in ("Drums.mid", "Bass.mid", "Loop.wav", "LEGGIMI.txt", "Test DnB Drum Rack.adg", "Test DnB Bass.adg"):
+    for f in ("Drums.mid", "Bass.mid", "Loop.wav", "README.txt", "Test DnB Drum Rack.adg", "Test DnB Bass.adg"):
         assert f in files, f
     doc = ET.fromstring(gzip.open(os.path.join(folder, "Test DnB Drum Rack.adg")).read())
     assert doc.tag == "Ableton" and doc.get("MajorVersion") == "5"
@@ -261,7 +261,7 @@ def test_alternation_render_midi_and_package(tmp_path, samples):
     assert names["Closed Hat 1"] == filled["chat"][0] and names["Closed Hat 2"] == filled["chat"][1]
     midi_notes = {n for _, _, n, _ in midi.read_notes(os.path.join(folder, "Drums.mid"))}
     assert midi_notes <= set(names.values())
-    assert "si alternano" in open(os.path.join(folder, "LEGGIMI.txt"), encoding="utf-8").read()
+    assert "the samples alternate" in open(os.path.join(folder, "README.txt"), encoding="utf-8").read()
 
 
 # ---------------------------------------------------------------- user patterns + cache

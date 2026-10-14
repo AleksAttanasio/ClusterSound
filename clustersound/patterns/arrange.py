@@ -10,6 +10,7 @@ The bass follows the key of the kit pattern for the whole sequence.
 """
 import copy
 
+from ..i18n import tr
 from . import model
 
 MAX_BARS = 256
@@ -32,7 +33,7 @@ def flatten(kit: dict, seq: dict) -> dict:
     kit = model.validate(kit)
     blocks = [b for b in seq.get("blocks", []) if b.get("groove")]
     if not blocks:
-        raise ValueError("la sequenza è vuota")
+        raise ValueError(tr("the sequence is empty"))
     out = copy.deepcopy(kit)
     steps = {b: [] for b in model.DRUM_IDS}
     ratchet = {b: [] for b in model.DRUM_IDS}
@@ -76,17 +77,17 @@ def flatten(kit: dict, seq: dict) -> dict:
     out["swing"] = swing_bars[0] if swing_bars else kit["swing"]
     out["swing_bars"] = swing_bars
     out["sections"] = sections
-    out["name"] = seq.get("name") or "Sequenza"
+    out["name"] = seq.get("name") or tr("Sequence")
     out["genre"] = "sequence"
     out["id"] = "sequence"
     return model.validate(out)
 
 
 def outline(p: dict) -> list[str]:
-    """Human readable running order, e.g. 'batt. 1-8   DnB Rollers · Main ×2'."""
+    """Human readable running order, e.g. 'bars 1-8   DnB Rollers · Main ×2'."""
     lines = []
     for s in p.get("sections", []):
         a, b = s["start_bar"] + 1, s["start_bar"] + s["bars"]
         rep = f" ×{s['repeat']}" if s["repeat"] > 1 else ""
-        lines.append(f"batt. {a}-{b}".ljust(14) + f"{s['label']}{rep}")
+        lines.append(tr("bars {a}-{b}", a=a, b=b).ljust(14) + f"{s['label']}{rep}")
     return lines

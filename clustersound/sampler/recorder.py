@@ -17,6 +17,7 @@ import numpy as np
 import soundfile as sf
 import soxr
 
+from ..i18n import N_, tr
 from ..online.downloads import safe_name, unique_path
 from ..paths import IS_MAC, IS_WIN, cache_dir, resource_path
 from . import wasapi
@@ -47,8 +48,8 @@ FORMATS = {
     "m4a": {"label": "M4A (AAC)", "ext": ".m4a", "sf": None, "multichannel": False,
             "qualities": [("256", "256 kbps"), ("192", "192 kbps"), ("128", "128 kbps")]},
 }
-RATES = [(0, "Del dispositivo"), (44100, "44,1 kHz"), (48000, "48 kHz"), (96000, "96 kHz")]
-CHANNELS = [("stereo", "Stereo"), ("mono", "Mono"), ("all", "Tutti i canali")]
+RATES = [(0, N_("Device rate")), (44100, "44,1 kHz"), (48000, "48 kHz"), (96000, "96 kHz")]
+CHANNELS = [("stereo", "Stereo"), ("mono", "Mono"), ("all", N_("All channels"))]
 # libsndfile maps the compression level onto these CBR bitrates (measured)
 MP3_LEVEL = {"320": 0.0, "256": 0.2, "192": 0.42, "128": 0.65}
 OGG_LEVEL = {"high": 0.1, "medium": 0.5, "low": 0.8}
@@ -158,7 +159,7 @@ class Writer:
             res = subprocess.run(["/usr/bin/afconvert", "-f", "m4af", "-d", "aac", "-b", str(bitrate),
                                   self._target, self._final], capture_output=True, text=True)
             if res.returncode != 0:
-                raise CaptureError(f"conversione in M4A non riuscita: {res.stderr.strip() or res.returncode}")
+                raise CaptureError(tr("M4A conversion failed: {error}", error=res.stderr.strip() or res.returncode))
             os.remove(self._target)
         return self.path
 
@@ -200,8 +201,8 @@ def output_devices() -> list[dict]:
     if IS_WIN:
         return wasapi.output_devices(ALL)
     binary = tap_binary()
-    mix = {"id": ALL, "name": "Tutte le uscite (mix)", "channels": 2, "sample_rate": None, "default": False,
-           "note": "Tutto ciò che il Mac suona"}
+    mix = {"id": ALL, "name": tr("All outputs (mix)"), "channels": 2, "sample_rate": None, "default": False,
+           "note": tr("Everything the Mac plays")}
     if binary is None:
         return [mix | {"backend": "sck"}] if SystemAudioBackend.available() else []
     try:
@@ -220,7 +221,7 @@ class TapBackend:
     def __init__(self, device: str, on_block, binary: str | None = None, timeout: float = 10.0):
         self.binary = binary or tap_binary()
         if not self.binary:
-            raise CaptureError("registrazione per dispositivo non disponibile (serve macOS 14.2 o successivo)")
+            raise CaptureError(tr("per-device recording not available (needs macOS 14.2 or later)"))
         self.device, self.on_block, self.timeout = device, on_block, timeout
         self.sr, self.channels = 0, 0
         self.proc: subprocess.Popen | None = None
@@ -237,7 +238,7 @@ class TapBackend:
                 return json.loads(line)["error"]
             except (ValueError, KeyError, TypeError):
                 continue
-        return text or "il registratore si è chiuso inatteso"
+        return text or tr("the recorder closed unexpectedly")
 
     def start(self) -> None:
         self.proc = subprocess.Popen([self.binary, "record", "--device", self.device, "--exclude-pid", str(os.getpid())],
@@ -250,7 +251,7 @@ class TapBackend:
         if not line:
             if reader.is_alive():
                 self.proc.kill()
-                raise CaptureError("il registratore non risponde (controlla il permesso di registrazione audio)")
+                raise CaptureError(tr("the recorder is not responding (check the audio recording permission)"))
             self.proc.wait(2)
             raise CaptureError(self._stderr_error())
         head = json.loads(line)
@@ -318,17 +319,18 @@ class Track:
 
 
 def source_text(name: str, started: str, seconds: float, fmt: dict) -> str:
-    return (f"Registrazione dell'uscita audio: {name}\nInizio: {started}\nDurata: {seconds:.1f} s\n"
-            f"Formato: {FORMATS[fmt['format']]['label']} · {fmt['quality']}\n\n{CAPTURE_NOTE}\n")
+    return (tr("Recording of the audio output: {name}", name=name) + "\n" + tr("Start: {v}", v=started) + "\n"
+            + tr("Duration: {v} s", v=f"{seconds:.1f}") + "\n"
+            + tr("Format: {v}", v=f"{FORMATS[fmt['format']]['label']} · {fmt['quality']}") + f"\n\n{tr(CAPTURE_NOTE)}\n")
 
 
 def unavailable_hint() -> str:
     """Why no output can be recorded on this system (shown when output_devices() is empty)."""
     if IS_WIN:
-        return ("Nessuna uscita registrabile: serve il pacchetto <code>soundcard</code> "
-                "e almeno un dispositivo di uscita attivo.")
-    return ("Nessuna uscita registrabile: serve macOS 14.2 o successivo "
-            "(oppure l'extra <code>capture</code> per il mix di tutte le uscite).")
+        return tr("No output can be recorded: it needs the <code>soundcard</code> package "
+                  "and at least one active output device.")
+    return tr("No output can be recorded: it needs macOS 14.2 or later "
+              "(or the <code>capture</code> extra for the mix of all outputs).")
 
 
 def _default_backend(device: dict, on_block):
@@ -357,9 +359,9 @@ class Recorder:
     def start(self, devices: list[dict], fmt: dict, folder: str = DEFAULT_DIR) -> dict:
         with self._lock:
             if self.running:
-                raise CaptureError("una registrazione è già in corso")
+                raise CaptureError(tr("a recording is already in progress"))
             if not devices:
-                raise CaptureError("scegli almeno un dispositivo di uscita")
+                raise CaptureError(tr("choose at least one output device"))
             fmt = normalize_format(fmt)
             stamp = time.strftime("%Y-%m-%d %H.%M.%S")
             self.started_label = stamp.replace(".", ":")
@@ -371,7 +373,7 @@ class Recorder:
                     t.backend = self.backend_factory(d, t.on_block)
                     t.backend.start()
                 except Exception as e:
-                    t.error = str(e) if isinstance(e, CaptureError) else f"avvio non riuscito ({e})"
+                    t.error = str(e) if isinstance(e, CaptureError) else tr("start failed ({error})", error=e)
                     t.backend = None
                 tracks.append(t)
             if all(t.backend is None for t in tracks):

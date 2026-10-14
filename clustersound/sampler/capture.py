@@ -8,6 +8,8 @@ import threading
 
 import numpy as np
 
+from ..i18n import tr
+
 SCK_RATE = 48000
 
 
@@ -39,7 +41,7 @@ def _wait(start, timeout: float = 10.0):
 
     start(handler)
     if not done.wait(timeout):
-        raise CaptureError("ScreenCaptureKit non risponde")
+        raise CaptureError(tr("ScreenCaptureKit is not responding"))
     return out["args"]
 
 
@@ -76,7 +78,7 @@ class SystemAudioBackend:
     def __init__(self, on_block):
         mods = _sck()
         if mods is None:
-            raise CaptureError("cattura dell'audio di sistema non disponibile: installa l'extra «capture»")
+            raise CaptureError(tr("system audio capture not available: install the «capture» extra"))
         self.CM, self.SCK, NSObject = mods
         self.on_block = on_block
         self.stream = None
@@ -105,8 +107,8 @@ class SystemAudioBackend:
         SCK, CM = self.SCK, self.CM
         content, err = _wait(SCK.SCShareableContent.getShareableContentWithCompletionHandler_)
         if content is None or not content.displays():
-            raise CaptureError("permesso mancante: abilita ClusterSound in Impostazioni di Sistema → Privacy e "
-                               "sicurezza → Registrazione schermo e audio di sistema, poi riavvia l'app"
+            raise CaptureError(tr("permission missing: enable ClusterSound in System Settings → Privacy & "
+                                  "Security → Screen & System Audio Recording, then restart the app")
                                + (f" ({err.localizedDescription()})" if err else ""))
         flt = SCK.SCContentFilter.alloc().initWithDisplay_excludingWindows_(content.displays()[0], [])
         cfg = SCK.SCStreamConfiguration.alloc().init()
@@ -121,13 +123,13 @@ class SystemAudioBackend:
         ok, err = stream.addStreamOutput_type_sampleHandlerQueue_error_(
             self._output, SCK.SCStreamOutputTypeAudio, None, None)
         if not ok:
-            raise CaptureError(f"impossibile avviare la cattura ({err})")
+            raise CaptureError(tr("cannot start the capture ({error})", error=err))
         global _active
         _active = self
         (err,) = _wait(stream.startCaptureWithCompletionHandler_)
         if err is not None:
             _active = None
-            raise CaptureError(f"cattura rifiutata: {err.localizedDescription()}")
+            raise CaptureError(tr("capture refused: {error}", error=err.localizedDescription()))
         self.stream = stream
 
     def stop(self) -> None:

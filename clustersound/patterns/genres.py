@@ -9,7 +9,7 @@ Every genre gets its hand-written variants plus two derived ones (Fill, Breakdow
 """
 from . import model
 
-GROUPS = ["Bass music UK", "Drum & Bass / Jungle", "Hip hop / Trap", "House / Techno", "Global / altro"]
+GROUPS = ["Bass music UK", "Drum & Bass / Jungle", "Hip hop / Trap", "House / Techno", "Global / other"]
 
 
 def V(name, drums, bass="", bars=1, **kw):
@@ -70,7 +70,7 @@ GENRES = [
         V("Main", {"kick": "X.........x.....", "snare": "........X.......", "chat": "..x...x...x...x.",
                    "perc": "......o.......o."},
           "0:6:0 8:4:0 12:4:-2"),
-        V("Variante B", {"kick": "X.....x...x.....", "snare": "........X.......", "clap": "........X.......",
+        V("Variant B", {"kick": "X.....x...x.....", "snare": "........X.......", "clap": "........X.......",
                          "chat": "x.x.x.x.x.x.x.x.", "ohat": "..............x."},
           "0:3:0 6:2:0 10:6:3g"),
         V("Rolling", {"kick": "X.........x..x..", "snare": "......o.X.....o.", "chat": "x.xxx.xxx.xxx.xx",
@@ -88,7 +88,7 @@ GENRES = [
         V("Main", {"kick": "X.....x.x.x.....", "snare": "........X.......", "chat": "x.x.x.x.x.x.x.x.",
                    "cymbal": "X..............."},
           "0:2:0 3:1:0 6:2:12 10:3:0 14:2:-1"),
-        V("Fill pesante", {"kick": "X.x...x.x.x.x...", "snare": "........X...o.33", "tom": "............x.xx",
+        V("Heavy fill", {"kick": "X.x...x.x.x.x...", "snare": "........X...o.33", "tom": "............x.xx",
                            "chat": "x.x.x.x.x.x....."},
           "0:4:0 6:2:12 10:4:0"),
     ], half_time=True),
@@ -341,7 +341,7 @@ GENRES = [
           "0:1:0 3:1:0 4:1:12 7:1:0 8:1:3 11:1:5 12:1:7 14:1:5"),
     ]),
     # ------------------------------------------------------------------ Global / other
-    G("afrobeats", "Afrobeats", "Global / altro", 104, (98, 110), 56, "A", [
+    G("afrobeats", "Afrobeats", "Global / other", 104, (98, 110), 56, "A", [
         V("Main", {"kick": "X..x..x...X.....", "rim": "...x..x....x..x.", "clap": "............x...",
                    "chat": "x.xxx.xxx.xxx.xx", "perc": "o.o.o.o.o.o.o.o."},
           "0:3:0 6:2:0 10:4:-2 14:2:3"),
@@ -349,7 +349,7 @@ GENRES = [
                      "perc": "xxxxxxxxxxxxxxxx"},
           "0:4:0 7:2:0 10:4:3"),
     ]),
-    G("amapiano", "Amapiano", "Global / altro", 113, (110, 116), 58, "F", [
+    G("amapiano", "Amapiano", "Global / other", 113, (110, 116), 58, "F", [
         V("Main", {"kick": "X...X...X...X...", "clap": "....X.......X...", "perc": "xxxxxxxxxxxxxxxx",
                    "rim": "..x..x..x..x..x.", "chat": "..x...x...x...x."},
           "3:2:0! 6:1:0 10:2:-5! 13:2:0"),
@@ -357,14 +357,14 @@ GENRES = [
                        "rim": "..x...x...x..x.."},
           "0:1:0! 3:1:0 6:2:7! 10:1:5 11:1:3 14:2:0!"),
     ]),
-    G("reggaeton", "Reggaeton / Dembow", "Global / altro", 95, (88, 100), 50, "C#", [
+    G("reggaeton", "Reggaeton / Dembow", "Global / other", 95, (88, 100), 50, "C#", [
         V("Main", {"kick": "X...X...X...X...", "snare": "...x..x....x..x.", "chat": "x.x.x.x.x.x.x.x."},
           "0:3:0 3:3:0 6:2:-2 8:3:0 11:3:3 14:2:5"),
         V("Perreo", {"kick": "X...X...X...X...", "snare": "...x..x....x..x.", "clap": "...x..x....x..x.",
                      "perc": "x..x..x.x..x..x.", "chat": "xxxxxxxxxxxxxxxx"},
           "0:3:0 3:3:0 6:2:0 8:3:-2 11:3:-2 14:2:-4"),
     ]),
-    G("dancehall", "Dancehall", "Global / altro", 98, (90, 105), 54, "G", [
+    G("dancehall", "Dancehall", "Global / other", 98, (90, 105), 54, "G", [
         V("Main", {"kick": "X..x..x...X.....", "snare": "....X.......X...", "rim": "...x..x....x..x.",
                    "chat": "x.x.x.x.x.x.x.x."},
           "0:3:0 6:2:0 10:4:-2"),
@@ -372,7 +372,7 @@ GENRES = [
                      "perc": "..x...x...x...x."},
           "0:3:0 3:3:5 8:3:0 11:3:3"),
     ]),
-    G("moombahton", "Moombahton", "Global / altro", 108, (105, 112), 50, "F#", [
+    G("moombahton", "Moombahton", "Global / other", 108, (105, 112), 50, "F#", [
         V("Main", {"kick": "X...X...X...X...", "snare": "...x..x....x..x.", "ohat": "..x...x...x...x.",
                    "chat": "x.x.x.x.x.x.x.x.", "perc": "x..x..x...x..x.."},
           "0:3:0 3:3:0 6:2:5 8:3:0 11:3:3 14:2:-2"),
@@ -380,7 +380,7 @@ GENRES = [
                     "chat": "..x...x...x...x."},
           "0:3:0g 3:3:12 8:3:0 11:3:7"),
     ]),
-    G("pop", "Pop", "Global / altro", 110, (95, 125), 52, "C", [
+    G("pop", "Pop", "Global / other", 110, (95, 125), 52, "C", [
         V("Main", {"kick": "X.......x.x.....", "snare": "....X.......X...", "clap": "....X.......X...",
                    "chat": "x.x.x.x.x.x.x.x."},
           "0:4:0 8:4:-3 12:4:-5"),
@@ -388,7 +388,7 @@ GENRES = [
                    "ohat": "..............x."},
           "0:2:0 4:2:0 8:2:-3 12:2:-5"),
     ]),
-    G("funk", "Funk", "Global / altro", 100, (90, 110), 55, "E", [
+    G("funk", "Funk", "Global / other", 100, (90, 110), 55, "E", [
         V("Main", {"kick": "X..x..x...x..x..", "snare": "....X..o.o..X..o", "chat": "xxxxxxxxxxxxxxxx",
                    "ohat": "......x........."},
           "0:2:0 3:1:12 6:2:0 10:1:3 11:1:5 13:2:7"),
@@ -396,7 +396,7 @@ GENRES = [
                             "ohat": ".......x........"},
           "0:2:0 2:1:0 6:2:-2 10:2:3 13:2:5"),
     ]),
-    G("rock", "Rock", "Global / altro", 120, (100, 140), 50, "E", [
+    G("rock", "Rock", "Global / other", 120, (100, 140), 50, "E", [
         V("Main", {"kick": "X.......X.X.....", "snare": "....X.......X...", "chat": "x.x.x.x.x.x.x.x.",
                    "cymbal": "X..............."},
           "0:2:0 2:2:0 4:2:0 6:2:0 8:2:5 10:2:5 12:2:7 14:2:7"),
@@ -404,7 +404,7 @@ GENRES = [
                         "tom": "............xxxx"},
           "0:4:0 6:4:0 10:6:-2"),
     ]),
-    G("breakbeat", "Breakbeat classico", "Global / altro", 100, (90, 110), 54, "A", [
+    G("breakbeat", "Classic breakbeat", "Global / other", 100, (90, 110), 54, "A", [
         V("Main", {"kick": "X.x...x...x..x..", "snare": "....X..o.o.oX..o", "chat": "x.x.x.x.x.x.x.x.",
                    "ohat": "..............x."},
           "0:3:0 6:2:0 10:3:3 13:3:-2"),

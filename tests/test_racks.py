@@ -206,8 +206,8 @@ def test_export_rack(tmp_path, samples):
         assert os.path.isfile(os.path.join(folder, *rel, fr.find("Name").get("Value")))
     wavs = [f for _, _, fs in os.walk(os.path.join(folder, "Samples")) for f in fs if f.endswith(".wav")]
     assert len(wavs) == 5
-    text = open(os.path.join(folder, "LEGGIMI.txt"), encoding="utf-8").read()
-    assert "MAPPA DEI PAD" in text and "C1" in text and "Choke group attivi: 1" in text
+    text = open(os.path.join(folder, "README.txt"), encoding="utf-8").read()
+    assert "PAD MAP" in text and "C1" in text and "Active choke groups: 1" in text
 
 
 def test_export_empty_rack_fails(tmp_path):

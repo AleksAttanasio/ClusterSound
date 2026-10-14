@@ -22,4 +22,4 @@ for s in 16 24 32 48 64 128 256; do
 done
 python3 tools/make_ico.py brand/ClusterSound.ico $ico >/dev/null
 rm -rf "$work"
-echo "Pronto: brand/ClusterSound.icns, brand/ClusterSound.ico"
+echo "Ready: brand/ClusterSound.icns, brand/ClusterSound.ico"

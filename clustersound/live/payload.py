@@ -20,6 +20,7 @@ from dataclasses import dataclass
 import soundfile as sf
 
 from ..chords import melody as chord_melody
+from ..i18n import tr
 from ..chords import perform as chord_perform
 from ..patterns import ableton as pat_ableton
 from ..patterns import midi as pat_midi
@@ -178,7 +179,7 @@ def _layer_clips(seq: dict, suffix: str = "") -> dict[str, tuple[str, dict]]:
 def compose(proj: dict, pure: bool = False, versions: list[str] | None = None) -> dict:
     """A Compose project ({versions, order, modes, modeActive, bpm, name}) or a single playable seq.
 
-    Every harmony version becomes a clip of one "Accordi" track, played with the active Modalità; every melody
+    Every harmony version becomes a clip of one "Chords" track, played with the active Mode; every melody
     layer (by name: "Melodia", "Basso"…) gets its own track, with its clip in the scene of its harmony."""
     name = proj.get("name") or "Progressione"
     bpm = float(proj.get("bpm") or 120)
@@ -197,7 +198,7 @@ def compose(proj: dict, pure: bool = False, versions: list[str] | None = None) -
             seq = {**seq, "bpm": bpm, "name": name, **({"mode": mode} if mode else {})}
             clips.append(_compose_clip(seq, f"{name} {v}" if many else name, pure))
             mel.append(_layer_clips(seq, v if many else ""))
-    tracks = [_track(f"Accordi – {name}", "chords", None, None, clips)]
+    tracks = [_track(f"{tr('Chords')} – {name}", "chords", None, None, clips)]
     for lname in dict.fromkeys(k for m in mel for k in m):  # an empty slot keeps a clip in the scene of its harmony
         role = next(m[lname][0] for m in mel if lname in m)
         tracks.append(_track(f"{lname} – {name}", role, None, None,
@@ -219,7 +220,7 @@ def audio(s: SamplerSession, stage: Stage, start: float | None = None, end: floa
                            bool(o.get("normalize")))
         name = f"{s.title or 'Audio'} {a:.2f}-{b:.2f}s"
     if y.shape[0] == 0:
-        raise ValueError("regione vuota")
+        raise ValueError(tr("empty region"))
     path = unique_path(os.path.join(stage.folder("Audio"), safe_name(name) + ".wav"))
     sf.write(path, y, s.sr, subtype="PCM_24")
     sampler_export.write_note(s, path, a, b)

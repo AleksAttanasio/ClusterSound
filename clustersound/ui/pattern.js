@@ -6,25 +6,27 @@ import { settingsLink, setRow, savedFlash } from './settings.js';
 import { sendToLive } from './live.js';
 import { btn, setPlayButton, openDialog } from './kit.js';
 import { svg } from './icons.js';
+import { t } from './i18n.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const LS_KEY = 'clustersound.pattern';
 const KIND_BADGE = { library: 'LIB', online: 'WEB', file: 'FILE' };
-const ALT_MODES = [['off', 'Insieme'], ['cycle', 'A giro'], ['random', 'Casuale'], ['random_pass', 'Casuale ogni giro']];
+const ALT_MODES = [['off', 'Together'], ['cycle', 'In turn'], ['random', 'Random'], ['random_pass', 'Random every loop']]; // t() where shown
 // buses where alternating samples makes no sense by default (one kick, one FX, a melodic bass)
 export const NO_ALT = new Set(['kick', 'fx', 'bass']);
 export const newSeed = () => Math.floor(Math.random() * 2 ** 32) >>> 0;
 const LS_RANDOM = 'clustersound.randomKit';
-const DYN_TIP = "Somiglianza dell'inviluppo (attacco, decay, coda) con i sample degli altri bus";
+const DYN_TIP = 'Similarity of the envelope (attack, decay, tail) with the samples of the other buses'; // t() where shown
 
 // "similar dynamics" controls for the random kit popovers (Pattern and Drum Rack)
-export const dynControls = (o, what = 'bus') => `
-      <wa-checkbox size="s" class="pop-check" data-o="dyn" ${o.dyn ? 'checked' : ''} title="Attacco, decay e coda simili, relativi allo strumento: un kit tutto secco o tutto ambientale">dinamica simile tra i ${what}</wa-checkbox>
-      <div class="pop-field" data-dyn-margin ${o.dyn ? '' : 'hidden'}><span class="pop-row"><span>Margine di similarità</span><span data-dyn-v>${Math.round((o.margin ?? 0.3) * 100)}%</span></span>
-        <wa-slider size="s" min="0.05" max="1" step="0.05" value="${o.margin ?? 0.3}" data-o="margin" label="Margine di similarità"></wa-slider>
-        <span class="pop-scale"><span>Stretto</span><span>Largo</span></span></div>`;
+// what: 'buses' (Sequencer) or 'groups' (Drum Rack)
+export const dynControls = (o, what = 'buses') => `
+      <wa-checkbox size="s" class="pop-check" data-o="dyn" ${o.dyn ? 'checked' : ''} title="${t('Similar attack, decay and tail, relative to the instrument: an all-dry or all-ambient kit')}">${what === 'groups' ? t('similar dynamics across the groups') : t('similar dynamics across the buses')}</wa-checkbox>
+      <div class="pop-field" data-dyn-margin ${o.dyn ? '' : 'hidden'}><span class="pop-row"><span>${t('Similarity margin')}</span><span data-dyn-v>${Math.round((o.margin ?? 0.3) * 100)}%</span></span>
+        <wa-slider size="s" min="0.05" max="1" step="0.05" value="${o.margin ?? 0.3}" data-o="margin" label="${t('Similarity margin')}"></wa-slider>
+        <span class="pop-scale"><span>${t('Tight')}</span><span>${t('Loose')}</span></span></div>`;
 export function wireDynControls(pop) {
   const box = pop.querySelector('[data-o=dyn]'), field = pop.querySelector('[data-dyn-margin]');
   box.onchange = () => {
@@ -33,6 +35,10 @@ export function wireDynControls(pop) {
   };
   pop.querySelector('[data-o=margin]').oninput = (e) => { pop.querySelector('[data-dyn-v]').textContent = `${Math.round(e.target.value * 100)}%`; };
 }
+// "Name (variation)" -> "Name", in either language (names saved before the switch keep the old word)
+const stripVariation = (name) => name.replace(/ \((variation|variazione)\)$/, '');
+const layersLabel = (n) => (n === 1 ? t('1 layer') : t('{n} layers', { n }));
+
 export const readDynControls = (pop) => ({ dyn: pop.querySelector('[data-o=dyn]').checked, margin: +pop.querySelector('[data-o=margin]').value });
 
 export class PatternEditor {
@@ -88,9 +94,9 @@ export class PatternEditor {
   /** Sequencer section of the Settings page. */
   renderSettings(body) {
     const map = midiMap();
-    body.innerHTML = setRow('Note della batteria nel MIDI', 'Come vengono scritte le note dei bus di batteria nei file MIDI esportati (pattern e canzone).',
-      `<wa-select id="set-midi-map" size="s" value="${map}" label="Mappatura" style="width:230px">
-         <wa-option value="drumrack">Drum Rack di Ableton (C1…)</wa-option><wa-option value="gm">General MIDI</wa-option></wa-select>`);
+    body.innerHTML = setRow(t('Drum notes in the MIDI'), t('How the notes of the drum buses are written in the exported MIDI files (pattern and song).'),
+      `<wa-select id="set-midi-map" size="s" value="${map}" label="${t('Mapping')}" style="width:230px">
+         <wa-option value="drumrack">${t('Ableton Drum Rack (C1…)')}</wa-option><wa-option value="gm">General MIDI</wa-option></wa-select>`);
     body.querySelector('#set-midi-map').addEventListener('change', (e) => { setMidiMap(e.target.value); savedFlash(body); });
   }
 
@@ -185,7 +191,8 @@ export class PatternEditor {
     this._persist();
     await this.seq.load(ref);
     if (this.root && !this.root.hidden) this.renderGrid();
-    toast(`${mode === 'replace' ? 'Sostituito in' : 'Aggiunto a'} ${this.busById[busId].label} (layer ${idx + 1})`);
+    const where = { bus: this.busById[busId].label, n: idx + 1 };
+    toast(mode === 'replace' ? t('Replaced in {bus} (layer {n})', where) : t('Added to {bus} (layer {n})', where));
   }
 
   // Samples from the Drum Rack: assign = {busId: {refs, alt}}. replace: the bus loses its layers;
@@ -235,13 +242,13 @@ export class PatternEditor {
   openRandomKit(anchor) {
     const o = this._randomOpts();
     const pop = showPopover(anchor, `
-      <div class="pop-title">${svg('dices')} Kit casuale</div>
-      <div class="hint">Per ogni bus non bloccato (lucchetto chiuso) sceglie a caso un gruppo di sample simili delle sue classi e ne prende sample a caso. Il groove non cambia.</div>
-      <wa-select size="s" class="pop-field" label="Sample per bus" data-o="variants" value="${o.variants}">${[1, 2, 4].map((n) => `<wa-option value="${n}">${n}${n > 1 ? ' (alternati a caso)' : ''}</wa-option>`).join('')}</wa-select>
-      <wa-input size="s" class="pop-field" label="Solo dalla cartella / pack (facoltativo)" data-o="folder" value="${esc(o.folder)}" placeholder="Es. Cymatics"></wa-input>
-      <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>Solo one-shot (niente loop)</wa-checkbox>
+      <div class="pop-title">${svg('dices')} ${t('Random kit')}</div>
+      <div class="hint">${t('For every unlocked bus (closed padlock) it picks at random a group of similar samples of its classes and takes random samples from it. The groove does not change.')}</div>
+      <wa-select size="s" class="pop-field" label="${t('Samples per bus')}" data-o="variants" value="${o.variants}">${[1, 2, 4].map((n) => `<wa-option value="${n}">${n}${n > 1 ? ` ${t('(alternated at random)')}` : ''}</wa-option>`).join('')}</wa-select>
+      <wa-input size="s" class="pop-field" label="${t('Only from the folder / pack (optional)')}" data-o="folder" value="${esc(o.folder)}" placeholder="${t('E.g. Cymatics')}"></wa-input>
+      <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>${t('One-shots only (no loops)')}</wa-checkbox>
       ${dynControls(o)}
-      <div class="pop-actions">${btn('Genera', { variant: 'brand', icon: 'dices', 'data-go': true })}</div>`);
+      <div class="pop-actions">${btn(t('Generate'), { variant: 'brand', icon: 'dices', 'data-go': true })}</div>`);
     wireDynControls(pop);
     pop.querySelector('[data-go]').onclick = async () => {
       const opts = {
@@ -285,12 +292,12 @@ export class PatternEditor {
     this._persist();
     await this.seq.preload(this.p);
     this.renderAll();
-    toast(done ? `Kit casuale: ${done} bus${locked ? ` · ${locked} bloccati` : ''}${dyn ? ` · dinamica ±${Math.round(margin * 100)}%` : ''}`
-      : 'Nessun sample adatto (controlla il filtro cartella)');
+    toast(done ? `${t('Random kit: {n} buses', { n: done })}${locked ? ` · ${t('{n} locked', { n: locked })}` : ''}${dyn ? ` · ${t('dynamics ±{p}%', { p: Math.round(margin * 100) })}` : ''}`
+      : t('No suitable samples (check the folder filter)'));
   }
 
   clearSamples() {
-    if (!confirm('Rimuovere tutti i sample da tutti i bus (anche quelli bloccati)? Il groove resta.')) return;
+    if (!confirm(t('Remove all the samples from all the buses (locked ones too)? The groove stays.'))) return;
     this.stop();
     for (const [id, b] of Object.entries(this.p.buses)) {
       b.layers = [];
@@ -300,7 +307,7 @@ export class PatternEditor {
     this.noAutofill = true;
     this._persist();
     this.renderGrid();
-    toast('Sample rimossi da tutti i bus');
+    toast(t('Samples removed from all the buses'));
   }
 
   layerCounts() {
@@ -356,46 +363,45 @@ export class PatternEditor {
   // ---------------------------------------------------------------- shell
   _buildShell() {
     this.root = $('#pattern');
-    const groups = this.meta.groups.map((g, k) => `${k ? '<wa-divider></wa-divider>' : ''}<small>${esc(g)}</small>${this.meta.genres.filter((x) => x.group === g)
+    const groups = this.meta.groups.map((g, k) => `${k ? '<wa-divider></wa-divider>' : ''}<small>${esc(t(g))}</small>${this.meta.genres.filter((x) => x.group === g)
       .map((x) => `<wa-option value="${x.id}">${esc(x.name)} · ${x.bpm}</wa-option>`).join('')}`).join('');
     const keys = this.meta.note_names.map((n) => `<wa-option value="${n}">${n}</wa-option>`).join('');
     this.root.innerHTML = `
       <div id="sq-panel" class="sq"></div>
       <div class="pt-bar">
-        <span class="pt-row-label">Genere</span>
-        <wa-select id="pt-genre" size="s" class="pt-genre" title="Genere">${groups}</wa-select>
+        <span class="pt-row-label">${t('Genre')}</span>
+        <wa-select id="pt-genre" size="s" class="pt-genre" title="${t('Genre')}">${groups}</wa-select>
       </div>
       <div class="pt-bar">
         <span class="pt-row-label">Pattern</span>
         <div id="pt-variants" class="chips pt-variants"></div>
         <div class="spacer"></div>
-        ${btn('Varia', { id: 'pt-vary', icon: 'shuffle', title: 'Genera una variazione del pattern corrente' })}
-        ${btn('Salva variante', { id: 'pt-save', icon: 'save', title: 'Salva come variante personale del genere' })}
-        ${btn('Elimina', { id: 'pt-del', icon: 'trash-2', hidden: true, title: 'Elimina questa variante personale' })}
+        ${btn(t('Vary'), { id: 'pt-vary', icon: 'shuffle', title: t('Generates a variation of the current pattern') })}
+        ${btn(t('Save variant'), { id: 'pt-save', icon: 'save', title: t('Save as a personal variant of the genre') })}
+        ${btn(t('Delete'), { id: 'pt-del', icon: 'trash-2', hidden: true, title: t('Delete this personal variant') })}
       </div>
       <div class="pt-seqblock">
       <div class="pt-bar pt-transport">
         ${btn('<wa-icon slot="start" name="play"></wa-icon>Play', { variant: 'brand', id: 'pt-play', cls: 'pt-play' })}
         <label>BPM <wa-number-input id="pt-bpm" size="s" min="40" max="250" step="1" without-steppers></wa-number-input></label>
-        <label title="Swing sugli 16esimi in levare (50 = dritto)">Swing <wa-slider id="pt-swing" size="s" min="50" max="75" step="1" label="Swing"></wa-slider><span id="pt-swing-v"></span></label>
-        <label>Battute <wa-select id="pt-bars" size="s" value="1"><wa-option value="1">1</wa-option><wa-option value="2">2</wa-option><wa-option value="4">4</wa-option></wa-select></label>
-        <label>Tonalità <wa-select id="pt-key" size="s">${keys}</wa-select><wa-select id="pt-oct" size="s" title="Ottava del basso (convenzione Ableton: C1 = nota MIDI 36)"><wa-option value="0">-1</wa-option><wa-option value="1">0</wa-option><wa-option value="2">1</wa-option><wa-option value="3">2</wa-option></wa-select></label>
+        <label title="${t('Swing on the off-beat 16ths (50 = straight)')}">Swing <wa-slider id="pt-swing" size="s" min="50" max="75" step="1" label="Swing"></wa-slider><span id="pt-swing-v"></span></label>
+        <label>${t('Bars')} <wa-select id="pt-bars" size="s" value="1"><wa-option value="1">1</wa-option><wa-option value="2">2</wa-option><wa-option value="4">4</wa-option></wa-select></label>
+        <label>${t('Key')} <wa-select id="pt-key" size="s">${keys}</wa-select><wa-select id="pt-oct" size="s" title="${t('Bass octave (Ableton convention: C1 = MIDI note 36)')}"><wa-option value="0">-1</wa-option><wa-option value="1">0</wa-option><wa-option value="2">1</wa-option><wa-option value="3">2</wa-option></wa-select></label>
         <div class="spacer"></div>
-        <wa-button-group label="Esporta">
-          ${btn('MIDI', { id: 'pt-midi', icon: 'file-down' })}${btn('WAV', { id: 'pt-wav' })}${btn('Invia a Live', { id: 'pt-live', title: 'Crea in Live le tracce Drums e Bass con rack e clip (serve il device ClusterSound nel set)' })}
+        <wa-button-group label="${t('Export')}">
+          ${btn('MIDI', { id: 'pt-midi', icon: 'file-down' })}${btn('WAV', { id: 'pt-wav' })}${btn(t('Send to Live'), { id: 'pt-live', title: t('Creates the Drums and Bass tracks in Live, with racks and clips (needs the ClusterSound device in the set)') })}
         </wa-button-group>
-        ${btn('Esporta per Ableton', { id: 'pt-abl', variant: 'brand', icon: 'file-down', title: 'Cartella con Drum Rack .adg, sample, MIDI e loop pronta per Ableton Live' })}
-        ${settingsLink('pattern', 'Opzioni di export')}
+        ${btn(t('Export for Ableton'), { id: 'pt-abl', variant: 'brand', icon: 'file-down', title: t('Folder with Drum Rack .adg, samples, MIDI and loop, ready for Ableton Live') })}
+        ${settingsLink('pattern', t('Export options'))}
       </div>
       <div class="pt-bar pt-tools">
-        ${btn('Kit casuale', { id: 'pt-random', icon: 'dices', title: 'Sceglie a caso un gruppo di sample simili per ogni bus non bloccato e ne prende sample a caso' })}
-        ${btn('Carica dal Drum Rack', { id: 'pt-fromrack', icon: 'layout-grid', title: 'Carica i sample del Drum Rack nei bus del Sequencer' })}
-        ${btn('', { id: 'pt-expand', title: 'Mostra o nasconde i sample (layer) di tutti i bus' })}
+        ${btn(t('Random kit'), { id: 'pt-random', icon: 'dices', title: t('Picks at random a group of similar samples for every unlocked bus and takes random samples from it') })}
+        ${btn(t('Load from the Drum Rack'), { id: 'pt-fromrack', icon: 'layout-grid', title: t('Loads the Drum Rack samples into the Sequencer buses') })}
+        ${btn('', { id: 'pt-expand', title: t('Shows or hides the samples (layers) of all the buses') })}
         <div class="spacer"></div>
-        ${btn('Svuota sample', { id: 'pt-clear', variant: 'danger', appearance: 'outlined', icon: 'trash-2', title: 'Rimuove tutti i sample da tutti i bus (il groove resta)' })}
+        ${btn(t('Clear samples'), { id: 'pt-clear', variant: 'danger', appearance: 'outlined', icon: 'trash-2', title: t('Removes all the samples from all the buses (the groove stays)') })}
       </div>
-      <div class="pt-help hint">Clic: step on/off · Shift+clic: accento · Alt+clic: ghost · Tasto destro: roll ×2/×3/×4 · Spazio: play/stop.
-        Invia sample ai bus dalla Libreria (tasto destro su un punto 3D o una riga), dalla scheda Online o dal Drum Rack.</div>
+      <div class="pt-help hint">${t('Click: step on/off · Shift+click: accent · Alt+click: ghost · Right-click: roll ×2/×3/×4 · Space: play/stop. Send samples to the buses from the Library (right-click on a 3D point or a row), from the Store tab or from the Drum Rack.')}</div>
       <div id="pt-empty" class="pt-empty hint" hidden></div>
       <div id="pt-grid" class="pt-grid"></div>
       </div>`;
@@ -430,12 +436,12 @@ export class PatternEditor {
     $('#pt-clear').onclick = () => this.clearSamples();
     $('#pt-save').onclick = () => this.saveVariant();
     $('#pt-del').onclick = () => this.deleteVariant();
-    $('#pt-midi').onclick = async () => { const p = await this.api.export_midi(this._exportable(), midiMap()); if (p) toast(`MIDI salvato: ${p.split('/').pop()}`); };
-    $('#pt-wav').onclick = async () => { toast('Rendering…'); const p = await this.api.export_wav(this._exportable()); if (p) toast(`WAV salvato: ${p.split('/').pop()}`); };
+    $('#pt-midi').onclick = async () => { const p = await this.api.export_midi(this._exportable(), midiMap()); if (p) toast(t('MIDI saved: {file}', { file: p.split('/').pop() })); };
+    $('#pt-wav').onclick = async () => { toast(t('Rendering…')); const p = await this.api.export_wav(this._exportable()); if (p) toast(t('WAV saved: {file}', { file: p.split('/').pop() })); };
     $('#pt-abl').onclick = async () => {
-      toast('Preparazione pacchetto Ableton…');
+      toast(t('Preparing the Ableton package…'));
       const r = await this.api.export_ableton(this._exportable());
-      if (r.error) alert(r.error); else if (r.folder) toast(`Pacchetto creato: ${r.folder.split('/').pop()}`);
+      if (r.error) alert(r.error); else if (r.folder) toast(t('Package created: {folder}', { folder: r.folder.split('/').pop() }));
     };
     $('#pt-live').onclick = () => sendToLive(this.api, 'pattern', this._exportable());
     $('#pt-grid').addEventListener('click', (e) => this._onGridClick(e));
@@ -482,7 +488,7 @@ export class PatternEditor {
     if (hits.length) hat.ratchet[hits[rnd(hits.length)]] = [2, 3][rnd(2)];
     const oh = this.p.buses.ohat.steps;
     if (oh.some((v) => v) && Math.random() < 0.5) { const i = 2 + 4 * rnd(n / 4); oh[i] = oh[i] ? 0 : 90; }
-    this.p.name = (this.p.name || 'Main').replace(/ \(variazione\)$/, '') + ' (variazione)';
+    this.p.name = stripVariation(this.p.name || 'Main') + ` (${t('variation')})`;
     this.source = { genre: this.p.genre, variant: null };
     this._persist();
     this.renderAll();
@@ -490,7 +496,7 @@ export class PatternEditor {
 
   async saveVariant() {
     const isUser = this.source?.user;
-    const name = prompt('Nome della variante', isUser ? this.p.name : `${this.p.name.replace(/ \(variazione\)$/, '')} mia`);
+    const name = prompt(t('Name of the variant'), isUser ? this.p.name : t('my {name}', { name: stripVariation(this.p.name) }));
     if (!name) return;
     const p = clone(this.p);
     p.name = name;
@@ -502,12 +508,12 @@ export class PatternEditor {
     this.source = { genre: saved.genre, user: saved.id };
     this._persist();
     this.renderBar();
-    toast(`Variante "${saved.name}" salvata`);
+    toast(t('Variant "{name}" saved', { name: saved.name }));
   }
 
   async deleteVariant() {
     const id = this.source?.user;
-    if (!id || !confirm('Eliminare questa variante personale?')) return;
+    if (!id || !confirm(t('Delete this personal variant?'))) return;
     await this.api.delete_user_pattern(id);
     this.meta.user = this.meta.user.filter((u) => u.id !== id);
     await this.loadVariant(this.p.genre, 0);
@@ -527,8 +533,8 @@ export class PatternEditor {
     $('#pt-genre').value = p.genre;
     const g = this.meta.genres.find((x) => x.id === p.genre);
     const user = this.meta.user.filter((u) => u.genre === p.genre);
-    $('#pt-variants').innerHTML = (g?.variants || []).map((v, i) => `<wa-button size="xs" pill class="chip ${this.source?.variant === i && !this.source?.user ? 'on' : ''}" data-variant="${i}" draggable="true" title="Clic: carica · trascina nella Sequenza (o doppio clic) per aggiungerla">${esc(v)}</wa-button>`).join('')
-      + user.map((u) => `<wa-button size="xs" pill class="chip user ${this.source?.user === u.id ? 'on' : ''}" data-user="${esc(u.id)}" draggable="true" title="Variante personale · trascina nella Sequenza per aggiungerla"><wa-icon slot="start" name="star"></wa-icon>${esc(u.name)}</wa-button>`).join('')
+    $('#pt-variants').innerHTML = (g?.variants || []).map((v, i) => `<wa-button size="xs" pill class="chip ${this.source?.variant === i && !this.source?.user ? 'on' : ''}" data-variant="${i}" draggable="true" title="${t('Click: load · drag into the Sequence (or double-click) to add it')}">${esc(v)}</wa-button>`).join('')
+      + user.map((u) => `<wa-button size="xs" pill class="chip user ${this.source?.user === u.id ? 'on' : ''}" data-user="${esc(u.id)}" draggable="true" title="${t('Personal variant · drag into the Sequence to add it')}"><wa-icon slot="start" name="star"></wa-icon>${esc(u.name)}</wa-button>`).join('')
       + (this.source?.variant === null && !this.source?.user ? `<wa-tag size="small" pill variant="brand" class="chip-tag">${esc(p.name)}</wa-tag>` : '');
     $('#pt-del').hidden = !this.source?.user;
     $('#pt-bpm').value = Math.round(p.bpm);
@@ -537,7 +543,7 @@ export class PatternEditor {
     $('#pt-bars').value = String(p.bars);
     $('#pt-key').value = p.key;
     $('#pt-oct').value = String(p.octave);
-    if (g) $('#pt-bpm').title = `Tipico ${g.bpm_range[0]}–${g.bpm_range[1]} BPM`;
+    if (g) $('#pt-bpm').title = t('Typical {a}–{b} BPM', { a: g.bpm_range[0], b: g.bpm_range[1] });
   }
 
   _cells(steps, ratchet, busId, layerIdx = null) {
@@ -556,10 +562,10 @@ export class PatternEditor {
     return `<div class="pt-mix">
       <button class="pt-ms ${b.mute ? 'on' : ''}" data-act="mute" data-bus="${id}" title="Mute">M</button>
       <button class="pt-ms solo ${b.solo ? 'on' : ''}" data-act="solo" data-bus="${id}" title="Solo">S</button>
-      <wa-slider size="xs" min="0" max="1.5" step="0.01" value="${b.volume}" data-field="volume" data-bus="${id}" class="vol" title="Volume bus" label="Volume bus"></wa-slider>
+      <wa-slider size="xs" min="0" max="1.5" step="0.01" value="${b.volume}" data-field="volume" data-bus="${id}" class="vol" title="${t('Bus volume')}" label="${t('Bus volume')}"></wa-slider>
       <wa-slider size="xs" min="-1" max="1" step="0.05" value="${b.pan}" indicator-offset="0" data-field="pan" data-bus="${id}" class="pan" title="Pan" label="Pan"></wa-slider>
-      <wa-select size="xs" data-field="filter" data-bus="${id}" title="Filtro del bus" value="${b.hp ? `hp:${b.hp}` : b.lp ? `lp:${b.lp}` : 'off'}">
-        <wa-option value="off">Filtro off</wa-option>
+      <wa-select size="xs" data-field="filter" data-bus="${id}" title="${t('Bus filter')}" value="${b.hp ? `hp:${b.hp}` : b.lp ? `lp:${b.lp}` : 'off'}">
+        <wa-option value="off">${t('Filter off')}</wa-option>
         ${[60, 120, 250, 500].map((f) => `<wa-option value="hp:${f}">HP ${f} Hz</wa-option>`).join('')}
         ${[2000, 5000, 9000].map((f) => `<wa-option value="lp:${f}">LP ${f / 1000} kHz</wa-option>`).join('')}
       </wa-select>
@@ -569,7 +575,7 @@ export class PatternEditor {
 
   _lock(id, b) {
     return `<button class="pt-ib pt-lock ${b.lock ? 'on' : ''}" data-act="lock" data-bus="${id}"
-      title="${b.lock ? 'Bloccato: Kit casuale non lo cambia (clic per sbloccare)' : 'Blocca: Kit casuale non cambierà questo bus'}">${svg(b.lock ? 'lock' : 'lock-open', 12)}</button>`;
+      title="${b.lock ? t('Locked: Random kit does not change it (click to unlock)') : t('Lock: Random kit will not change this bus')}">${svg(b.lock ? 'lock' : 'lock-open', 12)}</button>`;
   }
 
   // how the layers share the hits (only meaningful with 2+ layers)
@@ -577,9 +583,9 @@ export class PatternEditor {
     if (b.layers.length < 2) return '';
     const mode = b.alt?.mode || 'off';
     return `<wa-select size="xs" class="pt-alt ${mode !== 'off' ? 'on' : ''}" data-field="alt" data-bus="${id}" value="${mode}"
-        title="Layer: insieme = suonano tutti a ogni colpo; a giro / casuale = un layer diverso a ogni colpo">
-        ${ALT_MODES.map(([m, l]) => `<wa-option value="${m}">${l}</wa-option>`).join('')}</wa-select>
-      ${mode.startsWith('random') ? `<button class="pt-ib" data-act="reseed" data-bus="${id}" title="Nuova estrazione casuale dei layer">${svg('dices', 12)}</button>` : ''}`;
+        title="${t('Layers: together = they all play on every hit; in turn / random = a different layer on every hit')}">
+        ${ALT_MODES.map(([m, l]) => `<wa-option value="${m}">${t(l)}</wa-option>`).join('')}</wa-select>
+      ${mode.startsWith('random') ? `<button class="pt-ib" data-act="reseed" data-bus="${id}" title="${t('New random draw of the layers')}">${svg('dices', 12)}</button>` : ''}`;
   }
 
   _layerRow(id, b, l, j) {
@@ -590,18 +596,18 @@ export class PatternEditor {
     return `<div class="pt-layer ${sel ? 'sel' : ''}" data-bus="${id}" data-layer="${j}">
       <div class="pt-lhead">
         <span class="pt-lbadge ${l.ref?.kind || ''}" title="${esc(l.ref?.kind === 'online' ? (l.ref.source_label || '') : (l.ref?.path || ''))}">${badge}</span>
-        <span class="pt-lname" data-act="select-layer" title="${esc(l.name)} — clic per selezionarlo come layer da sostituire">${esc(l.name || 'Vuoto')}${lic}</span>
-        <button class="pt-ib" data-act="audition" title="Ascolta">${svg('play', 11)}</button>
-        <button class="pt-ib" data-act="next" title="Prossimo candidato della classe">${svg('refresh-cw', 11)}</button>
-        <button class="pt-ib" data-act="choose" title="Scegli sample…">${svg('search', 11)}</button>
+        <span class="pt-lname" data-act="select-layer" title="${esc(l.name)} — ${t('click to select it as the layer to replace')}">${esc(l.name || t('Empty'))}${lic}</span>
+        <button class="pt-ib" data-act="audition" title="${t('Listen')}">${svg('play', 11)}</button>
+        <button class="pt-ib" data-act="next" title="${t('Next candidate of the class')}">${svg('refresh-cw', 11)}</button>
+        <button class="pt-ib" data-act="choose" title="${t('Choose sample…')}">${svg('search', 11)}</button>
         <button class="pt-ms ${l.mute ? 'on' : ''}" data-act="lmute">M</button>
         <button class="pt-ms solo ${l.solo ? 'on' : ''}" data-act="lsolo">S</button>
-        <label title="Volume layer"><wa-slider size="xs" min="0" max="1.5" step="0.01" value="${l.volume}" data-lfield="volume" label="Volume layer"></wa-slider></label>
-        <label title="Pitch (semitoni)">± <wa-number-input size="xs" without-steppers min="-24" max="24" step="1" value="${l.pitch}" data-lfield="pitch"></wa-number-input></label>
-        <label title="Offset (ms) per allineare i transienti">ms <wa-number-input size="xs" without-steppers min="-50" max="200" step="1" value="${l.offset_ms}" data-lfield="offset_ms"></wa-number-input></label>
-        ${id === 'bass' ? `<label title="Nota del sample (radice), per l'intonazione">Root <wa-number-input size="xs" without-steppers min="0" max="127" value="${l.root ?? ''}" placeholder="Auto" data-lfield="root"></wa-number-input></label>`
-          : `<button class="pt-ib ${l.steps ? 'on' : ''}" data-act="own-steps" title="Step propri per questo layer">${svg('layout-grid', 11)}</button>`}
-        <button class="pt-ib danger" data-act="del-layer" title="Rimuovi layer">${svg('x', 11)}</button>
+        <label title="${t('Layer volume')}"><wa-slider size="xs" min="0" max="1.5" step="0.01" value="${l.volume}" data-lfield="volume" label="${t('Layer volume')}"></wa-slider></label>
+        <label title="${t('Pitch (semitones)')}">± <wa-number-input size="xs" without-steppers min="-24" max="24" step="1" value="${l.pitch}" data-lfield="pitch"></wa-number-input></label>
+        <label title="${t('Offset (ms) to align the transients')}">ms <wa-number-input size="xs" without-steppers min="-50" max="200" step="1" value="${l.offset_ms}" data-lfield="offset_ms"></wa-number-input></label>
+        ${id === 'bass' ? `<label title="${t('Note of the sample (root), for the tuning')}">Root <wa-number-input size="xs" without-steppers min="0" max="127" value="${l.root ?? ''}" placeholder="Auto" data-lfield="root"></wa-number-input></label>`
+          : `<button class="pt-ib ${l.steps ? 'on' : ''}" data-act="own-steps" title="${t('Own steps for this layer')}">${svg('layout-grid', 11)}</button>`}
+        <button class="pt-ib danger" data-act="del-layer" title="${t('Remove layer')}">${svg('x', 11)}</button>
       </div>
       ${l.steps && id !== 'bass' ? `<div class="pt-steps own" style="--n:${n}">${this._cells(l.steps, null, id, j)}</div>` : ''}
     </div>`;
@@ -621,7 +627,7 @@ export class PatternEditor {
         rows.push(`<div class="pt-bus bass" data-bus="${id}">
           <div class="pt-head"><span class="caret" data-act="expand">${svg(open ? 'chevron-down' : 'chevron-right')}</span>
             <span class="dot" style="background:${bdef.color}"></span><span class="pt-name">${bdef.label}</span>
-            <span class="pt-nl">${nl ? `${nl} layer` : 'Nessun sample'}</span>${this._lock(id, b)}${this._mix(id, b)}</div>
+            <span class="pt-nl">${nl ? layersLabel(nl) : t('No samples')}</span>${this._lock(id, b)}${this._mix(id, b)}</div>
           ${this._roll(b, n)}
           ${open ? `<div class="pt-layers">${b.layers.map((l, j) => this._layerRow(id, b, l, j)).join('')}
             ${btn('layer', { size: 'xs', icon: 'plus', cls: 'pt-add', 'data-act': 'add-layer', 'data-bus': id })}</div>` : ''}
@@ -632,7 +638,7 @@ export class PatternEditor {
         <div class="pt-row">
           <div class="pt-head"><span class="caret" data-act="expand">${svg(open ? 'chevron-down' : 'chevron-right')}</span>
             <span class="dot" style="background:${bdef.color}"></span><span class="pt-name">${bdef.label}</span>
-            <span class="pt-nl">${nl ? `${nl} layer` : '—'}</span>${this._lock(id, b)}${this._alt(id, b)}</div>
+            <span class="pt-nl">${nl ? layersLabel(nl) : '—'}</span>${this._lock(id, b)}${this._alt(id, b)}</div>
           <div class="pt-steps" style="--n:${n}">${this._cells(b.steps, b.ratchet, id)}</div>
           ${this._mix(id, b)}
         </div>
@@ -643,14 +649,13 @@ export class PatternEditor {
     $('#pt-grid').innerHTML = rows.join('');
     const withLayers = this.buses.filter((b) => p.buses[b.id].layers.length);
     const allOpen = withLayers.length && withLayers.every((b) => this.expanded.has(b.id));
-    $('#pt-expand').innerHTML = `<wa-icon slot="start" name="${allOpen ? 'chevron-right' : 'chevron-down'}"></wa-icon>${allOpen ? 'Chiudi tutti' : 'Espandi tutti'}`;
+    $('#pt-expand').innerHTML = `<wa-icon slot="start" name="${allOpen ? 'chevron-right' : 'chevron-down'}"></wa-icon>${allOpen ? t('Collapse all') : t('Expand all')}`;
     $('#pt-expand').disabled = !withLayers.length;
     $('#pt-clear').disabled = !withLayers.length;
     const anySample = Object.values(p.buses).some((b) => b.layers.length);
     const empty = $('#pt-empty');
     empty.hidden = anySample;
-    empty.textContent = 'Nessun sample assegnato: scegli una cartella nella scheda Libreria (i bus si riempiono da soli), '
-      + 'oppure usa "…" su un layer, "Invia" dalla Libreria e dalla scheda Online, o "Carica dal Drum Rack".';
+    empty.textContent = t('No samples assigned: choose a folder in the Library tab (the buses fill themselves), or use "…" on a layer, "Send" from the Library and the Store tab, or "Load from the Drum Rack".');
     this._bindRoll();
   }
 
@@ -675,7 +680,7 @@ export class PatternEditor {
     const H = 12;
     const notes = b.notes.map((nt, k) => `<div class="pt-note ${nt.glide ? 'glide' : ''}" data-k="${k}"
         style="left:${(nt.step / n) * 100}%;width:${(nt.len / n) * 100}%;top:${(hi - nt.semi) * H}px;height:${H - 1}px"
-        title="${nt.glide ? 'glide → ' : ''}Alt+clic: glide · trascina il bordo destro per allungare · clic: elimina"><span class="pt-rz"></span></div>`).join('');
+        title="${nt.glide ? 'glide → ' : ''}${t('Alt+click: glide · drag the right edge to lengthen · click: delete')}"><span class="pt-rz"></span></div>`).join('');
     return `<div class="pt-roll-wrap"><div class="pt-roll" id="pt-roll" data-lo="${lo}" data-hi="${hi}" style="height:${(hi - lo + 1) * H}px">
       <div class="pt-rgrid" style="--n:${n}">${Array.from({ length: n }, (_, i) => `<span class="${i % 4 === 0 ? 'beat' : ''} ${i % 16 === 0 ? 'bar' : ''}"></span>`).join('')}</div>
       ${rows.join('')}<div class="pt-rnotes">${notes}<div id="pt-roll-head" class="pt-rhead" style="display:none"></div></div></div></div>`;
@@ -831,7 +836,7 @@ export class PatternEditor {
 
   async nextCandidate(id, j) {
     const cands = await this.api.pattern_candidates(id, '', 200);
-    if (!cands.length) { toast('Nessun sample di questa classe nella libreria'); return; }
+    if (!cands.length) { toast(t('No samples of this class in the library')); return; }
     const bus = this.p.buses[id];
     const cur = bus.layers[j]?.ref;
     const k = cands.findIndex((c) => cur && c.path === cur.path);
@@ -845,18 +850,18 @@ export class PatternEditor {
   async openChooser(busId, mode) {
     const bdef = this.busById[busId];
     const modal = openDialog('pt-chooser', {
-      label: `${mode === 'add' ? 'Aggiungi layer a' : 'Sostituisci sample in'} ${bdef.label}`,
+      label: mode === 'add' ? t('Add a layer to {bus}', { bus: bdef.label }) : t('Replace the sample in {bus}', { bus: bdef.label }),
       cls: 'chooser',
       width: '680px',
       body: `<div class="chooser-body">
-        <wa-radio-group class="seg ch-tabs" orientation="horizontal" size="s" value="lib" label="Origine">
-          <wa-radio appearance="button" value="lib"><wa-icon name="search"></wa-icon>Libreria</wa-radio>
-          <wa-radio appearance="button" value="web"><wa-icon name="download"></wa-icon>Online (sessione)</wa-radio>
-          <wa-radio appearance="button" value="file"><wa-icon name="folder-open"></wa-icon>File…</wa-radio>
+        <wa-radio-group class="seg ch-tabs" orientation="horizontal" size="s" value="lib" label="${t('Origin')}">
+          <wa-radio appearance="button" value="lib"><wa-icon name="search"></wa-icon>${t('Library')}</wa-radio>
+          <wa-radio appearance="button" value="web"><wa-icon name="download"></wa-icon>${t('Online (session)')}</wa-radio>
+          <wa-radio appearance="button" value="file"><wa-icon name="folder-open"></wa-icon>${t('File…')}</wa-radio>
         </wa-radio-group>
-        <wa-input size="s" class="search" id="ch-q" type="search" with-clear placeholder="Cerca nella libreria (vuoto = classi del bus)…"><wa-icon slot="start" name="search"></wa-icon></wa-input>
+        <wa-input size="s" class="search" id="ch-q" type="search" with-clear placeholder="${t('Search the library (empty = classes of the bus)…')}"><wa-icon slot="start" name="search"></wa-icon></wa-input>
         <div id="ch-list" class="ch-list"></div></div>`,
-      footer: btn('Chiudi', { id: 'ch-close' }),
+      footer: btn(t('Close'), { id: 'ch-close' }),
     });
     const list = $('#ch-list', modal);
     const tabs = $('.ch-tabs', modal);
@@ -877,15 +882,15 @@ export class PatternEditor {
       ]) : [[], this.onlineRefs];
       const refs = sugg.concat(cands);
       const row = (r, i) => `<div class="ch-row" data-i="${i}">
-          <button class="pt-ib" data-ch="play" title="Ascolta">${svg('play', 11)}</button>
+          <button class="pt-ib" data-ch="play" title="${t('Listen')}">${svg('play', 11)}</button>
           <span class="dot" style="background:${this.classColor[r.cls] || 'transparent'}"></span>
           <span class="ch-name" title="${esc(r.path || r.url || '')}">${esc(r.name)}</span>
-          <span class="ch-meta">${r.dyn !== undefined ? `<span class="ch-dyn" title="${DYN_TIP}">≈ ${Math.round(r.dyn * 100)}%</span> · ` : ''}${r.kind === 'online' ? esc(r.source_label || '') + ' · ' + esc(r.license_label || '') : r.conf !== undefined ? Math.round(r.conf * 100) + '%' : ''}</span>
-          <button class="ch-use" data-ch="use">Usa</button></div>`;
+          <span class="ch-meta">${r.dyn !== undefined ? `<span class="ch-dyn" title="${t(DYN_TIP)}">≈ ${Math.round(r.dyn * 100)}%</span> · ` : ''}${r.kind === 'online' ? esc(r.source_label || '') + ' · ' + esc(r.license_label || '') : r.conf !== undefined ? Math.round(r.conf * 100) + '%' : ''}</span>
+          <button class="ch-use" data-ch="use">${t('Use')}</button></div>`;
       list.innerHTML = refs.length
-        ? (sugg.length ? `<div class="ch-section" title="${DYN_TIP}">${svg('sparkles', 11)} Dinamica simile al kit</div>${sugg.map(row).join('')}<div class="ch-section">Tutti i sample del bus</div>` : '')
+        ? (sugg.length ? `<div class="ch-section" title="${t(DYN_TIP)}">${svg('sparkles', 11)} ${t('Dynamics similar to the kit')}</div>${sugg.map(row).join('')}<div class="ch-section">${t('All the samples of the bus')}</div>` : '')
           + cands.map((r, i) => row(r, i + sugg.length)).join('')
-        : `<div class="hint">${tab === 'lib' ? 'Nessun sample: analizza una cartella nella scheda Libreria.' : 'Nessun sample online usato in questa sessione: usa "Invia" nella scheda Online.'}</div>`;
+        : `<div class="hint">${tab === 'lib' ? t('No samples: analyse a folder in the Library tab.') : t('No online samples used in this session: use "Send" in the Store tab.')}</div>`;
       list.onclick = async (e) => {
         const b = e.target.closest('[data-ch]');
         if (!b) return;

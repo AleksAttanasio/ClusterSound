@@ -8,7 +8,8 @@ import { ComposeEditor } from './compose.js';
 import { SamplerEditor } from './sampler.js';
 import { showSendMenu } from './sendmenu.js';
 import { isTypingTarget } from './kit.js';
-import { Nav, TAB_LABELS } from './nav.js';
+import { Nav, tabLabel } from './nav.js';
+import { t, setLang, applyI18n } from './i18n.js';
 import { Settings, generalSection, setRow } from './settings.js';
 
 const $ = (s) => document.querySelector(s);
@@ -44,6 +45,8 @@ const TABS = ['library', 'online', 'pattern', 'rack', 'compose', 'sampler', 'set
 async function main() {
   state.api = await whenApiReady();
   const init = await state.api.init();
+  setLang(init.language);
+  applyI18n();
   state.classes = init.classes;
   state.groups = init.groups;
   state.types = init.types;
@@ -77,8 +80,8 @@ async function main() {
   nav = new Nav($('#nav'), { onSelect: (tab) => setTab(tab) });
   window.__cs.nav = nav;
   settings = new Settings($('#settings'));
-  settings.add('general', 'Generale', 'settings', generalSection(state.api, (s) => online.onSettings(s)));
-  settings.add('library', 'Libreria', 'library-big', renderLibrarySettings);
+  settings.add('general', t('General'), 'settings', generalSection(state.api, (s) => online.onSettings(s)));
+  settings.add('library', t('Library'), 'library-big', renderLibrarySettings);
   settings.add('online', 'Store', 'store', (body) => online.renderSettings(body));
   settings.add('sampler', 'Recorder', 'mic', (body) => sampler.renderSettings(body));
   settings.add('pattern', 'Sequencer', 'audio-lines', (body) => pattern.renderSettings(body));
@@ -99,7 +102,7 @@ async function main() {
 
 // ------------------------------------------------------------------ sidebar
 function buildSidebar() {
-  $('#type-filters').innerHTML = state.types.map((t, i) => `<wa-button size="xs" pill class="chip on" data-type="${i}">${esc(t)}</wa-button>`).join('');
+  $('#type-filters').innerHTML = state.types.map((ty, i) => `<wa-button size="xs" pill class="chip on" data-type="${i}">${esc(ty)}</wa-button>`).join('');
   $('#type-filters').onclick = (e) => {
     const b = e.target.closest('.chip'); if (!b) return;
     const i = +b.dataset.type;
@@ -111,9 +114,9 @@ function buildSidebar() {
   const html = [];
   for (const g of state.groups) {
     const members = state.classes.map((c, i) => [c, i]).filter(([c]) => c.group === g);
-    html.push(`<div class="group" data-group="${esc(g)}"><div class="group-title" data-group="${esc(g)}"><span>${esc(g)}</span><span class="cls-count" data-gcount="${esc(g)}"></span></div>`);
+    html.push(`<div class="group" data-group="${esc(g)}"><div class="group-title" data-group="${esc(g)}"><span>${esc(t(g))}</span><span class="cls-count" data-gcount="${esc(g)}"></span></div>`);
     for (const [c, i] of members) {
-      html.push(`<div class="cls-row" data-cls="${i}" title="Clic: mostra/nascondi · Alt+clic: solo questa classe">
+      html.push(`<div class="cls-row" data-cls="${i}" title="${t('Click: show/hide · Alt+click: only this class')}">
         <span class="dot" style="background:${c.color}"></span><span class="cls-name">${esc(c.label)}</span><span class="cls-count" data-count="${i}">0</span></div>`);
     }
     html.push('</div>');
@@ -157,8 +160,8 @@ function updateCounts() {
   const d = state.data;
   if (!d) return;
   const vis = state.mask ? state.mask.reduce((a, b) => a + b, 0) : 0;
-  $('#stats').innerHTML = `${d.cls.length} sample · ${vis} visibili${d.errors ? ` · ${d.errors} illeggibili` : ''}<br>
-    Head addestrata su ${d.stats.head_samples || 0} esempi (${d.stats.head_classes || 0} classi)`;
+  $('#stats').innerHTML = `${t('{n} samples · {vis} visible', { n: d.cls.length, vis })}${d.errors ? ` · ${t('{n} unreadable', { n: d.errors })}` : ''}<br>
+    ${t('Head trained on {n} examples ({k} classes)', { n: d.stats.head_samples || 0, k: d.stats.head_classes || 0 })}`;
 }
 
 // ------------------------------------------------------------------ filters
@@ -196,13 +199,13 @@ function showProgress(p) {
   const pct = p.total ? (100 * p.done) / p.total : 0;
   $('#progress-bar').indeterminate = busy && !p.total;
   $('#progress-bar').value = pct;
-  const label = { scanning: 'Ricerca file', analysing: 'Analisi', classifying: 'Classificazione', layout: 'Layout 3D', error: 'Errore', stale: 'Snapshot' }[p.phase] || '';
+  const label = t({ scanning: 'Finding files', analysing: 'Analysis', classifying: 'Classification', layout: '3D layout', error: 'Error', stale: 'Snapshot' }[p.phase] || '');
   $('#progress-text').textContent = p.phase === 'analysing'
     ? `${label} ${p.done}/${p.total} · ${p.message}` : `${label} ${p.message && p.phase !== 'analysing' ? '· ' + p.message : ''}`;
   if (p.phase === 'error') $('#progress-text').classList.add('error');
   const badge = $('#layout-badge');
   badge.hidden = !state.data;
-  badge.textContent = p.layout === 'pca' ? 'Layout rapido (PCA) · t-SNE in corso…' : p.layout === 'tsne' ? 'Layout t-SNE · punti vicini = suoni simili' : '';
+  badge.textContent = p.layout === 'pca' ? t('Quick layout (PCA) · t-SNE in progress…') : p.layout === 'tsne' ? t('t-SNE layout · nearby points = similar sounds') : '';
 }
 
 async function loadResults() {
@@ -282,9 +285,9 @@ function onHover(i, x, y) {
   const c = state.classes[d.cls[i]];
   const sim = state.focus?.items.find((it) => it.id === i);
   tip.innerHTML = `<div class="t-name">${esc(d.name[i])}</div>
-    <div class="t-sub"><span class="dot" style="background:${c.color}"></span>${esc(c.label)} · ${d.user[i] ? 'manuale' : Math.round(d.conf[i] * 100) + '%'} · gruppo ${d.sub[i]}</div>
-    ${sim ? `<div class="t-sub">Somiglianza ${Math.round(sim.sim * 100)}%</div>` : ''}
-    <div class="t-hint">Tasto destro: invia al Sequencer o al Drum Rack</div>`;
+    <div class="t-sub"><span class="dot" style="background:${c.color}"></span>${esc(c.label)} · ${d.user[i] ? t('manual') : Math.round(d.conf[i] * 100) + '%'} · ${t('group {n}', { n: d.sub[i] })}</div>
+    ${sim ? `<div class="t-sub">${t('Similarity {p}%', { p: Math.round(sim.sim * 100) })}</div>` : ''}
+    <div class="t-hint">${t('Right-click: send to the Sequencer or the Drum Rack')}</div>`;
   tip.hidden = false;
   const W = $('#view3d').clientWidth;
   tip.style.left = `${Math.min(x + 14, W - tip.offsetWidth - 8)}px`;
@@ -377,7 +380,7 @@ function renderFocusBar() {
   const crumbs = $('#fb-crumbs');
   crumbs.hidden = f.trail.length < 2;
   crumbs.innerHTML = f.trail.map((id, k) => `${k ? '<span class="sep">›</span>' : ''}<button data-k="${k}"
-    class="${k === f.trail.length - 1 ? 'cur' : ''}" title="Torna qui · ${esc(d.rel[id])}">${k + 1} · ${esc(d.name[id])}</button>`).join('');
+    class="${k === f.trail.length - 1 ? 'cur' : ''}" title="${t('Go back here')} · ${esc(d.rel[id])}">${k + 1} · ${esc(d.name[id])}</button>`).join('');
 }
 
 // one HTML label per neighbour (name + similarity) and a numbered badge per trail stop
@@ -473,8 +476,8 @@ function togglePlay() {
   else playItem(state.selected);
 }
 
-function seek(t) {
-  if (state.selected >= 0) playItem(state.selected, Math.max(0, t));
+function seek(time) {
+  if (state.selected >= 0) playItem(state.selected, Math.max(0, time));
 }
 
 function onPlayState(playing, id) {
@@ -492,8 +495,8 @@ function playheadLoop() {
 
 // ------------------------------------------------------------------ list view
 const COLS = [
-  ['', null], ['Nome', 'name'], ['Cartella', 'rel'], ['Classe', 'cls'], ['Conf.', 'conf'],
-  ['Grp', 'sub'], ['Tipo', 'type'], ['Durata', 'dur'],
+  ['', null], ['Name', 'name'], ['Folder', 'rel'], ['Class', 'cls'], ['Conf.', 'conf'],
+  ['Grp', 'sub'], ['Type', 'type'], ['Duration', 'dur'],
 ];
 const ROW_H = 28;
 
@@ -516,7 +519,7 @@ function buildRows() {
 function renderHead() {
   $('#list-head').innerHTML = COLS.map(([label, key]) => {
     const s = state.sort.key === key;
-    return `<div data-key="${key ?? ''}" class="${s ? 'sorted' : ''} ${['conf', 'sub', 'dur'].includes(key) ? 'num' : ''}">${label}${s ? (state.sort.dir > 0 ? ' ↑' : ' ↓') : ''}</div>`;
+    return `<div data-key="${key ?? ''}" class="${s ? 'sorted' : ''} ${['conf', 'sub', 'dur'].includes(key) ? 'num' : ''}">${label && t(label)}${s ? (state.sort.dir > 0 ? ' ↑' : ' ↓') : ''}</div>`;
   }).join('');
 }
 
@@ -569,18 +572,18 @@ async function pickFolder() {
 async function renderLibrarySettings(body) {
   const f = state.folder;
   body.innerHTML =
-    setRow('Cartella dei sample', 'Analizzata ricorsivamente (wav, aif, flac, ogg, mp3, caf). I risultati restano in cache; i file originali non vengono mai modificati.',
-      `${f ? `<span class="set-path" title="${esc(f)}">${esc(f)}</span>` : '<span class="hint">Nessuna cartella</span>'}
-       <wa-button id="set-lib-pick" size="s" variant="brand"><wa-icon slot="start" name="folder-open"></wa-icon>Scegli…</wa-button>`)
-    + setRow('Riscansiona', 'Rianalizza la cartella: i file invariati vengono letti dalla cache.',
-      `<wa-button id="set-lib-rescan" size="s" appearance="filled-outlined"${!f || state.scanning ? ' disabled' : ''}><wa-icon slot="start" name="refresh-cw"></wa-icon>Riscansiona</wa-button>`)
-    + setRow('Report', 'CSV o JSON con classe, confidenza, alternative, sottocluster e tipo di ogni sample. <span id="set-lib-report"></span>',
-      `<wa-button id="set-lib-export" size="s" appearance="filled-outlined"${state.data ? '' : ' disabled'}><wa-icon slot="start" name="file-down"></wa-icon>Esporta report</wa-button>`);
+    setRow(t('Sample folder'), t('Analysed recursively (wav, aif, flac, ogg, mp3, caf). Results stay in the cache; the original files are never modified.'),
+      `${f ? `<span class="set-path" title="${esc(f)}">${esc(f)}</span>` : `<span class="hint">${t('No folder')}</span>`}
+       <wa-button id="set-lib-pick" size="s" variant="brand"><wa-icon slot="start" name="folder-open"></wa-icon>${t('Choose…')}</wa-button>`)
+    + setRow(t('Rescan'), t('Analyse the folder again: unchanged files are read from the cache.'),
+      `<wa-button id="set-lib-rescan" size="s" appearance="filled-outlined"${!f || state.scanning ? ' disabled' : ''}><wa-icon slot="start" name="refresh-cw"></wa-icon>${t('Rescan')}</wa-button>`)
+    + setRow(t('Report'), t('CSV or JSON with class, confidence, alternatives, subcluster and type of every sample.') + ' <span id="set-lib-report"></span>',
+      `<wa-button id="set-lib-export" size="s" appearance="filled-outlined"${state.data ? '' : ' disabled'}><wa-icon slot="start" name="file-down"></wa-icon>${t('Export report')}</wa-button>`);
   body.querySelector('#set-lib-pick').onclick = pickFolder;
   body.querySelector('#set-lib-rescan').onclick = () => { setTab('library'); startScan(state.folder); };
   body.querySelector('#set-lib-export').onclick = async () => {
     const p = await state.api.export_report();
-    if (p) body.querySelector('#set-lib-report').textContent = `Salvato in ${p}.`;
+    if (p) body.querySelector('#set-lib-report').textContent = t('Saved to {path}.', { path: p });
   };
 }
 
@@ -590,14 +593,14 @@ function showCrumb() {
   sub.hidden = state.tab !== 'library' || !state.folder;
   $('#crumb-sep').hidden = sub.hidden;
   sub.textContent = state.folder;
-  sub.title = `${state.folder}\nClic: cambia cartella nelle Impostazioni`;
+  sub.title = `${state.folder}\n${t('Click: change folder in Settings')}`;
 }
 
 async function startScan(path) {
   closePanel();
   state.scanning = true;
   const ok = await state.api.start_scan(path);
-  if (!ok) { $('#progress-text').textContent = 'Cartella non valida'; }
+  if (!ok) { $('#progress-text').textContent = t('Invalid folder'); }
 }
 
 function setView(v) {
@@ -636,11 +639,11 @@ function setTab(tab, section = '') {
   if (tab !== 'compose' && compose) compose.hide();
   if (tab !== 'sampler' && sampler) sampler.hide();
   nav.setActive(tab);
-  $('#crumb-title').textContent = TAB_LABELS[tab] || '';
+  $('#crumb-title').textContent = tabLabel(tab);
   showCrumb();
   $('#head-more').hidden = tab === 'settings';
   $('#head-more').dataset.settingsLink = tab;
-  for (const t of TABS) $('#' + t).hidden = t !== tab;
+  for (const id of TABS) $('#' + id).hidden = id !== tab;
   document.querySelectorAll('.head-tools').forEach((el) => { el.hidden = el.dataset.for !== tab; });
   if (tab === 'online') online.show(); else if (tab === 'pattern') pattern.show();
   else if (tab === 'rack') rack.show(); else if (tab === 'compose') compose.show();

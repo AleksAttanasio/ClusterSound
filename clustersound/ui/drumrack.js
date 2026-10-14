@@ -7,23 +7,24 @@ import { NO_ALT, dynControls, wireDynControls, readDynControls } from './pattern
 import { btn, openDialog } from './kit.js';
 import { settingsLink, setRow, savedFlash } from './settings.js';
 import { svg } from './icons.js';
+import { t } from './i18n.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const LS_KEY = 'clustersound.rack';
 const LS_SPD = 'clustersound.rack.spdsx';
 const LS_DEVICE = 'clustersound.rackDevice';
-const DEVICES = [['grid64', 'Controller 8×8 (Launchpad)'], ['spdsx', 'Roland SPD-SX']];
+const DEVICES = [['grid64', '8×8 controller (Launchpad)'], ['spdsx', 'Roland SPD-SX']]; // t() where shown
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const noteName = (n) => `${NOTE_NAMES[n % 12]}${Math.floor(n / 12) - 2}`; // Live: C1 = 36
 const HAT_FAMILIES = new Set(['chat', 'ohat', 'hats']);
-const MODES = [['nearest', 'Più simili'], ['random', 'Casuale'], ['manual', 'Manuale'], ['trail', 'Percorso']];
+const MODES = [['nearest', 'Most similar'], ['random', 'Random'], ['manual', 'Manual'], ['trail', 'Trail']]; // t() where shown
 const KIND_BADGE = { library: '', online: 'WEB', file: 'FILE' };
 const DRAG_TYPE = 'application/x-clustersound-rack';
 const LS_RANDOM = 'clustersound.randomRack';
 const MAX_PER_BUS = 8;
 const PEDAL_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20h16M7 20l3-12h4l3 12M10 8l-1-4h6l-1 4"/></svg>';
-const ALT_LABELS = [['off', 'Insieme (solo il 1° attivo)'], ['cycle', 'A giro'], ['random', 'Casuale'], ['random_pass', 'Casuale ogni giro']];
+const ALT_LABELS = [['off', 'Together (only the 1st active)'], ['cycle', 'In turn'], ['random', 'Random'], ['random_pass', 'Random every loop']]; // t() where shown
 
 const newRack = () => ({ name: 'Kit', geometry: 'cols8', mapping: 'launchpad', pads: new Array(64).fill(null), groups: {} });
 const newSpdRack = () => ({ device: 'spdsx', name: 'Kit SPD-SX', geometry: 'spd_kit', triggers: { trig1: true, trig2: false },
@@ -101,10 +102,10 @@ export class DrumRackEditor {
   async renderSettings(body) {
     await this.ensure();
     const kit = this.racks.grid64;
-    body.innerHTML = setRow('Note MIDI dei pad', `Vale per il kit 8×8 aperto (<b>${esc(kit.name)}</b>) ed è salvata con il kit: determina le note del Drum Rack esportato e inviato a Live. La SPD-SX usa sempre le note dei suoi pad.`,
-      `<wa-select id="set-rk-map" size="s" value="${kit.mapping}" label="Note" style="width:300px">
-         <wa-option value="launchpad">Launchpad / Live (quadranti 4×4)</wa-option>
-         <wa-option value="rows">Righe sequenziali (36 + riga×8)</wa-option></wa-select>`);
+    body.innerHTML = setRow(t('MIDI notes of the pads'), t('It applies to the open 8×8 kit ({kit}) and is saved with the kit: it sets the notes of the Drum Rack exported and sent to Live. The SPD-SX always uses the notes of its pads.', { kit: `<b>${esc(kit.name)}</b>` }),
+      `<wa-select id="set-rk-map" size="s" value="${kit.mapping}" label="${t('Notes')}" style="width:300px">
+         <wa-option value="launchpad">${t('Launchpad / Live (4×4 quadrants)')}</wa-option>
+         <wa-option value="rows">${t('Sequential rows (36 + row×8)')}</wa-option></wa-select>`);
     body.querySelector('#set-rk-map').addEventListener('change', (e) => {
       kit.mapping = e.target.value;
       this._persist();
@@ -179,33 +180,33 @@ export class DrumRackEditor {
     const root = $('#rack');
     root.innerHTML = `
       <aside class="sidebar rk-browser">
-        <div class="filter-title">Sample <span class="links"><wa-checkbox size="xs" id="rk-follow" title="Il browser segue la famiglia del gruppo selezionato">Segui gruppo</wa-checkbox></span></div>
+        <div class="filter-title">Sample <span class="links"><wa-checkbox size="xs" id="rk-follow" title="${t('The browser follows the family of the selected group')}">${t('Follow group')}</wa-checkbox></span></div>
         <wa-select id="rk-bfam" size="s" class="rk-select"></wa-select>
-        <wa-input id="rk-q" class="search" type="search" size="s" with-clear placeholder="Cerca per nome o cartella…" autocomplete="off"><wa-icon slot="start" name="search"></wa-icon></wa-input>
-        <div class="hint">Clic: ascolta e usa come seed · doppio clic: riempi il gruppo · trascina su un pad</div>
+        <wa-input id="rk-q" class="search" type="search" size="s" with-clear placeholder="${t('Search by name or folder…')}" autocomplete="off"><wa-icon slot="start" name="search"></wa-icon></wa-input>
+        <div class="hint">${t('Click: listen and use as seed · double-click: fill the group · drag onto a pad')}</div>
         <div id="rk-blist" class="rk-blist"></div>
         <div class="rk-trail-box">
-          <div class="filter-title">Percorso dei simili <span class="links"><a href="#" id="rk-trail-use">Usa sul gruppo</a></span></div>
+          <div class="filter-title">${t('Trail of similar samples')} <span class="links"><a href="#" id="rk-trail-use">${t('Use on the group')}</a></span></div>
           <div id="rk-trail" class="rk-trail"></div>
         </div>
       </aside>
       <main class="rk-main">
         <div class="rk-bar">
-          <wa-select id="rk-device" size="s" class="rk-select rk-device" title="Per quale strumento è il kit">${DEVICES.map(([id, l]) => `<wa-option value="${id}">${l}</wa-option>`).join('')}</wa-select>
-          <wa-input id="rk-name" size="s" class="rk-name" maxlength="80" title="Nome del kit (anche del file .adg)"></wa-input>
-          <wa-radio-group id="rk-geo" class="seg" orientation="horizontal" size="s" label="Geometria"></wa-radio-group>
+          <wa-select id="rk-device" size="s" class="rk-select rk-device" title="${t('Which instrument the kit is for')}">${DEVICES.map(([id, l]) => `<wa-option value="${id}">${t(l)}</wa-option>`).join('')}</wa-select>
+          <wa-input id="rk-name" size="s" class="rk-name" maxlength="80" title="${t('Name of the kit (also of the .adg file)')}"></wa-input>
+          <wa-radio-group id="rk-geo" class="seg" orientation="horizontal" size="s" label="${t('Layout')}"></wa-radio-group>
           <div class="spacer"></div>
-          ${btn('Auto-riempi', { id: 'rk-auto', icon: 'sparkles', title: 'Riempie i gruppi vuoti in base alla famiglia (Alt+clic: rigenera tutti i gruppi non bloccati)' })}
-          ${btn('Casuale', { id: 'rk-random', icon: 'dices', title: 'Per ogni gruppo non bloccato: un gruppo di sample simili a caso della sua famiglia, con sample a caso' })}
-          ${btn('Genera kit', { id: 'rk-gen', icon: 'dices', hidden: true, title: 'Kit SPD-SX casuale e suonabile: configurazione a caso, ogni gruppo da un gruppo di sample simili diverso' })}
-          <wa-select id="rk-saved" size="s" class="rk-select" title="Kit salvati"></wa-select>
-          ${btn('Salva', { id: 'rk-save', icon: 'save', title: 'Salva il kit' })}
-          ${btn('Elimina', { id: 'rk-del', icon: 'trash-2', hidden: true, title: 'Elimina il kit salvato' })}
-          ${btn('Svuota', { id: 'rk-clear', title: 'Svuota tutti i pad' })}
-          ${btn('Sequencer', { id: 'rk-toseq', icon: 'arrow-right', title: 'Carica i sample del kit nei bus del Sequencer' })}
-          ${btn('Esporta per Ableton', { id: 'rk-export', variant: 'brand', icon: 'file-down' })}
-          ${btn('Invia a Live', { id: 'rk-live', title: 'Crea in Live una traccia con questo Drum Rack (serve il device ClusterSound nel set)' })}
-          ${settingsLink('rack', 'Impostazioni del Drum Rack')}
+          ${btn(t('Auto-fill'), { id: 'rk-auto', icon: 'sparkles', title: t('Fills the empty groups by family (Alt+click: regenerates every unlocked group)') })}
+          ${btn(t('Random'), { id: 'rk-random', icon: 'dices', title: t('For every unlocked group: a random group of similar samples of its family, with random samples') })}
+          ${btn(t('Generate kit'), { id: 'rk-gen', icon: 'dices', hidden: true, title: t('Random, playable SPD-SX kit: random configuration, every group from a different group of similar samples') })}
+          <wa-select id="rk-saved" size="s" class="rk-select" title="${t('Saved kits')}"></wa-select>
+          ${btn(t('Save'), { id: 'rk-save', icon: 'save', title: t('Save the kit') })}
+          ${btn(t('Delete'), { id: 'rk-del', icon: 'trash-2', hidden: true, title: t('Delete the saved kit') })}
+          ${btn(t('Clear'), { id: 'rk-clear', title: t('Clear all the pads') })}
+          ${btn('Sequencer', { id: 'rk-toseq', icon: 'arrow-right', title: t('Loads the samples of the kit into the Sequencer buses') })}
+          ${btn(t('Export for Ableton'), { id: 'rk-export', variant: 'brand', icon: 'file-down' })}
+          ${btn(t('Send to Live'), { id: 'rk-live', title: t('Creates a track with this Drum Rack in Live (needs the ClusterSound device in the set)') })}
+          ${settingsLink('rack', t('Drum Rack settings'))}
         </div>
         <div class="rk-stage">
           <div id="rk-grid" class="rk-grid"></div>
@@ -237,7 +238,7 @@ export class DrumRackEditor {
     $('#rk-random').onclick = (e) => this.openRandomize(e.currentTarget);
     $('#rk-toseq').onclick = () => this.openLoadDialog();
     $('#rk-clear').onclick = () => {
-      if (!this.rack.pads.some(Boolean) || !confirm(`Svuotare tutti i ${this.padCount} pad?`)) return;
+      if (!this.rack.pads.some(Boolean) || !confirm(t('Clear all the {n} pads?', { n: this.padCount }))) return;
       this.rack.pads = new Array(this.padCount).fill(null);
       this._persist();
       this.renderAll();
@@ -334,21 +335,21 @@ export class DrumRackEditor {
       else if (act === 'use-trail') this.fillFromTrail();
     };
     insp.onchange = (e) => {
-      const t = e.target;
+      const el = e.target;
       const g = this.groupOf(this.pad);
-      if (t.dataset.set === 'mode') { this.opts.mode = t.value; this._persist(); this.renderInspector(); }
-      else if (t.dataset.set === 'family') { this.setSetting(g, 'family', t.value); this.renderAll(); this._followGroup(); }
-      else if (t.dataset.set === 'choke') { this.setSetting(g, 'choke', +t.value); }
-      else if (t.dataset.set === 'lock') { this.setSetting(g, 'lock', t.checked); this.renderGrid(); }
-      else if (t.dataset.opt) {
-        this.opts[t.dataset.opt] = t.localName === 'wa-checkbox' ? t.checked : t.localName === 'wa-slider' ? +t.value : t.value;
+      if (el.dataset.set === 'mode') { this.opts.mode = el.value; this._persist(); this.renderInspector(); }
+      else if (el.dataset.set === 'family') { this.setSetting(g, 'family', el.value); this.renderAll(); this._followGroup(); }
+      else if (el.dataset.set === 'choke') { this.setSetting(g, 'choke', +el.value); }
+      else if (el.dataset.set === 'lock') { this.setSetting(g, 'lock', el.checked); this.renderGrid(); }
+      else if (el.dataset.opt) {
+        this.opts[el.dataset.opt] = el.localName === 'wa-checkbox' ? el.checked : el.localName === 'wa-slider' ? +el.value : el.value;
         this._persist();
-        if (t.dataset.opt !== 'variation' && t.dataset.opt !== 'avoid') { this.manual.seedKey = ''; this.renderInspector(); }
-      } else if (t.dataset.pick != null) {
-        const k = +t.dataset.pick;
+        if (el.dataset.opt !== 'variation' && el.dataset.opt !== 'avoid') { this.manual.seedKey = ''; this.renderInspector(); }
+      } else if (el.dataset.pick != null) {
+        const k = +el.dataset.pick;
         const size = this.groups[g].length - 1;
-        if (t.checked) {
-          if (this.manual.picked.length >= size) { t.checked = false; toast(`Il gruppo ha posto per ${size} sample oltre al seed`); return; }
+        if (el.checked) {
+          if (this.manual.picked.length >= size) { el.checked = false; toast(t('The group has room for {n} samples besides the seed', { n: size })); return; }
           this.manual.picked.push(k);
         } else this.manual.picked = this.manual.picked.filter((x) => x !== k);
         $('#rk-pick-count').textContent = `${this.manual.picked.length}/${size}`;
@@ -364,13 +365,13 @@ export class DrumRackEditor {
     const list = this.isSpd ? this.meta.spdsx.configs : this.meta.geometries;
     $('#rk-device').value = this.device;
     $('#rk-geo').innerHTML = list.map((g) => `<wa-radio appearance="button" value="${g.id}">${esc(g.label)}</wa-radio>`).join('');
-    $('#rk-geo').title = this.isSpd ? 'Configurazione dei pad: quali gruppi e quali famiglie' : '';
+    $('#rk-geo').title = this.isSpd ? t('Pad configuration: which groups and which families') : '';
     $('#rk-gen').hidden = !this.isSpd;
     $('#rk-export').innerHTML = `<wa-icon slot="start" name="file-down"></wa-icon>${this._exportLabel()}`;
-    $('#rk-export').title = this.isSpd ? 'Drum Rack per Live sulle note della SPD-SX + WAV 16 bit per SPD-SX Wave Manager' : '';
+    $('#rk-export').title = this.isSpd ? t('Drum Rack for Live on the SPD-SX notes + 16-bit WAV for SPD-SX Wave Manager') : '';
   }
 
-  _exportLabel() { return this.isSpd ? 'Esporta (Live + SPD-SX)' : 'Esporta per Ableton'; }
+  _exportLabel() { return this.isSpd ? t('Export (Live + SPD-SX)') : t('Export for Ableton'); }
 
   setTrigger(key, on) {
     this.rack.triggers = { ...this.rack.triggers, [key]: on };
@@ -407,7 +408,7 @@ export class DrumRackEditor {
       const color = ref ? this.classColor[ref.cls] || '#8a8f98' : '';
       const badge = ref ? KIND_BADGE[ref.kind] : '';
       html.push(`<div class="rk-pad ${ref ? 'full' : ''} ${p === this.pad ? 'sel' : ''}" data-p="${p}" draggable="${ref ? 'true' : 'false'}"
-        style="${at(r, c)};${ref ? `--pc:${color}` : ''}" title="${ref ? esc(ref.name) + (ref.sim != null && ref.sim < 1 ? ` · somiglianza ${Math.round(ref.sim * 100)}%` : '') : 'Vuoto'}">
+        style="${at(r, c)};${ref ? `--pc:${color}` : ''}" title="${ref ? esc(ref.name) + (ref.sim != null && ref.sim < 1 ? ` · ${t('similarity {p}%', { p: Math.round(ref.sim * 100) })}` : '') : t('Empty')}">
         <span class="rk-note">${noteName(this.note(p))}</span>${badge ? `<span class="rk-badge">${badge}</span>` : ''}
         <span class="rk-pname">${ref ? esc(ref.name.replace(/\.[^.]+$/, '')) : ''}</span></div>`);
     }
@@ -431,7 +432,7 @@ export class DrumRackEditor {
   // TRIG IN lights follow the kit). viewBox units ≈ the manual's drawing, left to right.
   _spdConsole() {
     const spd = this.meta.spdsx;
-    const t = this.rack.triggers || {};
+    const trg = this.rack.triggers || {};
     const ref = this.rack.pads[this.pad];
     const txt = (x, y, s, cls = 't', anchor = 'middle') => `<text x="${x}" y="${y}" class="${cls}" text-anchor="${anchor}">${s}</text>`;
     const knob = (x, y, r, label, ly) => `<circle cx="${x}" cy="${y}" r="${r}" class="k"/><circle cx="${x}" cy="${y}" r="${r * 0.62}" class="kc"/>
@@ -459,7 +460,7 @@ export class DrumRackEditor {
       <text x="438" y="98" class="lcd-t dim">${esc(line2.length > 26 ? line2.slice(0, 25) + '…' : line2)}</text>
       <line x1="433" y1="112" x2="595" y2="112" class="lcd-l"/>
       ${[451, 514, 577].map((x) => `<circle cx="${x}" cy="146" r="1.6" class="dot"/>${button(x, 178, 50, 24, '')}`).join('')}
-      ${txt(623, 25, 'TRIG IN', 't', 'start')}${led(672, 21, t.trig1)}${txt(684, 25, '-')}${led(696, 21, t.trig2)}${led(722, 21, false)}${txt(734, 25, '-')}${led(746, 21, false)}
+      ${txt(623, 25, 'TRIG IN', 't', 'start')}${led(672, 21, trg.trig1)}${txt(684, 25, '-')}${led(696, 21, trg.trig2)}${led(722, 21, false)}${txt(734, 25, '-')}${led(746, 21, false)}
       ${txt(764, 25, 'FOOT SW', 't', 'start')}${led(824, 21, false)}${txt(836, 25, '-')}${led(848, 21, false)}
       ${txt(935, 20, 'VISUAL CONTROL', 't small')}${txt(935, 29, 'V-LINK', 't small')}
       <rect x="638" y="50" width="135" height="155" rx="8" class="frame"/>
@@ -477,7 +478,7 @@ export class DrumRackEditor {
   renderSpd() {
     const spd = this.meta.spdsx;
     const sel = this.groupOf(this.pad);
-    const t = this.rack.triggers || {};
+    const trg = this.rack.triggers || {};
     const famOf = {};
     const firstOf = {};
     this.groups.forEach((pads, g) => pads.forEach((p, k) => { famOf[p] = g; if (k === 0) firstOf[p] = g; }));
@@ -492,14 +493,14 @@ export class DrumRackEditor {
         ? `<span class="spd-fam">${s.lock ? svg('lock', 9) : ''}${esc(fam.label)}</span>` : (s.lock ? `<span class="spd-fam">${svg('lock', 9)}</span>` : '');
       return `<div class="rk-pad spd-pad ${extra} ${ref ? 'full' : ''} ${p === this.pad ? 'sel' : ''} ${g === sel ? 'gsel' : ''}" data-p="${p}"
         draggable="${ref ? 'true' : 'false'}" style="--gc:${fam.color};${ref ? `--pc:${color}` : ''}"
-        title="${esc(spd.labels[p])} · ${noteName(spd.notes[p])}${ref ? ` · ${esc(ref.name)}` : ' · vuoto'}">
+        title="${esc(spd.labels[p])} · ${noteName(spd.notes[p])}${ref ? ` · ${esc(ref.name)}` : ` · ${t('empty')}`}">
         <span class="rk-note"><i>${noteName(spd.notes[p])}</i></span>${badge ? `<span class="rk-badge">${badge}</span>` : ''}
         ${tag}<span class="rk-pname">${ref ? esc(ref.name.replace(/\.[^.]+$/, '')) : ''}</span>
         ${p < 9 ? `<span class="spd-num">${p + 1}</span><i class="spd-led"></i>` : ''}</div>`;
     };
-    const trig = (p, key, label, icon) => `<div class="spd-trig ${t[key] ? '' : 'off'}">
-        ${t[key] ? cell(p, 'spd-tpad') : `<div class="spd-tpad spd-empty">${icon}<span>Non collegato</span></div>`}
-        <wa-checkbox size="s" class="rk-check" data-trig="${key}" ${t[key] ? 'checked' : ''}>${label}</wa-checkbox>
+    const trig = (p, key, label, icon) => `<div class="spd-trig ${trg[key] ? '' : 'off'}">
+        ${trg[key] ? cell(p, 'spd-tpad') : `<div class="spd-tpad spd-empty">${icon}<span>${t('Not connected')}</span></div>`}
+        <wa-checkbox size="s" class="rk-check" data-trig="${key}" ${trg[key] ? 'checked' : ''}>${label}</wa-checkbox>
       </div>`;
     const grid = $('#rk-grid');
     grid.className = 'rk-spd';
@@ -509,7 +510,7 @@ export class DrumRackEditor {
         ${this._spdConsole()}
       </div>
       <div class="spd-trigs">
-        ${trig(spd.trig1, 'trig1', 'Pedale (Trig 1)', PEDAL_ICON)}
+        ${trig(spd.trig1, 'trig1', spd.labels[spd.trig1], PEDAL_ICON)}
         ${trig(spd.trig2, 'trig2', 'Trig 2', svg('circle', 20))}
       </div>
       <div id="rk-warn" class="rk-warn" hidden></div>`;
@@ -530,46 +531,47 @@ export class DrumRackEditor {
     const allowed = this.isSpd && this.rack.geometry !== 'spd_free' ? this.check?.allowed?.[g] : null;
     const famOpt = (f) => {
       const off = allowed && !allowed.includes(f.id);
-      return `<wa-option value="${f.id}" ${off ? 'disabled' : ''}><span slot="start" class="dot" style="background:${f.color}"></span>${esc(f.label)}${off ? ' — troppi pad di questo tipo' : ''}</wa-option>`;
+      return `<wa-option value="${f.id}" ${off ? 'disabled' : ''}><span slot="start" class="dot" style="background:${f.color}"></span>${esc(f.label)}${off ? ` — ${t('too many pads of this kind')}` : ''}</wa-option>`;
     };
     const html = [`
       <div class="rk-ihead"><span class="dot" style="background:${fam.color}"></span>
-        <b>Gruppo ${g + 1}</b><span class="hint">${pads.length} pad · ${filled} pieni · ${esc(where)}</span></div>
-      <wa-select size="s" class="rk-field" label="Famiglia" data-set="family" value="${s.family}">${this.meta.families.map(famOpt).join('')}</wa-select>
-      <wa-select size="s" class="rk-field" label="Choke group" data-set="choke" value="${s.choke || 0}" title="I pad con lo stesso choke group si zittiscono a vicenda (es. hat aperto/chiuso)"><wa-option value="0">Nessuno</wa-option>${Array.from({ length: 16 }, (_, i) => `<wa-option value="${i + 1}">${i + 1}</wa-option>`).join('')}</wa-select>
-      <wa-checkbox size="s" class="rk-check" data-set="lock" ${s.lock ? 'checked' : ''} title="Casuale e Auto-riempi (Alt) non cambiano i gruppi bloccati">Blocca gruppo</wa-checkbox>
+        <b>${t('Group {n}', { n: g + 1 })}</b><span class="hint">${t('{n} pads · {f} full', { n: pads.length, f: filled })} · ${esc(where)}</span></div>
+      <wa-select size="s" class="rk-field" label="${t('Family')}" data-set="family" value="${s.family}">${this.meta.families.map(famOpt).join('')}</wa-select>
+      <wa-select size="s" class="rk-field" label="Choke group" data-set="choke" value="${s.choke || 0}" title="${t('Pads with the same choke group silence each other (e.g. open/closed hat)')}"><wa-option value="0">${t('None')}</wa-option>${Array.from({ length: 16 }, (_, i) => `<wa-option value="${i + 1}">${i + 1}</wa-option>`).join('')}</wa-select>
+      <wa-checkbox size="s" class="rk-check" data-set="lock" ${s.lock ? 'checked' : ''} title="${t('Random and Auto-fill (Alt) do not change the locked groups')}">${t('Lock group')}</wa-checkbox>
       <div class="rk-sep"></div>
       <div class="rk-seed">${seed
-        ? `<button class="pt-ib" data-act="play-seed" title="Ascolta">${svg('play', 11)}</button><span class="dot" style="background:${this.classColor[seed.cls] || '#8a8f98'}"></span>
+        ? `<button class="pt-ib" data-act="play-seed" title="${t('Listen')}">${svg('play', 11)}</button><span class="dot" style="background:${this.classColor[seed.cls] || '#8a8f98'}"></span>
            <span class="rk-seed-name" title="${esc(seed.path || seed.name)}">${esc(seed.name)}</span>`
-        : '<span class="hint">Seed: clicca un sample nel browser, su un pad o “Drum Rack” dal menu Invia della Libreria.</span>'}</div>
-      <wa-radio-group class="seg rk-modes" orientation="horizontal" size="s" data-set="mode" value="${o.mode}" label="Modo di riempimento">${MODES.map(([m, l]) => `<wa-radio appearance="button" value="${m}">${l}</wa-radio>`).join('')}</wa-radio-group>`];
+        : `<span class="hint">${t('Seed: click a sample in the browser, a pad or “Drum Rack” in the Send menu of the Library.')}</span>`}</div>
+      <wa-radio-group class="seg rk-modes" orientation="horizontal" size="s" data-set="mode" value="${o.mode}" label="${t('Fill mode')}">${MODES.map(([m, l]) => `<wa-radio appearance="button" value="${m}">${t(l)}</wa-radio>`).join('')}</wa-radio-group>`];
     if (o.mode === 'random') {
-      html.push(`<div class="rk-field" title="Quanto lontano dal seed può pescare: 0% = i più simili"><span class="pop-row"><span>Variazione</span><span id="rk-var-v">${Math.round(o.variation * 100)}%</span></span>
-        <wa-slider size="s" min="0" max="1" step="0.05" value="${o.variation}" data-opt="variation" label="Variazione"></wa-slider></div>`);
+      html.push(`<div class="rk-field" title="${t('How far from the seed it can pick: 0% = the most similar')}"><span class="pop-row"><span>${t('Variation')}</span><span id="rk-var-v">${Math.round(o.variation * 100)}%</span></span>
+        <wa-slider size="s" min="0" max="1" step="0.05" value="${o.variation}" data-opt="variation" label="${t('Variation')}"></wa-slider></div>`);
     }
-    html.push(`<wa-select size="s" class="rk-field" label="Simili tra" data-opt="filter" value="${o.filter}">
-        <wa-option value="class">Stessa classe del seed</wa-option>
-        <wa-option value="family">famiglia del gruppo (${esc(fam.label)})</wa-option>
-        <wa-option value="none">Tutta la libreria</wa-option>
+    html.push(`<wa-select size="s" class="rk-field" label="${t('Similar among')}" data-opt="filter" value="${o.filter}">
+        <wa-option value="class">${t('Same class as the seed')}</wa-option>
+        <wa-option value="family">${t('family of the group ({family})', { family: esc(fam.label) })}</wa-option>
+        <wa-option value="none">${t('The whole library')}</wa-option>
       </wa-select>
-      <wa-checkbox size="s" class="rk-check" data-opt="oneshot" ${o.oneshot ? 'checked' : ''}>Solo one-shot</wa-checkbox>
-      <wa-checkbox size="s" class="rk-check" data-opt="avoid" ${o.avoid ? 'checked' : ''}>Evita sample già nel kit</wa-checkbox>`);
+      <wa-checkbox size="s" class="rk-check" data-opt="oneshot" ${o.oneshot ? 'checked' : ''}>${t('One-shots only')}</wa-checkbox>
+      <wa-checkbox size="s" class="rk-check" data-opt="avoid" ${o.avoid ? 'checked' : ''}>${t('Avoid samples already in the kit')}</wa-checkbox>`);
     if (o.mode === 'manual') {
-      html.push(`<div class="filter-title">Scegli i simili <span id="rk-pick-count">${this.manual.picked.length}/${pads.length - 1}</span></div>
-        <div id="rk-cands" class="rk-cands">${similarOk ? '<div class="hint">Carico…</div>' : '<div class="hint">Serve un seed della Libreria.</div>'}</div>`);
+      html.push(`<div class="filter-title">${t('Choose the similar ones')} <span id="rk-pick-count">${this.manual.picked.length}/${pads.length - 1}</span></div>
+        <div id="rk-cands" class="rk-cands">${similarOk ? `<div class="hint">${t('Loading…')}</div>` : `<div class="hint">${t('It needs a seed from the Library.')}</div>`}</div>`);
     }
     if (o.mode === 'trail') {
-      const t = this.getTrail();
-      html.push(`<div class="hint">${t.length
-        ? `Usa le ${t.length} tappe del percorso (in ordine${t.length < pads.length ? ', completate con i simili dell’ultima' : `, le prime ${pads.length}`}).`
-        : 'Nessun percorso: nella Libreria apri “Trova simili” e ricentra con doppio clic sui sample per tracciarlo.'}</div>`);
+      const trail = this.getTrail();
+      html.push(`<div class="hint">${!trail.length
+        ? t('No trail: in the Library open “Find similar” and re-centre with a double-click on the samples to draw it.')
+        : trail.length < pads.length ? t('Uses the {n} stops of the trail (in order, completed with the similar ones of the last).', { n: trail.length })
+          : t('Uses the {n} stops of the trail (in order, the first {k}).', { n: trail.length, k: pads.length })}</div>`);
     }
     const canFill = o.mode === 'trail' ? this.getTrail().length > 0 : !!seed && (similarOk || pads.length === 1);
     html.push(`<div class="rk-actions">
-      ${btn(o.mode === 'random' && filled ? 'Rigenera gruppo' : 'Riempi gruppo', { variant: 'brand', icon: o.mode === 'random' && filled ? 'refresh-cw' : 'layout-grid', 'data-act': 'fill', disabled: !canFill })}
-      ${btn('Svuota gruppo', { 'data-act': 'clear-group', disabled: !filled })}</div>
-      ${seed && !similarOk && pads.length > 1 ? '<div class="hint">Sample online/file: niente simili, trascinalo su un pad.</div>' : ''}`);
+      ${btn(o.mode === 'random' && filled ? t('Regenerate group') : t('Fill group'), { variant: 'brand', icon: o.mode === 'random' && filled ? 'refresh-cw' : 'layout-grid', 'data-act': 'fill', disabled: !canFill })}
+      ${btn(t('Clear group'), { 'data-act': 'clear-group', disabled: !filled })}</div>
+      ${seed && !similarOk && pads.length > 1 ? `<div class="hint">${t('Online/file sample: no similar ones, drag it onto a pad.')}</div>` : ''}`);
     $('#rk-insp').innerHTML = html.join('');
     if (o.mode === 'manual' && similarOk) this._loadCandidates();
   }
@@ -608,23 +610,23 @@ export class DrumRackEditor {
     const size = this.groups[this.groupOf(this.pad)].length - 1;
     $('#rk-pick-count').textContent = `${this.manual.picked.length}/${size}`;
     box.innerHTML = this.manual.cands.length ? this.manual.cands.map((c, k) => `<div class="rk-cand">
-      <button class="pt-ib" data-act="play" data-k="${k}" title="Ascolta">${svg('play', 11)}</button>
+      <button class="pt-ib" data-act="play" data-k="${k}" title="${t('Listen')}">${svg('play', 11)}</button>
       <wa-checkbox size="xs" class="rk-cname" data-pick="${k}" ${this.manual.picked.includes(k) ? 'checked' : ''} title="${esc(c.path)}"><span class="dot" style="background:${this.classColor[c.cls] || '#8a8f98'}"></span> ${esc(c.name)}</wa-checkbox><b>${Math.round(c.sim * 100)}%</b></div>`).join('')
-      : '<div class="hint">Nessun sample simile con questi filtri.</div>';
+      : `<div class="hint">${t('No similar samples with these filters.')}</div>`;
   }
 
   renderTrail() {
-    const t = this.getTrail();
-    $('#rk-trail').innerHTML = t.length
-      ? t.map((x, k) => `<button data-id="${x.id}" title="Usa come seed">${k + 1} · ${esc(x.name)}</button>`).join('')
-      : '<span class="hint">Vuoto: nella Libreria usa “Trova simili” e ricentra (doppio clic) per creare un percorso.</span>';
-    $('#rk-trail-use').hidden = !t.length;
+    const trail = this.getTrail();
+    $('#rk-trail').innerHTML = trail.length
+      ? trail.map((x, k) => `<button data-id="${x.id}" title="${t('Use as seed')}">${k + 1} · ${esc(x.name)}</button>`).join('')
+      : `<span class="hint">${t('Empty: in the Library use “Find similar” and re-centre (double-click) to create a trail.')}</span>`;
+    $('#rk-trail-use').hidden = !trail.length;
   }
 
   renderSaved() {
     const saved = (this.meta.saved || []).filter((r) => (r.device || 'grid64') === this.device);
     const sel = $('#rk-saved');
-    sel.placeholder = saved.length ? 'Carica kit…' : 'Nessun kit salvato';
+    sel.placeholder = saved.length ? t('Load kit…') : t('No saved kits');
     sel.disabled = !saved.length;
     sel.innerHTML = saved.map((r) => `<wa-option value="${esc(r.id)}">${esc(r.name)}</wa-option>`).join('');
     sel.value = saved.some((r) => r.id === this.rack.id) ? this.rack.id : '';
@@ -640,7 +642,7 @@ export class DrumRackEditor {
       <span class="dot" style="background:${this.classColor[it.cls] || '#8a8f98'}"></span>
       <span class="rk-bname">${esc(it.name)}</span>
       <span class="rk-bmeta">${it.type === 'One-shot' ? '' : esc(it.type || '')} ${Math.round((it.conf || 0) * 100)}%</span></div>`).join('')
-      : '<div class="hint">Nessun sample: scegli una cartella nella Libreria o cambia filtro.</div>';
+      : `<div class="hint">${t('No samples: choose a folder in the Library or change the filter.')}</div>`;
   }
 
   _followGroup(reload = true) {
@@ -700,7 +702,7 @@ export class DrumRackEditor {
     const size = this.groups[g].length;
     if (mode === 'trail') return this.fillFromTrail();
     const seed = this.seed;
-    if (!seed) { toast('Scegli prima un sample (seed)'); return; }
+    if (!seed) { toast(t('Choose a sample (seed) first')); return; }
     if (seed.kind !== 'library' || size === 1) { this._place(g, [seed]); return; }
     let refs;
     if (mode === 'manual') {
@@ -710,13 +712,13 @@ export class DrumRackEditor {
     } else {
       refs = await this.api.rack_fill(seed.id, size, mode === 'random' ? 'random' : 'nearest', this._apiOpts(true, g));
     }
-    if (!refs.length) { toast('Nessun sample simile con questi filtri'); return; }
+    if (!refs.length) { toast(t('No similar samples with these filters')); return; }
     this._place(g, refs);
-    if (refs.length < size) toast(`Trovati solo ${refs.length - 1} simili: allarga il filtro`);
+    if (refs.length < size) toast(t('Only {n} similar samples found: widen the filter', { n: refs.length - 1 }));
   }
 
   async fillFromTrail(trail = this.getTrail()) {
-    if (!trail.length) { toast('Nessun percorso: usa “Trova simili” nella Libreria'); return; }
+    if (!trail.length) { toast(t('No trail: use “Find similar” in the Library')); return; }
     const g = this.groupOf(this.pad);
     const refs = await this.api.rack_trail_fill(trail.map((x) => x.id), this.groups[g].length, this._apiOpts(true, g));
     if (!refs.length) return;
@@ -738,24 +740,24 @@ export class DrumRackEditor {
       this.rack.pads = out.pads;
       this._persist();
       this.renderAll();
-      if (!this.rack.pads.some(Boolean)) toast('Nessun sample nella Libreria da usare');
+      if (!this.rack.pads.some(Boolean)) toast(t('No samples in the Library to use'));
     } finally { btn.disabled = false; }
   }
 
-  // from the library's "Invia" menu and the similar-samples focus bar (Library tab)
+  // from the library's "Send" menu and the similar-samples focus bar (Library tab)
   async sendSeed(ref) {
     await this.ensure();
     this.seed = ref;
     const mode = this.opts.mode === 'random' ? 'random' : 'nearest';
     await this.fillGroup(mode);
     const g = this.groupOf(this.pad);
-    toast(`Drum Rack · gruppo ${g + 1}: ${ref.name}${ref.kind === 'library' && this.groups[g].length > 1 ? ` + ${this.groups[g].length - 1} simili` : ''}`);
+    toast(`Drum Rack · ${t('group {n}', { n: g + 1 })}: ${ref.name}${ref.kind === 'library' && this.groups[g].length > 1 ? ` + ${t('{n} similar', { n: this.groups[g].length - 1 })}` : ''}`);
   }
 
   async sendTrail(trail) {
     await this.ensure();
     const n = await this.fillFromTrail(trail);
-    if (n) toast(`Drum Rack · gruppo ${this.groupOf(this.pad) + 1}: ${n} sample dal percorso`);
+    if (n) toast(`Drum Rack · ${t('group {n}', { n: this.groupOf(this.pad) + 1 })}: ${t('{n} samples from the trail', { n })}`);
   }
 
   _padMenu(p, x, y) {
@@ -764,8 +766,8 @@ export class DrumRackEditor {
     const el = document.createElement('div');
     el.className = 'send-menu rk-menu';
     el.innerHTML = `<div class="send-title">Pad ${esc(this.padName(p))}${ref ? ` · <b>${esc(ref.name)}</b>` : ''}</div>
-      ${ref ? '<div class="send-row" data-m="seed">Usa come seed e riempi il gruppo</div><div class="send-row" data-m="clear">Svuota pad</div>' : ''}
-      <div class="send-row" data-m="group">Svuota gruppo</div>`;
+      ${ref ? `<div class="send-row" data-m="seed">${t('Use as seed and fill the group')}</div><div class="send-row" data-m="clear">${t('Clear pad')}</div>` : ''}
+      <div class="send-row" data-m="group">${t('Clear group')}</div>`;
     document.body.appendChild(el);
     const r = el.getBoundingClientRect();
     el.style.left = `${Math.min(x, window.innerWidth - r.width - 8)}px`;
@@ -784,14 +786,14 @@ export class DrumRackEditor {
     };
   }
 
-  // label of the target of "Invia → Drum Rack"
+  // label of the target of "Send → Drum Rack"
   async sendTarget() {
     await this.ensure();
     const g = this.groupOf(this.pad);
-    return `Gruppo ${g + 1} · ${this.famById[this.settings(g).family].label}`;
+    return `${t('Group {n}', { n: g + 1 })} · ${this.famById[this.settings(g).family].label}`;
   }
 
-  // From the Library / Online "Invia" menu: the sample alone on a pad, or with its similars on the group.
+  // From the Library / Online "Send" menu: the sample alone on a pad, or with its similars on the group.
   async addSample(ref, { similar = false } = {}) {
     await this.ensure();
     if (similar && ref.kind === 'library') { await this.sendSeed(ref); return; }
@@ -807,7 +809,7 @@ export class DrumRackEditor {
     this.seed = ref;
     this._persist();
     if (!$('#rack').hidden) this.renderAll();
-    toast(`Drum Rack · pad ${this.padName(p)} (gruppo ${this.groupOf(p) + 1})${replaced ? ', kit pieno: sostituito' : ''}: ${ref.name}`);
+    toast(`Drum Rack · pad ${this.padName(p)} (${t('group {n}', { n: this.groupOf(p) + 1 })})${replaced ? `, ${t('kit full: replaced')}` : ''}: ${ref.name}`);
   }
 
   // From the Recorder: several samples at once on the free pads, from the selected pad on: in note order on
@@ -824,8 +826,8 @@ export class DrumRackEditor {
     this._persist();
     if (!$('#rack').hidden) this.renderAll();
     const left = refs.length - placed.length;
-    toast(placed.length ? `Drum Rack: ${placed.length} sample da ${this.padName(placed[0])}${left ? `, ${left} non caricat${left === 1 ? 'o' : 'i'} (kit pieno)` : ''}`
-      : 'Drum Rack pieno: svuota qualche pad');
+    toast(placed.length ? `Drum Rack: ${t('{n} samples from {pad}', { n: placed.length, pad: this.padName(placed[0]) })}${left ? `, ${t('{n} not loaded (kit full)', { n: left })}` : ''}`
+      : t('Drum Rack full: clear some pads'));
     return placed.length;
   }
 
@@ -833,15 +835,14 @@ export class DrumRackEditor {
     let o = { scope: 'all', folder: '', oneshot: true, dyn: false, margin: 0.3 };
     try { o = { ...o, ...JSON.parse(localStorage.getItem(LS_RANDOM) || '{}') }; } catch { /* private mode */ }
     const pop = showPopover(anchor, `
-      <div class="pop-title">${svg('dices')} Kit casuale</div>
-      <div class="hint">Ogni gruppo prende un gruppo di sample simili scelto a caso tra quelli della sua famiglia, e sample a caso da lì.
-        I gruppi bloccati restano com'erano.</div>
-      <wa-select size="s" class="pop-field" label="Gruppi" data-o="scope" value="${o.scope}"><wa-option value="all">Tutti (non bloccati)</wa-option>
-          <wa-option value="empty">Solo quelli vuoti</wa-option></wa-select>
-      <wa-input size="s" class="pop-field" label="Solo dalla cartella / pack (facoltativo)" data-o="folder" value="${esc(o.folder)}" placeholder="Es. Cymatics"></wa-input>
-      <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>Solo one-shot (niente loop)</wa-checkbox>
-      ${dynControls(o, 'gruppi')}
-      <div class="pop-actions">${btn('Genera', { variant: 'brand', icon: 'dices', 'data-go': true })}</div>`);
+      <div class="pop-title">${svg('dices')} ${t('Random kit')}</div>
+      <div class="hint">${t('Every group takes a group of similar samples picked at random among those of its family, and random samples from there. The locked groups stay as they were.')}</div>
+      <wa-select size="s" class="pop-field" label="${t('Groups')}" data-o="scope" value="${o.scope}"><wa-option value="all">${t('All (unlocked)')}</wa-option>
+          <wa-option value="empty">${t('Only the empty ones')}</wa-option></wa-select>
+      <wa-input size="s" class="pop-field" label="${t('Only from the folder / pack (optional)')}" data-o="folder" value="${esc(o.folder)}" placeholder="${t('E.g. Cymatics')}"></wa-input>
+      <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>${t('One-shots only (no loops)')}</wa-checkbox>
+      ${dynControls(o, 'groups')}
+      <div class="pop-actions">${btn(t('Generate'), { variant: 'brand', icon: 'dices', 'data-go': true })}</div>`);
     wireDynControls(pop);
     pop.querySelector('[data-go]').onclick = async () => {
       o = { scope: pop.querySelector('[data-o=scope]').value, folder: (pop.querySelector('[data-o=folder]').value || '').trim(),
@@ -854,7 +855,7 @@ export class DrumRackEditor {
       this._persist();
       this.renderAll();
       const n = this.rack.pads.filter(Boolean).length;
-      toast(n ? `Kit casuale: ${n} pad pieni${o.dyn ? ` · dinamica ±${Math.round(o.margin * 100)}%` : ''}` : 'Nessun sample adatto (controlla il filtro cartella)');
+      toast(n ? `${t('Random kit: {n} pads full', { n })}${o.dyn ? ` · ${t('dynamics ±{p}%', { p: Math.round(o.margin * 100) })}` : ''}` : t('No suitable samples (check the folder filter)'));
     };
   }
 
@@ -863,15 +864,13 @@ export class DrumRackEditor {
     let o = { keep: false, folder: '', oneshot: true, dyn: false, margin: 0.3 };
     try { o = { ...o, ...JSON.parse(localStorage.getItem(LS_RANDOM + '.spdsx') || '{}') }; } catch { /* private mode */ }
     const pop = showPopover(anchor, `
-      <div class="pop-title">${svg('dices')} Genera kit SPD-SX</div>
-      <div class="hint">Sceglie una configurazione suonabile a caso (al massimo pedale + 1 pad di kick, 3 di snare/clap)
-        e riempie ogni gruppo con sample simili tra loro, ognuno da un gruppo di suoni diverso. Il pedale prende un kick.
-        Con un gruppo bloccato la configurazione resta quella attuale.</div>
-      <wa-checkbox size="s" class="pop-check" data-o="keep" ${o.keep ? 'checked' : ''}>Mantieni la configurazione attuale</wa-checkbox>
-      <wa-input size="s" class="pop-field" label="Solo dalla cartella / pack (facoltativo)" data-o="folder" value="${esc(o.folder)}" placeholder="Es. Cymatics"></wa-input>
-      <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>Solo one-shot (niente loop)</wa-checkbox>
-      ${dynControls(o, 'gruppi')}
-      <div class="pop-actions">${btn('Genera', { variant: 'brand', icon: 'dices', 'data-go': true })}</div>`);
+      <div class="pop-title">${svg('dices')} ${t('Generate SPD-SX kit')}</div>
+      <div class="hint">${t('It picks a playable configuration at random (at most pedal + 1 kick pad, 3 snare/clap pads) and fills every group with samples similar to each other, each from a different group of sounds. The pedal gets a kick. With a locked group the configuration stays the current one.')}</div>
+      <wa-checkbox size="s" class="pop-check" data-o="keep" ${o.keep ? 'checked' : ''}>${t('Keep the current configuration')}</wa-checkbox>
+      <wa-input size="s" class="pop-field" label="${t('Only from the folder / pack (optional)')}" data-o="folder" value="${esc(o.folder)}" placeholder="${t('E.g. Cymatics')}"></wa-input>
+      <wa-checkbox size="s" class="pop-check" data-o="oneshot" ${o.oneshot ? 'checked' : ''}>${t('One-shots only (no loops)')}</wa-checkbox>
+      ${dynControls(o, 'groups')}
+      <div class="pop-actions">${btn(t('Generate'), { variant: 'brand', icon: 'dices', 'data-go': true })}</div>`);
     wireDynControls(pop);
     pop.querySelector('[data-go]').onclick = async () => {
       o = { keep: pop.querySelector('[data-o=keep]').checked, folder: (pop.querySelector('[data-o=folder]').value || '').trim(),
@@ -888,7 +887,7 @@ export class DrumRackEditor {
       this._followGroup();
       const n = this.rack.pads.filter(Boolean).length;
       const cfg = this.meta.spdsx.configs.find((c) => c.id === out.geometry)?.label;
-      toast(n ? `Kit SPD-SX: ${cfg} · ${n} pad pieni` : 'Nessun sample adatto (controlla il filtro cartella)');
+      toast(n ? t('SPD-SX kit: {cfg} · {n} pads full', { cfg, n }) : t('No suitable samples (check the folder filter)'));
     };
   }
 
@@ -912,38 +911,37 @@ export class DrumRackEditor {
   async openLoadDialog() {
     await this.ensure();
     const seq = this.getSequencer();
-    if (!seq.ready) toast('Preparo il Sequencer…'); // first time: loads its pattern and samples
+    if (!seq.ready) toast(t('Preparing the Sequencer…')); // first time: loads its pattern and samples
     await seq.ensure();
     const buses = seq.buses;
     const kit = this._kitByBus(buses);
     const ids = buses.map((b) => b.id).filter((id) => kit[id]);
-    if (!ids.length) { toast('Il Drum Rack è vuoto'); return; }
+    if (!ids.length) { toast(t('The Drum Rack is empty')); return; }
     const counts = seq.layerCounts();
     const modal = openDialog('rk-load', {
-      label: 'Carica il Drum Rack nel Sequencer',
+      label: t('Load the Drum Rack into the Sequencer'),
       width: '640px',
       body: `<div class="rk-load">
-      <div class="hint">Ogni sample va nel bus della sua classe (max ${MAX_PER_BUS} per bus). Scegli quali bus caricare
-        e, quando un bus riceve più sample, se suonano insieme o si alternano a ogni colpo.</div>
+      <div class="hint">${t('Every sample goes to the bus of its class (max {max} per bus). Choose which buses to load and, when a bus gets several samples, whether they play together or alternate on every hit.', { max: MAX_PER_BUS })}</div>
       <div class="rk-load-rows">${ids.map((id) => {
         const b = buses.find((x) => x.id === id);
         const n = kit[id].length;
         const def = NO_ALT.has(id) || n < 2 ? 'off' : 'random';
         return `<div class="rk-load-row" data-bus="${id}">
           <wa-checkbox size="s" data-use checked><span class="dot" style="background:${b.color}"></span> <b>${esc(b.label)}</b></wa-checkbox>
-          <span class="hint">${n} dal kit · ora ${counts[id] || 0} layer</span>
+          <span class="hint">${t('{n} from the kit · now {k} layers', { n, k: counts[id] || 0 })}</span>
           ${b.melodic || n < 2 ? '<span class="hint">—</span>'
-            : `<wa-select size="xs" data-alt value="${def}" title="Come suonano i sample del bus">${ALT_LABELS.map(([m, l]) => `<wa-option value="${m}">${l}</wa-option>`).join('')}</wa-select>`}
+            : `<wa-select size="xs" data-alt value="${def}" title="${t('How the samples of the bus play')}">${ALT_LABELS.map(([m, l]) => `<wa-option value="${m}">${t(l)}</wa-option>`).join('')}</wa-select>`}
         </div>`;
       }).join('')}</div>
       <div class="rk-load-opts">
-        <wa-radio-group size="s" data-mode value="replace" label="Come caricare">
-          <wa-radio value="replace">Sovrascrivi i bus selezionati</wa-radio>
-          <wa-radio value="add">Aggiungi ai layer esistenti</wa-radio>
+        <wa-radio-group size="s" data-mode value="replace" label="${t('How to load')}">
+          <wa-radio value="replace">${t('Overwrite the selected buses')}</wa-radio>
+          <wa-radio value="add">${t('Add to the existing layers')}</wa-radio>
         </wa-radio-group>
-        <wa-checkbox size="s" data-clear>Svuota anche gli altri bus (sovrascrivi tutto)</wa-checkbox>
+        <wa-checkbox size="s" data-clear>${t('Clear the other buses too (overwrite everything)')}</wa-checkbox>
       </div></div>`,
-      footer: btn('Annulla', { 'data-cancel': true }) + btn('Carica e apri il Sequencer', { variant: 'brand', icon: 'arrow-right', 'data-ok': true }),
+      footer: btn(t('Cancel'), { 'data-cancel': true }) + btn(t('Load and open the Sequencer'), { variant: 'brand', icon: 'arrow-right', 'data-ok': true }),
     });
     const close = () => modal.close();
     modal.querySelector('[data-cancel]').onclick = close;
@@ -960,14 +958,14 @@ export class DrumRackEditor {
       const replace = clearOthers || modal.querySelector('[data-mode]').value === 'replace';
       close();
       await seq.loadKit(assign, { replace, clearOthers });
-      toast(`Sequencer: ${Object.keys(assign).length} bus caricati dal Drum Rack`);
+      toast(t('Sequencer: {n} buses loaded from the Drum Rack', { n: Object.keys(assign).length }));
       this.onOpenSequencer?.();
     };
   }
 
   // ---------------------------------------------------------------- save / export
   async save() {
-    const name = prompt('Nome del kit', this.rack.name || 'Kit');
+    const name = prompt(t('Name of the kit'), this.rack.name || 'Kit');
     if (!name) return;
     this.rack.name = name;
     const saved = await this.api.save_rack(this.rack);
@@ -975,7 +973,7 @@ export class DrumRackEditor {
     this.meta.saved = await this.api.list_racks();
     this._persist();
     this.renderAll();
-    toast(`Kit “${name}” salvato`);
+    toast(t('Kit “{name}” saved', { name }));
   }
 
   loadSaved(id) {
@@ -989,7 +987,7 @@ export class DrumRackEditor {
   }
 
   async deleteSaved() {
-    if (!this.rack.id || !confirm(`Eliminare il kit salvato “${this.rack.name}”?`)) return;
+    if (!this.rack.id || !confirm(t('Delete the saved kit “{name}”?', { name: this.rack.name }))) return;
     await this.api.delete_rack(this.rack.id);
     delete this.rack.id;
     this.meta.saved = await this.api.list_racks();
@@ -998,18 +996,18 @@ export class DrumRackEditor {
   }
 
   async sendRackToLive() {
-    if (!this.rack.pads.some(Boolean)) { toast('Il kit è vuoto'); return; }
+    if (!this.rack.pads.some(Boolean)) { toast(t('The kit is empty')); return; }
     await sendToLive(this.api, 'rack', this.rack);
   }
 
   async exportRack() {
-    if (!this.rack.pads.some(Boolean)) { toast('Il kit è vuoto'); return; }
+    if (!this.rack.pads.some(Boolean)) { toast(t('The kit is empty')); return; }
     const btn = $('#rk-export');
     btn.loading = true;
     try {
       const res = await this.api.export_rack(this.rack);
-      if (res.error) toast(`Errore: ${res.error}`);
-      else if (res.folder) toast(`Esportato in ${res.folder}`);
+      if (res.error) toast(t('Error: {error}', { error: res.error }));
+      else if (res.folder) toast(t('Exported to {folder}', { folder: res.folder }));
     } finally {
       btn.loading = false;
     }

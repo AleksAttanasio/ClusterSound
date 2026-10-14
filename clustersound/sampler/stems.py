@@ -13,6 +13,7 @@ import numpy as np
 import soundfile as sf
 import soxr
 
+from ..i18n import N_, tr
 from ..online.downloads import safe_name, unique_path
 from ..paths import data_dir_path, torch_device
 from . import export as sampler_export
@@ -21,8 +22,8 @@ from .session import SamplerSession
 MODEL = "htdemucs_6s"  # 6 sources: drums, bass, other, vocals, guitar, piano
 MODEL_DIR = str(data_dir_path() / "models" / "demucs")
 MODEL_MB = 55
-STEMS = [("drums", "Batteria"), ("bass", "Basso"), ("guitar", "Chitarra"), ("piano", "Piano"), ("vocals", "Voce"),
-         ("other", "Altro")]
+STEMS = [("drums", N_("Drums")), ("bass", N_("Bass")), ("guitar", N_("Guitar")), ("piano", "Piano"), ("vocals", N_("Vocals")),
+         ("other", N_("Other"))]
 CHOOSABLE = [k for k, _ in STEMS if k != "other"]  # "other" is always written: whatever wasn't chosen
 INSTALL_HINT = 'pip install -e ".[stems]"'
 BLOCK_S = 60.0   # separated per block: a 20-minute source at once would need several GB
@@ -47,7 +48,7 @@ def installed() -> bool:
 def status() -> dict:
     ok = installed()
     return {"installed": ok, "model_ready": ok and os.path.isfile(_marker()), "model_mb": MODEL_MB,
-            "install_hint": INSTALL_HINT, "stems": [{"key": k, "label": l, "choosable": k in CHOOSABLE} for k, l in STEMS]}
+            "install_hint": INSTALL_HINT, "stems": [{"key": k, "label": tr(l), "choosable": k in CHOOSABLE} for k, l in STEMS]}
 
 
 def _local_bag():
@@ -82,7 +83,7 @@ def download_model() -> None:
         for sig in sigs:
             hf_hub_download(repo, f"{sig}.safetensors", local_dir=MODEL_DIR)
     if _local_bag() is None:
-        raise RuntimeError("modello non trovato dopo il download")
+        raise RuntimeError(tr("model not found after the download"))
     with open(_marker(), "w", encoding="utf-8") as f:
         f.write(MODEL + "\n")
 
@@ -94,7 +95,7 @@ class _Demucs:
         import torch
         self.model = _local_bag() if os.path.isfile(_marker()) else None
         if self.model is None:
-            raise RuntimeError("modello Demucs non scaricato")
+            raise RuntimeError(tr("Demucs model not downloaded"))
         self.torch = torch
         self.model.eval()
         self.samplerate = int(self.model.samplerate)
@@ -163,7 +164,7 @@ def chosen(keys: list[str] | None) -> list[str]:
         return [k for k, _ in STEMS]
     bad = set(keys) - set(CHOOSABLE)
     if bad or not keys:
-        raise ValueError(f"stem sconosciuti: {', '.join(sorted(bad))}" if bad else "scegli almeno uno stem")
+        raise ValueError(tr("unknown stems: {stems}", stems=", ".join(sorted(bad))) if bad else tr("choose at least one stem"))
     return [k for k in CHOOSABLE if k in keys] + ["other"]
 
 
@@ -173,11 +174,11 @@ def separate(s: SamplerSession, start: float, end: float, folder: str, base_name
     """Separate [start, end) s of the session into one 24-bit WAV per chosen stem (+ "other") in folder.
     Returns [{key, label, path}]; on cancel or error no partial file is left."""
     keys = chosen(keys)
-    labels = dict(STEMS)
+    labels = {k: tr(v) for k, v in STEMS}
     a, b = s._span(start, end)
     x = s.audio[a:b]
     if x.shape[0] == 0:
-        raise ValueError("regione vuota")
+        raise ValueError(tr("empty region"))
     model = _load_model()
     os.makedirs(folder, exist_ok=True)
     paths = [unique_path(os.path.join(folder, safe_name(f"{base_name} - {labels[k]}") + ".wav")) for k in keys]

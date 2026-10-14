@@ -1,56 +1,56 @@
 # YAMNet
 
-[YAMNet](https://github.com/tensorflow/models/tree/master/research/audioset/yamnet) è una MobileNet v1 di Google
-addestrata su **AudioSet** (521 classi di eventi sonori). In ClusterSound fornisce due cose:
+[YAMNet](https://github.com/tensorflow/models/tree/master/research/audioset/yamnet) is a Google MobileNet v1
+trained on **AudioSet** (521 sound event classes). In ClusterSound it provides two things:
 
-- un **embedding a 1024 dimensioni** per ogni sample: la base di somiglianza, sottocluster, mappa 3D e della head
-  di classificazione;
-- **score su 521 classi AudioSet**, usati come segnale *zero-shot* (es. *Snare drum*, *Hi-hat*, *Clapping*).
+- a **1024-dimensional embedding** for every sample: the basis of similarity, subclusters, 3D map and of the
+  classification head;
+- **scores on 521 AudioSet classes**, used as a *zero-shot* signal (e.g. *Snare drum*, *Hi-hat*, *Clapping*).
 
-## Front-end log-mel (`frontend.py`)
+## Log-mel front end (`frontend.py`)
 
-Riproduce esattamente le feature del modello originale, in numpy:
+It reproduces exactly the features of the original model, in numpy:
 
-| Parametro | Valore |
+| Parameter | Value |
 |---|---|
-| Frequenza | 16 kHz mono |
-| Finestra / hop | 25 ms (400 campioni) / 10 ms (160), Hann periodica, FFT 512 |
-| Mel | 64 bande HTK, 125–7500 Hz, `log(mel + 0.001)` |
-| Patch | 96 frame × 64 bande (0,96 s), hop di 48 frame (0,48 s) |
+| Sample rate | 16 kHz mono |
+| Window / hop | 25 ms (400 samples) / 10 ms (160), periodic Hann, FFT 512 |
+| Mel | 64 HTK bands, 125–7500 Hz, `log(mel + 0.001)` |
+| Patch | 96 frames × 64 bands (0.96 s), hop of 48 frames (0.48 s) |
 
-Il segnale viene prima normalizzato a picco 0,9 e tagliato a 10 s; il padding garantisce almeno una patch.
+The signal is first normalised to a 0.9 peak and cut at 10 s; padding guarantees at least one patch.
 
-## Rete (`yamnet_np.py`)
+## Network (`yamnet_np.py`)
 
-MobileNet v1 in layout NHWC con padding "SAME" di TensorFlow:
+MobileNet v1 in NHWC layout with TensorFlow "SAME" padding:
 
-1. conv 3×3 standard, 32 canali, stride 2 (implementata come *im2col* + matmul);
-2. 13 blocchi **depthwise-separable**: depthwise 3×3 (nove shift moltiplicati e sommati) + pointwise 1×1
-   (matmul BLAS), ReLU dopo ciascuno; stride `[2,1,2,1,2,1,2,1,1,1,1,1,2,1]` sui 14 layer;
-3. *global average pooling* → embedding 1024-d;
-4. layer lineare 1024 → 521 e sigmoide → score.
+1. standard 3×3 conv, 32 channels, stride 2 (implemented as *im2col* + matmul);
+2. 13 **depthwise-separable** blocks: 3×3 depthwise (nine shifts multiplied and summed) + 1×1 pointwise
+   (BLAS matmul), ReLU after each; strides `[2,1,2,1,2,1,2,1,1,1,1,1,2,1]` on the 14 layers;
+3. *global average pooling* → 1024-d embedding;
+4. linear layer 1024 → 521 and sigmoid → scores.
 
-La BatchNorm è **fusa nei pesi** in fase di conversione (scala = 1/√(var + 1e-4)), quindi a runtime ci sono solo
-moltiplicazioni e somme. I 70 array sono salvati in **float16** (`models/yamnet.npz`, 6,9 MB) e convertiti in
-float32 al caricamento; il modello è un singleton caricato alla prima analisi e protetto da un lock.
+BatchNorm is **folded into the weights** at conversion time (scale = 1/√(var + 1e-4)), so at runtime there are only
+multiplications and sums. The 70 arrays are saved in **float16** (`models/yamnet.npz`, 6.9 MB) and converted to
+float32 on load; the model is a singleton loaded at the first analysis and protected by a lock.
 
-La conversione dai pesi Keras originali (`yamnet.h5`) è in `tools/build_yamnet_npz.py`.
+The conversion from the original Keras weights (`yamnet.h5`) is in `tools/build_yamnet_npz.py`.
 
-## Pooling sulle patch (`embedder.py`)
+## Pooling over the patches (`embedder.py`)
 
-Un sample produce N patch (elaborate a gruppi di 16). Per non far pesare il silenzio o la coda:
+A sample produces N patches (processed in groups of 16). So that silence or the tail do not weigh in:
 
-- ogni patch ha un peso `softmax(energia log-mel media)`: le patch forti contano di più;
-- **embedding** e `scores_mean` = medie pesate; `scores_max` = massimo sulle patch.
+- every patch has a weight `softmax(mean log-mel energy)`: loud patches count more;
+- **embedding** and `scores_mean` = weighted means; `scores_max` = maximum over the patches.
 
-Embedding, score e profilo mel vengono salvati in float16 nella cache.
+Embedding, scores and mel profile are saved in float16 in the cache.
 
-## Come vengono usati
+## How they are used
 
-| Uso | Cosa | Dove |
+| Use | What | Where |
 |---|---|---|
-| Zero-shot | `0,5·max + 0,5·mean` degli score, mappati sulle classi con pesi (es. Kick ← *Bass drum* 1,0, *Thump* 0,6) | [Classificatore](classificatore.md) |
-| Classificazione | embedding L2-normalizzato come input delle head MLP | [Classificatore](classificatore.md) |
-| Somiglianza | coseno tra embedding normalizzati (*Trova simili*, Drum Rack) | [Clustering](../algoritmi/clustering-e-mappa.md) |
-| Struttura | sottocluster k-means e mappa t-SNE | [Clustering](../algoritmi/clustering-e-mappa.md) |
-| Profilo | spettro d'attacco, del corpo e inviluppo ricavati dal log-mel (144 valori) | [Analisi audio](../algoritmi/analisi-audio.md) |
+| Zero-shot | `0.5·max + 0.5·mean` of the scores, mapped onto the classes with weights (e.g. Kick ← *Bass drum* 1.0, *Thump* 0.6) | [Classifier](classifier.md) |
+| Classification | L2-normalised embedding as the input of the MLP heads | [Classifier](classifier.md) |
+| Similarity | cosine between normalised embeddings (*Find similar*, Drum Rack) | [Clustering](../algorithms/clustering-and-map.md) |
+| Structure | k-means subclusters and t-SNE map | [Clustering](../algorithms/clustering-and-map.md) |
+| Profile | attack spectrum, body spectrum and envelope derived from the log-mel (144 values) | [Audio analysis](../algorithms/audio-analysis.md) |

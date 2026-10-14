@@ -7,6 +7,7 @@ import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
+from ..i18n import tr
 from .base import LICENSES, USER_AGENT, OnlineResult
 
 DEFAULT_DIR = os.path.expanduser("~/Music/ClusterSound Downloads")
@@ -54,24 +55,26 @@ def target_path(root: str, r: OnlineResult, url: str) -> str:
 
 def license_text(r: OnlineResult, url: str) -> str:
     lic = LICENSES.get(r.license, LICENSES["unknown"])
+    label = tr(lic["label"])
     lines = [
-        f"Titolo: {r.title}",
-        f"Autore: {r.author or 'sconosciuto'}",
-        f"Fonte: {r.source_label}",
-        f"Pagina: {r.page_url}",
-        f"File: {url}",
-        f"Licenza: {lic['label']}" + (f" ({r.license_url})" if r.license_url else ""),
-        f"Uso commerciale come sample: {'sì' if lic['commercial'] else 'no / da verificare'}",
+        tr("Title: {v}", v=r.title),
+        tr("Author: {v}", v=r.author or tr("unknown")),
+        tr("Source: {v}", v=r.source_label),
+        tr("Page: {v}", v=r.page_url),
+        tr("File: {v}", v=url),
+        tr("Licence: {v}", v=label) + (f" ({r.license_url})" if r.license_url else ""),
+        tr("Commercial use as a sample: {v}", v=tr("yes") if lic["commercial"] else tr("no / to be checked")),
     ]
     if r.download_note:
-        lines.append(f"Nota: {r.download_note}")
+        lines.append(tr("Note: {v}", v=r.download_note))
     if r.license not in ("cc0", "pd"):
-        attribution = r.extra.get("attribution") or (
-            f'"{r.title}" di {r.author or "autore sconosciuto"} ({r.page_url}), licenza {lic["label"]}')
-        lines += ["", "Attribuzione richiesta:", attribution]
+        attribution = r.extra.get("attribution") or tr(
+            '"{title}" by {author} ({page}), licence {license}', title=r.title,
+            author=r.author or tr("unknown author"), page=r.page_url, license=label)
+        lines += ["", tr("Attribution required:"), attribution]
     if r.license == "unknown":
-        lines += ["", "ATTENZIONE: licenza non dichiarata dalla fonte. Verifica i diritti prima dell'uso."]
-    lines.append(f"\nScaricato con ClusterSound il {time.strftime('%Y-%m-%d %H:%M')}")
+        lines += ["", tr("WARNING: licence not declared by the source. Check the rights before using it.")]
+    lines.append("\n" + tr("Downloaded with ClusterSound on {date}", date=time.strftime("%Y-%m-%d %H:%M")))
     return "\n".join(lines) + "\n"
 
 
@@ -85,9 +88,9 @@ class Downloader:
 
     def enqueue(self, r: OnlineResult, url: str, root: str) -> dict:
         if not url:
-            raise ValueError("nessun file scaricabile per questo risultato")
+            raise ValueError(tr("no downloadable file for this result"))
         if not host_allowed(url):
-            raise ValueError("host non consentito")
+            raise ValueError(tr("host not allowed"))
         with self._lock:
             self._seq += 1
             job = {"id": str(self._seq), "uid": r.uid, "title": r.path.rsplit("/", 1)[-1] if r.path else r.title,
@@ -106,7 +109,7 @@ class Downloader:
             req = urllib.request.Request(job["url"], headers={"User-Agent": USER_AGENT})
             with urllib.request.urlopen(req, timeout=60) as resp, open(tmp, "wb") as f:
                 if not host_allowed(resp.geturl()):
-                    raise ValueError("redirect verso un host non consentito")
+                    raise ValueError(tr("redirect to a host that is not allowed"))
                 total = resp.headers.get("Content-Length")
                 job["total"] = int(total) if total and total.isdigit() else job["total"]
                 while chunk := resp.read(CHUNK):

@@ -7,4 +7,4 @@ $py = ".venv\Scripts\python.exe"
 if (-not (Test-Path $py)) { throw "Ambiente non trovato: crea .venv e installa con pip install -e "".[dev]""" }
 & $py -m PyInstaller --noconfirm ClusterSound.spec
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller non riuscito ($LASTEXITCODE)" }
-Write-Host "Pronto: dist\ClusterSound\ClusterSound.exe"
+Write-Host "Ready: dist\ClusterSound\ClusterSound.exe"

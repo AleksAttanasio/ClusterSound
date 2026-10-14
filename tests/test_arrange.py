@@ -81,9 +81,9 @@ def test_sequence_ableton_package(kit, tmp_path):
     flat = arrange.flatten(kit, seq())
     folder = ableton.export_package(flat, str(tmp_path), lambda r: r.get("path"), lambda r: None, "Seq")
     files = os.listdir(folder)
-    assert "Sequenza.wav" in files and "Loop.wav" not in files
-    readme = open(os.path.join(folder, "LEGGIMI.txt"), encoding="utf-8").read()
-    assert "SCALETTA" in readme and "batt. 1-2" in readme and "×2" in readme and "batt. 5-5" in readme
+    assert "Sequence.wav" in files and "Loop.wav" not in files
+    readme = open(os.path.join(folder, "README.txt"), encoding="utf-8").read()
+    assert "RUNNING ORDER" in readme and "bars 1-2" in readme and "×2" in readme and "bars 5-5" in readme
     last = max(t for _, t, _, _ in midi.read_notes(os.path.join(folder, "Drums.mid")))
     assert last > 4 * 16 * 24  # the drums MIDI covers the whole sequence
     assert gzip.open(os.path.join(folder, "Seq Drum Rack.adg")).read(5) == b"<?xml"
