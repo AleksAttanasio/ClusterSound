@@ -568,9 +568,9 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#ready-made-app-macos" class="md-nav__link">
+  <a href="#ready-made-app" class="md-nav__link">
     <span class="md-ellipsis">
-      Ready-made app (macOS)
+      Ready-made app
     </span>
   </a>
   
@@ -1744,9 +1744,9 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#ready-made-app-macos" class="md-nav__link">
+  <a href="#ready-made-app" class="md-nav__link">
     <span class="md-ellipsis">
-      Ready-made app (macOS)
+      Ready-made app
     </span>
   </a>
   
@@ -1817,10 +1817,21 @@
 </div>
 </div>
 <p>Without <code>uv</code> on macOS: <code>python3 -m venv .venv &amp;&amp; .venv/bin/pip install -e ".[dev]"</code>.</p>
-<h2 id="ready-made-app-macos">Ready-made app (macOS)<a class="headerlink" href="#ready-made-app-macos" title="Permanent link">&para;</a></h2>
-<p>Download the zip for your Mac (<code>arm64</code> for Apple Silicon, <code>x86_64</code> for Intel) from the
-<a href="https://github.com/AleksAttanasio/ClusterSound/releases">Releases</a> page: it contains <code>ClusterSound.app</code> with all
-the extras. The app is not notarized: open it the first time with right-click › <strong>Open</strong>.</p>
+<h2 id="ready-made-app">Ready-made app<a class="headerlink" href="#ready-made-app" title="Permanent link">&para;</a></h2>
+<p>From the <a href="https://github.com/AleksAttanasio/ClusterSound/releases">Releases</a> page, with all the extras:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">macOS</label><label for="__tabbed_2_2">Windows</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Download the zip for your Mac (<code>arm64</code> for Apple Silicon, <code>x86_64</code> for Intel): it contains
+<code>ClusterSound.app</code>. The app is not notarized: open it the first time with right-click › <strong>Open</strong>.</p>
+</div>
+<div class="tabbed-block">
+<p>Download <code>ClusterSound-X.Y.Z-windows-x64.zip</code>, unzip it and run <code>ClusterSound\ClusterSound.exe</code> (keep the
+whole folder). The exe is not signed: if SmartScreen blocks it, <em>More info</em> › <strong>Run anyway</strong>. It needs the
+Edge WebView2 runtime (already on Windows 11). <em>Extract stems</em> and <em>Enhance</em> run on the CPU.</p>
+</div>
+</div>
+</div>
 <h2 id="optional-extras">Optional extras<a class="headerlink" href="#optional-extras" title="Permanent link">&para;</a></h2>
 <p>The heavy features are extras, to install only if you need them:</p>
 <table>

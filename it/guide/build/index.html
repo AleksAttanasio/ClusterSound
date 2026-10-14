@@ -1763,9 +1763,10 @@ Distribuisci solo il bundle <code>.app</code>.</p>
 <p>Demucs e PyTorch vengono inclusi solo se installati nell'ambiente di build. Dettagli su spec e helper nativo in
 <a href="../../technical/development/#packaging">Sviluppo e test</a>.</p>
 <h2 id="release-automatiche">Release automatiche<a class="headerlink" href="#release-automatiche" title="Permanent link">&para;</a></h2>
-<p>Il push di un tag <code>vX.Y.Z</code> avvia il workflow <code>release</code> (<code>.github/workflows/release.yml</code>): costruisce l'app su
-GitHub per Apple Silicon e Intel, con tutti gli extra (<code>midi</code>, <code>capture</code>, <code>stems</code>, <code>enhance</code>), e pubblica
-<code>ClusterSound-X.Y.Z-macos-arm64.zip</code> e <code>ClusterSound-X.Y.Z-macos-x86_64.zip</code> come
+<p>Il push di un tag <code>vX.Y.Z</code> avvia il workflow <code>release</code> (<code>.github/workflows/release.yml</code>): costruisce in parallelo
+su GitHub l'app per Apple Silicon, Intel e Windows x64, con tutti gli extra (<code>midi</code>, <code>capture</code> sul Mac, <code>stems</code>,
+<code>enhance</code>), e pubblica <code>ClusterSound-X.Y.Z-macos-arm64.zip</code>, <code>ClusterSound-X.Y.Z-macos-x86_64.zip</code> e
+<code>ClusterSound-X.Y.Z-windows-x64.zip</code> (la cartella <code>ClusterSound\</code> con <code>ClusterSound.exe</code>) come
 <a href="https://github.com/AleksAttanasio/ClusterSound/releases">GitHub Release</a>.</p>
 <ol>
 <li>Imposta <code>version</code> in <code>pyproject.toml</code> (il bundle la legge da lì) e fai il merge di <code>develop</code> in <code>main</code>.</li>
@@ -1776,9 +1777,11 @@ GitHub per Apple Silicon e Intel, con tutti gli extra (<code>midi</code>, <code>
 </li>
 </ol>
 <p>Il workflow si ferma se il tag non è su <code>main</code> o non coincide con la versione in <code>pyproject.toml</code>. Lanciato a mano
-dalla scheda <em>Actions</em>, costruisce soltanto e lascia gli zip come artifact del workflow.</p>
+dalla scheda <em>Actions</em>, costruisce soltanto (tutte le piattaforme, o solo <code>macos</code> o <code>windows</code>) e lascia gli zip come
+artifact del workflow.</p>
 <p>L'app è firmata ad hoc, non notarizzata: al primo avvio macOS chiede di aprirla con tasto destro › <strong>Apri</strong> (o
-<code>xattr -cr ClusterSound.app</code>).</p>
+<code>xattr -cr ClusterSound.app</code>). L'exe per Windows non è firmato: SmartScreen chiede <em>Ulteriori informazioni</em> ›
+<strong>Esegui comunque</strong>.</p>
 
 
 

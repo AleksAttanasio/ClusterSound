@@ -1763,9 +1763,10 @@ Distribute only the <code>.app</code> bundle.</p>
 <p>Demucs and PyTorch are included only if installed in the build environment. Details on the spec and the native
 helper in <a href="../../technical/development/#packaging">Development and tests</a>.</p>
 <h2 id="automatic-releases">Automatic releases<a class="headerlink" href="#automatic-releases" title="Permanent link">&para;</a></h2>
-<p>Pushing a <code>vX.Y.Z</code> tag runs the <code>release</code> workflow (<code>.github/workflows/release.yml</code>): it builds the app on GitHub
-for Apple Silicon and Intel, with all the extras (<code>midi</code>, <code>capture</code>, <code>stems</code>, <code>enhance</code>), and publishes
-<code>ClusterSound-X.Y.Z-macos-arm64.zip</code> and <code>ClusterSound-X.Y.Z-macos-x86_64.zip</code> as a
+<p>Pushing a <code>vX.Y.Z</code> tag runs the <code>release</code> workflow (<code>.github/workflows/release.yml</code>): it builds the app on GitHub,
+in parallel, for Apple Silicon, Intel and Windows x64, with all the extras (<code>midi</code>, <code>capture</code> on the Mac, <code>stems</code>,
+<code>enhance</code>), and publishes <code>ClusterSound-X.Y.Z-macos-arm64.zip</code>, <code>ClusterSound-X.Y.Z-macos-x86_64.zip</code> and
+<code>ClusterSound-X.Y.Z-windows-x64.zip</code> (the <code>ClusterSound\</code> folder with <code>ClusterSound.exe</code>) as a
 <a href="https://github.com/AleksAttanasio/ClusterSound/releases">GitHub Release</a>.</p>
 <ol>
 <li>Set <code>version</code> in <code>pyproject.toml</code> (the bundle reads it from there) and merge <code>develop</code> into <code>main</code>.</li>
@@ -1776,9 +1777,11 @@ for Apple Silicon and Intel, with all the extras (<code>midi</code>, <code>captu
 </li>
 </ol>
 <p>The workflow stops if the tag is not on <code>main</code> or differs from the version in <code>pyproject.toml</code>. Run by hand from
-the <em>Actions</em> tab, it only builds and leaves the zips as workflow artifacts.</p>
+the <em>Actions</em> tab, it only builds (all platforms, or just <code>macos</code> or <code>windows</code>) and leaves the zips as
+workflow artifacts.</p>
 <p>The app is signed ad hoc, not notarized: on first launch macOS asks to open it with right-click › <strong>Open</strong> (or
-<code>xattr -cr ClusterSound.app</code>).</p>
+<code>xattr -cr ClusterSound.app</code>). The Windows exe is not signed: SmartScreen asks for <em>More info</em> › <strong>Run
+anyway</strong>.</p>
 
 
 
