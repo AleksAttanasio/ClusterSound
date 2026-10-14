@@ -133,7 +133,7 @@ class Library:
             self._set_progress("done", n, n, tr("{n} samples, {errors} errors · from snapshot", n=n, errors=len(self.errors)))
             return
         if snapshot_only:
-            self._set_progress("stale", message=tr("No up-to-date snapshot for this folder: press Rescan"))
+            self._set_progress("stale", message=tr("No up-to-date snapshot of the selected folders: press Refresh"))
             return
         if not self.scan_analysis_only(roots, listing):
             return

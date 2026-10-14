@@ -6,8 +6,9 @@ import { PatternEditor } from './pattern.js';
 import { DrumRackEditor } from './drumrack.js';
 import { ComposeEditor } from './compose.js';
 import { SamplerEditor } from './sampler.js';
-import { showSendMenu } from './sendmenu.js';
-import { isTypingTarget } from './kit.js';
+import { showSendMenu, showPopover } from './sendmenu.js';
+import { isTypingTarget, btn } from './kit.js';
+import { svg } from './icons.js';
 import { Nav, tabLabel } from './nav.js';
 import { t, setLang, applyI18n } from './i18n.js';
 import { Settings, generalSection, setRow } from './settings.js';
@@ -21,7 +22,8 @@ const state = {
   data: null, version: -1,
   classOn: new Set(), typeOn: new Set(), minConf: 0, search: '',
   mask: null, selected: -1, scanning: false,
-  view: '3d', sort: { key: 'cls', dir: 1 }, rows: [], tab: 'library', folder: '',
+  view: '3d', sort: { key: 'cls', dir: 1 }, rows: [], tab: 'library',
+  folders: [], history: [], // analysed folders (their union is the library) and the folder history
   focus: null, // {center, items: [{id, sim}], trail: [id…]} while the similar-samples view is open
   lastTrail: [], // trail of the last similar-samples view (kept after closing it, for the Drum Rack)
   simK: (() => { try { return Math.min(60, Math.max(5, +localStorage.getItem('cs.simK') || 12)); } catch { return 12; } })(),
@@ -76,7 +78,7 @@ async function main() {
     if (await rack.addSamples(refs)) setTab('rack');
   } });
   online.onSend = (ref, x, y) => sendRef(ref, x, y);
-  online.onLibrary = (path) => { setTab('library'); setFolder(path); };
+  online.onLibrary = (path) => { setTab('library'); addFolder(path); };
   nav = new Nav($('#nav'), { onSelect: (tab) => setTab(tab) });
   window.__cs.nav = nav;
   settings = new Settings($('#settings'));
@@ -90,10 +92,9 @@ async function main() {
   window.addEventListener('cs:open-settings', (e) => setTab('settings', e.detail));
   buildSidebar();
   bindUi();
-  if (init.last_folder) {
-    setFolder(init.last_folder, false);
-    state.api.restore(init.last_folder);
-  }
+  state.history = init.history || [];
+  setFolders(init.folders || [], false);
+  if (state.folders.length) state.api.restore(state.folders);
   let last = 'library';
   try { last = localStorage.getItem('cs.tab') || 'library'; } catch { /* private mode */ }
   setTab(TABS.includes(last) && last !== 'settings' ? last : 'library');
@@ -197,6 +198,7 @@ function showProgress(p) {
   $('#progress-wrap').hidden = !busy && p.phase !== 'error' && p.phase !== 'stale';
   const wrap = $('#progress-wrap');
   const pct = p.total ? (100 * p.done) / p.total : 0;
+  $('#lib-refresh').disabled = busy || !state.folders.length;
   $('#progress-bar').indeterminate = busy && !p.total;
   $('#progress-bar').value = pct;
   const label = t({ scanning: 'Finding files', analysing: 'Analysis', classifying: 'Classification', layout: '3D layout', error: 'Error', stale: 'Snapshot' }[p.phase] || '');
@@ -210,8 +212,9 @@ function showProgress(p) {
 
 async function loadResults() {
   const d = await state.api.results();
+  if (d.pending) return; // asked again at the next poll
   state.version = d.version;
-  if (!d.cls.length) return;
+  if (!d.cls.length) { if (state.data) clearLibrary(); return; }
   if (d.cls.length !== state.data?.cls.length) { exitFocus(false); state.lastTrail = []; }
   state.data = d;
   $('#empty').hidden = true;
@@ -221,6 +224,25 @@ async function loadResults() {
   computeCentroids();
   if (state.selected >= d.cls.length) closePanel();
   else if (state.selected >= 0) scene.setSelected(state.selected);
+}
+
+// No folder left in the selection: back to the empty state.
+function clearLibrary() {
+  exitFocus(false);
+  closePanel();
+  state.data = null;
+  state.mask = null;
+  state.rows = [];
+  state.lastTrail = [];
+  scene.setData({ cls: [], xyz: [] }, state.classes.map((c) => c.color));
+  centroids = [];
+  $('#labels').innerHTML = '';
+  $('#list-spacer').style.height = '0px';
+  $('#list-body').querySelectorAll('.list-row').forEach((r) => r.remove());
+  $('#stats').innerHTML = '';
+  $('#empty').hidden = false;
+  nav.setBadge('library', null);
+  updateCounts();
 }
 
 // ------------------------------------------------------------------ labels
@@ -557,50 +579,107 @@ function highlightRow() {
 }
 
 // ------------------------------------------------------------------ ui
-function setFolder(path, scan = true) {
-  state.folder = path;
+function setFolders(folders, scan = true) {
+  state.folders = folders;
   showCrumb();
-  if (scan) startScan(path);
+  if (scan) startScan(folders);
+}
+
+function addFolder(path) {
+  setFolders(state.folders.includes(path) ? state.folders : [...state.folders, path]);
 }
 
 async function pickFolder() {
   const p = await state.api.pick_folder();
-  if (p) { setTab('library'); setFolder(p); }
+  if (p) { setTab('library'); addFolder(p); }
+}
+
+// Dropdown of the folder history: the ticked folders make up the library.
+let folderPop = null, folderTimer = 0, folderQueued = false;
+function openFolderMenu() {
+  if (folderPop?.isConnected) { folderPop.close(); return; }
+  folderPop = showPopover($('#crumb-sub'), `<div class="pop-title">${t('Library folders')}</div>
+    <div class="fold-list"></div>
+    <div class="pop-actions">${btn(t('Browse…'), { icon: 'folder-open', id: 'fold-browse' })}</div>`);
+  folderPop.classList.add('fold-pop');
+  renderFolderMenu();
+  folderPop.querySelector('#fold-browse').onclick = () => { folderPop.close(); pickFolder(); };
+  folderPop.querySelector('.fold-list').addEventListener('click', async (e) => {
+    const row = e.target.closest('.fold-row');
+    if (!row) return;
+    const path = row.dataset.path;
+    if (e.target.closest('.fold-x')) {
+      if (folderQueued) { clearTimeout(folderTimer); await startScan(state.folders); } // ticks not applied yet
+      const r = await state.api.forget_folder(path);
+      state.folders = r.folders;
+      state.history = r.history;
+      showCrumb();
+      renderFolderMenu();
+      return;
+    }
+    const on = !state.folders.includes(path);
+    state.folders = on ? [...state.folders, path] : state.folders.filter((f) => f !== path);
+    showCrumb();
+    renderFolderMenu();
+    clearTimeout(folderTimer); // a few quick ticks rebuild the library once
+    folderQueued = true;
+    folderTimer = setTimeout(() => startScan(state.folders), 400);
+  });
+}
+
+function renderFolderMenu() {
+  const box = folderPop?.isConnected && folderPop.querySelector('.fold-list');
+  if (!box) return;
+  const list = [...state.history, ...state.folders.filter((f) => !state.history.includes(f))];
+  box.innerHTML = list.length ? list.map((f) => {
+    const on = state.folders.includes(f);
+    return `<div class="fold-row ${on ? 'on' : ''}" data-path="${esc(f)}" role="checkbox" aria-checked="${on}" title="${esc(f)}">
+      <span class="fold-check">${on ? svg('check', 12) : ''}</span><span class="fold-path">${esc(f)}</span>
+      <button class="fold-x" type="button" title="${t('Remove from history')}">${svg('x', 12)}</button></div>`;
+  }).join('') : `<div class="hint">${t('No folder')}</div>`;
 }
 
 // Library section of the Settings page: the analysed folder and the report.
 async function renderLibrarySettings(body) {
-  const f = state.folder;
+  const f = state.folders;
   body.innerHTML =
-    setRow(t('Sample folder'), t('Analysed recursively (wav, aif, flac, ogg, mp3, caf). Results stay in the cache; the original files are never modified.'),
-      `${f ? `<span class="set-path" title="${esc(f)}">${esc(f)}</span>` : `<span class="hint">${t('No folder')}</span>`}
-       <wa-button id="set-lib-pick" size="s" variant="brand"><wa-icon slot="start" name="folder-open"></wa-icon>${t('Choose…')}</wa-button>`)
-    + setRow(t('Rescan'), t('Analyse the folder again: unchanged files are read from the cache.'),
-      `<wa-button id="set-lib-rescan" size="s" appearance="filled-outlined"${!f || state.scanning ? ' disabled' : ''}><wa-icon slot="start" name="refresh-cw"></wa-icon>${t('Rescan')}</wa-button>`)
+    setRow(t('Sample folders'), t('Analysed recursively (wav, aif, flac, ogg, mp3, caf). Results stay in the cache; the original files are never modified.'),
+      `<span class="set-paths">${f.length ? f.map((p) => `<span class="set-path" title="${esc(p)}">${esc(p)}</span>`).join('') : `<span class="hint">${t('No folder')}</span>`}</span>
+       <wa-button id="set-lib-pick" size="s" variant="brand"><wa-icon slot="start" name="folder-open"></wa-icon>${t('Add…')}</wa-button>`)
+    + setRow(t('Rescan'), t('Analyse the selected folders again: unchanged files are read from the cache.'),
+      `<wa-button id="set-lib-rescan" size="s" appearance="filled-outlined"${!f.length || state.scanning ? ' disabled' : ''}><wa-icon slot="start" name="refresh-cw"></wa-icon>${t('Rescan')}</wa-button>`)
     + setRow(t('Report'), t('CSV or JSON with class, confidence, alternatives, subcluster and type of every sample.') + ' <span id="set-lib-report"></span>',
       `<wa-button id="set-lib-export" size="s" appearance="filled-outlined"${state.data ? '' : ' disabled'}><wa-icon slot="start" name="file-down"></wa-icon>${t('Export report')}</wa-button>`);
   body.querySelector('#set-lib-pick').onclick = pickFolder;
-  body.querySelector('#set-lib-rescan').onclick = () => { setTab('library'); startScan(state.folder); };
+  body.querySelector('#set-lib-rescan').onclick = () => { setTab('library'); startScan(state.folders); };
   body.querySelector('#set-lib-export').onclick = async () => {
     const p = await state.api.export_report();
     if (p) body.querySelector('#set-lib-report').textContent = t('Saved to {path}.', { path: p });
   };
 }
 
-// Breadcrumb of the page header: the analysed folder in the Library, a link to its settings.
+// Breadcrumb of the page header: the analysed folders in the Library (a dropdown to pick them) and Refresh.
 function showCrumb() {
-  const sub = $('#crumb-sub');
-  sub.hidden = state.tab !== 'library' || !state.folder;
+  const sub = $('#crumb-sub'), f = state.folders;
+  sub.hidden = state.tab !== 'library' || (!f.length && !state.history.length);
   $('#crumb-sep').hidden = sub.hidden;
-  sub.textContent = state.folder;
-  sub.title = `${state.folder}\n${t('Click: change folder in Settings')}`;
+  $('#lib-refresh').hidden = sub.hidden;
+  $('#lib-refresh').disabled = state.scanning || !f.length;
+  $('#crumb-path').textContent = f.length === 1 ? f[0] : f.length ? t('{n} folders', { n: f.length }) : t('No folders selected');
+  sub.classList.toggle('none', !f.length);
+  sub.title = `${f.join('\n')}${f.length ? '\n' : ''}${t('Click: choose the folders')}`;
 }
 
-async function startScan(path) {
+async function startScan(folders) {
+  folderQueued = false;
   closePanel();
-  state.scanning = true;
-  const ok = await state.api.start_scan(path);
-  if (!ok) { $('#progress-text').textContent = t('Invalid folder'); }
+  state.scanning = folders.length > 0;
+  const r = await state.api.start_scan(folders);
+  if (!folderQueued) state.folders = r.folders; // else newer ticks are waiting to be applied
+  state.history = r.history;
+  showCrumb();
+  renderFolderMenu();
+  if (!r.ok) { $('#progress-wrap').hidden = false; $('#progress-text').textContent = t('Invalid folder'); }
 }
 
 function setView(v) {
@@ -666,7 +745,8 @@ function bindUi() {
     sendLibraryItem(+r.dataset.i, e.clientX, e.clientY);
   });
   $('#btn-empty-folder').onclick = pickFolder;
-  $('#crumb-sub').dataset.settingsLink = 'library';
+  $('#crumb-sub').onclick = openFolderMenu;
+  $('#lib-refresh').onclick = () => { if (state.folders.length) startScan(state.folders); };
   $('#view-toggle').addEventListener('change', (e) => { if (e.target.id === 'view-toggle') setView(e.target.value); });
   $('#search').oninput = (e) => { state.search = e.target.value || ''; applyFilters(); };
   $('#search').addEventListener('wa-clear', () => { state.search = ''; applyFilters(); });
