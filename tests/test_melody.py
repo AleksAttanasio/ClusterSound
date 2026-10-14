@@ -238,3 +238,14 @@ def test_generate_keeps_only_the_target_layer(tmp_path):
     seq["melody"] = {"layers": [lead], "active": "l"}
     out = melody.generate(seq, C_MAJ, {"role": "bass", "fromBar": 1, "layer": None}, seed=1)
     assert all(n["pitch"] < 60 for item in out for n in item["melody"]["notes"])
+
+
+def test_api_keeps_midi_and_audio_recorders_apart():
+    from clustersound.api import Api
+    from clustersound.chords import midi_in
+    from clustersound.sampler import recorder as sampler_recorder
+    a = Api()
+    assert isinstance(a._midi_recorder, midi_in.Recorder)
+    assert isinstance(a._recorder, sampler_recorder.Recorder)
+    r = a.compose_midi_inputs()  # used to fail: the audio recorder has no available()
+    assert set(r) >= {"available", "ports"}
