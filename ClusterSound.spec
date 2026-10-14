@@ -64,6 +64,12 @@ exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="ClusterSound",
           console=False, strip=False, upx=False, target_arch=None,
           icon=str(root / "brand" / "ClusterSound.ico") if WIN else None)
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="ClusterSound")
+if WIN:
+    # pywebview reaches WinForms/WebView2 through pythonnet on .NET Framework, which refuses to load assemblies
+    # marked as downloaded from the internet (every file of an unzipped download): allow it for this exe only.
+    (Path(DISTPATH) / "ClusterSound" / "ClusterSound.exe.config").write_text(
+        '<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <runtime>\n'
+        '    <loadFromRemoteSources enabled="true"/>\n  </runtime>\n</configuration>\n', encoding="utf-8")
 if not WIN:
     app = BUNDLE(
         coll,

@@ -61,3 +61,13 @@ def test_is_inside(tmp_path):
 def test_safe_name_avoids_windows_device_names(name, expected):
     from clustersound.online.downloads import safe_name
     assert safe_name(name) == expected
+
+
+def test_check_gui_reports_a_broken_backend(monkeypatch, tmp_path):
+    import sys
+    from clustersound.__main__ import main
+    backend = "webview.platforms.winforms" if sys.platform == "win32" else "webview.platforms.cocoa"
+    monkeypatch.setitem(sys.modules, backend, None)  # the import fails, as with a blocked Python.Runtime.dll
+    log = tmp_path / "gui.log"
+    assert main(["--check-gui", str(log)]) == 1
+    assert "Traceback" in log.read_text(encoding="utf-8")
