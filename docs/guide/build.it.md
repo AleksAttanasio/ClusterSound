@@ -24,9 +24,10 @@ Demucs e PyTorch vengono inclusi solo se installati nell'ambiente di build. Dett
 
 ## Release automatiche
 
-Il push di un tag `vX.Y.Z` avvia il workflow `release` (`.github/workflows/release.yml`): costruisce l'app su
-GitHub per Apple Silicon e Intel, con tutti gli extra (`midi`, `capture`, `stems`, `enhance`), e pubblica
-`ClusterSound-X.Y.Z-macos-arm64.zip` e `ClusterSound-X.Y.Z-macos-x86_64.zip` come
+Il push di un tag `vX.Y.Z` avvia il workflow `release` (`.github/workflows/release.yml`): costruisce in parallelo
+su GitHub l'app per Apple Silicon, Intel e Windows x64, con tutti gli extra (`midi`, `capture` sul Mac, `stems`,
+`enhance`), e pubblica `ClusterSound-X.Y.Z-macos-arm64.zip`, `ClusterSound-X.Y.Z-macos-x86_64.zip` e
+`ClusterSound-X.Y.Z-windows-x64.zip` (la cartella `ClusterSound\` con `ClusterSound.exe`) come
 [GitHub Release](https://github.com/AleksAttanasio/ClusterSound/releases).
 
 1. Imposta `version` in `pyproject.toml` (il bundle la legge da lì) e fai il merge di `develop` in `main`.
@@ -40,4 +41,5 @@ Il workflow si ferma se il tag non è su `main` o non coincide con la versione i
 dalla scheda *Actions*, costruisce soltanto e lascia gli zip come artifact del workflow.
 
 L'app è firmata ad hoc, non notarizzata: al primo avvio macOS chiede di aprirla con tasto destro › **Apri** (o
-`xattr -cr ClusterSound.app`).
+`xattr -cr ClusterSound.app`). L'exe per Windows non è firmato: SmartScreen chiede *Ulteriori informazioni* ›
+**Esegui comunque**.
