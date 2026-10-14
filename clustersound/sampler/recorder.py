@@ -187,8 +187,19 @@ def tap_binary(build: bool = True) -> str | None:
     if not (build and os.path.exists(src) and shutil.which("swiftc")):
         return CACHE_BIN if os.access(CACHE_BIN, os.X_OK) else None
     os.makedirs(os.path.dirname(CACHE_BIN), exist_ok=True)
+    env = dict(os.environ)
+    if "SDKROOT" not in env:
+        try:
+            dev_path = subprocess.check_output(["xcode-select", "-p"], text=True, timeout=5).strip()
+            for cand in [os.path.join(dev_path, "SDKs", "MacOSX.sdk"),
+                         os.path.join(dev_path, "Platforms", "MacOSX.platform", "Developer", "SDKs", "MacOSX.sdk")]:
+                if os.path.isdir(cand):
+                    env["SDKROOT"] = cand
+                    break
+        except (OSError, subprocess.SubprocessError):
+            pass
     res = subprocess.run(["swiftc", "-O", "-swift-version", "5", "-o", CACHE_BIN + ".tmp", src],
-                         capture_output=True, text=True, timeout=600)
+                         capture_output=True, text=True, timeout=600, env=env)
     if res.returncode != 0:
         return None
     os.replace(CACHE_BIN + ".tmp", CACHE_BIN)

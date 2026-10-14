@@ -4,6 +4,14 @@
 # the drop mark on a black squircle, already drawn with the ~10% margin macOS icons expect.
 set -e
 cd "$(dirname "$0")/.."
+if [ -z "$SDKROOT" ]; then
+  dev_path=$(xcode-select -p 2>/dev/null || true)
+  if [ -d "$dev_path/SDKs/MacOSX.sdk" ]; then
+    export SDKROOT="$dev_path/SDKs/MacOSX.sdk"
+  elif [ -d "$dev_path/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" ]; then
+    export SDKROOT="$dev_path/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+  fi
+fi
 work=$(mktemp -d)
 src=$work/logo-app.png
 swift tools/render_svg.swift brand/logo-app.svg "$src" 1024
