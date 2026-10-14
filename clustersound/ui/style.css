@@ -594,9 +594,10 @@ wa-spinner.spin { font-size: 12px; --track-width: 2px; vertical-align: -2px; }
 .send-rk-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .send-sugg { padding: 0 8px 6px; border-bottom: 1px solid var(--line); }
 .send-sugg:empty { padding: 0; }
-.send-sugg-title { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--text-3); padding: 2px 0 4px; }
+.send-sugg-title { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--accent); padding: 2px 0 4px; display: flex; align-items: center; gap: 6px; }
+.send-sugg-title .send-ib { width: 20px; height: 18px; }
 .send-sugg-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.send-sug { display: flex; align-items: center; gap: 4px; min-width: 0; border: 1px solid var(--line); border-radius: 5px; padding: 3px; }
+.send-sug { display: flex; align-items: center; gap: 4px; min-width: 0; border: 1px solid var(--sel-line); background: var(--sel-bg); border-radius: 5px; padding: 3px; }
 .send-sug-name { all: unset; flex: 1; min-width: 0; cursor: pointer; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .send-sug:hover { border-color: var(--wa-color-brand-border-loud); }
 .tooltip .t-hint { color: var(--text-3); font-size: 10px; margin-top: 3px; }

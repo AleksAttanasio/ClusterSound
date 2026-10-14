@@ -65,8 +65,8 @@ export function showSendMenu({ x, y, ref, buses, counts = {}, onPick, rack, onOp
     busBox.innerHTML = list.map((b) => `<div class="send-row ${b.id === sug ? 'sug' : ''}" data-bus="${b.id}">
       <span class="dot" style="background:${b.color}"></span><span class="send-bus">${esc(b.label)}${b.id === sug ? ` <i>${t('suggested')}</i>` : ''}</span>
       <span class="send-count">${counts[b.id] ? (counts[b.id] === 1 ? t('1 layer') : t('{n} layers', { n: counts[b.id] })) : t('Empty')}</span>
-      <wa-button size="xs" appearance="filled-outlined" data-mode="add" title="${t('Add as a new layer of the bus')}"><wa-icon slot="start" name="plus"></wa-icon>Layer</wa-button>
-      <wa-button size="xs" appearance="filled-outlined" data-mode="replace" title="${t('Replace the selected layer (or the first one)')}" ${counts[b.id] ? '' : 'disabled'}>${t('Replace')}</wa-button>
+      <wa-button size="xs" appearance="filled-outlined" data-mode="add" title="${t('Add as a new layer of the bus')}"><wa-icon name="plus" label="${t('Add as a new layer of the bus')}"></wa-icon></wa-button>
+      <wa-button size="xs" appearance="filled-outlined" data-mode="replace" title="${t('Replace the selected layer (or the first one)')}" ${counts[b.id] ? '' : 'disabled'}>${svg('replace', 14)}</wa-button>
     </div>`).join('');
   };
 
@@ -79,6 +79,7 @@ export function showSendMenu({ x, y, ref, buses, counts = {}, onPick, rack, onOp
     const cur = groups.find((g) => g.g === group) || groups[0];
     shown = samples.map((s) => s.ref);
     sugg = [];
+    seen = new Set();
     rkBox.innerHTML = `<div class="send-sec"><wa-icon name="drum"></wa-icon>Drum Rack
         <button class="send-grp" data-grp title="${t('Show another group of the Drum Rack')}">${esc(cur.label)} ${svg('chevron-down', 11)}</button>
         <span class="send-sec-tools">${onOpen ? ib('data-open="rack"', 'arrow-right', t('Open the Drum Rack tab')) : ''}</span></div>
@@ -86,17 +87,26 @@ export function showSendMenu({ x, y, ref, buses, counts = {}, onPick, rack, onOp
         <span>${esc(g.label)}</span><span class="send-count">${g.count || t('Empty')}</span></div>`).join('')}</div>` : ''}
       <div class="send-rk-list">${samples.map((s, k) => `<div class="send-rk-row">${ib(`data-play="${k}"`, 'play', t('Listen'), 10)}
         <span class="send-pad">${esc(s.padName)}</span><span class="send-rk-name" title="${esc(s.ref.name)}">${esc(s.ref.name)}</span></div>`).join('')}</div>
-      <div class="send-rack"><wa-button size="xs" appearance="filled-outlined" data-add title="${t('Adds the sample to this group (on the selected pad or the first free one)')}"><wa-icon slot="start" name="plus"></wa-icon>${t('Add')}</wa-button></div>
+      <div class="send-rack"><wa-button size="xs" appearance="filled-outlined" data-add title="${t('Adds the sample to this group (on the selected pad or the first free one)')}"><wa-icon name="plus" label="${t('Add')}"></wa-icon></wa-button></div>
       <div class="send-sugg"></div>`;
     place();
-    if (!samples.some((s) => s.ref.kind === 'library')) return;
-    const skip = ref.kind === 'library' ? [ref.id] : [];
-    sugg = await rack.suggest(group, skip);
-    if (tok !== token || !el.isConnected || !sugg.length) return;
-    const base = shown.length;
-    shown = [...shown, ...sugg];
-    el.querySelector('.send-sugg').innerHTML = `<div class="send-sugg-title">${t('Suggested')}</div><div class="send-sugg-row">
-      ${sugg.map((c, k) => `<div class="send-sug">${ib(`data-play="${base + k}"`, 'play', t('Listen'), 10)}
+    nGroup = samples.length;
+    if (samples.some((s) => s.ref.kind === 'library')) renderSugg(tok);
+  };
+
+  // 3 suggestions for the group; `more` skips the ones already proposed (and starts over when none is left)
+  let seen = new Set(), nGroup = 0;
+  const renderSugg = async (tok, more = false) => {
+    if (more) sugg.forEach((c) => seen.add(c.id));
+    const skip = () => [...(ref.kind === 'library' ? [ref.id] : []), ...seen];
+    let next = await rack.suggest(group, skip());
+    if (!next.length && seen.size) { seen = new Set(); next = await rack.suggest(group, skip()); }
+    if (tok !== token || !el.isConnected || !next.length) return;
+    sugg = next;
+    shown = [...shown.slice(0, nGroup), ...sugg];
+    el.querySelector('.send-sugg').innerHTML = `<div class="send-sugg-title">${t('suggested')}
+        ${ib('data-more', 'refresh-cw', t('Suggest 3 other samples'), 11)}</div><div class="send-sugg-row">
+      ${sugg.map((c, k) => `<div class="send-sug">${ib(`data-play="${nGroup + k}"`, 'play', t('Listen'), 10)}
         <button class="send-sug-name" data-sug="${k}" title="${esc(t('Add {name} to the group', { name: c.name }))}">${esc(c.name)}</button></div>`).join('')}</div>`;
     place();
   };
@@ -116,6 +126,7 @@ export function showSendMenu({ x, y, ref, buses, counts = {}, onPick, rack, onOp
     }
     if (b('[data-grp]')) { pickGroup = !pickGroup; renderRack(); return; }
     if (b('[data-g]')) { group = +b('[data-g]').dataset.g; pickGroup = false; renderRack(); return; }
+    if (b('[data-more]')) { renderSugg(token, true); return; }
     if (b('[data-play]')) { rack.preview(shown[+b('[data-play]').dataset.play]); return; }
     if (b('[data-add]') || b('[data-sug]')) {
       const r = b('[data-add]') ? ref : sugg[+b('[data-sug]').dataset.sug];
