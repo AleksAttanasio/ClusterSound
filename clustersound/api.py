@@ -94,7 +94,7 @@ class Api:
         self._rack_cache: dict = {}
         self._rack_lock = threading.Lock()  # js_api calls run on several threads
         self._chords: ChordLibrary | None = None
-        self._recorder = chord_midi_in.Recorder()
+        self._midi_recorder = chord_midi_in.Recorder()  # Compose: melody from a MIDI keyboard
         self._live = live_server.Bridge(self._live_stage(), self._resolve, self._describe, self._title)
         self._sampler: sampler_session.SamplerSession | None = None
         self._recorder = sampler_recorder.Recorder()
@@ -1175,23 +1175,23 @@ class Api:
                 "age": round(time.time() - clip["at"])}
 
     def compose_midi_inputs(self) -> dict:
-        if not self._recorder.available():
+        if not self._midi_recorder.available():
             return {"available": False, "ports": [], "hint": i18n.tr(chord_midi_in.HINT)}
         try:
-            return {"available": True, "ports": self._recorder.ports()}
+            return {"available": True, "ports": self._midi_recorder.ports()}
         except Exception as e:
             return {"available": False, "ports": [], "hint": i18n.tr("MIDI not available: {error}", error=e)}
 
     def compose_record_start(self, port: int = 0) -> dict:
         try:
-            self._recorder.start(int(port))
+            self._midi_recorder.start(int(port))
         except Exception as e:
             return {"error": str(e)}
         return {"ok": True}
 
     def compose_record_stop(self, offset: float, bpm: float, bars: int, grid: int = 1, loop: bool = False) -> dict:
         """The take: offset = seconds from record start to the transport's first beat."""
-        notes = self._recorder.stop()
+        notes = self._midi_recorder.stop()
         ppq = chord_perform.PPQ
         spans = chord_midi_in.to_ticks(notes, float(offset), float(bpm), ppq, int(bars) * 4 * ppq if loop else None)
         return {"notes": chord_melody.from_spans(spans, ppq, max(1, int(grid)), keep=True)}
