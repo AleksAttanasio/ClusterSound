@@ -148,6 +148,23 @@ jobs:
           path: ${{ steps.zip.outputs.name }}
           if-no-files-found: error
 
+      - name: Check the GUI from the downloaded zip
+        # Unzipped as a user would after downloading it: every file marked as coming from the internet
+        # (Zone.Identifier), which makes .NET Framework refuse to load Python.Runtime.dll unless the exe allows it
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP "downloaded"
+          Expand-Archive "${{ steps.zip.outputs.name }}" -DestinationPath $dir
+          Get-ChildItem $dir -Recurse -File | ForEach-Object {
+            Set-Content -LiteralPath $_.FullName -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3"
+          }
+          $log = Join-Path $env:RUNNER_TEMP "check-gui.log"
+          $p = Start-Process (Join-Path $dir "ClusterSound\ClusterSound.exe") -ArgumentList "--check-gui", "`"$log`"" -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            if (Test-Path $log) { Get-Content $log }
+            Write-Error "ClusterSound.exe --check-gui exited with $($p.ExitCode)"; exit 1
+          }
+
   release:
     needs: [build, build-windows]
     if: startsWith(github.ref, 'refs/tags/')
