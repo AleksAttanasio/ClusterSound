@@ -228,7 +228,7 @@ def lib_api(tmp_path):
                       "info": {"duration": 0.5}})
 
     class Lib:
-        root = str(tmp_path / "lib")
+        roots = [str(tmp_path / "lib")]
     a = object.__new__(Api)
     a._lib = Lib()
     a._lib.items = items
@@ -249,7 +249,9 @@ def test_library_browse_folders_files_search(lib_api):
     hits = lib_api.sampler_library_browse("", "LOOP")
     assert [f["rel"] for f in hits["files"]] == ["Pack A/Loops/loop 1.wav", "Pack A/Loops/loop 2.wav"]
     assert lib_api.sampler_library_browse("", "l")["folders"]  # 1 character: browse, not search
-    lib_api._lib.root = None
+    lib_api._lib.roots = [str(lib_api._lib.roots[0]), "/other"]  # several folders: the top is "Library"
+    assert lib_api.sampler_library_browse()["crumbs"][0]["name"] == "Library"
+    lib_api._lib.roots = []
     assert lib_api.sampler_library_browse()["error"]
 
 

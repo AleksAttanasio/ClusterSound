@@ -23,7 +23,9 @@
 
   <div class="content">
   <header class="page-head">
-    <div class="crumb"><span id="crumb-title" class="crumb-title"></span><span id="crumb-sep" class="crumb-sep" hidden>/</span><span id="crumb-sub" class="crumb-sub" hidden></span></div>
+    <div class="crumb"><span id="crumb-title" class="crumb-title"></span><span id="crumb-sep" class="crumb-sep" hidden>/</span>
+      <button id="crumb-sub" class="crumb-sub" type="button" hidden><span id="crumb-path" class="crumb-path"></span><wa-icon name="chevron-down"></wa-icon></button>
+      <wa-button id="lib-refresh" class="icon-btn" appearance="plain" size="s" hidden title="Refresh the selected folders" data-i18n-title="Refresh the selected folders"><wa-icon name="refresh-cw" label="Refresh the selected folders" data-i18n-label="Refresh the selected folders"></wa-icon></wa-button></div>
     <div class="head-tools" data-for="library">
       <div class="progress-wrap" id="progress-wrap" hidden>
         <wa-progress-bar id="progress-bar" class="progress" value="0" label="Analysis progress" data-i18n-label="Analysis progress"></wa-progress-bar>
@@ -46,7 +48,7 @@
         <wa-radio appearance="button" value="instrument" data-i18n="By instrument">By instrument</wa-radio>
       </wa-radio-group>
     </div>
-    <wa-button id="head-more" class="icon-btn more-btn" appearance="plain" size="s" title="Section settings" data-i18n-title="Section settings" data-settings-link=""><wa-icon name="ellipsis" label="Section settings" data-i18n-label="Section settings"></wa-icon></wa-button>
+    <wa-button id="head-more" class="icon-btn more-btn" appearance="plain" size="s" title="Section settings" data-i18n-title="Section settings" data-settings-link=""><wa-icon name="settings" label="Section settings" data-i18n-label="Section settings"></wa-icon></wa-button>
   </header>
 
   <div class="layout" id="library">

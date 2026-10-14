@@ -26,7 +26,7 @@ from .enhance import job as enhance_job
 from .enhance import models as enhance_models
 from .enhance import runner as enhance_runner
 from .features import TYPES
-from .library import AUDIO_EXT, Library
+from .library import AUDIO_EXT, Library, normalize_roots
 from .live import payload as live_payload
 from .live import server as live_server
 from .online import cache as online_cache
@@ -58,6 +58,7 @@ from .sampler import stems as sampler_stems
 
 PREVIEW_MAX_SECONDS = 60
 LIBRARY_BROWSE_MAX = 200  # search results shown by "Dalla libreria…"
+FOLDER_HISTORY_MAX = 20  # library folders remembered in the header dropdown
 EXPORT_DIR = os.path.expanduser("~/Music/ClusterSound Patterns")
 AUDIO_TYPES = ("Audio (*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg)",)
 
@@ -123,10 +124,22 @@ class Api:
         s = self._settings() | kw
         self._settings_path.write_text(json.dumps(s), encoding="utf-8")
 
+    def _folders(self) -> tuple[list[str], list[str]]:
+        """(selected library folders, folder history most recent first); older settings had last_folder."""
+        s = self._settings()
+        last = [s["last_folder"]] if s.get("last_folder") else []
+        folders = s.get("library_folders", last)
+        history = s.get("folder_history", last)
+        return list(folders), list(history)
+
+    def _save_folders(self, folders: list[str], history: list[str]) -> None:
+        self._save_settings(library_folders=folders, folder_history=history[:FOLDER_HISTORY_MAX])
+
     # ------------------------------------------------------------------ setup
     def init(self) -> dict:
+        folders, history = self._folders()
         return {"classes": taxonomy.ui_classes(), "groups": taxonomy.GROUPS, "types": TYPES,
-                "last_folder": self._settings().get("last_folder"), "language": i18n.language()}
+                "folders": folders, "history": history, "language": i18n.language()}
 
     def pick_folder(self) -> str | None:
         import webview
@@ -135,19 +148,33 @@ class Api:
             return None
         return res[0] if isinstance(res, (list, tuple)) else res
 
-    def start_scan(self, path: str) -> bool:
-        if not path or not os.path.isdir(path):
+    def start_scan(self, paths) -> dict:
+        """Analyse the union of the selected folders (an empty list empties the library); unchanged
+        files come from the snapshot or the feature cache. Selected folders join the history."""
+        folders = normalize_roots(paths)
+        _, history = self._folders()
+        history = folders + [h for h in history if h not in folders]
+        self._save_folders(folders, history)
+        self._lib.start_scan(folders)
+        return {"ok": bool(folders) or not paths, "folders": folders, "history": history[:FOLDER_HISTORY_MAX]}
+
+    def restore(self, paths) -> bool:
+        """At startup: show the selected folders from their snapshot, without re-analysing them."""
+        folders = normalize_roots(paths)
+        if not folders:
             return False
-        self._save_settings(last_folder=path)
-        self._lib.start_scan(path)
+        self._lib.start_scan(folders, snapshot_only=True)
         return True
 
-    def restore(self, path: str) -> bool:
-        """At startup: show the last folder from its snapshot, without re-analysing it."""
-        if not path or not os.path.isdir(path):
-            return False
-        self._lib.start_scan(path, snapshot_only=True)
-        return True
+    def forget_folder(self, path: str) -> dict:
+        """Drop a folder from the history (and from the selection, rebuilding the library without it)."""
+        folders, history = self._folders()
+        history = [h for h in history if h != path]
+        if path in folders:
+            folders = [f for f in folders if f != path]
+            self._lib.start_scan(folders)
+        self._save_folders(folders, history)
+        return {"folders": folders, "history": history}
 
     def progress(self) -> dict:
         return {**self._lib.progress, "version": self._lib.version,
@@ -157,11 +184,13 @@ class Api:
     def results(self) -> dict:
         """Columnar payload: compact enough for tens of thousands of points."""
         lib = self._lib
+        if any("cls" not in it for it in lib.items):  # mid-scan: analysed, not classified yet
+            return {"version": lib.version, "pending": True}
         items = lib.public_items()
         cls_index = {c["id"]: i for i, c in enumerate(taxonomy.ui_classes())}
         return {
             "version": lib.version,
-            "root": lib.root,
+            "roots": lib.roots,
             "layout": lib.layout_kind,
             "stats": {k: v for k, v in lib.stats.items() if isinstance(v, (int, float, str))},
             "errors": len(lib.errors),
@@ -349,10 +378,7 @@ class Api:
         return {"error": None, "queued": queued, "in_library": self._downloads_in_library()}
 
     def _inside_library(self, folder: str) -> bool:
-        lib_root = self._lib.root
-        if not lib_root:
-            return False
-        return is_inside(folder, lib_root)
+        return any(is_inside(folder, r) for r in self._lib.roots)
 
     def _downloads_in_library(self) -> bool:
         return self._inside_library(self._settings().get("download_dir") or DEFAULT_DIR)
@@ -375,8 +401,8 @@ class Api:
             self._rescan_timer.daemon = True
             self._rescan_timer.start()
             return
-        if self._lib.root and self._lib.progress.get("phase") not in ("scanning", "analysing", "classifying", "layout"):
-            self._lib.start_scan(self._lib.root)  # unchanged files come from the feature cache
+        if self._lib.roots and self._lib.progress.get("phase") not in ("scanning", "analysing", "classifying", "layout"):
+            self._lib.start_scan(self._lib.roots)  # unchanged files come from the feature cache
 
     def online_expand(self, uid: str, params: dict) -> dict:
         return online.expand(uid, params or {})
@@ -478,13 +504,15 @@ class Api:
         """The library as folders and files, for "Dalla libreria…": the subfolders of folder (with how many
         files are under each) and its files; with q (2+ characters) the matching files of the whole library."""
         items = self._lib.items
-        if not self._lib.root or not items:
+        roots = self._lib.roots
+        if not roots or not items:
             return {"error": i18n.tr("no library open: choose one in the Library tab")}
         folder = "/".join(p for p in (folder or "").split("/") if p not in ("", ".", ".."))
         file_of = lambda it: {"id": it["id"], "name": it["name"], "rel": it["rel"], "cls": it["cls"],
                               "dur": round(float(it["info"].get("duration", 0)), 2)}
-        out = {"error": None, "root": self._lib.root, "folder": folder, "q": q or "",
-               "crumbs": [{"name": os.path.basename(self._lib.root.rstrip("/" + os.sep)) or i18n.tr("Library"), "path": ""}]
+        top = (os.path.basename(roots[0].rstrip("/" + os.sep)) if len(roots) == 1 else "") or i18n.tr("Library")
+        out = {"error": None, "root": roots[0] if len(roots) == 1 else None, "folder": folder, "q": q or "",
+               "crumbs": [{"name": top, "path": ""}]
                + [{"name": part, "path": "/".join(folder.split("/")[:i + 1])}
                   for i, part in enumerate(folder.split("/")) if folder],
                "folders": [], "files": []}
