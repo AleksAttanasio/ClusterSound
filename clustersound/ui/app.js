@@ -710,10 +710,10 @@ async function sendRef(ref, x, y) {
   await pattern.ensure();
   showSendMenu({ x, y, ref, buses: pattern.buses, counts: pattern.layerCounts(),
     onPick: (bus, mode) => pattern.addSample(bus, ref, mode),
-    rack: { target: await rack.sendTarget(), onAdd: async (similar, open) => {
-      await rack.addSample(ref, { similar });
-      if (open) setTab('rack');
-    } } });
+    rack: { group: (await rack.ensure(), rack.currentGroup), groups: () => rack.groupList(),
+      samples: (g) => rack.groupSamples(g), suggest: (g, skip) => rack.suggestForGroup(g, 3, skip),
+      add: (r, g) => rack.addSample(r, { group: g }), preview: (r) => rack.audition(r) },
+    onOpen: (tab) => setTab(tab) });
 }
 
 async function sendLibraryItem(id, x, y) {
