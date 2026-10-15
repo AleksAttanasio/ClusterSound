@@ -1147,7 +1147,24 @@ wa-button.rc-rec.on::part(base) { background: #ef5350; border-color: #ef5350; co
 .sp-lib-row:hover { background: var(--bg); border-color: var(--line); }
 .sp-lib-row.busy { opacity: .5; pointer-events: none; }
 .sp-lib-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.st-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+.popover.st-pop { width: 600px; max-width: calc(100vw - 16px); }
+.st-board { display: grid; grid-template-columns: auto 1fr; gap: 10px; min-width: 0; }
+.st-palette { display: flex; flex-direction: column; gap: 5px; padding-right: 10px; border-right: 1px solid var(--line); }
+.st-palette .st-chip { cursor: grab; }
+.st-palette .st-chip:active { cursor: grabbing; }
+.st-chip { display: inline-flex; align-items: center; gap: 2px; padding: 3px 4px 3px 8px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--bg-3); font-size: 12px; white-space: nowrap; user-select: none; }
+.st-palette .st-chip { padding-right: 8px; }
+.st-x { display: inline-flex; padding: 2px; border: 0; border-radius: 999px; background: none; color: var(--text-3); cursor: pointer; font-size: 11px; }
+.st-x:hover { color: var(--text); background: var(--bg); }
+.st-cols { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; min-width: 0; }
+.st-col { flex: 0 0 132px; display: flex; flex-direction: column; gap: 6px; min-height: 150px; padding: 6px; border: 1px solid var(--line-2); border-radius: var(--radius); background: var(--bg); }
+.st-col-head { display: flex; align-items: center; gap: 4px; min-height: 20px; }
+.st-col-name { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-col-body { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
+.st-col.ghost { opacity: .55; border-style: dashed; background: none; }
+.st-col.ghost .st-col-name { color: var(--text-3); font-weight: 500; }
+.st-col.over { opacity: 1; border-color: var(--sel-line); background: var(--sel-bg); }
+.st-rest:empty { display: none; }
 wa-radio-group.seg.st-scope::part(form-control-input) { flex-wrap: wrap; }
 .st-meter { height: 6px; flex: none; }
 .st-meter > div { height: 100%; background: var(--cs-gradient-h); transition: width 200ms linear; }
