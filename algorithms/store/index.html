@@ -1836,13 +1836,23 @@ type, duration, BPM, key, lossless, suspect packs), so the filters work the same
 per-file checks until they are expanded.</p>
 <h2 id="labelling-by-instrument">Labelling by instrument<a class="headerlink" href="#labelling-by-instrument" title="Permanent link">&para;</a></h2>
 <p>The sources do not know the 34 classes: every result is labelled <strong>with the same name parser as the library</strong>
-(<code>instruments.infer</code>):</p>
+(<code>instruments.infer_label</code>), which returns a class and a state: <em>sure</em>, <em>weak</em> (shown as "Class ?"), <em>mix</em> or none:</p>
 <ol>
-<li>if the tags contain non-musical context words (soccer, door, gun…) without musical words, no class;</li>
-<li>phrases rewritten into the taxonomy keywords ("bass drum" → kick);</li>
-<li>score on the title, or on the path inside a pack (with the decreasing folder weights); the tags count 0.8;</li>
-<li>the best class if the score is ≥ 0.45.</li>
+<li>phrases rewritten into the taxonomy keywords ("bass drum" → kick, "down sweep" → downlifter, "SDR" → snare);</li>
+<li>score on the title, or on the path inside a pack (with the decreasing folder weights), plus the tags at 0.8:
+   evidence from both adds up, and every extra tag that backs the same class adds 0.1;</li>
+<li>ties are broken by the title, then by the number of agreeing tags, then by taxonomy order — never by tag order
+   (Freesound sorts tags alphabetically, so "bass, kick" used to win over "kick, bass");</li>
+<li>non-musical context (soccer, car, gun…) in the title <strong>or</strong> the tags without musical words: no musical class
+   (FX and foley classes stay allowed);</li>
+<li><strong>mix</strong>: a drum class with "kit" in the title, a beat/loop whose title does not name the drum, or several strong
+   classes at once. A one-shot (≤ 1.5 s, or tagged "one shot") is never a mix;</li>
+<li>a near tie (&lt; 0.15) with nothing in the name: no class (pack-wide tags like "kick snare toms" say nothing about
+   one file);</li>
+<li><em>sure</em> from 0.7 (0.6 inside a pack), <em>weak</em> from 0.45.</li>
 </ol>
+<p>Freesound packs are labelled from their own name, not from the sound that stands for them. The store home only
+shows <em>sure</em> results of the category it queried, so the badge always matches.</p>
 <p>A result is kept if its class is in the filter, or if the server already found it for that instrument and it has no
 non-musical context. The <strong>type</strong> comes from name, tags and duration (one-shot ≤ 2.5 s, loop if it has a BPM in the
 title, …); <strong>BPM</strong> (50–220) and <strong>key</strong> from the title (the key needs an accidental or the mode word, so that normal

@@ -1836,13 +1836,24 @@ durata, BPM, tonalità, lossless, pack sospetti), così i filtri valgono uguale 
 per file finché non vengono espansi.</p>
 <h2 id="etichettatura-per-strumento">Etichettatura per strumento<a class="headerlink" href="#etichettatura-per-strumento" title="Permanent link">&para;</a></h2>
 <p>Le fonti non conoscono le 34 classi: ogni risultato viene etichettato <strong>con lo stesso parser dei nomi della
-libreria</strong> (<code>instruments.infer</code>):</p>
+libreria</strong> (<code>instruments.infer_label</code>), che restituisce una classe e uno stato: <em>sicura</em>, <em>debole</em> (mostrata come
+"Classe ?"), <em>mix</em> o nessuna:</p>
 <ol>
-<li>se i tag contengono parole di contesto non musicale (soccer, door, gun…) senza parole musicali, nessuna classe;</li>
-<li>frasi riscritte nelle keyword della tassonomia ("bass drum" → kick);</li>
-<li>punteggio sul titolo, o sul percorso dentro un pack (con i pesi decrescenti delle cartelle); i tag contano 0,8;</li>
-<li>la classe migliore se il punteggio è ≥ 0,45.</li>
+<li>frasi riscritte nelle keyword della tassonomia ("bass drum" → kick, "down sweep" → downlifter, "SDR" → snare);</li>
+<li>punteggio sul titolo, o sul percorso dentro un pack (con i pesi decrescenti delle cartelle), più i tag a 0,8:
+   le prove si sommano, e ogni tag in più che conferma la stessa classe aggiunge 0,1;</li>
+<li>i pareggi si risolvono col titolo, poi col numero di tag concordi, poi con l'ordine della tassonomia — mai con
+   l'ordine dei tag (Freesound li ordina alfabeticamente, quindi "bass, kick" vinceva su "kick, bass");</li>
+<li>contesto non musicale (soccer, car, gun…) nel titolo <strong>o</strong> nei tag senza parole musicali: nessuna classe musicale
+   (FX e foley restano ammesse);</li>
+<li><strong>mix</strong>: una classe di batteria con "kit" nel titolo, un beat/loop il cui titolo non nomina il pezzo, o più classi
+   forti insieme. Un one-shot (≤ 1,5 s, o con tag "one shot") non è mai un mix;</li>
+<li>quasi pareggio (&lt; 0,15) senza indizi nel nome: nessuna classe (tag di tutto il pack come "kick snare toms" non
+   dicono nulla del singolo file);</li>
+<li><em>sicura</em> da 0,7 (0,6 dentro un pack), <em>debole</em> da 0,45.</li>
 </ol>
+<p>I pack Freesound sono etichettati dal proprio nome, non dal suono che li rappresenta. La home dello Store mostra solo
+risultati <em>sicuri</em> della categoria cercata, così il badge corrisponde sempre.</p>
 <p>Un risultato è tenuto se la classe è nel filtro, oppure se il server l'ha già trovato per quello strumento e non ha
 contesto non musicale. Il <strong>tipo</strong> viene da nome, tag e durata (one-shot ≤ 2,5 s, loop se ha un BPM nel titolo, …);
 <strong>BPM</strong> (50–220) e <strong>tonalità</strong> dal titolo (la tonalità richiede un'alterazione o la parola del modo, per non leggere
