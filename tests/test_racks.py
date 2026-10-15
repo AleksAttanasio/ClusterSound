@@ -28,18 +28,32 @@ def test_group_shapes():
     assert layouts.groups("quadcols")[4] == [4, 12, 20, 28]  # first column of the bottom-right quadrant
 
 
-@pytest.mark.parametrize("mapping", ["launchpad", "rows"])
-def test_notes_are_unique(mapping):
-    notes = [layouts.note_for(p, mapping) for p in range(64)]
+@pytest.mark.parametrize("mapping,quads", [("launchpad", "CABD"), ("launchpad", "CDAB"), ("launchpad", "DBCA"), ("rows", "CABD")])
+def test_notes_are_unique(mapping, quads):
+    notes = [layouts.note_for(p, mapping, quads) for p in range(64)]
     assert sorted(notes) == list(range(36, 100))
 
 
 def test_launchpad_quadrants():
+    # default = the Launchpad's Drum mode: 84-99 top left, 52-67 top right, 36-51 bottom left, 68-83 bottom right
     n = lambda r, c: layouts.note_for(layouts.pad(r, c))  # noqa: E731
     assert n(0, 0) == 36 and n(0, 3) == 39 and n(3, 3) == 51
-    assert n(0, 4) == 52 and n(0, 7) == 55
-    assert n(4, 0) == 68 and n(7, 0) == 80
-    assert n(7, 7) == 99
+    assert n(0, 4) == 68 and n(0, 7) == 71
+    assert n(4, 0) == 84 and n(7, 0) == 96
+    assert n(4, 4) == 52 and n(7, 7) == 67
+
+
+def test_live_quadrants():
+    n = lambda r, c: layouts.note_for(layouts.pad(r, c), "launchpad", "CDAB")  # noqa: E731
+    assert n(0, 0) == 36 and n(0, 4) == 52 and n(4, 0) == 68 and n(7, 7) == 99
+
+
+def test_quads_are_validated():
+    assert layouts.new_rack()["quads"] == "CABD"
+    assert layouts.validate({"quads": "AABB"})["quads"] == "CABD"
+    assert layouts.validate({})["quads"] == "CABD"
+    r = layouts.validate({"quads": "DCBA"})
+    assert r["quads"] == "DCBA" and layouts.note_of(r, 0) == 52
 
 
 def test_group_settings_defaults_and_overrides():
@@ -186,8 +200,8 @@ def test_export_rack(tmp_path, samples):
     rack["pads"][0] = kick                      # col 0 (kick group), note 36
     rack["pads"][layouts.pad(1, 0)] = kick      # same file on another pad, note 40
     rack["pads"][1] = snare                     # col 1, note 37
-    rack["pads"][layouts.pad(7, 3)] = chat      # col 3 (closed hat, choke 1), note 83
-    rack["pads"][layouts.pad(0, 4)] = ohat      # col 4 (open hat, choke 1), note 52
+    rack["pads"][layouts.pad(7, 3)] = chat      # col 3 (closed hat, choke 1), note 99
+    rack["pads"][layouts.pad(0, 4)] = ohat      # col 4 (open hat, choke 1), note 68
     rack["pads"][5] = {"kind": "file", "path": str(tmp_path / "missing.wav"), "name": "missing.wav"}
     out = tmp_path / "out"
     out.mkdir()
@@ -196,10 +210,10 @@ def test_export_rack(tmp_path, samples):
     doc = ET.fromstring(gzip.open(os.path.join(folder, "Test Kit Drum Rack.adg")).read())
     branches = doc.findall(".//DrumBranchPreset")
     notes = sorted(128 - int(b.find("ZoneSettings/ReceivingNote").get("Value")) for b in branches)
-    assert notes == [36, 37, 40, 52, 83]
+    assert notes == [36, 37, 40, 68, 99]
     chokes = {128 - int(b.find("ZoneSettings/ReceivingNote").get("Value")): int(b.find("ZoneSettings/ChokeGroup").get("Value"))
               for b in branches}
-    assert chokes[83] == 1 and chokes[52] == 1 and chokes[36] == 0
+    assert chokes[99] == 1 and chokes[68] == 1 and chokes[36] == 0
     for b in branches:
         fr = b.find(".//SampleRef/FileRef")
         rel = [e.get("Dir") for e in fr.find("RelativePath")]
