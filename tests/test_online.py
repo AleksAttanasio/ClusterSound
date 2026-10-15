@@ -81,6 +81,8 @@ def test_infer_instrument(title, tags, path, expected):
     ("Trap drum loop", ["808", "hihat", "kick", "snare", "trap"], "", (None, "mix")),
     ("TR-909 Drum Kit", [], "", (None, "mix")),
     ("808 Drum Kit", [], "", (None, "mix")),
+    ("01 - hip hop drum beat", ["drums", "hip_hop", "beat", "beats", "snare"], "", (None, "mix")),
+    ("Kick loop 120bpm", ["kick", "loop"], "", ("kick", "sure")),
     ("Express Yourself", ["arp", "bass", "beat", "clap", "cymbals", "dance"], "", (None, "mix")),
     # non-musical context in the title, not only in the tags
     ("Car crash", [], "", (None, None)),
@@ -339,3 +341,21 @@ network = pytest.mark.skipif(not os.environ.get("CLUSTERSOUND_NETWORK_TESTS"),
 def test_live_sources(source):
     res = S.search_source(source, {"instruments": ["kick"]}, 1, {})
     assert res["error"] is None and res["fetched"] > 0
+
+
+def test_showcase_source(monkeypatch):
+    """Store home carousel: only surely labelled results of each category, interleaved across categories."""
+    search = S
+
+    def fake(name, p, page, settings, packs=False):
+        cid = p["instruments"][0]
+        rows = [{"uid": f"{cid}{i}", "author": f"{cid}-a{i}", "instrument": cid, "label_state": "sure"} for i in range(3)]
+        rows.insert(0, {"uid": f"{cid}-weak", "author": "x", "instrument": cid, "label_state": "weak"})
+        rows.insert(0, {"uid": f"{cid}-other", "author": "y", "instrument": "pad", "label_state": "sure"})
+        return {"results": rows, "error": None}
+
+    monkeypatch.setattr(search, "search_source", fake)
+    d = search.showcase_source("openverse", {})
+    cats = catalog.SHOWCASE_LIMITED["openverse"]
+    assert [r["uid"] for r in d["results"]] == [f"{c}0" for c in cats] + [f"{c}1" for c in cats]
+    assert search.showcase_source("freesound", {})["needs_key"]

@@ -4,7 +4,7 @@ from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
 from ..i18n import tr
-from . import archive, ccmixter, freesound, openverse
+from . import archive, catalog, ccmixter, freesound, openverse
 from . import instruments as inst
 from .base import LICENSE_GROUPS, OnlineResult, SourceError
 
@@ -235,3 +235,38 @@ def featured(settings: dict) -> dict:
     with ThreadPoolExecutor(max_workers=len(jobs)) as ex:
         futs = {k: ex.submit(fn) for k, fn in jobs.items()}
         return {k: f.result() for k, f in futs.items()}
+
+
+def showcase_source(name: str, settings: dict) -> dict:
+    """Store home: a varied carousel of one source's samples, a few per category.
+
+    Only results surely labelled as the queried category are kept,
+    so the category badge on every card is the one the user would expect.
+    """
+    if name not in SOURCES:
+        return {"source": name, "results": [], "error": tr("unknown source"), "needs_key": False}
+    if name == "freesound" and not (settings or {}).get("freesound_key"):
+        return {"source": name, "results": [], "error": tr("API key missing"), "needs_key": True}
+    cats = catalog.SHOWCASE_LIMITED.get(name, catalog.SHOWCASE_CATEGORIES)
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        res = list(ex.map(lambda c: search_source(name, {"instruments": [c], "sort": "downloads"}, 1, settings), cats))
+    buckets, errors, seen, authors = [], [], set(), {}
+    for cid, d in zip(cats, res):
+        if d.get("error"):
+            errors.append(d["error"])
+            continue
+        rows = [r for r in d["results"] if r["instrument"] == cid and r["label_state"] == "sure"]
+        picked = []
+        for r in rows:
+            if r["uid"] in seen or authors.get(r["author"], 0) >= 2:
+                continue  # one prolific uploader must not fill the carousel
+            picked.append(r)
+            seen.add(r["uid"])
+            authors[r["author"]] = authors.get(r["author"], 0) + 1
+            if len(picked) == catalog.SHOWCASE_PER_CATEGORY:
+                break
+        buckets.append(picked)
+    # round robin across categories: kick, snare, hat, … then the second of each
+    out = [b[i] for i in range(catalog.SHOWCASE_PER_CATEGORY) for b in buckets if i < len(b)]
+    error = errors[0] if errors and not out else None
+    return {"source": name, "results": out, "error": error, "needs_key": bool(error and "API key" in error)}

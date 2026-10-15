@@ -77,6 +77,7 @@ def _rewrite(text: str) -> str:
 _MIX_CONTEXT = {"kit", "kits", "drumkit", "drumkits", "drums", "beat", "beats", "breakbeat", "breakbeats",
                 "loop", "loops", "groove", "pack", "full"}
 _KIT = {"kit", "kits", "drumkit", "drumkits"}
+_BEAT = {"beat", "beats", "breakbeat", "breakbeats", "groove", "grooves", "drumloop", "drumloops"}
 _MUSICAL_GROUPS = {"Drums", "Percussion", "Melodic/Bass", "Vocal"}
 _GROUP = {c.id: c.group for c in taxonomy.CLASSES}
 _ORDER = {c.id: i for i, c in enumerate(taxonomy.CLASSES)}
@@ -130,8 +131,12 @@ def infer_label(title: str, tags: list[str] | None = None, path: str = "") -> tu
     # a football kick, a car crash: musical classes need a musical context
     if context & NONMUSIC and not context & MUSIC and _GROUP[best] in _MUSICAL_GROUPS:
         return None, None
-    if kit and _GROUP[best] in ("Drums", "Percussion"):
-        return None, "mix"
+    if _GROUP[best] in ("Drums", "Percussion"):
+        if kit:
+            return None, "mix"
+        # a beat tagged "snare" is still a whole beat, unless its title names the drum ("Kick loop")
+        if (loop or context & _BEAT) and title_scores.get(best, 0.0) < CANDIDATE:
+            return None, "mix"
     strong = [c for c in ranked if scores[c] >= CANDIDATE]
     drums = [c for c in strong if _GROUP[c] in ("Drums", "Percussion")]
     if len(strong) >= 3 or (len(drums) >= 2 and (loop or context & _MIX_CONTEXT or taxonomy.is_loop_name(tags))):

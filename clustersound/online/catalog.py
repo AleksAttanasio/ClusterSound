@@ -38,6 +38,12 @@ PROVIDERS = [
      "description": N_("Tens of thousands of loops and one-shots from Computer Music and Future Music, royalty-free.")},
 ]
 
+# Store home: categories sampled for each live source (one query each, so a varied carousel).
+# Openverse's anonymous rate limit is tight: fewer queries there.
+SHOWCASE_CATEGORIES = ["kick", "snare", "closed_hat", "hand_drum", "bass", "synth", "keys", "vocal", "riser", "impact"]
+SHOWCASE_LIMITED = {"openverse": ["kick", "snare", "synth", "vocal"]}
+SHOWCASE_PER_CATEGORY = 2
+
 _NO_REDIST = N_("Royalty-free, commercial use included; redistributing the files as they are is not allowed.")
 
 # instruments: class ids of clustersound.taxonomy (used for the store's category tiles)
