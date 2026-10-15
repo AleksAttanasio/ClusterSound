@@ -8,7 +8,7 @@ Su Windows `Ctrl` al posto di `⌘`.
 | | `Esc` | chiude la tendina |
 | | `↑` `↓` (lista) | sample precedente/successivo, con ascolto |
 | | `Alt`+clic su una classe | solo quella classe |
-| Recorder | `Spazio` | play/stop |
+| Recorder | `Spazio` | riproduci/pausa |
 | | `↑` `↓` | regione precedente/successiva |
 | | `Canc` | elimina la regione |
 | | rotella / `Maiusc`+rotella | zoom / scorri |

@@ -8,7 +8,7 @@ On Windows `Ctrl` instead of `⌘`.
 | | `Esc` | closes the drawer |
 | | `↑` `↓` (list) | previous/next sample, with playback |
 | | `Alt`+click on a class | only that class |
-| Recorder | `Space` | play/stop |
+| Recorder | `Space` | play/pause |
 | | `↑` `↓` | previous/next region |
 | | `Del` | deletes the region |
 | | wheel / `Shift`+wheel | zoom / scroll |

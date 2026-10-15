@@ -1,7 +1,8 @@
-// "Recorder" screen: record what the computer sends to one or more output devices (one file each, several formats),
-// then open a recording below to mark regions on its waveform (by hand or on transients) and export them as
-// samples. Opening own files and openly licensed links is still here, hidden while show_sources is false.
-import { btn, iconBtn, slider, check, num, select, seg, text, setPlayButton, icon, openDialog, FILE_MANAGER } from './kit.js';
+// "Recorder" screen: a file bar on top (the shown track and a button to open another one), one tab per open track
+// over the waveform, a media-player transport under it (play/pause from the cursor, stop, show all, record the
+// audio output), then the "Extractions" of all the open tracks in three tabs: Cuts (regions marked by hand or on
+// transients), Stems and Enhanced (files already made from them, found again on disk).
+import { btn, iconBtn, slider, check, num, select, seg, text, icon, openDialog, FILE_MANAGER } from './kit.js';
 import { toast, showPopover } from './sendmenu.js';
 import { liveToast } from './live.js';
 import { settingsLink, setRow, savedFlash } from './settings.js';
@@ -12,6 +13,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const LS_KEY = 'clustersound.sampler';
 const EDGE_PX = 6;         // grab distance of a region edge
 const MIN_VIEW_S = 0.02;   // deepest zoom
+const PLAY_BLOCK_S = 30;   // a track plays in blocks this long (rendered by the backend one at a time)
 // English source text: t() where shown
 const ORIGIN_LABEL = { file: 'File', link: 'Link', capture: 'Recording' };
 const CAPTURE_NOTE = 'Recording for personal use (private copy): nothing is decrypted or bypassed, and apps '
@@ -25,33 +27,45 @@ const fmt = (sec) => {
 };
 
 export class SamplerEditor {
-  constructor({ api, player, onSendToRack, classes = [] }) {
+  constructor({ api, player, onSendToRack, onSend, getBuses, onSendToBus, classes = [] }) {
     this.api = api;
     this.classes = classes;   // library classes, for the labels in "From the library…"
     this.onSendToRack = onSendToRack; // (refs) -> loads them on the Drum Rack
+    this.onSend = onSend;             // (ref, x, y) -> the "Send" menu of the library (Sequencer bus or Drum Rack group)
+    this.getBuses = getBuses;         // async () -> the Sequencer buses
+    this.onSendToBus = onSendToBus;   // (refs, busId) -> new layers on that bus
     this.player = player;
     this.ready = null;
-    this.session = null;      // describe() of the open audio
-    this.token = 0;           // bumps when a new source opens
+    this.tracks = [];         // open tracks (tabs), see _track(); the shown one is this.cur
+    this.cur = null;          // session, regions, sel, view, overview, detail and cursor read through it (see TRACK)
+    this.token = 0;           // bumps when another track is shown (late peaks are dropped)
     this.audioRev = 0;        // bumps when fades / normalisation change (player cache keys)
     this.maxS = 30;
-    this.view = { start: 0, end: 1 };
-    this.overview = null;     // peaks of the whole source
-    this.detail = null;       // peaks of the current view
-    this.regions = [];        // {start, end, name, on, file?: {key, path} of its last export}
-    this.sel = -1;
     this.drag = null;
-    this.playing = null;      // {start, end} being played
+    this.playing = null;      // {sid, start, end, key} of a track being played, or {path} of an extracted file
     this.rec = { devices: [], formats: {}, running: false, tracks: [], recordings: [] };
     this.recFmt = null;       // {format, quality, rate, channels}
     this.recDir = '';
-    this.showSources = false;
-    this.linkFiles = [];
+    this.sampDir = '';
+    this.ext = { stems: [], enhanced: [] }; // extracted files of the open tracks: {path, name, dur, sr, sid, source, on}
+    this.hidden = new Set();  // extracted files removed from the lists with "Clear all" (they stay on disk)
+    this.collapsed = new Set(); // groups of stems shown closed: "sid|name"
+    this.libCopies = new Map();  // extracted file -> its copy sent to the library (shown in the Finder until it is saved)
     this.stems = null;        // stems_status(): extra installed, model ready, last job
     this.enh = null;          // enhance_status(): models (installed, downloaded), last "Enhance" job
-    this.opts = { fade_in_ms: 1, fade_out_ms: 10, normalize: false, sensitivity: 0.5, devices: null };
+    this.opts = { fade_in_ms: 1, fade_out_ms: 10, normalize: false, sensitivity: 0.5, devices: null, tab: 'cuts' };
     try { Object.assign(this.opts, JSON.parse(localStorage.getItem(LS_KEY) || '{}')); } catch { /* private mode */ }
-    this.player.subscribe((on) => { if (!on) { this.playing = null; this._syncPlay(); } });
+    this.player.subscribe((on, id, ended) => {
+      if (on) return;
+      const p = this.playing;
+      this.playing = null;
+      if (ended && p?.key === 'cur') { // the track goes on in the next block, or the cursor goes back to the start
+        const tr = this.tracks.find((x) => x.sid === p.sid);
+        if (tr && p.end < tr.session.duration - 1e-3) { this._playFrom(tr, p.end); return; }
+        if (tr) tr.cursor = 0;
+      }
+      this._syncPlay();
+    });
   }
 
   ensure() {
@@ -63,19 +77,18 @@ export class SamplerEditor {
     const init = await this.api.sampler_init();
     this.supported = init.supported;
     this.maxS = init.max_seconds;
-    this.showSources = !!init.show_sources;
     this.rec = init.recorder;
     this.recFmt = init.settings.recorder_format;
     this.recDir = init.settings.recorder_dir;
+    this.sampDir = init.settings.sampler_dir;
     this._buildShell();
     if (this.rec.running) this._pollRec();
     this.stems = await this.api.stems_status();
-    this._renderStems();
     if (this._stemsBusy()) this._pollStems();
     this.enh = await this.api.enhance_status();
-    this._renderEnh();
     if (this._enhBusy()) this._pollEnh();
     if (init.session) await this._opened(init);
+    else { this._renderTracks(); this.renderRegions(); }
   }
 
   async show() {
@@ -92,88 +105,56 @@ export class SamplerEditor {
   // ---------------------------------------------------------------- shell
   _buildShell() {
     const root = $('#sampler');
-    const o = this.opts;
+    const tab = (id, ic, label, cls = '') => `<button class="sp-tab ${cls}" data-tab="${id}" role="tab">${icon(ic)}<span>${label}</span><span class="sp-tab-n"></span></button>`;
     root.innerHTML = `
-      <aside class="sidebar sp-side">
-        <div class="filter-block">
-          <div class="filter-title">${t('Open audio')}</div>
-          <div class="sp-open-row">
-            ${btn(t('Open file…'), { icon: 'folder-open', id: 'sp-open-file', title: t('An audio file on the computer (wav, aif, flac, mp3, ogg…)') })}
-            ${btn(t('From the library…'), { icon: 'list', id: 'sp-open-lib', title: t('A sample or a loop of the ClusterSound library, by folder or by name') })}
-          </div>
-          <div class="hint">${t('Or drag an audio file from {app} onto the waveform.', { app: FILE_MANAGER })}</div>
-        </div>
-        ${this.showSources ? `<div class="filter-block">
-          <div class="filter-title">${t('Source')}</div>
-          ${btn(t('Open audio file…'), { icon: 'folder-open', cls: 'sp-wide', id: 'sp-open' })}
-          <div class="sp-link">
-            <wa-input id="sp-url" size="s" placeholder="${t('Paste a link (Freesound, Archive…)')}" autocomplete="off" with-clear></wa-input>
-            ${btn(t('Open'), { id: 'sp-url-go' })}
-          </div>
-          <div class="hint">${t('Accepted links: {sites}. YouTube, Spotify, Tidal and the other streaming services do not allow downloading the audio.', { sites: esc(this.supported) })}</div>
-          <div id="sp-files" class="sp-files" hidden></div>
-        </div>` : ''}
-        <div class="filter-block rc-block">
-          <div class="filter-title rc-title">${t('Record the audio output')} ${settingsLink('sampler', t('Outputs, format and folder'))}</div>
-          <div id="rc-devices" class="rc-devices"></div>
-          <div class="rc-folder"><span class="rc-fmt-sum" id="rc-fmt-sum"></span><span class="rc-path" id="rc-path"></span>
-            ${iconBtn('folder-open', t('Show the folder in {app}', { app: FILE_MANAGER }), { size: 'xs', id: 'rc-reveal' })}</div>
-          <div class="rc-go">
-            ${btn(t('Record'), { variant: 'brand', icon: 'circle', id: 'rc-rec', cls: 'rc-rec' })}
-            <span class="rc-clock" id="rc-clock">0:00</span>
-          </div>
-          <div class="hint" id="rc-info"></div>
-          <div class="hint sp-note">${esc(t(CAPTURE_NOTE))}</div>
-        </div>
-        <div class="filter-block">
-          <div class="filter-title">${t('Recordings')}</div>
-          <div id="rc-list" class="rc-list"></div>
-        </div>
-        <div class="filter-block">
-          <div class="filter-title">Stem</div>
-          <div id="st-box" class="rc-list"></div>
-        </div>
-        <div class="filter-block">
-          <div class="filter-title en-title">${icon('sparkles')} ${t('Enhance')}</div>
-          <div id="en-box" class="rc-list"></div>
-        </div>
-        <div class="filter-block">
-          <div class="filter-title rc-title">${t('Extracted samples')} ${settingsLink('sampler', t('Fades and normalisation'))}</div>
-          <div class="hint" id="sp-opts-sum"></div>
-          <div class="hint" id="sp-max-hint"></div>
-        </div>
-      </aside>
       <main class="sp-main">
+        <div class="sp-filebar">
+          ${icon('audio-lines')}
+          <span class="sp-path" id="sp-path" role="button" tabindex="0" title="${t('Choose a sample or an audio track…')}"></span>
+          ${iconBtn('folder-open', t('Choose a sample or an audio track…'), { id: 'sp-choose' })}
+        </div>
+        <div class="sp-tracks" id="sp-tracks" role="tablist"></div>
         <div class="sp-info" id="sp-info"></div>
         <div class="sp-toolbar">
-          ${btn('Play', { variant: 'brand', icon: 'play', id: 'sp-play' })}
-          ${iconBtn('maximize-2', t('Show all'), { id: 'sp-fit' })}
+          <span class="sp-slice">${btn(t('Slice on transients'), { icon: 'scissors', id: 'sp-slice' })}${iconBtn('ellipsis', t('Sensitivity of the slicing'), { id: 'sp-slice-more' })}</span>
           <span class="sp-sep"></span>
-          ${btn(t('Slice on transients'), { icon: 'sparkles', id: 'sp-slice' })}
-          <span class="sp-sens" title="${t('Sensitivity: higher = more slices')}">
-            <span class="hint">${t('Sensitivity')}</span>${slider(0, 1, 0.05, o.sensitivity, { id: 'sp-sens', label: t('Sensitivity') })}
-          </span>
-          <span class="sp-sep"></span>
-          ${btn(t('Extract stems'), { icon: 'audio-lines', id: 'sp-stems', title: t('Separates drums, bass, guitar, vocals and the rest, on this computer') })}
+          ${btn(t('Extract stems'), { icon: 'layers', id: 'sp-stems', title: t('Separates drums, bass, guitar, vocals and the rest, on this computer') })}
           ${btn(t('Enhance'), { icon: 'sparkles', id: 'sp-enh', cls: 'cs-ai', title: t('AI restoration of the selected region (or of all the audio): high frequencies and compression artefacts, on this computer') })}
-          <span class="spacer"></span>
-          <span class="hint" id="sp-view-info"></span>
         </div>
         <div class="sp-wave-wrap" id="sp-wave-wrap">
           <canvas id="sp-wave" class="sp-wave"></canvas>
           <canvas id="sp-overview" class="sp-overview"></canvas>
           <div class="empty sp-empty" id="sp-empty">
             <div class="empty-title">${t('Record the audio output, or open a file')}</div>
-            <div class="empty-sub">${t('Choose one or more outputs and the format, then press Record: every output goes into a file. You can also open an audio file or a library sample, or drag it here from {app}. Open a recording to cut samples: drag on the waveform to create a region (max {max}) or use «Slice on transients». Wheel: zoom · Shift+wheel: scroll.', { app: FILE_MANAGER, max: '<span class="sp-max"></span>' })}</div>
+            <div class="empty-sub">${t('Press ● under the waveform to record the outputs chosen in Settings: every output goes into a file. Or choose an audio file or a library sample with the folder button above, or drag it here from {app}. Then drag on the waveform to cut a region (max {max}) or use «Slice on transients». Wheel: zoom · Shift+wheel: scroll.', { app: FILE_MANAGER, max: '<span class="sp-max"></span>' })}</div>
           </div>
         </div>
-        <div class="sp-regions-head">
-          <span class="filter-title">${t('Regions')} <span id="sp-count"></span></span>
+        <div class="sp-transport">
+          <span></span>
+          <div class="sp-transport-mid">
+          ${iconBtn('square', t('Stop'), { id: 'sp-stop' })}
+          <wa-button id="sp-play" class="sp-play" variant="brand" size="s" title="${t('Play')}">${icon('play', t('Play'))}</wa-button>
+          ${iconBtn('maximize-2', t('Show all the track'), { id: 'sp-fit' })}
+          <span class="sp-sep"></span>
+          <wa-button id="rc-rec" class="rc-rec" appearance="filled-outlined" size="s">${icon('circle', t('Record'))}</wa-button>
+          <span class="rc-clock" id="rc-clock">0:00</span>
+          <div class="rc-meters" id="rc-devices"></div>
+          <wa-icon name="triangle-alert" class="rc-warn" id="rc-warn" label="${t('Personal use only')}"></wa-icon>
+          <wa-tooltip for="rc-warn" placement="top" class="rc-warn-tip">${esc(t(CAPTURE_NOTE))}</wa-tooltip>
+          ${settingsLink('sampler', t('Outputs, format and folder'))}
+          </div>
+          <span class="hint sp-view-info" id="sp-view-info"></span>
+        </div>
+        <div class="sp-ext-head">
+          <span class="filter-title">${t('Extractions')} <span id="sp-count"></span></span>
+          <div class="sp-tabs" role="tablist">
+            ${tab('cuts', 'scissors', t('Cuts'))}${tab('stems', 'layers', t('Stems'))}${tab('enhanced', 'sparkles', t('Enhanced'), 'cs-ai-tab')}
+          </div>
           <span class="spacer"></span>
-          ${btn(t('Clear'), { icon: 'trash-2', id: 'sp-clear' })}
-          ${btn(t('Send to Live'), { icon: 'music', id: 'sp-live', title: t('Puts the selected region, or with no selection all the open audio, on a new audio track in Live (needs the ClusterSound device in the set). The file also stays in the Live browser: User Library › ClusterSound › Audio') })}
-          ${btn(t('To the Drum Rack'), { icon: 'layout-grid', id: 'sp-rack', title: t('Exports the selected regions and loads them on the free pads of the Drum Rack, to play them') })}
-          ${btn(t('Export selected'), { variant: 'brand', icon: 'file-down', id: 'sp-export' })}
+          ${btn(t('Clear all'), { icon: 'trash-2', id: 'sp-clear' })}
+          ${btn(`${t('Send to')} ${icon('chevron-down')}`, { icon: 'arrow-right', id: 'sp-send' })}
+          ${btn(t('Export all'), { variant: 'brand', icon: 'file-down', id: 'sp-export', title: t('Saves the ticked rows in the export folder: new cuts, stems and enhanced files are temporary until then, and are deleted when ClusterSound closes') })}
+          <span id="sp-ext-set">${settingsLink('sampler', t('Fades, normalisation and export folder'))}</span>
         </div>
         <div class="sp-regions" id="sp-regions"></div>
       </main>`;
@@ -182,6 +163,7 @@ export class SamplerEditor {
     this._bind();
     this._renderMax();
     this.renderInfo();
+    this._renderTabs();
     this.renderRegions();
     this._renderRecorder();
     new ResizeObserver(() => this._resize()).observe($('#sp-wave-wrap'));
@@ -190,38 +172,14 @@ export class SamplerEditor {
   _bind() {
     this._bindOpen();
     this._bindRecorder();
-    if (this.showSources) this._bindSources();
     this._bindRest();
   }
 
-  _bindSources() {
-    $('#sp-open').onclick = async () => this._opened(await this.api.sampler_open_file(null));
-    const go = async () => {
-      const url = ($('#sp-url').value || '').trim();
-      if (!url) return;
-      const b = $('#sp-url-go');
-      b.loading = true;
-      const r = await this.api.sampler_link(url);
-      b.loading = false;
-      if (r.error) return this._error(r.error);
-      if (r.files) return this._showFiles(r.files);
-      this._opened(r);
-    };
-    $('#sp-url-go').onclick = go;
-    $('#sp-url').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
-    $('#sp-files').onclick = async (e) => {
-      const row = e.target.closest('[data-uid]');
-      if (!row) return;
-      row.classList.add('busy');
-      const r = await this.api.sampler_open_result(row.dataset.uid);
-      row.classList.remove('busy');
-      this._opened(r);
-    };
-  }
-
   _bindOpen() {
-    $('#sp-open-file').onclick = async () => this._opened(await this.api.sampler_open_file(null));
-    $('#sp-open-lib').onclick = () => this.openLibrary();
+    $('#sp-choose').onclick = () => this.openChooser();
+    // the whole bar opens the chooser too
+    $('#sp-path').onclick = () => this.openChooser();
+    $('#sp-path').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.openChooser(); } };
     // the path of a file dropped from the Finder / File Explorer comes from Python (pywebview): here only the highlight
     const wrap = $('#sp-wave-wrap');
     let depth = 0;
@@ -236,6 +194,40 @@ export class SamplerEditor {
     $('#sp-wave-wrap')?.classList.remove('sp-drop');
     if (!r?.error) toast(t('Opened: {title}', { title: r.session.title }));
     this._opened(r);
+  }
+
+  // "Open audio" modal: a file of the computer, a sample of the library, or a recording of this session.
+  openChooser() {
+    const recs = (this.rec.recordings || []).map((r) => `
+      <div class="rc-item sp-rec-row" data-path="${esc(r.path)}" title="${esc(r.path)}">
+        <div class="rc-item-name">${esc(r.device)}</div>
+        <span class="hint">${clock(r.seconds)} · ${esc(r.format)} · ${mb(r.bytes)}${r.error ? ` · <span class="error">${esc(r.error)}</span>` : ''}</span>
+        ${iconBtn('pencil', t('Open in the editor'), { size: 'xs', 'data-act': 'open' })}
+        ${iconBtn('folder-open', t('Show in {app}', { app: FILE_MANAGER }), { size: 'xs', 'data-act': 'reveal' })}
+      </div>`).join('');
+    const choice = (go, ic, label, hint) => `<button class="sp-open-choice" data-go="${go}">${icon(ic)}<b>${label}</b><span class="hint">${hint}</span></button>`;
+    const dlg = openDialog('sp-open-dlg', { label: t('Open audio'), width: '560px', body: `
+      <div class="sp-open-choices">
+        ${choice('file', 'hard-drive', t('Local folder…'), t('An audio file on the computer (wav, aif, flac, mp3, ogg…)'))}
+        ${choice('lib', 'library-big', t('Sample library…'), t('A sample or a loop of the ClusterSound library, by folder or by name'))}
+      </div>
+      <div class="filter-title sp-open-sub">${icon('history')} ${t('Recent recordings')}</div>
+      <div class="rc-list">${recs || `<div class="hint">${t('The recordings of this session show up here.')}</div>`}</div>
+      <div class="hint">${t('Or drag an audio file from {app} onto the waveform.', { app: FILE_MANAGER })}</div>` });
+    dlg.querySelector('.sp-open-choices').onclick = async (e) => {
+      const go = e.target.closest('[data-go]')?.dataset.go;
+      if (!go) return;
+      dlg.close();
+      if (go === 'lib') return this.openLibrary();
+      this._opened(await this.api.sampler_open_file(null));
+    };
+    dlg.querySelector('.rc-list').onclick = async (e) => {
+      const row = e.target.closest('[data-path]');
+      if (!row) return;
+      if (e.target.closest('[data-act]')?.dataset.act === 'reveal') return this.api.reveal_path(row.dataset.path);
+      dlg.close();
+      this._opened(await this.api.recorder_open(row.dataset.path));
+    };
   }
 
   async openLibrary(folder = this.opts.libFolder || '', q = '') {
@@ -288,25 +280,45 @@ export class SamplerEditor {
   }
 
   _bindRest() {
-    $('#sp-sens').addEventListener('change', (e) => { this.opts.sensitivity = +e.target.value; this._persist(); });
+    $('#sp-slice-more').onclick = (e) => this._sliceMenu(e.currentTarget);
+    $('#sp-tracks').onclick = (e) => {
+      const b = e.target.closest('[data-sid]');
+      if (!b) return;
+      if (e.target.closest('[data-close]')) return this.closeTrack(b.dataset.sid);
+      if (b.dataset.sid !== this.cur?.sid) this.selectTrack(b.dataset.sid);
+    };
+    $('#sp-tracks').addEventListener('auxclick', (e) => { // middle click closes, like a browser tab
+      const b = e.target.closest('[data-sid]');
+      if (b && e.button === 1) this.closeTrack(b.dataset.sid);
+    });
     $('#sp-play').onclick = () => this.togglePlay();
+    $('#sp-stop').onclick = () => this.stop();
     $('#sp-fit').onclick = () => this.setView(0, this.duration);
     $('#sp-slice').onclick = () => this.autoSlice();
-    $('#sp-clear').onclick = () => { this.regions = []; this.sel = -1; this.renderRegions(); this.draw(); };
+    $('#sp-clear').onclick = () => this.clearAll();
     $('#sp-export').onclick = () => this.export();
-    $('#sp-rack').onclick = () => this.sendToRack();
-    $('#sp-live').onclick = () => this.sendToLive();
+    $('#sp-send').onclick = (e) => this._sendMenu(e.currentTarget);
     $('#sp-stems').onclick = (e) => this._stemsMenu(e.currentTarget);
-    $('#st-box').addEventListener('click', (e) => this._stemsClick(e));
     $('#sp-enh').onclick = (e) => this._enhMenu(e.currentTarget);
-    $('#en-box').addEventListener('click', (e) => this._enhClick(e));
-    $('#sp-regions').addEventListener('click', (e) => this._regionClick(e));
+    $('.sp-tabs').onclick = (e) => {
+      const b = e.target.closest('[data-tab]');
+      if (b) this.setTab(b.dataset.tab);
+    };
+    $('#sp-regions').addEventListener('click', (e) => this._rowClick(e));
     $('#sp-regions').addEventListener('change', (e) => {
+      const set = e.target.closest('[data-set]');
+      if (set && e.target.matches('[data-set-check]')) { // tick or untick every stem of the group
+        const st = this._stemSets().find((x) => `${this.ext.stems[x.idx[0]].sid}|${x.name}` === set.dataset.set);
+        st?.idx.forEach((i) => { this.ext.stems[i].on = e.target.checked; });
+        return this.renderRegions();
+      }
       const row = e.target.closest('[data-i]');
       if (!row) return;
-      const r = this.regions[+row.dataset.i];
+      const r = this._rows()[+row.dataset.i];
+      if (!r) return;
       if (e.target.matches('wa-checkbox')) r.on = e.target.checked;
       if (e.target.matches('wa-input')) r.name = e.target.value;
+      if (this.opts.tab === 'stems') return this.renderRegions(); // the tick of its group follows
       this._renderCount();
     });
     // waveform
@@ -316,7 +328,7 @@ export class SamplerEditor {
     this.cv.addEventListener('pointerup', (e) => this._up(e));
     this.cv.addEventListener('dblclick', (e) => {
       const i = this._regionAt(this._time(e));
-      if (i >= 0) this.playRegion(i);
+      if (i >= 0) this.playRegion(this.cur, i);
     });
     this.ov.addEventListener('pointerdown', (e) => {
       const seek = (ev) => {
@@ -339,10 +351,21 @@ export class SamplerEditor {
     if (e.key === 'Escape' && this.sel >= 0) { this.sel = -1; this.renderRegions(); this.draw(); return true; }
     if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && this.regions.length) {
       const i = Math.max(0, Math.min(this.regions.length - 1, this.sel + (e.key === 'ArrowDown' ? 1 : -1)));
-      this.playRegion(i);
+      this.playRegion(this.cur, i);
       return true;
     }
     return false;
+  }
+
+  // Sensitivity of «Slice on transients», in a menu next to it.
+  _sliceMenu(anchor) {
+    const pop = showPopover(anchor, `<div class="pop-title">${icon('scissors')} ${t('Slice on transients')}</div>
+      <div class="sp-sens"><span class="hint">${t('Sensitivity')}</span>${slider(0, 1, 0.05, this.opts.sensitivity, { id: 'sp-sens', label: t('Sensitivity') })}
+        <span class="hint sp-sens-v">${Math.round(this.opts.sensitivity * 100)}%</span></div>
+      <div class="hint">${t('Sensitivity: higher = more slices')}</div>`);
+    const sl = pop.querySelector('#sp-sens');
+    sl.addEventListener('input', () => { pop.querySelector('.sp-sens-v').textContent = `${Math.round(sl.value * 100)}%`; });
+    sl.addEventListener('change', () => { this.opts.sensitivity = +sl.value; this._persist(); });
   }
 
   _error(msg) {
@@ -351,41 +374,102 @@ export class SamplerEditor {
     if (info && msg.length > 140) info.innerHTML = `<div class="sp-error">${icon('triangle-alert')} ${esc(msg)}</div>`;
   }
 
-  // ---------------------------------------------------------------- sources
-  _showFiles(files) {
-    this.linkFiles = files;
-    const box = $('#sp-files');
-    box.hidden = false;
-    const first = files[0];
-    box.innerHTML = `<div class="hint">${esc(first.info?.pack_title || first.source_label)} · ${t('{n} files', { n: files.length })}
-      · ${t('licence {license}. Choose which one to open:', { license: esc(first.license_label) })}</div>`
-      + files.map((f) => `<button class="sp-file" data-uid="${esc(f.uid)}" title="${esc(f.path || f.title)}">
-          <span class="sp-file-name">${esc((f.path || f.title).split('/').pop())}</span>
-          <span class="hint">${f.duration ? fmt(f.duration) : ''}</span></button>`).join('');
-  }
-
+  // ---------------------------------------------------------------- open tracks (tabs)
+  // r: a backend answer with the shown session and every tab. A new session gets its track, then it is shown.
   async _opened(r) {
     if (!r || r.cancelled) return;
     if (r.error) return this._error(r.error);
-    this.player.stop();
-    this.session = r.session;
     this.maxS = r.max_seconds || this.maxS;
+    // the tabs follow the backend's: new ones get a track, closed ones lose it
+    const old = new Map(this.tracks.map((x) => [x.sid, x]));
+    this.tracks = (r.tabs || []).map((s) => old.get(s.sid)
+      || { sid: s.sid, session: s, regions: [], sel: -1, view: null, overview: null, detail: null, cursor: 0 });
+    await this._show(r.session ? this.tracks.find((x) => x.sid === r.session.sid) : null);
+    await this._loadExtractions();
+  }
+
+  // Show a track (its session is the shown one in the backend already).
+  async _show(tr) {
+    if (this._main()) this.player.stop();
+    this.cur = tr;
     this.token += 1;
-    this.regions = [];
-    this.sel = -1;
-    this.overview = await this.api.sampler_view(0, null, 2000);
-    this.detail = null;
+    if (tr && !tr.overview) tr.overview = await this.api.sampler_view(0, null, 2000);
+    if (tr) tr.detail = null;
     this._renderMax();
     this.renderInfo();
+    this._renderTracks();
     this.renderRegions();
-    this.setView(0, this.duration);
+    if (tr) this.setView(tr.view?.start ?? 0, tr.view?.end ?? tr.session.duration);
+    else { $('#sp-view-info').textContent = ''; this.draw(); }
+    this._syncPlay();
+  }
+
+  async selectTrack(sid) {
+    const tr = this.tracks.find((x) => x.sid === sid);
+    if (!tr) return;
+    const r = await this.api.sampler_select(sid);
+    if (r.error) return this._error(r.error);
+    await this._show(tr);
+  }
+
+  async closeTrack(sid) {
+    const tr = this.tracks.find((x) => x.sid === sid);
+    if (!tr) return;
+    const unsaved = tr.regions.filter((x) => !x.file).length;
+    if (unsaved && !(await this._confirm(t('Close the track'), (unsaved === 1 ? t('Close «{title}»? Its cut not exported yet is lost.', { title: esc(tr.session.title) })
+      : t('Close «{title}»? Its {n} cuts not exported yet are lost.', { title: esc(tr.session.title), n: unsaved })), t('Close')))) return;
+    if (this.playing?.sid === sid) this.player.stop();
+    await this._opened(await this.api.sampler_close(sid));
+  }
+
+  // A small yes/no dialog; resolves to true on yes.
+  _confirm(label, msg, yes) {
+    return new Promise((done) => {
+      let answer = false;
+      const dlg = openDialog('sp-confirm-dlg', { label, width: '420px', body: `<p>${msg}</p>`, onHide: () => done(answer),
+        footer: `${btn(t('Cancel'), { 'data-go': 'no' })}${btn(yes, { variant: 'danger', 'data-go': 'yes' })}` });
+      dlg.querySelector('.modal-actions').onclick = (e) => {
+        const go = e.target.closest('[data-go]')?.dataset.go;
+        if (!go) return;
+        answer = go === 'yes';
+        dlg.close();
+      };
+    });
+  }
+
+  _renderTracks() {
+    const box = $('#sp-tracks');
+    const ic = (x) => (x.session.parent ? 'layers' : x.session.origin === 'capture' ? 'mic' : 'audio-lines');
+    box.innerHTML = this.tracks.map((x) => `
+      <div class="sp-track${x === this.cur ? ' on' : ''}" data-sid="${x.sid}" role="tab" aria-selected="${x === this.cur}" title="${esc(x.session.path || x.session.title)}">
+        ${icon(ic(x))}<span class="sp-track-name">${esc(x.session.title)}</span>
+        ${x.regions.length ? `<span class="sp-tab-n">${x.regions.length}</span>` : ''}
+        <button class="sp-track-x" data-close title="${esc(t('Close'))}">×</button>
+      </div>`).join('') + `<button class="sp-track sp-track-add${this.tracks.length ? '' : ' alone'}" id="sp-track-add" title="${esc(t('Open another track…'))}">${icon('plus')}</button>`;
+    $('#sp-track-add').onclick = () => this.openChooser();
+  }
+
+  // Stems and enhanced files of the open tracks, from disk; the ticks of the files already listed are kept.
+  async _loadExtractions() {
+    const r = await this.api.sampler_extractions();
+    if (r.error) return;
+    for (const k of ['stems', 'enhanced']) {
+      const was = new Map(this.ext[k].map((f) => [f.path, f.on]));
+      this.ext[k] = r[k].filter((f) => !this.hidden.has(f.path)).map((f) => ({ ...f, on: was.get(f.path) ?? true }));
+    }
+    this._renderTabs();
+    if (this.opts.tab !== 'cuts') this.renderRegions();
   }
 
   get duration() { return this.session?.duration || 0; }
 
   renderInfo() {
-    const box = $('#sp-info');
+    const box = $('#sp-info'), path = $('#sp-path');
     $('#sp-empty').hidden = !!this.session;
+    // the marks keep the slashes in place in the right-to-left ellipsis (the start of a long path is cut)
+    path.textContent = this.session ? `\u200e${this.session.path || this.session.title}\u200e` : t('No audio open: choose a file or a library sample →');
+    path.title = this.session?.path ? `${this.session.path}\n${t('Click to open another track')}` : t('Choose a sample or an audio track…');
+    path.classList.toggle('none', !this.session);
     if (!this.session) { box.innerHTML = ''; return; }
     const s = this.session, src = s.source;
     const lic = src ? `<span class="sp-badge ${src.commercial_ok ? 'ok' : 'warn'}" title="${src.commercial_ok
@@ -397,58 +481,37 @@ export class SamplerEditor {
       <b class="sp-title" title="${esc(s.path || s.title)}">${esc(s.title)}</b>
       <span class="hint">${fmt(s.duration)} · ${s.sr} Hz · ${s.channels === 1 ? 'mono' : 'stereo'}${who}${
         s.truncated ? ` · ${t('only the first 20 minutes opened')}` : ''}</span>${page}
-      ${s.origin === 'capture' ? `<span class="hint sp-note-inline">${icon('triangle-alert')} ${t('personal use only')}</span>` : ''}
       ${src?.suspect ? `<span class="sp-badge warn" title="${t('It looks like commercial material re-uploaded with a free licence')}">${t('Check the rights')}</span>` : ''}`;
     const a = box.querySelector('.sp-page');
     if (a) a.onclick = (e) => { e.preventDefault(); this.api.open_url(a.dataset.url); };
   }
 
+  // The tooltip of the ⋯ next to "Extractions": what the exported samples get, and where they go.
   _renderOptsSummary() {
-    const o = this.opts, el = $('#sp-opts-sum');
-    if (el) el.textContent = `Fade ${o.fade_in_ms} ms in · ${o.fade_out_ms} ms out${o.normalize ? ` · ${t('normalised to −0.3 dBFS')}` : ''}.`;
+    const o = this.opts, b = $('#sp-ext-set wa-button');
+    if (!b) return;
+    b.title = `Fade ${o.fade_in_ms} ms in · ${o.fade_out_ms} ms out${o.normalize ? ` · ${t('normalised to −0.3 dBFS')}` : ''}. `
+      + t('Every sample lasts at most {max} s. They go into {folder}, with the provenance of the recording next to them.', { max: this.maxS, folder: this.sampDir });
   }
 
   _renderMax() {
     document.querySelectorAll('#sampler .sp-max').forEach((el) => { el.textContent = `${this.maxS} s`; });
-    const h = $('#sp-max-hint');
-    if (h) h.textContent = t('Every sample lasts at most {max} s. They go into ~/Music/ClusterSound Samples, with the provenance of the recording next to them.', { max: this.maxS });
+    this._renderOptsSummary();
   }
 
   // ---------------------------------------------------------------- recorder
   _bindRecorder() {
-    $('#rc-reveal').onclick = async (e) => {
-      e.preventDefault();
-      if (!(await this.api.reveal_path(this.recDir))) toast(t('The folder will be created by the first recording'));
-    };
     $('#rc-rec').onclick = () => this.toggleRecording();
-    $('#rc-list').addEventListener('click', async (e) => {
-      const row = e.target.closest('[data-path]');
-      const act = e.target.closest('[data-act]')?.dataset.act;
-      if (!row || !act) return;
-      if (act === 'reveal') return this.api.reveal_path(row.dataset.path);
-      this._opened(await this.api.recorder_open(row.dataset.path));
-    });
-  }
-
-  // The selected region, or all the open audio, onto a new audio track in Live (through the M4L device).
-  async sendToLive() {
-    if (!this.session) return this._error(t('Open a recording first'));
-    const r = this.regions[this.sel];
-    const b = $('#sp-live');
-    b.loading = true;
-    toast(r ? t('Sending the region to Live…') : t('Sending the audio to Live…'));
-    const out = await this.api.sampler_send_to_live(r ? r.start : null, r ? r.end : null, this.opts);
-    b.loading = false;
-    if (out.file && !out.running) return toast(t('Live bridge not active: the file is in the Live browser anyway, User Library › ClusterSound › Audio'));
-    liveToast(out);
   }
 
   // ---------------------------------------------------------------- stems
   _stemsBusy() { return ['running', 'downloading'].includes(this.stems?.job?.state); }
 
-  _stemsMenu(anchor) {
+  // target: none (the shown track: all of it or its selected region), {sid, start, end, label} (a cut of any
+  // track) or {path, label} (an extracted file, e.g. an enhanced one).
+  _stemsMenu(anchor, target = null) {
     const st = this.stems;
-    if (!this.session) return this._error(t('Open a recording first'));
+    if (!target && !this.session) return this._error(t('Open a recording first'));
     const r = this.regions[this.sel];
     let body;
     if (!st?.installed) {
@@ -464,8 +527,9 @@ export class SamplerEditor {
       body = `<div class="hint">${t('One WAV file per stem, on this computer, with no external services.')}</div>
         <div class="st-keys">${choosable.map((x) => check(esc(x.label), keys.has(x.key), { 'data-key': x.key })).join('')}</div>
         <div class="hint">${t('+ <b>Other</b>: everything you did not choose, so nothing is lost.')}</div>
-        ${seg([['all', t('Whole recording')], ['region', t('Selected region'), { disabled: !r, title: r ? `${fmt(r.start)} – ${fmt(r.end)}` : t('Select a region') }]],
-          scope, { 'data-o': 'scope', cls: 'st-scope' })}
+        ${target ? `<div class="hint"><b>${esc(target.label)}</b></div>`
+          : seg([['all', t('Whole recording')], ['region', t('Selected region'), { disabled: !r, title: r ? `${fmt(r.start)} – ${fmt(r.end)}` : t('Select a region') }]],
+            scope, { 'data-o': 'scope', cls: 'st-scope' })}
         <div class="pop-actions">${btn(t('Extract'), { variant: 'brand', icon: 'audio-lines', 'data-go': 'extract', disabled: !keys.size })}</div>`;
     }
     const pop = showPopover(anchor, `<div class="pop-title">${icon('audio-lines')} ${t('Extract stems')}</div>${body}`);
@@ -481,6 +545,13 @@ export class SamplerEditor {
         if (go === 'download') {
           pop.close();
           out = await this.api.stems_download_model();
+        } else if (target) {
+          const keys = picked();
+          Object.assign(this.opts, { stemKeys: keys });
+          this._persist();
+          pop.close();
+          out = target.path ? await this.api.stems_start('all', null, null, keys, null, target.path)
+            : await this.api.stems_start('region', target.start, target.end, keys, target.sid);
         } else {
           const keys = picked(), scope = pop.querySelector('[data-o=scope]').value === 'region' && r ? 'region' : 'all';
           Object.assign(this.opts, { stemKeys: keys, stemScope: scope });
@@ -505,53 +576,59 @@ export class SamplerEditor {
       const j = this.stems.job;
       if (this._stemsBusy()) return this._pollStems();
       if (prev === 'downloading' && j.state === 'idle') toast(t('Model downloaded: now you can extract the stems'));
-      if (j.state === 'done') toast(t('Stems ready: {n} files', { n: j.stems.length }));
+      if (j.state === 'done') { toast(t('Stems ready: {n} files', { n: j.stems.length })); this._jobDone('stems'); }
       if (j.state === 'error') this._error(j.error);
     }, 500);
   }
 
-  _renderStems() {
-    const box = $('#st-box');
-    if (!box) return;
-    const j = this.stems?.job || {};
-    const tab = document.querySelector('.nav-item[data-tab="sampler"]');
-    if (j.state === 'downloading' || j.state === 'running') {
-      const pct = Math.round((j.progress || 0) * 100);
-      box.innerHTML = `<div class="rc-item">
-        <div class="rc-item-name">${j.state === 'downloading' ? t('Downloading the model…') : `${esc(j.title)} · ${j.scope === 'region' ? t('region') : t('whole')}`}</div>
-        ${j.state === 'running' ? `<div class="sp-meter st-meter"><div style="width:${pct}%"></div></div>
-          <div class="rc-item-act"><span class="hint">${pct}%</span><span class="spacer"></span>
-          ${btn(t('Cancel'), { size: 'xs', 'data-act': 'cancel' })}</div>` : ''}
-      </div>`;
-    } else if (j.state === 'done' && j.stems?.length) {
-      box.innerHTML = `<div class="hint">${esc(j.title)} · ${j.scope === 'region' ? t('region') : t('whole')}
-          <a href="#" data-act="folder">${icon('folder-open')}</a></div>`
-        + j.stems.map((r) => `
-        <div class="rc-item st-item" data-path="${esc(r.path)}" title="${esc(r.path)}">
-          <div class="rc-item-act"><span class="rc-item-name">${esc(r.label)}</span><span class="spacer"></span>
-            ${btn(t('Open in the editor'), { size: 'xs', 'data-act': 'open', icon: 'pencil' })}
-            ${iconBtn('folder-open', t('Show in {app}', { app: FILE_MANAGER }), { size: 'xs', 'data-act': 'reveal' })}
-          </div>
-        </div>`).join('');
-    } else {
-      const msg = j.state === 'cancelled' ? t('Separation cancelled.') : j.state === 'error' ? `<span class="error">${esc(j.error)}</span>`
-        : !this.stems?.installed ? t('To separate the stems install the extension: see «Extract stems».')
-          : t('Open a recording and use «Extract stems»: the stems show up here.');
-      box.innerHTML = `<div class="hint">${msg}</div>`;
-    }
-    tab?.classList.toggle('busy', j.state === 'running');
+  // A job finished: its files join the list of the open audio, and the tab blinks once.
+  async _jobDone(tab) {
+    await this._loadExtractions();
+    const b = $(`.sp-tab[data-tab="${tab}"]`);
+    b?.classList.remove('pulse');
+    void b?.offsetWidth;
+    b?.classList.add('pulse');
   }
 
-  async _stemsClick(e) {
-    const act = e.target.closest('[data-act]')?.dataset.act;
-    if (!act) return;
-    e.preventDefault();
-    if (act === 'cancel') { this.stems = await this.api.stems_cancel(); return; }
-    if (act === 'folder') return this.api.reveal_path(this.stems.job.folder);
-    const path = e.target.closest('[data-path]')?.dataset.path;
-    if (!path) return;
-    if (act === 'reveal') return this.api.reveal_path(path);
-    this._opened(await this.api.stems_open(path));
+  _renderStems() {
+    const j = this.stems?.job || {};
+    document.querySelector('.nav-item[data-tab="sampler"]')?.classList.toggle('busy', j.state === 'running');
+    this._renderTabs();
+    if (this.opts.tab === 'stems') this.renderRegions();
+  }
+
+  // The state of the last job, on top of its tab: progress and Cancel while it works, or why it stopped.
+  _jobHtml(tab) {
+    if (tab === 'stems') {
+      const j = this.stems?.job || {};
+      if (j.state === 'downloading') return `<div class="sp-job">${t('Downloading the model…')}</div>`;
+      if (j.state === 'running') {
+        const pct = Math.round((j.progress || 0) * 100);
+        return `<div class="sp-job"><span class="rc-item-name">${esc(j.title)} · ${j.scope === 'region' ? t('region') : t('whole')}</span>
+          <div class="sp-meter st-meter"><div style="width:${pct}%"></div></div><span class="hint">${pct}%</span>
+          ${btn(t('Cancel'), { size: 'xs', 'data-job': 'cancel' })}</div>`;
+      }
+      if (j.state === 'cancelled') return `<div class="sp-job hint">${t('Separation cancelled.')}</div>`;
+      if (j.state === 'error') return `<div class="sp-job error">${esc(j.error)}</div>`;
+      return '';
+    }
+    const j = this.enh?.job || {};
+    if (j.state === 'downloading') return `<div class="sp-job">${t('Downloading the model…')}</div>`;
+    if (j.state === 'running') {
+      const pct = Math.round((j.progress || 0) * 100);
+      const what = `${esc(j.title)} · ${j.scope === 'region' ? t('region, {s} s', { s: j.seconds }) : t('whole')}`;
+      return `<div class="sp-job en-item"><span class="rc-item-name">${what}</span>
+        <div class="sp-meter st-meter en-meter"><div style="width:${pct}%"></div></div><span class="hint">${pct ? `${pct}%` : t('Loading the model…')}</span>
+        ${btn(t('Cancel'), { size: 'xs', 'data-job': 'cancel' })}</div>`;
+    }
+    if (j.state === 'cancelled') return `<div class="sp-job hint">${t('Enhancement cancelled.')}</div>`;
+    if (j.state === 'error') return `<div class="sp-job error">${esc(j.error)}</div>`;
+    return '';
+  }
+
+  async _cancelJob() {
+    if (this.opts.tab === 'stems') this.stems = await this.api.stems_cancel();
+    else this.enh = await this.api.enhance_cancel();
   }
 
   // ---------------------------------------------------------------- enhance
@@ -562,13 +639,14 @@ export class SamplerEditor {
     return ms.find((m) => m.key === this.opts.enhModel) || ms.find((m) => m.key === this.enh.default) || ms[0];
   }
 
-  _enhMenu(anchor, forceScope) {
+  // target: as in _stemsMenu (none: the shown track, all of it or its selected region).
+  _enhMenu(anchor, target = null) {
     const st = this.enh;
-    if (!this.session) return this._error(t('Open a recording first'));
+    if (!target && !this.session) return this._error(t('Open a recording first'));
     if (!st?.models?.length) return;
     const r = this.regions[this.sel];
     const m = this._enhModel();
-    const scope = forceScope || (r ? 'region' : 'all');
+    const scope = r ? 'region' : 'all';
     const models = st.models.length > 1
       ? `<div class="en-model"><b>${esc(m.label)}</b>${settingsLink('sampler', t('Change model'))}</div>` : '';
     const facts = `<div class="en-facts">
@@ -581,6 +659,10 @@ export class SamplerEditor {
     } else if (!m.model_ready) {
       body = `<div class="hint">${t('It needs the {model} model (~{mb} MB), downloaded only once. After that it works offline: the audio never leaves the computer.', { model: `<b>${esc(m.label)}</b>`, mb: m.mb })}</div>`;
       go = btn(t('Download the model'), { variant: 'brand', icon: 'download', 'data-go': 'download' });
+    } else if (target) {
+      body = `<div class="hint"><b>${esc(target.label)}</b></div>
+        <div class="hint">${t('Creates a new «… ({enhanced}).wav» file next to the samples: the original stays as it is.', { enhanced: t('enhanced') })}</div>`;
+      go = btn(t('Enhance'), { icon: 'sparkles', cls: 'cs-ai', 'data-go': 'run' });
     } else {
       body = `${seg([['region', t('Selected region'), { disabled: !r, title: r ? `${fmt(r.start)} – ${fmt(r.end)}` : t('Select a region') }],
         ['all', t('Whole audio')]], scope, { 'data-o': 'scope', cls: 'st-scope' })}
@@ -598,6 +680,10 @@ export class SamplerEditor {
         pop.close();
         if (b.dataset.go === 'download') {
           out = await this.api.enhance_download_model(m.key);
+        } else if (target?.path) {
+          out = await this.api.enhance_start('all', null, null, m.key, target.path);
+        } else if (target) {
+          out = await this.api.enhance_start('region', target.start, target.end, m.key, null, target.sid);
         } else {
           const sc = pop.querySelector('[data-o=scope]')?.value === 'region' && r ? 'region' : 'all';
           out = await this.api.enhance_start(sc, sc === 'region' ? r.start : null, sc === 'region' ? r.end : null, m.key);
@@ -619,49 +705,15 @@ export class SamplerEditor {
       const j = this.enh.job;
       if (this._enhBusy()) return this._pollEnh();
       if (prev === 'downloading' && j.state === 'idle') toast(t('Model downloaded: now you can use «Enhance»'));
-      if (j.state === 'done') toast(t('Sample enhanced: open it in the editor to listen to it'));
+      if (j.state === 'done') { toast(t('Sample enhanced: it is in the «Enhanced» tab')); this._jobDone('enhanced'); }
       if (j.state === 'error') this._error(j.error);
     }, 500);
   }
 
   _renderEnh() {
-    const box = $('#en-box');
-    if (!box) return;
-    const j = this.enh?.job || {};
-    const what = `${esc(j.title)} · ${j.scope === 'region' ? t('region, {s} s', { s: j.seconds }) : t('whole')}`;
-    if (j.state === 'downloading') {
-      box.innerHTML = `<div class="rc-item"><div class="rc-item-name">${t('Downloading the model…')}</div></div>`;
-    } else if (j.state === 'running') {
-      const pct = Math.round((j.progress || 0) * 100);
-      box.innerHTML = `<div class="rc-item en-item">
-        <div class="rc-item-name">${what}</div>
-        <div class="sp-meter st-meter en-meter"><div style="width:${pct}%"></div></div>
-        <div class="rc-item-act"><span class="hint">${pct ? `${pct}%` : t('Loading the model…')}</span><span class="spacer"></span>
-          ${btn(t('Cancel'), { size: 'xs', 'data-act': 'cancel' })}</div>
-      </div>`;
-    } else if (j.state === 'done' && j.result) {
-      box.innerHTML = `<div class="rc-item en-item" title="${esc(j.result.path)}">
-        <div class="rc-item-name">${what}</div>
-        <div class="rc-item-act"><span class="hint">${(j.result.sr / 1000).toFixed(1)} kHz</span><span class="spacer"></span>
-          ${btn(t('Open in the editor'), { size: 'xs', 'data-act': 'open', icon: 'pencil' })}
-          ${iconBtn('folder-open', t('Show in {app}', { app: FILE_MANAGER }), { size: 'xs', 'data-act': 'reveal' })}
-        </div>
-      </div>`;
-    } else {
-      const msg = j.state === 'cancelled' ? t('Enhancement cancelled.') : j.state === 'error' ? `<span class="error">${esc(j.error)}</span>`
-        : t('Select a region and press «Enhance»: the AI restoration rebuilds the high frequencies and cleans up the compression.');
-      box.innerHTML = `<div class="hint">${msg}</div>`;
-    }
-    $('#sp-enh')?.toggleAttribute('loading', j.state === 'running');
-  }
-
-  async _enhClick(e) {
-    const act = e.target.closest('[data-act]')?.dataset.act;
-    if (!act) return;
-    e.preventDefault();
-    if (act === 'cancel') { this.enh = await this.api.enhance_cancel(); return; }
-    if (act === 'reveal') return this.api.reveal_path(this.enh.job.result.path);
-    if (act === 'open') this._opened(await this.api.enhance_open());
+    $('#sp-enh')?.toggleAttribute('loading', this.enh?.job?.state === 'running');
+    this._renderTabs();
+    if (this.opts.tab === 'enhanced') this.renderRegions();
   }
 
   _selectedDevices() {
@@ -672,16 +724,17 @@ export class SamplerEditor {
   }
 
   _renderRecorder() {
-    $('#rc-path').textContent = this.recDir;
-    $('#rc-path').title = this.recDir;
-    const f = this.recFmt, spec = this.rec.formats[f.format];
-    const lbl = (list, v) => list.find(([k]) => String(k) === String(v))?.[1] ?? v;
-    $('#rc-fmt-sum').textContent = `${spec.label} · ${lbl(spec.qualities, f.quality)} · ${lbl(this.rec.channels, f.channels)}`;
     this._renderOptsSummary();
     this._renderDevices();
     this._renderRecButton();
-    this._renderRecordings();
     if (this._setBody?.isConnected) this._renderSetDevices();
+  }
+
+  // Format and folder of the recordings, for the tooltip of the Record button.
+  _recSummary() {
+    const f = this.recFmt, spec = this.rec.formats[f.format];
+    const lbl = (list, v) => list.find(([k]) => String(k) === String(v))?.[1] ?? v;
+    return `${spec.label} · ${lbl(spec.qualities, f.quality)} · ${lbl(this.rec.channels, f.channels)} → ${this.recDir}`;
   }
 
   _formatControls() {
@@ -696,12 +749,12 @@ export class SamplerEditor {
       ${select(chans, f.channels, { 'data-k': 'channels', label: t('Channels'), disabled: dis })}`;
   }
 
-  // On screen: the outputs that will be recorded (chosen in Settings), with live meters while recording.
+  // In the transport: a small level meter per output that will be recorded (chosen in Settings), live while recording.
   _renderDevices() {
     const box = $('#rc-devices');
     if (!box) return;
     if (!this.rec.devices.length) {
-      box.innerHTML = `<div class="hint">${this.rec.hint || t('No output can be recorded.')}</div>`;
+      box.innerHTML = `<span class="hint rc-none" title="${esc(this.rec.hint || '')}">${t('No output can be recorded.')}</span>`;
       return;
     }
     const sel = new Set(this._selectedDevices());
@@ -709,13 +762,10 @@ export class SamplerEditor {
     const shown = this.rec.devices.filter((d) => (this.rec.running ? tracks[d.id] : sel.has(d.id)));
     box.innerHTML = shown.map((d) => {
       const tr = this.rec.running ? tracks[d.id] : null;
-      const meta = d.sample_rate ? `${t('{n} ch', { n: d.channels })} · ${(d.sample_rate / 1000).toFixed(1).replace('.0', '')} kHz` : (d.note || '');
-      return `<div class="rc-dev${tr ? ' on' : ''}">
-        <div class="rc-dev-name">${esc(d.name)}${d.default ? ` <span class="hint">· ${t('default')}</span>` : ''}</div>
-        <div class="rc-dev-meta hint">${tr ? (tr.error ? `<span class="error">${esc(tr.error)}</span>`
-          : `${clock(tr.seconds)} · ${mb(tr.bytes)}`) : meta}</div>
-        ${tr && !tr.error ? `<div class="sp-meter"><div style="width:${Math.min(100, Math.sqrt(tr.level || 0) * 220)}%"></div></div>` : ''}
-      </div>`;
+      const meta = tr ? (tr.error || `${clock(tr.seconds)} · ${mb(tr.bytes)}`)
+        : d.sample_rate ? `${t('{n} ch', { n: d.channels })} · ${(d.sample_rate / 1000).toFixed(1).replace('.0', '')} kHz` : (d.note || '');
+      const lvl = tr && !tr.error ? Math.min(100, Math.sqrt(tr.level || 0) * 220) : 0;
+      return `<div class="rc-meter${tr ? ' on' : ''}${tr?.error ? ' err' : ''}" title="${esc(d.name)}${meta ? ` · ${esc(meta)}` : ''}"><div style="width:${lvl}%"></div></div>`;
     }).join('');
   }
 
@@ -744,6 +794,9 @@ export class SamplerEditor {
       + setRow(t('Recordings folder'), '',
         `<span class="set-path" id="set-rc-path" title="${esc(this.recDir)}">${esc(this.recDir)}</span>
          <wa-button id="set-rc-pick" size="s" appearance="filled-outlined"><wa-icon slot="start" name="folder-open"></wa-icon>${t('Choose…')}</wa-button>`)
+      + setRow(t('Export folder'), t('Where «Export all» writes the samples, the stems and the enhanced files.'),
+        `<span class="set-path" id="set-sp-path" title="${esc(this.sampDir)}">${esc(this.sampDir)}</span>
+         <wa-button id="set-sp-pick" size="s" appearance="filled-outlined"><wa-icon slot="start" name="folder-open"></wa-icon>${t('Choose…')}</wa-button>`)
       + setRow(t('Fades of the extracted samples'), t('Applied to every exported region, to avoid clicks at the start and at the end.'),
         `${num(o.fade_in_ms, { id: 'set-sp-fi', min: 0, max: 200, step: 1, label: 'Fade in', style: 'width:120px' }).replace('></wa-number-input>', '><span slot="end" class="hint">ms in</span></wa-number-input>')}
          ${num(o.fade_out_ms, { id: 'set-sp-fo', min: 0, max: 2000, step: 5, label: 'Fade out', style: 'width:130px' }).replace('></wa-number-input>', '><span slot="end" class="hint">ms out</span></wa-number-input>')}`)
@@ -791,6 +844,16 @@ export class SamplerEditor {
       this._renderRecorder();
       savedFlash(body);
     };
+    body.querySelector('#set-sp-pick').onclick = async () => {
+      const p = await this.api.pick_folder();
+      if (!p) return;
+      this.sampDir = (await this.api.set_setting('sampler_dir', p)).sampler_dir;
+      body.querySelector('#set-sp-path').textContent = this.sampDir;
+      body.querySelector('#set-sp-path').title = this.sampDir;
+      this._renderOptsSummary();
+      this._loadExtractions();
+      savedFlash(body);
+    };
     const optNum = (id, key) => body.querySelector(id).addEventListener('change', (e) => {
       this.opts[key] = Math.max(0, +e.target.value || 0); saved(); this._dropAudio(); this._renderOptsSummary();
     });
@@ -802,38 +865,42 @@ export class SamplerEditor {
 
   _renderRecButton() {
     const on = this.rec.running, b = $('#rc-rec');
-    setPlayButton(b, on, t('Record'), t('Stop'));
-    b.querySelector('wa-icon')?.setAttribute('name', on ? 'square' : 'circle');
     const n = this._selectedDevices().length;
+    const live = this.rec.tracks.filter((tr) => !tr.error).length;
+    const info = on ? (live === 1 ? t('Recording 1 output…') : t('Recording {n} outputs…', { n: live }))
+      : n ? (n === 1 ? t('1 output selected: one file.') : t('{n} outputs selected: one file each.', { n })) : t('Select at least one output.');
+    const label = on ? t('Stop') : t('Record the audio output');
+    // only when the state changes: the meters poll every 200 ms, and a click whose icon was just replaced is lost
+    if (b.dataset.on !== String(on)) { b.innerHTML = icon(on ? 'square' : 'circle', label); b.dataset.on = on; }
+    b.title = `${label} · ${info}\n${this._recSummary()}`;
+    b.classList.toggle('on', on);
     b.disabled = !on && !n;
     $('#rc-clock').textContent = clock(on ? this.rec.elapsed : 0);
     $('#rc-clock').classList.toggle('on', on);
-    const live = this.rec.tracks.filter((tr) => !tr.error).length;
-    $('#rc-info').textContent = on ? (live === 1 ? t('Recording 1 output…') : t('Recording {n} outputs…', { n: live }))
-      : n ? (n === 1 ? t('1 output selected: one file.') : t('{n} outputs selected: one file each.', { n })) : t('Select at least one output.');
     document.querySelector('.nav-item[data-tab="sampler"]')?.classList.toggle('recording', on);
-  }
-
-  _renderRecordings() {
-    const list = this.rec.recordings || [];
-    $('#rc-list').innerHTML = list.length ? list.map((r) => `
-      <div class="rc-item" data-path="${esc(r.path)}" title="${esc(r.path)}">
-        <div class="rc-item-name">${esc(r.device)}</div>
-        <div class="hint">${clock(r.seconds)} · ${esc(r.format)} · ${mb(r.bytes)}${r.error ? ` · <span class="error">${esc(r.error)}</span>` : ''}</div>
-        <div class="rc-item-act">
-          ${btn(t('Open in the editor'), { size: 'xs', 'data-act': 'open', icon: 'pencil' })}
-          ${iconBtn('folder-open', t('Show in {app}', { app: FILE_MANAGER }), { size: 'xs', 'data-act': 'reveal' })}
-        </div>
-      </div>`).join('') : `<div class="hint">${t('The recordings of this session show up here.')}</div>`;
   }
 
   async toggleRecording() {
     const b = $('#rc-rec');
-    b.loading = true;
-    const st = this.rec.running ? await this.api.recorder_stop()
-      : await this.api.recorder_start(this._selectedDevices(), this.recFmt);
-    b.loading = false;
+    if (b.loading) return;
+    // a meter poll already on its way would bring back the state from before the click: it is dropped
+    clearTimeout(this.recTimer);
+    this.recGen = (this.recGen || 0) + 1;
     const was = this.rec.running;
+    b.loading = true;
+    let st;
+    try {
+      st = was ? await this.api.recorder_stop() : await this.api.recorder_start(this._selectedDevices(), this.recFmt);
+    } catch (e) {
+      st = { error: String(e?.message || e) };
+    } finally {
+      b.loading = false;
+    }
+    if (!st || st.running === undefined) { // the call failed: show what the recorder is really doing
+      const err = st?.error;
+      st = await this.api.recorder_status().catch(() => ({ running: false, tracks: [], elapsed: 0 }));
+      if (err) st.error = err;
+    }
     Object.assign(this.rec, st);
     if (st.error) this._error(st.error);
     this._renderRecorder();
@@ -847,8 +914,11 @@ export class SamplerEditor {
 
   _pollRec() {
     clearTimeout(this.recTimer);
+    const gen = this.recGen;
     this.recTimer = setTimeout(async () => {
-      Object.assign(this.rec, await this.api.recorder_status());
+      const st = await this.api.recorder_status();
+      if (gen !== this.recGen) return; // Record/Stop was pressed meanwhile
+      Object.assign(this.rec, st);
       this._renderDevices();
       this._renderRecButton();
       if (this.rec.running) this._pollRec();
@@ -970,10 +1040,16 @@ export class SamplerEditor {
       ctx.fillStyle = this.drag.limited ? 'rgba(239,83,80,.25)' : 'rgba(47,209,189,.25)';
       ctx.fillRect(Math.min(x0, x1), 0, Math.abs(x1 - x0), H);
     }
-    if (this.playing && this.player.playing) {
-      const x = this._x(this.playing.start + this.player.currentTime);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(x, 0, Math.max(1, dpr), H);
+    // playhead: where the track plays, or the cursor where play starts
+    const on = this._main() && this.playing.sid === this.cur.sid;
+    const head = on ? this.playing.start + this.player.currentTime : this.cursor;
+    ctx.fillStyle = on ? '#ffffff' : 'rgba(255,255,255,.65)';
+    ctx.fillRect(this._x(head), 0, Math.max(1, dpr), H);
+    if (!on) { // a small handle on top, to see the cursor at rest
+      const x = this._x(head);
+      ctx.beginPath();
+      ctx.moveTo(x - 5 * dpr, 0); ctx.lineTo(x + 5 * dpr, 0); ctx.lineTo(x, 6 * dpr);
+      ctx.fill();
     }
   }
 
@@ -990,6 +1066,9 @@ export class SamplerEditor {
     }
     ctx.fillStyle = 'rgba(0,176,159,.5)';
     for (const r of this.regions) ctx.fillRect(r.start / this.duration * W, H - 3, Math.max(1, (r.end - r.start) / this.duration * W), 3);
+    const on = this._main() && this.playing.sid === this.cur.sid;
+    ctx.fillStyle = 'rgba(255,255,255,.8)';
+    ctx.fillRect((on ? this.playing.start + this.player.currentTime : this.cursor) / this.duration * W, 0, devicePixelRatio, H);
     const x0 = this.view.start / this.duration * W, x1 = this.view.end / this.duration * W;
     ctx.strokeStyle = '#00b09f';
     ctx.lineWidth = devicePixelRatio;
@@ -1043,19 +1122,28 @@ export class SamplerEditor {
     this.drag = null;
     if (!d) return;
     if (d.kind === 'edge') { this.renderRegions(); this._dropAudio(); this.draw(); return; }
-    if (Math.abs(e.clientX - d.x) < 4) {  // a click: select (and play) the region under the pointer
-      if (d.hit >= 0) this.playRegion(d.hit);
-      else { this.sel = -1; this.renderRegions(); this.draw(); }
-      this.setView(this.view.start, this.view.end);
+    if (Math.abs(e.clientX - d.x) < 4) {  // a click: the cursor goes there (playing goes on from there) and selects the region under it
+      this.seek(d.a);
+      if (d.hit !== this.sel) { this.sel = d.hit; this.renderRegions(); }
+      this.draw();
       return;
     }
     const start = Math.min(d.a, d.b), end = Math.max(d.a, d.b);
     this.regions.push({ start, end, name: '', on: true });
     this.regions.sort((x, y) => x.start - y.start);
     this.sel = this.regions.findIndex((r) => r.start === start && r.end === end);
+    this._renderTracks();
     this.renderRegions();
     this.setView(this.view.start, this.view.end);
-    this.playRegion(this.sel);
+    this.playRegion(this.cur, this.sel);
+  }
+
+  // Move the cursor of the shown track; if it is playing, it goes on from there.
+  seek(at) {
+    if (!this.cur) return;
+    this.cursor = Math.max(0, Math.min(this.duration, at));
+    if (this._main() && this.playing.sid === this.cur.sid) this._playFrom(this.cur, this.cursor);
+    this.draw();
   }
 
   async autoSlice() {
@@ -1070,129 +1158,385 @@ export class SamplerEditor {
     this.regions = this.regions.filter((r) => r.end <= lo || r.start >= hi).concat(found.map((r) => ({ ...r, name: '', on: true })));
     this.regions.sort((x, y) => x.start - y.start);
     this.sel = -1;
+    this._renderTracks();
     this.renderRegions();
     this.draw();
     toast(!found.length ? t('No transients found: try raising the sensitivity')
       : whole ? t('{n} regions on the transients', { n: found.length }) : t('{n} regions on the transients of the visible part', { n: found.length }));
   }
 
-  removeRegion(i) {
-    this.regions.splice(i, 1);
-    this.sel = Math.min(this.sel, this.regions.length - 1);
-    if (this.sel === i) this.sel = -1;
+  removeRegion(i, tr = this.cur) {
+    tr.regions.splice(i, 1);
+    if (tr.sel === i) tr.sel = -1;
+    else if (tr.sel > i) tr.sel -= 1;
+    this._renderTracks();
     this.renderRegions();
     this.draw();
   }
 
+  // ---------------------------------------------------------------- extractions (tabs)
+  setTab(tab) {
+    if (!['cuts', 'stems', 'enhanced'].includes(tab)) tab = 'cuts';
+    this.opts.tab = tab;
+    this._persist();
+    this._renderTabs();
+    this.renderRegions();
+  }
+
+  // The cuts of every open track, in tab order: [{tr, i, r}].
+  _cuts() { return this.tracks.flatMap((tr) => tr.regions.map((r, i) => ({ tr, i, r }))); }
+
+  // The rows of a tab: regions (cuts of every track) or extracted files.
+  _rows(tab = this.opts.tab) { return tab === 'cuts' ? this._cuts().map((c) => c.r) : this.ext[tab] || []; }
+
+  _renderTabs() {
+    const busy = { stems: this._stemsBusy(), enhanced: this._enhBusy() };
+    document.querySelectorAll('#sampler .sp-tab').forEach((b) => {
+      const k = b.dataset.tab, n = this._rows(k).length;
+      b.classList.toggle('on', k === this.opts.tab);
+      b.setAttribute('aria-selected', k === this.opts.tab);
+      b.classList.toggle('busy', !!busy[k]);
+      b.querySelector('.sp-tab-n').textContent = n || '';
+    });
+  }
+
   _renderCount() {
-    const on = this.regions.filter((r) => r.on).length;
-    $('#sp-count').textContent = this.regions.length ? t('({n} of {total} selected)', { n: on, total: this.regions.length }) : '';
+    const rows = this._rows(), on = rows.filter((r) => r.on).length;
+    $('#sp-count').textContent = rows.length ? t('({n} of {total} selected)', { n: on, total: rows.length }) : '';
     $('#sp-export').disabled = !on;
-    $('#sp-rack').disabled = !on;
-    $('#sp-clear').disabled = !this.regions.length;
+    $('#sp-send').disabled = !this.session && !on;
+    $('#sp-clear').disabled = !rows.length;
   }
 
   renderRegions() {
-    const box = $('#sp-regions');
+    const box = $('#sp-regions'), tab = this.opts.tab;
     this._renderCount();
-    if (!this.regions.length) {
-      box.innerHTML = `<div class="hint sp-regions-empty">${this.session ? t('No regions: drag on the waveform or use «Slice on transients».') : ''}</div>`;
+    this._renderTabs();
+    const job = tab === 'cuts' ? '' : this._jobHtml(tab);
+    const rows = this._rows();
+    if (!rows.length) {
+      const empty = tab === 'cuts' ? (this.session ? t('No cuts: drag on the waveform or use «Slice on transients».') : '')
+        : tab === 'stems' ? (!this.stems?.installed ? t('To separate the stems install the extension: see «Extract stems».')
+          : this.session ? t('No stems of the open tracks yet: use «Extract stems».') : '')
+          : this.session ? t('Nothing enhanced from the open tracks yet: use «Enhance» on a track, on a cut or on a stem.') : '';
+      box.innerHTML = `${job}<div class="hint sp-regions-empty">${empty}</div>`;
       return;
     }
-    box.innerHTML = this.regions.map((r, i) => `
-      <div class="sp-row${i === this.sel ? ' sel' : ''}" data-i="${i}">
-        ${check('', r.on, { label: t('Export') })}
-        <span class="sp-num">${i + 1}</span>
-        <wa-input size="s" value="${esc(r.name)}" placeholder="${esc(this._defaultName(i))}" label="${t('Name')}"></wa-input>
-        <span class="sp-time">${fmt(r.start)}</span>
-        <span class="sp-time ${r.end - r.start >= this.maxS - 1e-3 ? 'error' : ''}">${fmt(r.end - r.start)}</span>
+    const acts = ({ stems, ai }) => `
         ${iconBtn('play', t('Listen'), { 'data-act': 'play' })}
-        ${iconBtn('search', t('Show on the waveform'), { 'data-act': 'zoom' })}
-        ${iconBtn('sparkles', t('Enhance with AI'), { 'data-act': 'enhance', cls: 'cs-ai-icon' })}
-        ${iconBtn('layout-grid', t('To the Drum Rack'), { 'data-act': 'rack' })}
-        ${iconBtn('x', t('Delete'), { 'data-act': 'del' })}
-      </div>`).join('');
+        ${iconBtn('scan-search', tab === 'cuts' ? t('Show on the waveform') : t('Open its waveform in a new tab'), { 'data-act': 'zoom' })}
+        ${stems ? iconBtn('layers', t('Extract stems'), { 'data-act': 'stems' }) : '<span></span>'}
+        ${ai ? iconBtn('sparkles', t('Enhance with AI'), { 'data-act': 'enhance', cls: 'cs-ai-icon' }) : '<span></span>'}
+        ${iconBtn('send', t('Send to the Sequencer or the Drum Rack'), { 'data-act': 'send' })}`;
+    const state = (saved) => `<span class="sp-saved${saved ? ' on' : ''}" title="${esc(saved ? t('Saved in the export folder')
+      : t('Temporary: «Export all» saves it, otherwise it is deleted when ClusterSound closes'))}">${icon(saved ? 'check' : 'circle')}</span>`;
+    // a title over the rows of every track (or source) when there is more than one
+    const groups = new Set((tab === 'cuts' ? this._cuts().map((c) => c.tr.sid) : rows.map((f) => f.sid)));
+    let last = null;
+    const head = (key, title, sid) => {
+      if (groups.size < 2 || key === last) return '';
+      last = key;
+      return `<div class="sp-group${sid === this.cur?.sid ? ' on' : ''}" data-group="${esc(sid)}">${esc(title)}</div>`;
+    };
+    if (tab === 'cuts') {
+      box.innerHTML = this._cuts().map(({ tr, i, r }, k) => `${head(tr.sid, tr.session.title, tr.sid)}
+        <div class="sp-row${tr === this.cur && i === tr.sel ? ' sel' : ''}" data-i="${k}">
+          ${check('', r.on, { label: t('Select') })}
+          <span class="sp-num">${i + 1}</span>
+          <wa-input size="s" value="${esc(r.name)}" placeholder="${esc(this._defaultName(tr, i))}" label="${t('Name')}"></wa-input>
+          <span class="sp-time sp-start">${fmt(r.start)}</span>
+          <span class="sp-time ${r.end - r.start >= this.maxS - 1e-3 ? 'error' : ''}">${fmt(r.end - r.start)}</span>
+          ${state(this._cutSaved(tr, i))}
+          ${acts({ stems: true, ai: true })}
+          <span></span>
+          ${iconBtn('x', t('Delete'), { 'data-act': 'del' })}
+        </div>`).join('');
+      return;
+    }
+    const fileRow = (f, i) => `
+      <div class="sp-row sp-file-row${f.path === this.session?.path ? ' sel' : ''}${tab === 'enhanced' ? ' en-row' : ''}" data-i="${i}" title="${esc(f.path)}">
+        ${check('', f.on, { label: t('Select') })}
+        <span class="sp-num">${i + 1}</span>
+        <span class="sp-file-name">${esc(tab === 'stems' ? f.name.split(' - ').pop() : f.name)}</span>
+        <span class="sp-time sp-start">${f.sr ? `${(f.sr / 1000).toFixed(1)} kHz` : ''}</span>
+        <span class="sp-time">${fmt(f.dur)}</span>
+        ${state(f.saved)}
+        ${acts({ stems: tab === 'enhanced', ai: tab === 'stems' })}
+        ${this._whereSaved(f) ? iconBtn('folder-open', t('Show in {app}', { app: FILE_MANAGER }), { 'data-act': 'reveal' })
+          : iconBtn('folder-open', t('Not saved yet'), { 'data-act': 'reveal', cls: 'is-off', 'aria-disabled': 'true' })}
+        ${iconBtn('trash-2', f.saved ? t('Move to the Trash') : t('Delete'), { 'data-act': 'del' })}
+      </div>`;
+    if (tab === 'enhanced') {
+      box.innerHTML = job + rows.map((f, i) => head(f.sid, f.source, f.sid) + fileRow(f, i)).join('');
+      return;
+    }
+    // stems: the ones of the same separated audio (a track, a cut, an enhanced file) together, collapsible
+    let html = job;
+    for (const set of this._stemSets()) {
+      const f0 = rows[set.idx[0]], key = `${f0.sid}|${set.name}`, open = !this.collapsed.has(key);
+      const on = set.idx.filter((i) => rows[i].on).length;
+      html += head(f0.sid, f0.source, f0.sid) + `
+        <div class="sp-set${open ? ' open' : ''}" data-set="${esc(key)}">
+          ${icon(open ? 'chevron-down' : 'chevron-right')}
+          ${check('', on === set.idx.length, { label: t('Select'), indeterminate: on > 0 && on < set.idx.length, 'data-set-check': '' })}
+          <span class="sp-set-name">${esc(set.name)}</span><span class="sp-tab-n">${set.idx.length}</span>
+        </div>` + (open ? set.idx.map((i) => fileRow(rows[i], i)).join('') : '');
+    }
+    box.innerHTML = html;
   }
 
-  _defaultName(i) { return `${this.session?.title || 'sample'} - ${String(i + 1).padStart(2, '0')}`; }
+  // Stems grouped by what was separated (the name before « - Drums»), in list order: [{name, idx: [i…]}].
+  _stemSets() {
+    const sets = new Map();
+    this.ext.stems.forEach((f, i) => {
+      const parts = f.name.split(' - '), name = parts.length > 1 ? parts.slice(0, -1).join(' - ') : f.name;
+      const k = `${f.sid}|${name}`;
+      if (!sets.has(k)) sets.set(k, { name, idx: [] });
+      sets.get(k).idx.push(i);
+    });
+    return [...sets.values()];
+  }
 
-  _regionClick(e) {
+  _defaultName(tr, i) { return `${tr.session?.title || 'sample'} - ${String(i + 1).padStart(2, '0')}`; }
+
+  async _rowClick(e) {
+    if (e.target.closest('[data-job]')) return this._cancelJob();
+    const g = e.target.closest('[data-group]');
+    if (g) return this.tracks.some((x) => x.sid === g.dataset.group) && this.selectTrack(g.dataset.group);
+    const set = e.target.closest('[data-set]');
+    if (set) {
+      if (e.target.closest('[data-set-check]')) return; // the tick of the group: see the change handler
+      const k = set.dataset.set;
+      if (this.collapsed.has(k)) this.collapsed.delete(k); else this.collapsed.add(k);
+      return this.renderRegions();
+    }
     const row = e.target.closest('[data-i]');
     if (!row) return;
-    const i = +row.dataset.i, act = e.target.closest('[data-act]')?.dataset.act;
-    if (act === 'del') return this.removeRegion(i);
+    const k = +row.dataset.i, act = e.target.closest('[data-act]')?.dataset.act;
+    const anchor = () => $(`#sp-regions [data-i="${k}"] [data-act="${act}"]`); // the row may have been re-rendered
+    if (this.opts.tab !== 'cuts') {
+      const f = this._rows()[k];
+      if (act === 'reveal') {
+        const where = this._whereSaved(f);
+        if (!where) return this._unsavedMenu(anchor(), f);
+        if (!(await this.api.reveal_path(where))) this._error(t('Cannot show the file: it was moved or deleted'));
+        return;
+      }
+      if (act === 'del') return this.deleteFile(f);
+      if (act === 'zoom') return this._opened(await this.api.sampler_open_extraction(f.path));
+      if (act === 'enhance') return this._enhMenu(anchor(), { path: f.path, label: f.name });
+      if (act === 'stems') return this._stemsMenu(anchor(), { path: f.path, label: f.name });
+      if (act === 'send') return this._sendOne(this._fileRef(f), anchor());
+      if (e.target.closest('wa-checkbox')) return;
+      return this.playFile(f.path);
+    }
+    const { tr, i, r } = this._cuts()[k];
+    const label = r.name || this._defaultName(tr, i);
+    if (act === 'del') return this.removeRegion(i, tr);
     if (act === 'zoom') {
-      const r = this.regions[i], pad = Math.max(0.05, (r.end - r.start) * 0.25);
+      if (tr !== this.cur) await this.selectTrack(tr.sid);
+      const pad = Math.max(0.05, (r.end - r.start) * 0.25);
       this.sel = i;
       this.renderRegions();
       return this.setView(r.start - pad, r.end + pad);
     }
-    if (act === 'play') return this.playRegion(i);
-    if (act === 'rack') return this.sendToRack([i]);
-    if (act === 'enhance') {
-      this.sel = i;
+    if (act === 'play') return this.playRegion(tr, i);
+    if (act === 'send') {
+      const refs = await this._regionRefs(tr, [i], e.target.closest('wa-button'));
+      return refs?.[0] && this._sendOne(refs[0], anchor());
+    }
+    if (act === 'stems' || act === 'enhance') {
+      if (tr === this.cur) { this.sel = i; this.draw(); }
       this.renderRegions();
-      this.draw();
-      return this._enhMenu($(`#sp-regions [data-i="${i}"] [data-act=enhance]`), 'region'); // the row was re-rendered
+      const target = { sid: tr.sid, start: r.start, end: r.end, label };
+      return act === 'stems' ? this._stemsMenu(anchor(), target) : this._enhMenu(anchor(), target);
     }
     if (e.target.closest('wa-input, wa-checkbox')) return;
-    this.playRegion(i);
+    this.playRegion(tr, i);
+  }
+
+  // The "Send" menu of the library (Sequencer bus or Drum Rack group), under the row's button.
+  _sendOne(ref, anchor) {
+    if (!this.onSend || !anchor) return;
+    const r = anchor.getBoundingClientRect();
+    this.onSend(ref, r.left, r.bottom + 4);
+  }
+
+  _fileRef(f) { return { kind: 'file', path: f.path, name: f.path.split('/').pop(), cls: null, root: null, dur: f.dur }; }
+
+  // ---------------------------------------------------------------- header actions
+  async clearAll() {
+    const rows = this._rows();
+    if (!rows.length) return;
+    const tab = this.opts.tab;
+    const msg = tab === 'cuts' ? t('Remove all the {n} cuts of the open tracks?', { n: rows.length })
+      : t('Remove the {n} files from the list? They stay on disk.', { n: rows.length });
+    if (!(await this._confirm(t('Clear all'), msg, t('Clear all')))) return;
+    if (tab === 'cuts') {
+      for (const tr of this.tracks) { tr.regions = []; tr.sel = -1; }
+      this._renderTracks();
+      this.draw();
+    } else {
+      for (const f of rows) this.hidden.add(f.path);
+      this.ext[tab] = [];
+    }
+    this.renderRegions();
+  }
+
+  // "Send to ▾": the ticked rows to Live, to the Drum Rack or to a Sequencer bus.
+  async _sendMenu(anchor) {
+    const n = this._rows().filter((r) => r.on).length;
+    const item = (go, ic, label, hint, dis) => `<button class="sp-send-item" data-go="${go}"${dis ? ' disabled' : ''}>${icon(ic)}<span><b>${label}</b><span class="hint">${hint}</span></span></button>`;
+    const pop = showPopover(anchor, `<div class="pop-title">${icon('arrow-right')} ${t('Send to')}</div>
+      <div class="sp-send-list">
+        ${item('live', 'music', 'Ableton Live', n > 1 ? t('{n} new audio tracks', { n }) : n ? t('A new audio track') : t('All the shown track, on a new audio track'), !this.session && !n)}
+        ${item('rack', 'layout-grid', 'Drum Rack', t('On the free pads, from the selected one'), !n)}
+        ${item('seq', 'audio-lines', 'Sequencer', t('As new layers of a bus'), !n || !this.getBuses)}
+        ${item('lib', 'library-big', t('Library'), t('Copied into «{dir}», a folder per track', { dir: 'ClusterSound Recorder' }), !n)}
+      </div><div class="sp-send-buses"></div>`);
+    pop.onclick = async (e) => {
+      const b = e.target.closest('[data-go], [data-bus]');
+      if (!b || b.disabled) return;
+      if (b.dataset.bus) { pop.close(); return this.sendToBus(b.dataset.bus); }
+      const go = b.dataset.go;
+      if (go === 'live') { pop.close(); return this.sendToLive(); }
+      if (go === 'rack') { pop.close(); return this.sendToRack(); }
+      if (go === 'lib') { pop.close(); return this.sendToLibrary(); }
+      const box = pop.querySelector('.sp-send-buses');
+      box.innerHTML = `<div class="hint">${t('Loading…')}</div>`;
+      const buses = await this.getBuses();
+      box.innerHTML = `<div class="hint">${t('Bus')}</div>` + buses.map((x) =>
+        `<button class="sp-send-bus" data-bus="${esc(x.id)}"><span class="sp-bus-dot" style="background:${esc(x.color || 'var(--text-3)')}"></span>${esc(x.label)}</button>`).join('');
+    };
   }
 
   // ---------------------------------------------------------------- playback
   _dropAudio() { this.audioRev += 1; } // the region audio changed: re-render it on next play
 
-  async _playSpan(start, end, key) {
-    const buf = await this.player.load(`sp:${this.token}.${this.audioRev}:${key}:${start.toFixed(4)}-${end.toFixed(4)}`,
-      () => this.api.sampler_audio(start, end, this.opts));
+  _main() { return !!this.playing && !this.playing.path && this.player.playing; } // a track (or a cut) is playing
+
+  // Play [start, end) of a track; key 'cur' is the track itself from the cursor (no fades), else a cut.
+  async _playSpan(tr, start, end, key) {
+    const raw = key === 'cur';
+    const load = (a, b) => this.player.load(`sp:${tr.sid}.${raw ? 'raw' : this.audioRev}:${key}:${a.toFixed(4)}-${b.toFixed(4)}`,
+      () => this.api.sampler_audio(a, b, raw ? { fade_in_ms: 0, fade_out_ms: 0, normalize: false } : this.opts, tr.sid));
+    const buf = await load(start, end);
     if (!buf) return;
-    this.player.play(`sampler:${key}`, buf, 0);
-    this.playing = { start, end };
+    this.player.play(`sampler:${tr.sid}:${key}`, buf, 0);
+    this.playing = { sid: tr.sid, start, end, key };
     this._syncPlay();
-    const tick = () => { if (this.playing) { this.draw(); requestAnimationFrame(tick); } };
+    const tick = () => { if (this.playing && !this.playing.path) { this.draw(); requestAnimationFrame(tick); } };
     requestAnimationFrame(tick);
+    if (raw && end < tr.session.duration - 1e-3) load(end, Math.min(tr.session.duration, end + PLAY_BLOCK_S)); // the next block, ready in time
   }
 
-  playRegion(i) {
-    const r = this.regions[i];
+  // The track from a point on, in blocks of PLAY_BLOCK_S (the backend renders at most 60 s at a time).
+  _playFrom(tr, at) {
+    // blocks start on a grid, so the next one is the same (cached) whatever the point played from
+    const end = Math.min(tr.session.duration, (Math.floor(at / PLAY_BLOCK_S) + 1) * PLAY_BLOCK_S);
+    return this._playSpan(tr, at, end, 'cur');
+  }
+
+  async playFile(path) {
+    if (this.playing?.path === path && this.player.playing) { this.player.stop(); return; }
+    const buf = await this.player.load(`spf:${path}`, () => this.api.sample_audio({ kind: 'file', path }));
+    if (!buf) return this._error(t('file not found'));
+    this.player.play(`sampler:f:${path}`, buf, 0);
+    this.playing = { path };
+    this._syncPlay();
+  }
+
+  playRegion(tr, i) {
+    const r = tr?.regions[i];
     if (!r) return;
-    this.sel = i;
+    tr.sel = i;
     this.renderRegions();
     this.draw();
-    this._playSpan(r.start, r.end, `r${i}`);
+    this._playSpan(tr, r.start, r.end, `r${i}`);
   }
 
+  // Play / pause the shown track from its cursor; pausing leaves the cursor where it stopped.
   togglePlay() {
-    if (this.player.playing && this.playing) { this.player.stop(); return; }
-    if (!this.session) return;
-    if (this.sel >= 0) return this.playRegion(this.sel);
-    this._playSpan(this.view.start, Math.min(this.view.end, this.view.start + 60), 'view');
+    if (!this.cur) return;
+    if (this._main() && this.playing.key === 'cur' && this.playing.sid === this.cur.sid) {
+      this.cursor = this.playing.start + this.player.currentTime;
+      this.player.stop();
+      return;
+    }
+    if (this.cursor >= this.duration - 1e-3) this.cursor = 0;
+    this._playFrom(this.cur, this.cursor);
+  }
+
+  // Stop: the cursor goes back to the start of the track.
+  stop() {
+    this.player.stop();
+    if (this.cur) this.cursor = 0;
+    this._syncPlay();
   }
 
   _syncPlay() {
-    setPlayButton($('#sp-play'), !!this.playing && this.player.playing);
+    const b = $('#sp-play'), on = this._main() && this.playing.key === 'cur' && this.playing.sid === this.cur?.sid;
+    if (b) {
+      const label = on ? t('Pause') : t('Play');
+      if (b.dataset.on !== String(on)) { b.innerHTML = icon(on ? 'pause' : 'play', label); b.dataset.on = on; }
+      b.title = `${label} (${t('Space')})`;
+    }
     this.draw();
   }
 
   // ---------------------------------------------------------------- export
-  // Regions as WAV files, aligned with `idx`. A region already exported with the same bounds, name and
-  // fades/normalisation reuses its file (sending to the Drum Rack twice doesn't duplicate it).
-  async _files(idx, button) {
-    const key = (r, i) => JSON.stringify([r.start, r.end, r.name || this._defaultName(i), this.opts.fade_in_ms,
-      this.opts.fade_out_ms, this.opts.normalize]);
-    const todo = idx.filter((i) => this.regions[i].file?.key !== key(this.regions[i], i));
+  _cutKey(tr, r, i) {
+    return JSON.stringify([r.start, r.end, r.name || this._defaultName(tr, i), this.opts.fade_in_ms, this.opts.fade_out_ms, this.opts.normalize]);
+  }
+
+  _cutSaved(tr, i) { const r = tr.regions[i]; return !!r.file?.saved && r.file.key === this._cutKey(tr, r, i); }
+
+  // Cuts of a track as WAV files, aligned with `idx`: saved into the export folder, or (temp) into the temporary
+  // folder of this run. A cut already written with the same bounds, name and fades/normalisation reuses its file
+  // (a saved one also when a temporary one would do).
+  async _files(tr, idx, button, temp = false) {
+    const todo = idx.filter((i) => {
+      const r = tr.regions[i];
+      return r.file?.key !== this._cutKey(tr, r, i) || (!temp && !r.file.saved);
+    });
     if (todo.length) {
       // empty names get the placeholder shown in the list, so numbers match the region numbers
-      const regions = todo.map((i) => ({ start: this.regions[i].start, end: this.regions[i].end, name: this.regions[i].name || this._defaultName(i) }));
+      const regions = todo.map((i) => ({ start: tr.regions[i].start, end: tr.regions[i].end, name: tr.regions[i].name || this._defaultName(tr, i) }));
       if (button) button.loading = true;
-      const r = await this.api.sampler_export(regions, this.opts);
+      const r = await this.api.sampler_export(regions, this.opts, tr.sid, temp);
       if (button) button.loading = false;
       if (r.error) { this._error(r.error); return null; }
-      todo.forEach((i, k) => { if (r.files[k]) this.regions[i].file = { key: key(this.regions[i], i), path: r.files[k] }; });
-      this._showExported(r.folder, r.paths[0]);
+      todo.forEach((i, k) => { if (r.files[k]) tr.regions[i].file = { key: this._cutKey(tr, tr.regions[i], i), path: r.files[k], saved: !temp }; });
+      if (!temp) this._showExported(r.folder, r.paths[0]);
       if (r.in_library) toast(t('The samples are in the library: analysing them'));
     }
-    return idx.map((i) => this.regions[i].file?.path || null);
+    return idx.map((i) => tr.regions[i].file?.path || null);
+  }
+
+  // Cuts as sample refs, for sending them somewhere (temporary files unless already saved).
+  async _regionRefs(tr, idx, button) {
+    const files = await this._files(tr, idx, button, true);
+    if (!files) return null;
+    return idx.map((i, k) => files[k] && {
+      kind: 'file', path: files[k], name: files[k].split('/').pop(), cls: null, root: null, sid: tr.sid,
+      dur: +(tr.regions[i].end - tr.regions[i].start).toFixed(3) }).filter(Boolean);
+  }
+
+  // The ticked cuts, per track: [[tr, [i…]]].
+  _checkedCuts() {
+    return this.tracks.map((tr) => [tr, tr.regions.map((r, i) => (r.on ? i : -1)).filter((i) => i >= 0)]).filter(([, idx]) => idx.length);
+  }
+
+  // Ticked rows of the active tab as sample refs (cuts are written first, as temporary files).
+  async _checkedRefs(button) {
+    if (this.opts.tab !== 'cuts') return this._rows().filter((f) => f.on).map((f) => ({ ...this._fileRef(f), sid: f.sid }));
+    const out = [];
+    for (const [tr, idx] of this._checkedCuts()) {
+      const refs = await this._regionRefs(tr, idx, button);
+      if (!refs) return null;
+      out.push(...refs);
+    }
+    return out;
   }
 
   _showExported(folder, first) {
@@ -1203,25 +1547,152 @@ export class SamplerEditor {
     $('#sp-regions').before(head);
   }
 
-  _checked() { return this.regions.map((r, i) => (r.on ? i : -1)).filter((i) => i >= 0); }
-
+  // "Export all": saves the ticked rows of the tab into the export folder chosen in Settings. What is not saved
+  // stays temporary and is deleted when ClusterSound closes.
   async export() {
-    const idx = this._checked();
-    if (!idx.length) return;
-    const files = await this._files(idx, $('#sp-export'));
-    if (!files) return;
-    const n = files.filter(Boolean).length;
-    toast(n === 1 ? t('1 sample exported') : t('{n} samples exported', { n }));
+    const b = $('#sp-export');
+    let n = 0;
+    if (this.opts.tab === 'cuts') {
+      for (const [tr, idx] of this._checkedCuts()) {
+        const files = await this._files(tr, idx, b);
+        if (!files) return;
+        n += files.filter(Boolean).length;
+      }
+      this._renderTracks();
+      this.renderRegions();
+    } else {
+      const paths = this._rows().filter((f) => f.on).map((f) => f.path);
+      if (!paths.length) return;
+      n = await this.exportFiles(paths);
+    }
+    if (n) toast(n === 1 ? t('1 sample saved') : t('{n} samples saved', { n }));
   }
 
-  // Selected regions (or one) onto free Drum Rack pads, from the rack's selected pad on, to play them there.
-  async sendToRack(idx = this._checked()) {
-    if (!idx.length || !this.onSendToRack) return;
-    const files = await this._files(idx, $('#sp-rack'));
-    if (!files) return;
-    const refs = idx.map((i, k) => files[k] && {
-      kind: 'file', path: files[k], name: files[k].split('/').pop(), cls: null, root: null,
-      dur: +(this.regions[i].end - this.regions[i].start).toFixed(3) }).filter(Boolean);
-    if (refs.length) this.onSendToRack(refs);
+  // Where a stem or enhanced file can be shown in the Finder: saved, or its copy in the library (else null).
+  _whereSaved(f) { return f.saved ? f.path : this.libCopies.get(f.path) || null; }
+
+  // «Show in Finder» of a temporary file: it is not saved yet; offer to send it to the library or to export it.
+  _unsavedMenu(anchor, f) {
+    const pop = showPopover(anchor, `<div class="pop-title">${icon('triangle-alert')} ${t('Not saved yet')}</div>
+      <div class="hint sp-unsaved">${t('«{name}» is temporary: it is deleted when ClusterSound closes. Save it to find it in {app}.', { name: esc(f.name), app: FILE_MANAGER })}</div>
+      <div class="pop-actions">
+        ${btn(t('Send to the library'), { icon: 'library-big', 'data-go': 'lib' })}
+        ${btn(t('Export'), { variant: 'brand', icon: 'file-down', 'data-go': 'save', title: t('Saves it in the export folder, like «Export all»') })}
+      </div>`);
+    pop.querySelectorAll('[data-go]').forEach((b) => {
+      b.onclick = async () => {
+        pop.close();
+        if (b.dataset.go === 'lib') return this.sendToLibrary(null, [{ path: f.path, sid: f.sid }]);
+        const n = await this.exportFiles([f.path]);
+        if (n) toast(t('1 sample saved'));
+      };
+    });
   }
+
+  // Save extracted files (temporary ones move into the export folder); returns how many.
+  async exportFiles(paths) {
+    const b = $('#sp-export');
+    b.loading = true;
+    const r = await this.api.sampler_export_files(paths);
+    b.loading = false;
+    if (r.error) { this._error(r.error); return 0; }
+    this._showExported(r.folder, r.paths[0]);
+    if (r.in_library) toast(t('The samples are in the library: analysing them'));
+    await this._loadExtractions(); // the saved ones moved
+    return r.paths.length;
+  }
+
+  // A stem or enhanced file: a temporary one is deleted, a saved one goes to the Trash (after a confirmation).
+  async deleteFile(f) {
+    if (f.saved && !(await this._confirm(t('Move to the Trash'), t('Move «{name}» to the Trash? It is saved in the export folder.', { name: esc(f.name) }), t('Move to the Trash')))) return;
+    if (this.playing?.path === f.path) this.player.stop();
+    const r = await this.api.sampler_delete_extraction(f.path);
+    if (r.error) return this._error(r.error);
+    if (this.session?.path === f.path) { // its own tab, if open, has nothing to show any more
+      const tr = this.cur;
+      await this._opened(await this.api.sampler_close(tr.sid));
+    }
+    await this._loadExtractions();
+    toast(f.saved ? t('Moved to the Trash') : t('Deleted'));
+  }
+
+  // Ticked rows into the library: ClusterSound Recorder/<track>/ of one of its folders (asked if there are more).
+  async sendToLibrary(root = null, items = null) {
+    if (!items) {
+      const refs = await this._checkedRefs($('#sp-send'));
+      if (!refs?.length) return;
+      items = refs.map((x) => ({ path: x.path, sid: x.sid }));
+    }
+    let r = await this.api.sampler_send_to_library(items, root);
+    if (r.choose) {
+      root = await this._chooseRoot(r.choose);
+      if (!root) return;
+      r = await this.api.sampler_send_to_library(items, root);
+    }
+    if (r.error) return this._error(r.error);
+    for (const [src, dst] of Object.entries(r.copies || {})) this.libCopies.set(src, dst);
+    this.renderRegions();
+    toast(r.files.length === 1 ? t('1 sample copied to the library') : t('{n} samples copied to the library', { n: r.files.length }));
+  }
+
+  // Which library folder, when the library is made of several.
+  _chooseRoot(roots) {
+    return new Promise((done) => {
+      let picked = null;
+      const dlg = openDialog('sp-root-dlg', { label: t('Send to the library'), width: '480px', onHide: () => done(picked),
+        body: `<p class="hint">${t('The library is made of several folders: in which one should the «{dir}» folder go?', { dir: 'ClusterSound Recorder' })}</p>
+          <div class="sp-roots">${roots.map((x) => `<button class="sp-open-choice" data-root="${esc(x)}">${icon('folder-open')}<b>${esc(x.split('/').pop() || x)}</b><span class="hint">${esc(x)}</span></button>`).join('')}</div>` });
+      dlg.querySelector('.sp-roots').onclick = (e) => {
+        const b = e.target.closest('[data-root]');
+        if (!b) return;
+        picked = b.dataset.root;
+        dlg.close();
+      };
+    });
+  }
+
+  // The ticked rows (cuts of every track, or files) to Live, one new audio track each; with no cut ticked,
+  // all the shown track.
+  async sendToLive() {
+    const b = $('#sp-send');
+    const send = (...a) => this.api.sampler_send_to_live(...a);
+    const jobs = [];
+    if (this.opts.tab === 'cuts') {
+      for (const [tr, idx] of this._checkedCuts()) for (const i of idx) jobs.push(() => send(tr.regions[i].start, tr.regions[i].end, this.opts, null, tr.sid));
+      if (!jobs.length && this.cur) jobs.push(() => send(null, null, this.opts, null, this.cur.sid));
+    } else {
+      for (const f of this._rows().filter((x) => x.on)) jobs.push(() => send(null, null, null, f.path));
+    }
+    if (!jobs.length) return this._error(t('Open a recording first'));
+    b.loading = true;
+    toast(t('Sending to Live…'));
+    let out = null;
+    for (const job of jobs) out = await job();
+    b.loading = false;
+    if (out.error) return this._error(out.error);
+    if (out.file && !out.running) return toast(t('Live bridge not active: the file is in the Live browser anyway, User Library › ClusterSound › Audio'));
+    liveToast(out);
+  }
+
+  // Ticked rows onto free Drum Rack pads, from the rack's selected pad on, to play them there.
+  async sendToRack() {
+    if (!this.onSendToRack) return;
+    const refs = await this._checkedRefs($('#sp-send'));
+    if (refs?.length) this.onSendToRack(refs);
+  }
+
+  async sendToBus(bus) {
+    if (!this.onSendToBus) return;
+    const refs = await this._checkedRefs($('#sp-send'));
+    if (refs?.length) this.onSendToBus(refs, bus);
+  }
+}
+
+// What the editor shows is the shown track's: these read and write this.cur (defaults with no track open).
+const TRACK = { session: null, regions: [], sel: -1, view: { start: 0, end: 1 }, overview: null, detail: null, cursor: 0 };
+for (const [k, d] of Object.entries(TRACK)) {
+  Object.defineProperty(SamplerEditor.prototype, k, {
+    get() { return this.cur ? this.cur[k] : (Array.isArray(d) ? [] : d); },
+    set(v) { if (this.cur) this.cur[k] = v; },
+  });
 }

@@ -237,6 +237,7 @@ def test_send_to_live_api(stage):
     from clustersound.sampler import session as S
     a = object.__new__(Api)
     a._sampler = None
+    a._sessions, a._sid_next, a._extr_paths = {}, 0, {}
     a._live = server.Bridge(stage, _resolve, lambda r: None)
     a._settings = lambda: {}
     assert a.sampler_send_to_live()["error"] == "no audio open"

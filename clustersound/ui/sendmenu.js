@@ -149,12 +149,21 @@ export function showPopover(anchor, html, cls = '') {
   el.className = `popover ${cls}`.trim(); // before measuring: the class can change the width
   el.innerHTML = html;
   document.body.appendChild(el);
-  const a = anchor.getBoundingClientRect(), r = el.getBoundingClientRect();
-  el.style.left = `${Math.max(8, Math.min(a.right - r.width, window.innerWidth - r.width - 8))}px`;
-  el.style.top = `${Math.min(a.bottom + 6, window.innerHeight - r.height - 8)}px`;
+  // under the anchor, or over it when there is no room; again when the content grows (web components render late)
+  const place = () => {
+    const a = anchor.getBoundingClientRect(), r = el.getBoundingClientRect(), H = window.innerHeight;
+    el.style.left = `${Math.max(8, Math.min(a.right - r.width, window.innerWidth - r.width - 8))}px`;
+    const below = a.bottom + 6, above = a.top - r.height - 6;
+    const top = below + r.height <= H - 8 ? below : above >= 8 ? above : H - r.height - 8;
+    el.style.top = `${Math.max(8, Math.min(top, H - r.height - 8))}px`;
+  };
+  place();
+  const ro = new ResizeObserver(place);
+  ro.observe(el);
   const outside = (e) => { if (!el.contains(e.target) && !anchor.contains(e.target)) el.close(); };
   const esc_ = (e) => { if (e.key === 'Escape') el.close(); };
   el.close = () => {
+    ro.disconnect();
     el.remove();
     document.removeEventListener('pointerdown', outside, true);
     document.removeEventListener('keydown', esc_, true);

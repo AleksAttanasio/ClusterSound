@@ -168,6 +168,8 @@ def api(tmp_path, monkeypatch):
     a._enh_source = None
     a._enh_cancel = threading.Event()
     a._sampler = None
+    a._sessions, a._sid_next, a._extr_paths = {}, 0, {}
+    a._work = str(tmp_path / "work")
     monkeypatch.setattr(Api, "_settings", lambda self: {"sampler_dir": str(tmp_path / "samples")})
     monkeypatch.setattr(Api, "_inside_library", lambda self, folder: False)
 
@@ -191,7 +193,7 @@ def test_api_region_job_and_open(api, tmp_path):
     job = api.wait()
     assert job["state"] == "done" and job["model"] == "apollo", job
     path = job["result"]["path"]
-    assert path.startswith(str(tmp_path / "samples")) and path.endswith("(enhanced).wav")
+    assert path.startswith(str(tmp_path / "work")) and path.endswith("(enhanced).wav")
     assert os.path.isfile(path + ".source.txt")  # the capture's provenance follows the file
     y, sr = sf.read(path)
     assert job["result"]["sr"] == sr and abs(len(y) / sr - 1.0) < 1e-3  # just the region

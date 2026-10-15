@@ -233,6 +233,8 @@ def lib_api(tmp_path):
     a._lib = Lib()
     a._lib.items = items
     a._sampler = None
+    a._sessions, a._sid_next, a._extr_paths = {}, 0, {}
+    a._work = str(tmp_path / "work")
     a._sampler_max = lambda: 30.0
     return a
 
