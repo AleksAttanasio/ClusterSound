@@ -844,9 +844,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#exporting" class="md-nav__link">
+  <a href="#extractions" class="md-nav__link">
     <span class="md-ellipsis">
-      Exporting
+      Extractions
     </span>
   </a>
   
@@ -1789,9 +1789,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#exporting" class="md-nav__link">
+  <a href="#extractions" class="md-nav__link">
     <span class="md-ellipsis">
-      Exporting
+      Extractions
     </span>
   </a>
   
@@ -1837,8 +1837,12 @@
 <p>Records what the computer sends to one or more <strong>audio outputs</strong>, then cuts samples out of the recording: they go
 into the library and are classified like the others. It also opens any audio file or library sample.</p>
 <p><img alt="Recorder with regions on the transients" class="shot" src="../../assets/screenshots/recorder.png" /></p>
+<p>The screen uses its whole width: the <strong>file bar</strong> on top, one <strong>tab per open track</strong> over the waveform, the
+<strong>transport</strong> under it and the <strong>Extractions</strong> of all the open tracks at the bottom.</p>
 <h2 id="recording">Recording<a class="headerlink" href="#recording" title="Permanent link">&para;</a></h2>
 <ul>
+<li><strong>● Record</strong> is in the transport, with the clock and a small level meter per output (hover it for the output's
+  name). The yellow ⚠ next to it recalls the legal note below; ⋯ opens the Recorder settings.</li>
 <li><strong>Outputs</strong>: speakers, headphones, audio interfaces, AirPlay… plus <em>All outputs (mix)</em> (on Windows <em>Default
   output</em>). Several outputs start together, each with its own file and meter. <em>Refresh the list</em> reads the
   devices again.</li>
@@ -1849,35 +1853,64 @@ into the library and are classified like the others. It also opens any audio fil
   The recording goes on while you switch section.</li>
 </ul>
 <h2 id="opening-audio">Opening audio<a class="headerlink" href="#opening-audio" title="Permanent link">&para;</a></h2>
-<p><em>Open file…</em> (or drag from the Finder onto the waveform) opens any audio file; <em>From the library…</em> opens samples and
-loops browsing folders and packs or searching by name.</p>
+<p>The file bar shows the path of the open audio. Its folder button asks where to open from: <strong>Local folder…</strong> (any
+audio file of the computer), <strong>Sample library…</strong> (samples and loops by folder, pack or name) or one of the
+<strong>Recent recordings</strong> of the session. An audio file dragged from the Finder onto the waveform opens too.</p>
+<p>Every opened file gets its own <strong>tab</strong> over the waveform (a file already open just shows its tab); <strong>+</strong> opens
+another one, <strong>×</strong> (or a middle click) closes it, asking first if it has cuts not exported yet. Slicing, stems,
+Enhance and the transport work on the shown track.</p>
 <h2 id="editor-and-regions">Editor and regions<a class="headerlink" href="#editor-and-regions" title="Permanent link">&para;</a></h2>
 <ul>
-<li>When you stop, the recording opens in the editor. <strong>Drag</strong> on the waveform to create a region, the edges resize
-  it, click to listen to it.</li>
-<li><strong>Slice on transients</strong> creates one region per hit in the visible part; <em>Sensitivity</em> sets how many hits it
-  finds.</li>
-<li>Wheel: zoom · <code>Shift</code>+wheel: scroll · the strip below moves the view · <code>Space</code> play/stop · <code>↑</code> <code>↓</code>
+<li>When you stop, the recording opens in a new tab. <strong>Drag</strong> on the waveform to create a region, the edges resize
+  it, double click to listen to it.</li>
+<li><strong>Click</strong> on the waveform to move the <strong>cursor</strong> there (and select the region under it): play starts from the
+  cursor, and while playing a click jumps there.</li>
+<li><strong>Slice on transients</strong> creates one region per hit in the visible part; its <strong>⋯</strong> sets the <em>Sensitivity</em> (how
+  many hits it finds).</li>
+<li>Transport: <strong>■</strong> stop (the cursor goes back to the start of the track), <strong>▶/❚❚</strong> play and pause from the cursor
+  (pausing leaves the cursor where it stopped), <strong>⤢</strong> shows the whole track.</li>
+<li>Wheel: zoom · <code>Shift</code>+wheel: scroll · the strip below moves the view · <code>Space</code> play/pause · <code>↑</code> <code>↓</code>
   previous/next region · <code>Del</code> delete.</li>
 </ul>
-<h2 id="exporting">Exporting<a class="headerlink" href="#exporting" title="Permanent link">&para;</a></h2>
+<h2 id="extractions">Extractions<a class="headerlink" href="#extractions" title="Permanent link">&para;</a></h2>
+<p>Everything extracted from <strong>all the open tracks</strong>, in three tabs with a tick per row; with more than one track the
+rows are grouped under its name (click it to show that track):</p>
 <ul>
-<li><strong>Export selected</strong>: 24-bit WAV in <code>~/Music/ClusterSound Samples/</code>, with fades (1 ms in, 10 ms out) and optional
-  normalisation, at most 30 s each.</li>
-<li><strong>To the Drum Rack</strong>: loads the regions on the free pads from the selected pad on, in note order, and opens the
-  Drum Rack.</li>
-<li><strong>Send to Live</strong>: a new audio track in Ableton with the region (or all the audio), in the first empty slot of
-  the selected scene. It needs the ClusterSound device with <em>Receive</em> on.</li>
+<li><strong>✂ Cuts</strong>: the regions, cut by hand or on the transients.</li>
+<li><strong>Stems</strong>: the stems of the open tracks, found again on disk when they open. The stems of the same separated
+  audio (a track, a cut, an enhanced file) are grouped: click a group to open or close it, its tick ticks them all.</li>
+<li><strong>✨ Enhanced</strong>: the enhanced files made from the tracks, from their cuts or from their stems.</li>
+</ul>
+<p>Every row has icon-only buttons: listen, show the waveform (a cut is zoomed in; a stem or an enhanced file opens
+in a new tab), <strong>Extract stems</strong> (cuts and enhanced files), ✨ Enhance (cuts and stems) and <strong>Send</strong>, the same menu as
+in the library (a Sequencer bus or a Drum Rack group). Stems and enhanced files also have show in the Finder (greyed out until the file is saved
+or sent to the library: clicking it offers to do one of the two) and 🗑 <strong>delete</strong>: a temporary file is deleted, a saved one goes to the Trash after a confirmation.</p>
+<div class="admonition info">
+<p class="admonition-title">Temporary until saved</p>
+<p>New cuts, stems and enhanced files are <strong>temporary</strong>: they are kept in a work folder of ClusterSound while it is
+open, and deleted when it closes (○ next to the duration). <strong>Export all</strong> saves them (✓). Cuts sent to the Drum
+Rack or the Sequencer without saving them stay temporary too, so those pads are empty after a restart.</p>
+</div>
+<p>Next to the title:</p>
+<ul>
+<li><strong>Clear all</strong> empties the tab, after a confirmation (stems and enhanced files stay on disk).</li>
+<li><strong>Send to</strong>: the ticked rows to <strong>Ableton Live</strong> (one new audio track each; with no cut ticked, all the shown track),
+  to the <strong>Drum Rack</strong> (on the free pads from the selected one) or to the <strong>Sequencer</strong> (new layers of the chosen
+  bus), or to the <strong>Library</strong>: a copy in <code>ClusterSound Recorder/&lt;track&gt;/</code> of the library folder (asked when the
+  library is made of several), analysed like the other samples. Live needs the ClusterSound device with <em>Receive</em> on.</li>
+<li><strong>Export all</strong> saves the ticked rows into the <strong>export folder</strong> (Settings › Recorder, by default
+  <code>~/Music/ClusterSound Samples/</code>). Cuts become 24-bit WAVs with fades (1 ms in, 10 ms out) and optional
+  normalisation, at most 30 s each; stems and enhanced files move there with their provenance note.</li>
 </ul>
 <h2 id="extract-stems">Extract stems<a class="headerlink" href="#extract-stems" title="Permanent link">&para;</a></h2>
-<p>Separates the recording or the region into <strong>Drums, Bass, Guitar, Piano, Vocals</strong> (those you tick) plus always
+<p>Separates the shown track or its region (or, from its row, a single cut or enhanced file) into <strong>Drums, Bass, Guitar, Piano, Vocals</strong> (those you tick) plus always
 <strong>Other</strong> with the rest, so the sum gives back the original. One 24-bit WAV per stem, which can be opened in the
-editor. It runs locally with Demucs (<code>stems</code> extra, 55 MB model downloaded on first use). Details:
+editor. The stems show up in the <strong>Stems</strong> tab. It runs locally with Demucs (<code>stems</code> extra, 55 MB model downloaded on first use). Details:
 <a href="../../ai/demucs/">Demucs</a>.</p>
 <h2 id="enhance">Enhance<a class="headerlink" href="#enhance" title="Permanent link">&para;</a></h2>
-<p>Purple ✨ button, also on every region: <strong>AI restoration</strong> that rebuilds the cut high frequencies and cleans up the
-artefacts of compression (MP3, streaming). The result is a new <code>… (enhanced).wav</code> file; the original stays as it
-is. It runs locally with Apollo (<code>enhance</code> extra, 66 MB). Details: <a href="../../ai/apollo/">Apollo</a>.</p>
+<p>Purple ✨ button, also on every cut and stem: <strong>AI restoration</strong> that rebuilds the cut high frequencies and cleans up the
+artefacts of compression (MP3, streaming). The result is a new <code>… (enhanced).wav</code> file, listed in the <strong>Enhanced</strong> tab; the
+original stays as it is. It runs locally with Apollo (<code>enhance</code> extra, 66 MB). Details: <a href="../../ai/apollo/">Apollo</a>.</p>
 <div class="admonition warning">
 <p class="admonition-title">Legal note</p>
 <p>Nothing is decrypted or bypassed: apps that protect their stream record silence. Recordings are for personal

@@ -844,9 +844,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#esportare" class="md-nav__link">
+  <a href="#estrazioni" class="md-nav__link">
     <span class="md-ellipsis">
-      Esportare
+      Estrazioni
     </span>
   </a>
   
@@ -1789,9 +1789,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#esportare" class="md-nav__link">
+  <a href="#estrazioni" class="md-nav__link">
     <span class="md-ellipsis">
-      Esportare
+      Estrazioni
     </span>
   </a>
   
@@ -1837,8 +1837,12 @@
 <p>Registra ciò che il computer manda a una o più <strong>uscite audio</strong>, poi ritaglia i sample dalla registrazione: finiscono
 nella libreria e vengono classificati come gli altri. Apre anche qualsiasi file audio o sample della libreria.</p>
 <p><img alt="Recorder con regioni sui transienti" class="shot" src="../../../assets/screenshots/recorder.png" /></p>
+<p>La schermata usa tutta la larghezza: la <strong>barra del file</strong> in alto, una <strong>scheda per ogni traccia aperta</strong> sopra
+la forma d'onda, il <strong>trasporto</strong> sotto e le <strong>Estrazioni</strong> di tutte le tracce aperte in fondo.</p>
 <h2 id="registrare">Registrare<a class="headerlink" href="#registrare" title="Permanent link">&para;</a></h2>
 <ul>
+<li><strong>● Registra</strong> è nel trasporto, con l'orologio e un piccolo meter per uscita (passaci sopra per il nome
+  dell'uscita). Il ⚠ giallo accanto ricorda la nota legale qui sotto; ⋯ apre le impostazioni del Recorder.</li>
 <li><strong>Uscite</strong>: casse, cuffie, interfacce audio, AirPlay… più <em>Tutte le uscite (mix)</em> (su Windows <em>Uscita
   predefinita</em>). Più uscite partono insieme, ognuna con il suo file e il suo meter. <em>Aggiorna l'elenco</em> rilegge i
   dispositivi.</li>
@@ -1849,33 +1853,69 @@ nella libreria e vengono classificati come gli altri. Apre anche qualsiasi file 
   La registrazione continua anche cambiando sezione.</li>
 </ul>
 <h2 id="aprire-audio">Aprire audio<a class="headerlink" href="#aprire-audio" title="Permanent link">&para;</a></h2>
-<p><em>Apri file…</em> (o trascina dal Finder sulla forma d'onda) apre qualsiasi file audio; <em>Dalla libreria…</em> apre sample e
-loop navigando per cartelle e pack o cercando per nome.</p>
+<p>La barra del file mostra il percorso dell'audio aperto. Il suo tasto cartella chiede da dove aprire: <strong>Cartella
+locale…</strong> (qualsiasi file audio del computer), <strong>Libreria dei sample…</strong> (sample e loop per cartella, pack o nome)
+o una delle <strong>Registrazioni recenti</strong> della sessione. Si apre anche un file audio trascinato dal Finder sulla forma
+d'onda.</p>
+<p>Ogni file aperto ha la sua <strong>scheda</strong> sopra la forma d'onda (un file già aperto mostra solo la sua scheda); <strong>+</strong>
+ne apre un altro, <strong>×</strong> (o il clic centrale) la chiude, chiedendo prima se ha tagli non ancora esportati. Taglio,
+stem, Migliora e trasporto lavorano sulla traccia mostrata.</p>
 <h2 id="editor-e-regioni">Editor e regioni<a class="headerlink" href="#editor-e-regioni" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Allo stop la registrazione si apre nell'editor. <strong>Trascina</strong> sulla forma d'onda per creare una regione, i bordi
-  la ridimensionano, clic per ascoltarla.</li>
-<li><strong>Taglia sui transienti</strong> crea una regione per colpo nella parte visibile; <em>Sensibilità</em> regola quanti colpi
-  trova.</li>
-<li>Rotella: zoom · <code>Maiusc</code>+rotella: scorri · la striscia sotto sposta la vista · <code>Spazio</code> play/stop · <code>↑</code> <code>↓</code>
+<li>Allo stop la registrazione si apre in una nuova scheda. <strong>Trascina</strong> sulla forma d'onda per creare una regione,
+  i bordi la ridimensionano, doppio clic per ascoltarla.</li>
+<li><strong>Clic</strong> sulla forma d'onda per spostarci il <strong>cursore</strong> (e selezionare la regione sotto): la riproduzione parte
+  dal cursore, e mentre suona un clic salta lì.</li>
+<li><strong>Taglia sui transienti</strong> crea una regione per colpo nella parte visibile; il suo <strong>⋯</strong> regola la <em>Sensibilità</em>
+  (quanti colpi trova).</li>
+<li>Trasporto: <strong>■</strong> stop (il cursore torna all'inizio della traccia), <strong>▶/❚❚</strong> riproduci e pausa dal cursore (la
+  pausa lascia il cursore dove si è fermato), <strong>⤢</strong> mostra tutta la traccia.</li>
+<li>Rotella: zoom · <code>Maiusc</code>+rotella: scorri · la striscia sotto sposta la vista · <code>Spazio</code> riproduci/pausa · <code>↑</code> <code>↓</code>
   regione precedente/successiva · <code>Canc</code> elimina.</li>
 </ul>
-<h2 id="esportare">Esportare<a class="headerlink" href="#esportare" title="Permanent link">&para;</a></h2>
+<h2 id="estrazioni">Estrazioni<a class="headerlink" href="#estrazioni" title="Permanent link">&para;</a></h2>
+<p>Tutto ciò che è stato estratto da <strong>tutte le tracce aperte</strong>, in tre schede con una spunta per riga; con più
+tracce le righe sono raggruppate sotto il suo nome (clic per mostrare quella traccia):</p>
 <ul>
-<li><strong>Esporta selezionate</strong>: WAV 24 bit in <code>~/Music/ClusterSound Samples/</code>, con fade (1 ms in, 10 ms out) e
-  normalizzazione opzionale, massimo 30 s ciascuno.</li>
-<li><strong>Al Drum Rack</strong>: carica le regioni sui pad liberi dal pad selezionato, in ordine di nota, e apre il Drum Rack.</li>
-<li><strong>Invia a Live</strong>: una nuova traccia audio in Ableton con la regione (o tutto l'audio), nel primo slot vuoto
-  della scena selezionata. Serve il device ClusterSound con <em>Ricevi</em> attivo.</li>
+<li><strong>✂ Tagli</strong>: le regioni, tagliate a mano o sui transienti.</li>
+<li><strong>Stem</strong>: gli stem delle tracce aperte, ritrovati sul disco quando si aprono. Gli stem dello stesso audio
+  separato (una traccia, un taglio, un file migliorato) sono raggruppati: clic su un gruppo per aprirlo o chiuderlo,
+  la sua spunta li spunta tutti.</li>
+<li><strong>✨ Migliorati</strong>: i file migliorati ricavati dalle tracce, dai loro tagli o dai loro stem.</li>
+</ul>
+<p>Ogni riga ha tasti solo icona: ascolta, mostra la forma d'onda (un taglio viene ingrandito; uno stem o un file
+migliorato si apre in una nuova scheda), <strong>Estrai stem</strong> (tagli e file migliorati), ✨ Migliora (tagli e stem) e
+<strong>Invia</strong>, lo stesso menu della libreria (un bus del Sequencer o un gruppo del Drum Rack). Stem e file migliorati
+hanno anche mostra nel Finder (spento finché il file non è salvato o inviato alla libreria: cliccandolo
+propone di fare una delle due) e 🗑 <strong>elimina</strong>: un file temporaneo viene eliminato, uno salvato va nel Cestino dopo
+una conferma.</p>
+<div class="admonition info">
+<p class="admonition-title">Temporanei finché non li salvi</p>
+<p>Tagli, stem e file migliorati nuovi sono <strong>temporanei</strong>: restano in una cartella di lavoro di ClusterSound
+finché è aperto, e vengono eliminati alla chiusura (○ accanto alla durata). <strong>Esporta tutto</strong> li salva (✓).
+Anche i tagli mandati al Drum Rack o al Sequencer senza salvarli restano temporanei: dopo un riavvio quei pad
+sono vuoti.</p>
+</div>
+<p>Accanto al titolo:</p>
+<ul>
+<li><strong>Svuota tutto</strong> svuota la scheda, dopo una conferma (stem e file migliorati restano sul disco).</li>
+<li><strong>Invia a</strong>: le righe spuntate ad <strong>Ableton Live</strong> (una nuova traccia audio ciascuna; senza tagli spuntati,
+  tutta la traccia mostrata), al <strong>Drum Rack</strong> (sui pad liberi da quello selezionato) o al <strong>Sequencer</strong> (nuovi layer del bus
+  scelto), oppure alla <strong>Libreria</strong>: una copia in <code>ClusterSound Recorder/&lt;traccia&gt;/</code> della cartella della libreria
+  (chiesta se la libreria è fatta di più cartelle), analizzata come gli altri sample. Live richiede il device
+  ClusterSound con <em>Ricevi</em> attivo.</li>
+<li><strong>Esporta tutto</strong> salva le righe spuntate nella <strong>cartella di esportazione</strong> (Impostazioni › Recorder, di base
+  <code>~/Music/ClusterSound Samples/</code>). I tagli diventano WAV 24 bit con fade (1 ms in, 10 ms out) e normalizzazione
+  opzionale, massimo 30 s ciascuno; stem e file migliorati ci vengono spostati con la loro nota di provenienza.</li>
 </ul>
 <h2 id="estrai-stem">Estrai stem<a class="headerlink" href="#estrai-stem" title="Permanent link">&para;</a></h2>
-<p>Separa la registrazione o la regione in <strong>Batteria, Basso, Chitarra, Piano, Voce</strong> (quelli che spunti) più sempre
-<strong>Altro</strong> con il resto, così la somma ridà l'originale. Un WAV 24 bit per stem, apribile nell'editor. Gira in
+<p>Separa la traccia mostrata o la sua regione (o, dalla sua riga, un singolo taglio o file migliorato) in <strong>Batteria, Basso, Chitarra, Piano, Voce</strong> (quelli che spunti) più sempre
+<strong>Altro</strong> con il resto, così la somma ridà l'originale. Un WAV 24 bit per stem, apribile nell'editor. Gli stem compaiono nella scheda <strong>Stem</strong>. Gira in
 locale con Demucs (extra <code>stems</code>, modello da 55 MB scaricato al primo uso). Dettagli: <a href="../../ai/demucs/">Demucs</a>.</p>
 <h2 id="migliora">Migliora<a class="headerlink" href="#migliora" title="Permanent link">&para;</a></h2>
-<p>Pulsante viola ✨, anche su ogni regione: <strong>restauro AI</strong> che ricostruisce le alte frequenze tagliate e ripulisce
-gli artefatti della compressione (MP3, streaming). Il risultato è un nuovo file <code>… (migliorato).wav</code>; l'originale
-resta com'è. Gira in locale con Apollo (extra <code>enhance</code>, 66 MB). Dettagli: <a href="../../ai/apollo/">Apollo</a>.</p>
+<p>Pulsante viola ✨, anche su ogni taglio e stem: <strong>restauro AI</strong> che ricostruisce le alte frequenze tagliate e ripulisce
+gli artefatti della compressione (MP3, streaming). Il risultato è un nuovo file <code>… (migliorato).wav</code>, elencato nella
+scheda <strong>Migliorati</strong>; l'originale resta com'è. Gira in locale con Apollo (extra <code>enhance</code>, 66 MB). Dettagli: <a href="../../ai/apollo/">Apollo</a>.</p>
 <div class="admonition warning">
 <p class="admonition-title">Nota legale</p>
 <p>Nulla viene decifrato o aggirato: le app che proteggono il flusso registrano silenzio. Le registrazioni sono
