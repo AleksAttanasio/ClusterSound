@@ -13,7 +13,7 @@ restano nel `localStorage` della WebView.
 | `cache_mb` | 300 | Generale | limite della cache temporanea (50–10000 MB) |
 | `live_port` | 8770 | Generale | porta del bridge per il device Max for Live (1024–65535) |
 | `live_library` | User Library di Live | Generale | dove scrivere i rack per Live |
-| `sampler_dir` | `~/Music/ClusterSound Samples` | Recorder | cartella dei sample estratti |
+| `sampler_dir` | `~/Music/ClusterSound Samples` | Recorder | cartella di esportazione: tagli, stem e file migliorati (Impostazioni › Recorder › *Cartella di esportazione*) |
 | `sampler_max_seconds` | 30 | Recorder | durata massima di un sample estratto |
 | `recorder_dir` | `~/Music/ClusterSound Recordings` | Recorder | cartella delle registrazioni |
 | `recorder_format` | — | Recorder | formato, bit, bitrate, frequenza e canali |

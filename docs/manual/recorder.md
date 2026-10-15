@@ -5,8 +5,13 @@ into the library and are classified like the others. It also opens any audio fil
 
 ![Recorder with regions on the transients](../assets/screenshots/recorder.png){ .shot }
 
+The screen uses its whole width: the **file bar** on top, the waveform, the **transport** under it and the
+**Extractions** of the open audio at the bottom.
+
 ## Recording
 
+- **● Record** is in the transport, with the clock and a small level meter per output (hover it for the output's
+  name). The yellow ⚠ next to it recalls the legal note below; ⋯ opens the Recorder settings.
 - **Outputs**: speakers, headphones, audio interfaces, AirPlay… plus *All outputs (mix)* (on Windows *Default
   output*). Several outputs start together, each with its own file and meter. *Refresh the list* reads the
   devices again.
@@ -18,8 +23,9 @@ into the library and are classified like the others. It also opens any audio fil
 
 ## Opening audio
 
-*Open file…* (or drag from the Finder onto the waveform) opens any audio file; *From the library…* opens samples and
-loops browsing folders and packs or searching by name.
+The file bar shows the path of the open audio. Its folder button asks where to open from: **Local folder…** (any
+audio file of the computer), **Sample library…** (samples and loops by folder, pack or name) or one of the
+**Recent recordings** of the session. An audio file dragged from the Finder onto the waveform opens too.
 
 ## Editor and regions
 
@@ -27,30 +33,45 @@ loops browsing folders and packs or searching by name.
   it, click to listen to it.
 - **Slice on transients** creates one region per hit in the visible part; *Sensitivity* sets how many hits it
   finds.
-- Wheel: zoom · `Shift`+wheel: scroll · the strip below moves the view · `Space` play/stop · `↑` `↓`
+- Transport: **■** stop (back to the start), **▶/❚❚** play and pause (play resumes where it paused), **⤢** shows
+  the whole track.
+- Wheel: zoom · `Shift`+wheel: scroll · the strip below moves the view · `Space` play/pause · `↑` `↓`
   previous/next region · `Del` delete.
 
-## Exporting
+## Extractions
 
-- **Export selected**: 24-bit WAV in `~/Music/ClusterSound Samples/`, with fades (1 ms in, 10 ms out) and optional
-  normalisation, at most 30 s each.
-- **To the Drum Rack**: loads the regions on the free pads from the selected pad on, in note order, and opens the
-  Drum Rack.
-- **Send to Live**: a new audio track in Ableton with the region (or all the audio), in the first empty slot of
-  the selected scene. It needs the ClusterSound device with *Receive* on.
+Three tabs, each with a tick per row:
+
+- **✂ Cuts**: the regions, cut by hand or on the transients.
+- **Stems**: the stems already extracted from the open audio, found again on disk when it opens.
+- **✨ Enhanced**: the enhanced files made from the audio, from its cuts or from its stems.
+
+Every row has icon-only buttons: listen, show the waveform (a cut is zoomed in; a stem or an enhanced file opens
+in the editor, and the lists stay those of its source), ✨ Enhance (cuts and stems) and **Send**, the same menu as
+in the library (a Sequencer bus or a Drum Rack group).
+
+Next to the title:
+
+- **Clear all** empties the tab, after a confirmation (stems and enhanced files stay on disk).
+- **Send to**: the ticked rows to **Ableton Live** (one new audio track each; with no cut ticked, all the audio),
+  to the **Drum Rack** (on the free pads from the selected one) or to the **Sequencer** (new layers of the chosen
+  bus). Live needs the ClusterSound device with *Receive* on.
+- **Export all**: the ticked rows into the **export folder** (Settings › Recorder, by default
+  `~/Music/ClusterSound Samples/`). Cuts become 24-bit WAVs with fades (1 ms in, 10 ms out) and optional
+  normalisation, at most 30 s each; stems and enhanced files are copied with their provenance note.
 
 ## Extract stems
 
 Separates the recording or the region into **Drums, Bass, Guitar, Piano, Vocals** (those you tick) plus always
 **Other** with the rest, so the sum gives back the original. One 24-bit WAV per stem, which can be opened in the
-editor. It runs locally with Demucs (`stems` extra, 55 MB model downloaded on first use). Details:
+editor. The stems show up in the **Stems** tab. It runs locally with Demucs (`stems` extra, 55 MB model downloaded on first use). Details:
 [Demucs](../ai/demucs.md).
 
 ## Enhance
 
-Purple ✨ button, also on every region: **AI restoration** that rebuilds the cut high frequencies and cleans up the
-artefacts of compression (MP3, streaming). The result is a new `… (enhanced).wav` file; the original stays as it
-is. It runs locally with Apollo (`enhance` extra, 66 MB). Details: [Apollo](../ai/apollo.md).
+Purple ✨ button, also on every cut and stem: **AI restoration** that rebuilds the cut high frequencies and cleans up the
+artefacts of compression (MP3, streaming). The result is a new `… (enhanced).wav` file, listed in the **Enhanced** tab; the
+original stays as it is. It runs locally with Apollo (`enhance` extra, 66 MB). Details: [Apollo](../ai/apollo.md).
 
 !!! warning "Legal note"
     Nothing is decrypted or bypassed: apps that protect their stream record silence. Recordings are for personal
