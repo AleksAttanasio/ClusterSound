@@ -1551,22 +1551,62 @@ class Api:
             if settings[g]["lock"] or (only_empty and any(rack["pads"][p] for p in pads)):
                 continue
             fam = settings[g]["family"]
-            classes = rack_layouts.family_classes(fam)
-            pool = [it for it in items if (not classes or it["cls"] in classes) and it["id"] not in used
-                    and it["feats"].get("type") == "One-shot"]
-            if not pool:
-                continue
-            pool = self._ranked(pool, classes)[:300]
             subs = used_subs.setdefault(fam, set())
-            seed = next((it for it in pool if (it["cls"], it.get("sub")) not in subs), pool[0])
+            seed = self._autofill_seed(fam, used, subs)
+            if seed is None:
+                continue
             subs.add((seed["cls"], seed.get("sub")))
-            opts = {"filter": "family", "family": fam, "oneshot": True}
-            picks = rack_select.pick(a["Xn"], seed["id"], len(pads) - 1, "random", self._rack_mask(None, opts),
+            picks = rack_select.pick(a["Xn"], seed["id"], len(pads) - 1, "random", self._autofill_mask(fam),
                                      variation, used | {seed["id"]})
             for p, ref in zip(pads, self._rack_refs([(seed["id"], 1.0)] + picks)):
                 rack["pads"][p] = ref
                 used.add(ref["id"])
         return rack
+
+    def _autofill_seed(self, family: str, used: set, subs: set) -> dict | None:
+        """Auto-fill's seed for a group: the best one-shot of the family not in the kit yet, from a
+        sub-cluster (`subs`: (class, sub) pairs) no other group of the same family uses, if possible."""
+        classes = rack_layouts.family_classes(family)
+        pool = [it for it in self._lib.items if (not classes or it["cls"] in classes) and it["id"] not in used
+                and it["feats"].get("type") == "One-shot"]
+        if not pool:
+            return None
+        pool = self._ranked(pool, classes)[:300]
+        return next((it for it in pool if (it["cls"], it.get("sub")) not in subs), pool[0])
+
+    def _autofill_mask(self, family: str) -> np.ndarray | None:
+        return self._rack_mask(None, {"filter": "family", "family": family, "oneshot": True})
+
+    def rack_autosample(self, rack: dict, group: int, variation: float = 0.3, opts: dict | None = None) -> dict | None:
+        """One more sample for a group, with Auto-fill's criterion: a similarity-weighted draw among the
+        nearest one-shots of the family to the group's seed (its first library sample), not in the kit yet.
+        A group with no library sample gets a random sample of its family instead, with the Generate
+        options `oneshot` and `avoid` (samples already in the kit). None when nothing fits."""
+        rack = rack_layouts.validate(rack)
+        opts = opts or {}
+        if not self._lib.items:
+            return None
+        groups = rack_layouts.groups_of(rack)
+        g = int(group)
+        if not 0 <= g < len(groups):
+            return None
+        fam = rack_layouts.group_settings(rack)[g]["family"]
+        pads = rack["pads"]
+        used = {r["id"] for r in pads if r and r.get("kind") == "library"}
+        mine = [pads[p]["id"] for p in groups[g] if pads[p] and pads[p].get("kind") == "library"]
+        if not mine:
+            classes = rack_layouts.family_classes(fam)
+            avoid = opts.get("avoid", True)
+            oneshot = opts.get("oneshot", True)
+            pool = [it["id"] for it in self._lib.items if (not classes or it["cls"] in classes)
+                    and not (avoid and it["id"] in used) and not (oneshot and it["feats"].get("type") != "One-shot")]
+            if not pool:
+                return None
+            pick = int(np.random.default_rng(opts.get("rng_seed")).choice(pool))
+            return self._rack_refs([(pick, 1.0)])[0]
+        a = self._rack_arrays()
+        picks = rack_select.pick(a["Xn"], mine[0], 1, "random", self._autofill_mask(fam), variation, used)
+        return self._rack_refs(picks)[0] if picks else None
 
     def _random_mask(self, classes: list[str], opts: dict) -> np.ndarray:
         a = self._rack_arrays()

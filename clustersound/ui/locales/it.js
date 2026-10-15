@@ -391,7 +391,6 @@ export default {
   "Fades of the extracted samples": "Fade dei sample estratti",
   "Falling": "Scende",
   "Family": "Famiglia",
-  "family of the group ({family})": "famiglia del gruppo ({family})",
   "Featured packs on Freesound": "Pack in evidenza su Freesound",
   "Fifths": "Quinte",
   "File": "File",
@@ -1339,5 +1338,19 @@ export default {
   "Not saved yet": "Non ancora salvato",
   "«{name}» is temporary: it is deleted when ClusterSound closes. Save it to find it in {app}.": "«{name}» è temporaneo: viene eliminato alla chiusura di ClusterSound. Salvalo per trovarlo nel {app}.",
   "Saves it in the export folder, like «Export all»": "Lo salva nella cartella di esportazione, come «Esporta tutto»",
-  "Cannot show the file: it was moved or deleted": "Impossibile mostrare il file: è stato spostato o eliminato"
+  "Cannot show the file: it was moved or deleted": "Impossibile mostrare il file: è stato spostato o eliminato",
+  "Family of the group ({family})": "Famiglia del gruppo ({family})",
+  "New Kit": "Nuovo kit",
+  "Overwrite the saved kit “{name}”?": "Sovrascrivere il kit salvato “{name}”?",
+  "Select by": "Seleziona per",
+  "Show in the 3D view of the Library": "Mostra nella vista 3D della Libreria",
+  "Only for Library samples": "Solo per i campioni della Libreria",
+  "Unlock group": "Sblocca gruppo",
+  "not saved yet": "non ancora salvato",
+  "Ableton Drum Rack (.adg) with its samples, in a folder": "Drum Rack di Ableton (.adg) con i suoi campioni, in una cartella",
+  "Auto-sample": "Auto-sample",
+  "Adds one sample similar to the group on its next empty pad (same criterion as Auto-fill)": "Aggiunge un sample simile al gruppo sul suo prossimo pad vuoto (stesso criterio di Auto-fill)",
+  "The group is full": "Il gruppo è pieno",
+  "The group has no samples to start from. Load a random {family} sample, with the options of Generate?": "Il gruppo non ha sample da cui partire. Caricare un sample {family} a caso, con le opzioni di Generate?",
+  "No {family} samples with these options": "Nessun sample {family} con queste opzioni"
 };

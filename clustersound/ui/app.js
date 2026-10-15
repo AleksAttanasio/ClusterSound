@@ -71,7 +71,8 @@ async function main() {
   online = new Online({ api: state.api, player, classes: state.classes, groups: state.groups, types: state.types });
   pattern = new PatternEditor({ api: state.api, player, classes: state.classes, onLoadFromRack: () => rack.openLoadDialog() });
   rack = new DrumRackEditor({ api: state.api, player, classes: state.classes, getTrail,
-    getSequencer: () => pattern, onOpenSequencer: () => setTab('pattern') });
+    getSequencer: () => pattern, onOpenSequencer: () => setTab('pattern'),
+    onShowInLibrary: (id) => { setTab('library'); setView('3d'); select(id, false); } });
   compose = new ComposeEditor({ api: state.api, player, getPattern: () => pattern, onOpenSequencer: () => setTab('pattern') });
   sampler = new SamplerEditor({ api: state.api, player, classes: state.classes,
     onSendToRack: async (refs) => { if (await rack.addSamples(refs)) setTab('rack'); },
@@ -814,6 +815,7 @@ function bindUi() {
     if (state.tab === 'pattern' && e.key === ' ') { e.preventDefault(); pattern.togglePlay(); return; }
     if (state.tab === 'compose') { if (!document.querySelector('.popover') && compose.onKey(e)) e.preventDefault(); return; }
     if (state.tab === 'sampler') { if (sampler.onKey(e)) e.preventDefault(); return; }
+    if (state.tab === 'rack') { if (rack.onKey(e)) e.preventDefault(); return; }
     if (state.tab !== 'library') return;
     if (e.key === 'Escape') { if (state.focus) exitFocus(); else closePanel(); }
     if (e.key === ' ' && state.selected >= 0) { e.preventDefault(); togglePlay(); }
