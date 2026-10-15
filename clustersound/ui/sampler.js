@@ -1318,7 +1318,9 @@ export class SamplerEditor {
       const f = this._rows()[k];
       if (act === 'reveal') {
         const where = this._whereSaved(f);
-        return where ? this.api.reveal_path(where) : this._unsavedMenu(anchor(), f);
+        if (!where) return this._unsavedMenu(anchor(), f);
+        if (!(await this.api.reveal_path(where))) this._error(t('Cannot show the file: it was moved or deleted'));
+        return;
       }
       if (act === 'del') return this.deleteFile(f);
       if (act === 'zoom') return this._opened(await this.api.sampler_open_extraction(f.path));

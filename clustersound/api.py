@@ -448,9 +448,10 @@ class Api:
         return self._downloader.status()
 
     def reveal_path(self, path: str) -> bool:
+        """Show a file in the Finder / File Explorer: only inside the app's folders or the library."""
         s = self._settings()
         roots = [s.get("download_dir") or DEFAULT_DIR, s.get("sampler_dir") or sampler_export.DEFAULT_DIR,
-                 s.get("recorder_dir") or sampler_recorder.DEFAULT_DIR]
+                 s.get("recorder_dir") or sampler_recorder.DEFAULT_DIR, *self._lib.roots]
         path = os.path.realpath(path or "")
         if not any(is_inside(path, r) for r in roots) or not os.path.exists(path):
             return False

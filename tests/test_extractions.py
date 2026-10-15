@@ -135,6 +135,10 @@ def test_api_send_to_library(api, tmp_path, rec, monkeypatch):
     assert r["error"] is None and sorted(r["files"]) == [os.path.join(folder, "Take 1 - 01.wav"), os.path.join(folder, "Take 1 - Bass.wav")]
     assert r["copies"][stem] == os.path.join(folder, "Take 1 - Bass.wav")
     assert os.path.isfile(stem)  # a copy: the temporary file stays temporary
+    shown = []
+    monkeypatch.setattr("clustersound.api.reveal", shown.append)
+    assert api.reveal_path(r["copies"][stem]) and shown == [os.path.realpath(r["copies"][stem])]  # the library copy
+    assert not api.reveal_path(str(tmp_path / "elsewhere.wav"))
 
 
 def test_api_tabs(api, tmp_path):
