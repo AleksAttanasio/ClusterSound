@@ -109,7 +109,7 @@ export class SamplerEditor {
       <main class="sp-main">
         <div class="sp-filebar">
           ${icon('audio-lines')}
-          <span class="sp-path" id="sp-path"></span>
+          <span class="sp-path" id="sp-path" role="button" tabindex="0" title="${t('Choose a sample or an audio track…')}"></span>
           ${iconBtn('folder-open', t('Choose a sample or an audio track…'), { id: 'sp-choose' })}
         </div>
         <div class="sp-tracks" id="sp-tracks" role="tablist"></div>
@@ -129,6 +129,8 @@ export class SamplerEditor {
           </div>
         </div>
         <div class="sp-transport">
+          <span></span>
+          <div class="sp-transport-mid">
           ${iconBtn('square', t('Stop'), { id: 'sp-stop' })}
           <wa-button id="sp-play" class="sp-play" variant="brand" size="s" title="${t('Play')}">${icon('play', t('Play'))}</wa-button>
           ${iconBtn('maximize-2', t('Show all the track'), { id: 'sp-fit' })}
@@ -139,8 +141,8 @@ export class SamplerEditor {
           <wa-icon name="triangle-alert" class="rc-warn" id="rc-warn" label="${t('Personal use only')}"></wa-icon>
           <wa-tooltip for="rc-warn" placement="top" class="rc-warn-tip">${esc(t(CAPTURE_NOTE))}</wa-tooltip>
           ${settingsLink('sampler', t('Outputs, format and folder'))}
-          <span class="spacer"></span>
-          <span class="hint" id="sp-view-info"></span>
+          </div>
+          <span class="hint sp-view-info" id="sp-view-info"></span>
         </div>
         <div class="sp-ext-head">
           <span class="filter-title">${t('Extractions')} <span id="sp-count"></span></span>
@@ -174,6 +176,9 @@ export class SamplerEditor {
 
   _bindOpen() {
     $('#sp-choose').onclick = () => this.openChooser();
+    // the whole bar opens the chooser too
+    $('#sp-path').onclick = () => this.openChooser();
+    $('#sp-path').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.openChooser(); } };
     // the path of a file dropped from the Finder / File Explorer comes from Python (pywebview): here only the highlight
     const wrap = $('#sp-wave-wrap');
     let depth = 0;
@@ -433,14 +438,13 @@ export class SamplerEditor {
 
   _renderTracks() {
     const box = $('#sp-tracks');
-    box.hidden = !this.tracks.length;
     const ic = (x) => (x.session.parent ? 'layers' : x.session.origin === 'capture' ? 'mic' : 'audio-lines');
     box.innerHTML = this.tracks.map((x) => `
       <div class="sp-track${x === this.cur ? ' on' : ''}" data-sid="${x.sid}" role="tab" aria-selected="${x === this.cur}" title="${esc(x.session.path || x.session.title)}">
         ${icon(ic(x))}<span class="sp-track-name">${esc(x.session.title)}</span>
         ${x.regions.length ? `<span class="sp-tab-n">${x.regions.length}</span>` : ''}
         <button class="sp-track-x" data-close title="${esc(t('Close'))}">×</button>
-      </div>`).join('') + `<button class="sp-track-add" id="sp-track-add" title="${esc(t('Open another track…'))}">${icon('plus')}</button>`;
+      </div>`).join('') + `<button class="sp-track sp-track-add${this.tracks.length ? '' : ' alone'}" id="sp-track-add" title="${esc(t('Open another track…'))}">${icon('plus')}</button>`;
     $('#sp-track-add').onclick = () => this.openChooser();
   }
 
@@ -463,7 +467,7 @@ export class SamplerEditor {
     $('#sp-empty').hidden = !!this.session;
     // the marks keep the slashes in place in the right-to-left ellipsis (the start of a long path is cut)
     path.textContent = this.session ? `\u200e${this.session.path || this.session.title}\u200e` : t('No audio open: choose a file or a library sample →');
-    path.title = this.session?.path || '';
+    path.title = this.session?.path ? `${this.session.path}\n${t('Click to open another track')}` : t('Choose a sample or an audio track…');
     path.classList.toggle('none', !this.session);
     if (!this.session) { box.innerHTML = ''; return; }
     const s = this.session, src = s.source;

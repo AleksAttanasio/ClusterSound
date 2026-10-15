@@ -1334,5 +1334,6 @@ export default {
   "1 sample copied to the library": "1 sample copiato nella libreria",
   "{n} samples copied to the library": "{n} sample copiati nella libreria",
   "Send to the library": "Invia alla libreria",
-  "The library is made of several folders: in which one should the «{dir}» folder go?": "La libreria è fatta di più cartelle: in quale va la cartella «{dir}»?"
+  "The library is made of several folders: in which one should the «{dir}» folder go?": "La libreria è fatta di più cartelle: in quale va la cartella «{dir}»?",
+  "Click to open another track": "Clic per aprire un’altra traccia"
 };

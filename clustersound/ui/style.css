@@ -968,10 +968,9 @@ wa-button.icon-btn.active::part(button) { background: var(--sel-bg); border-colo
 .sp-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 12px 16px; gap: 10px; }
 .sp-filebar { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--wa-color-surface-lowered); min-width: 0; }
 .sp-filebar > wa-icon { color: var(--text-3); flex: none; }
-.sp-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; font-family: var(--mono); font-size: 12px; color: var(--text-2); }
+.sp-path { cursor: pointer; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; font-family: var(--mono); font-size: 12px; color: var(--text-2); }
 .sp-info:empty { display: none; }
 .sp-tracks { display: flex; align-items: flex-end; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; margin-bottom: -4px; }
-.sp-tracks[hidden] { display: none; }
 .sp-track { display: inline-flex; align-items: center; gap: 6px; max-width: 240px; padding: 5px 6px 5px 10px; border: 1px solid transparent; border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; color: var(--text-2); font-size: 12px; cursor: pointer; flex: none; }
 .sp-track:hover { color: var(--text); background: var(--bg-3); }
 .sp-track.on { color: var(--text); background: var(--wa-color-surface-lowered); border-color: var(--line); box-shadow: inset 0 2px 0 var(--cs-teal, #00b09f); margin-bottom: -1px; padding-bottom: 6px; }
@@ -980,8 +979,9 @@ wa-button.icon-btn.active::part(button) { background: var(--sel-bg); border-colo
 .sp-track-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sp-track-x { border: 0; background: none; color: var(--text-3); font: inherit; font-size: 14px; line-height: 1; width: 18px; height: 18px; border-radius: 4px; cursor: pointer; padding: 0; }
 .sp-track-x:hover { background: var(--bg-3); color: var(--text); }
-.sp-track-add { border: 0; background: none; color: var(--text-3); padding: 5px 8px; border-radius: 6px; cursor: pointer; align-self: center; }
-.sp-track-add:hover { color: var(--text); background: var(--bg-3); }
+.sp-track-add { background: none; font: inherit; padding: 5px 12px; }
+.sp-track-add.alone { color: var(--text); border-color: var(--line); background: var(--wa-color-surface-lowered); margin-bottom: -1px; }
+.sp-track-add wa-icon { color: inherit; }
 .sp-slice { display: inline-flex; align-items: center; gap: 2px; }
 .sp-sens-v { min-width: 34px; text-align: right; font-family: var(--mono); }
 .sp-group { padding: 5px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); background: var(--bg-2); border-bottom: 1px solid var(--line); cursor: pointer; position: sticky; top: 0; z-index: 1; }
@@ -994,6 +994,8 @@ wa-button.icon-btn.active::part(button) { background: var(--sel-bg); border-colo
 .sp-saved.on { color: var(--cs-teal, #00b09f); opacity: 1; }
 .sp-roots { display: flex; flex-direction: column; gap: 8px; }
 .sp-path.none { direction: ltr; font-family: inherit; color: var(--text-3); }
+.sp-path:hover { color: var(--text); }
+.sp-filebar:hover { border-color: var(--line-2); }
 .sp-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 24px; }
 .sp-title { font-size: 14px; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sp-badge { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; padding: 2px 7px; border-radius: 4px; border: 1px solid var(--line-2); color: var(--text-2); }
@@ -1003,7 +1005,9 @@ wa-button.icon-btn.active::part(button) { background: var(--sel-bg); border-colo
 .sp-note-inline { color: var(--wa-color-warning-on-quiet); display: inline-flex; gap: 4px; align-items: center; }
 .sp-error { color: #ef5350; display: flex; gap: 6px; align-items: flex-start; max-width: 760px; }
 .sp-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.sp-transport { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 32px; }
+.sp-transport { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; min-height: 32px; }
+.sp-transport-mid { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; }
+.sp-view-info { justify-self: end; text-align: right; }
 wa-button.sp-play::part(base) { border-radius: 50%; width: 34px; height: 34px; padding: 0; }
 wa-button.rc-rec::part(base) { border-radius: 50%; width: 30px; height: 30px; padding: 0; color: #ef5350; }
 wa-button.rc-rec wa-icon { color: #ef5350; }
