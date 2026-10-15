@@ -1,13 +1,25 @@
 // Detail drawer: class, actions, dynamics (waveform + RMS envelope + ADSR), spectrogram, metrics.
 
-import { btn, FILE_MANAGER } from './kit.js';
+import { btn, iconBtn, FILE_MANAGER } from './kit.js';
 import { t } from './i18n.js';
+import { showPopover, toast } from './sendmenu.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (v, d = 1, unit = '') => (v === null || v === undefined || Number.isNaN(v) ? '—' : `${Number(v).toFixed(d)}${unit}`);
 const fmtTime = (s) => (s === null || s === undefined ? '—' : s < 1 ? `${(s * 1000).toFixed(0)} ms` : `${s.toFixed(2)} s`);
 
-const playLabel = (playing) => playing ? '<wa-icon slot="start" name="square"></wa-icon>Stop' : '<wa-icon slot="start" name="play"></wa-icon>Play';
+const playLabel = (playing) => `<wa-icon name="${playing ? 'square' : 'play'}" label="${playing ? 'Stop' : 'Play'}"></wa-icon>`;
+const LS_COPY = 'cs.copyWhat'; // 'name' | 'path': what the copy button next to the sample name copies
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return; } catch { /* not allowed in the webview: fallback */ }
+  const ta = Object.assign(document.createElement('textarea'), { value: text });
+  ta.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  ta.remove();
+}
 
 const ADSR_COLORS = { A: '#ffb74d', D: '#ef5350', S: '#66bb6a', R: '#42a5f5' };
 
@@ -21,12 +33,12 @@ function ramp(t) {
 }
 
 export class Panel {
-  constructor(root, content, { classes, groups, onRelabel, onReveal, onSimilar, onPlayToggle, onSeek, onClose, onSend, onStore }) {
+  constructor(root, content, { classes, groups, onRelabel, onReveal, onSimilar, onPlayToggle, onSeek, onClose, onSend }) {
     this.root = root;
     this.content = content;
     this.classes = classes;
     this.groups = groups;
-    this.cb = { onRelabel, onReveal, onSimilar, onPlayToggle, onSeek, onClose, onSend, onStore };
+    this.cb = { onRelabel, onReveal, onSimilar, onPlayToggle, onSeek, onClose, onSend };
     this.d = null;
     this.playhead = null;
   }
@@ -40,7 +52,6 @@ export class Panel {
     this.content.innerHTML = `
       ${this._classHeader(cls, item.conf, item.user)}
       <div class="p-name">${esc(item.name)}</div>
-      <div class="p-path">${esc(item.rel)}</div>
       <div class="hint">${t('Analysing the dynamics…')}</div>`;
   }
 
@@ -66,16 +77,18 @@ export class Panel {
 
     this.content.innerHTML = `
       ${this._classHeader(cls, d.conf, d.user)}
-      <div>
-        <div class="p-name">${esc(d.name)}</div>
-        <div class="p-path" title="${esc(d.path)}">${esc(d.rel)}</div>
+      <div class="p-name-row">
+        <div class="p-name" title="${esc(d.path)}">${esc(d.name)}</div>
+        <span class="p-name-tools">
+          ${iconBtn('copy', this._copyTitle(), { 'data-act': 'copy' })}
+          <wa-button appearance="plain" size="s" class="icon-btn p-copy-what" data-act="copy-what" title="${t('Choose what to copy')}"><wa-icon name="chevron-down" label="${t('Choose what to copy')}"></wa-icon></wa-button>
+          ${iconBtn('folder-open', t('Opens {app} with the file selected', { app: FILE_MANAGER }), { 'data-act': 'reveal' })}
+        </span>
       </div>
       <div class="p-actions">
-        ${btn(playLabel(playing), { variant: 'brand', 'data-act': 'play' })}
-        ${btn(t('Show in folder'), { icon: 'folder-open', 'data-act': 'reveal', title: t('Opens {app} with the file selected', { app: FILE_MANAGER }) })}
-        ${btn(t('Find similar'), { icon: 'sparkles', 'data-act': 'similar' })}
-        ${btn(t('Send'), { 'data-act': 'send', 'with-caret': true, title: t('Add the sample to a Sequencer bus or to the Drum Rack') })}
-        ${btn(t('More in the Store'), { icon: 'store', 'data-act': 'store', title: t('Search the Store for free «{cls}» samples', { cls: cls.label }) })}
+        ${btn(playLabel(playing), { variant: 'brand', 'data-act': 'play', title: t('Play / stop') })}
+        ${btn(t('Send to'), { icon: 'arrow-right', 'data-act': 'send', 'with-caret': true, title: t('Add the sample to a Sequencer bus or to the Drum Rack') })}
+        ${btn(t('Find similar'), { icon: 'search', 'data-act': 'similar' })}
       </div>
 
       <div>
@@ -119,7 +132,11 @@ export class Panel {
     this.content.querySelector('[data-act=play]').onclick = () => this.cb.onPlayToggle();
     this.content.querySelector('[data-act=reveal]').onclick = () => this.cb.onReveal(d.id);
     this.content.querySelector('[data-act=similar]').onclick = () => this.cb.onSimilar(d.id);
-    this.content.querySelector('[data-act=store]').onclick = () => this.cb.onStore(d.cls);
+    this.content.querySelector('[data-act=copy]').onclick = async () => {
+      await copyText(this._copyWhat() === 'path' ? d.path : d.name);
+      toast(this._copyWhat() === 'path' ? t('Path copied') : t('Name copied'));
+    };
+    this.content.querySelector('[data-act=copy-what]').onclick = (e) => this._copyMenu(e.currentTarget);
     this.content.querySelector('[data-act=send]').onclick = (e) => {
       const r = e.currentTarget.getBoundingClientRect();
       this.cb.onSend(d.id, r.left - 120, r.bottom + 4);
@@ -141,6 +158,27 @@ export class Panel {
       this.drawWave();
       this.drawMel();
     }
+  }
+
+  _copyWhat() {
+    try { return localStorage.getItem(LS_COPY) === 'path' ? 'path' : 'name'; } catch { return 'name'; }
+  }
+
+  _copyTitle() { return this._copyWhat() === 'path' ? t('Copy the absolute path') : t('Copy the sample name'); }
+
+  // The choice is shown only while the menu is open; next to the copy button there is just the arrow.
+  _copyMenu(anchor) {
+    const cur = this._copyWhat();
+    const pop = showPopover(anchor, [['name', t('Sample name')], ['path', t('Absolute path')]].map(([v, l]) =>
+      `<div class="p-copy-opt ${v === cur ? 'on' : ''}" data-v="${v}"><wa-icon name="check"></wa-icon>${l}</div>`).join(''), 'p-copy-pop');
+    pop.onclick = (e) => {
+      const o = e.target.closest('[data-v]');
+      if (!o) return;
+      try { localStorage.setItem(LS_COPY, o.dataset.v); } catch { /* private mode */ }
+      const b = this.content.querySelector('[data-act=copy]');
+      if (b) b.title = this._copyTitle();
+      pop.close();
+    };
   }
 
   setPlaying(playing) {
