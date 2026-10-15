@@ -39,10 +39,9 @@ def server_filters() -> dict[str, list[str]]:
 
 def enrich(r: OnlineResult) -> OnlineResult:
     """Fill instrument/type/bpm/key from title and tags when the source didn't."""
-    if r.instrument is None and not r.is_pack:
-        r.instrument = inst.infer(r.title, r.tags, r.path)
-    elif r.instrument is None and r.is_pack:
-        r.instrument = inst.infer(r.title, r.tags)
+    if r.instrument is None and r.label_state is None:
+        cid, state = inst.infer_label(r.title, r.tags, "" if r.is_pack else r.path)
+        r.instrument, r.label_state = cid, state or ""
     if r.bpm is None:
         r.bpm = inst.bpm_from_text(r.title)
     if not r.key:

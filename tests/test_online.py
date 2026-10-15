@@ -70,6 +70,32 @@ def test_infer_instrument(title, tags, path, expected):
     assert inst.infer(title, tags, path) == expected
 
 
+@pytest.mark.parametrize("title,tags,path,expected", [
+    # tag order (Freesound sorts tags alphabetically) must not decide the class
+    ("Some sound", ["bass", "kick"], "", ("kick", "weak")),
+    ("Some sound", ["kick", "bass"], "", ("kick", "weak")),
+    ("Kick 01", [], "", ("kick", "sure")),
+    ("Deep house bass", ["bass", "house", "synth"], "", ("bass", "sure")),
+    ("K1.wav", [], "Pack/Kicks/K1.wav", ("kick", "sure")),
+    # several instruments together
+    ("Trap drum loop", ["808", "hihat", "kick", "snare", "trap"], "", (None, "mix")),
+    ("TR-909 Drum Kit", [], "", (None, "mix")),
+    ("808 Drum Kit", [], "", (None, "mix")),
+    ("Express Yourself", ["arp", "bass", "beat", "clap", "cymbals", "dance"], "", (None, "mix")),
+    # non-musical context in the title, not only in the tags
+    ("Car crash", [], "", (None, None)),
+    ("Football kick", [], "", (None, None)),
+    # only ambiguous words
+    ("Square wave beep", [], "", ("synth", "weak")),
+    ("Metal clang", [], "", ("foley", "weak")),
+    # phrases
+    ("Down sweep", [], "", ("downlifter", "sure")),
+    ("Sub drop", [], "", ("downlifter", "sure")),
+])
+def test_infer_label(title, tags, path, expected):
+    assert inst.infer_label(title, tags, path) == expected
+
+
 def test_infer_is_deterministic():
     """Ties between classes must not depend on PYTHONHASHSEED (it changed results between runs)."""
     import subprocess
@@ -80,7 +106,7 @@ def test_infer_is_deterministic():
     root = Path(__file__).parent.parent
     outs = {subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=root,
                            env={**os.environ, "PYTHONHASHSEED": str(seed)}).stdout for seed in (1, 2, 3)}
-    assert len(outs) == 1 and outs.pop().split() == ["synth", "kick"]
+    assert len(outs) == 1 and outs.pop().split() == ["None", "kick"]
 
 
 def test_name_metadata():

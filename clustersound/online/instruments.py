@@ -16,7 +16,7 @@ TERMS: dict[str, list[str]] = {
     "clap": ["clap", "handclap", "hand clap"],
     "snap": ["snap", "finger snap", "fingersnap"],
     "closed_hat": ["hihat", "hi-hat", "hi hat", "closed hat", "closed hihat"],
-    "open_hat": ["open hihat", "open hi-hat", "open hat", "hihat", "hi-hat"],
+    "open_hat": ["open hihat", "open hi-hat", "open hat"],
     "ride": ["ride", "ride cymbal"],
     "crash": ["crash", "crash cymbal"],
     "cymbal_other": ["cymbal", "splash", "china cymbal"],
@@ -51,6 +51,8 @@ _PHRASES = [
     (r"hand[\s_-]?clap", "clap"), (r"finger[\s_-]?snap", "snap"), (r"sub[\s_-]?bass", "subbass"),
     (r"snare[\s_-]?drum", "snare"), (r"wood[\s_-]?block", "woodblock"), (r"spoken[\s_-]?word", "spoken"),
     (r"build[\s_-]?up", "buildup"), (r"electric[\s_-]?piano", "epiano"),
+    (r"down[\s_-]?sweep", "downsweep"), (r"sub[\s_-]?drop", "downlifter"),
+    (r"open[\s_-]?hihat", "open hihat"),
 ]
 
 # Context that means "not a musical sample" (a football kick, a door hit, …)
@@ -71,24 +73,78 @@ def _rewrite(text: str) -> str:
     return t
 
 
+# Context that means "several instruments together" (a drum loop, a kit, a beat)
+_MIX_CONTEXT = {"kit", "kits", "drumkit", "drumkits", "drums", "beat", "beats", "breakbeat", "breakbeats",
+                "loop", "loops", "groove", "pack", "full"}
+_KIT = {"kit", "kits", "drumkit", "drumkits"}
+_MUSICAL_GROUPS = {"Drums", "Percussion", "Melodic/Bass", "Vocal"}
+_GROUP = {c.id: c.group for c in taxonomy.CLASSES}
+_ORDER = {c.id: i for i, c in enumerate(taxonomy.CLASSES)}
+SURE = 0.7     # one strong keyword (weights >= 0.7) or two weak ones that agree
+SURE_IN_PACK = 0.6
+CANDIDATE = 0.7
+MARGIN = 0.15
+THRESHOLD = 0.45
+
+
+def _tag_evidence(tags: list[str]) -> tuple[dict[str, float], dict[str, int]]:
+    """Tag scores (all tags together, so 'open' + 'hihat' still works) and how many tags back each class."""
+    joined = taxonomy.keyword_scores(taxonomy.tokenize(" ".join(_rewrite(t) for t in tags)))
+    support: dict[str, int] = {}
+    for t in dict.fromkeys(tags):
+        for cid, s in taxonomy.keyword_scores(taxonomy.tokenize(_rewrite(t))).items():
+            if s >= 0.5:
+                support[cid] = support.get(cid, 0) + 1
+    return joined, support
+
+
+def infer_label(title: str, tags: list[str] | None = None, path: str = "") -> tuple[str | None, str | None]:
+    """Class of a result and how sure it is: (cid, "sure" | "weak"), (None, "mix") or (None, None).
+
+    "mix" = several instruments together (a drum loop, a kit); "weak" = only ambiguous words or a
+    near tie. Ties are broken by the title, then by how many tags agree, then by taxonomy order:
+    never by tag order (Freesound sorts tags alphabetically).
+    """
+    tags = [t.lower() for t in (tags or [])]
+    if path:
+        title_scores, loop = classifier.name_scores(_rewrite(path))
+        title_toks = taxonomy.tokenize(path)
+    else:
+        title_toks = taxonomy.tokenize(_rewrite(title))
+        title_scores, loop = taxonomy.keyword_scores(title_toks), taxonomy.is_loop_name(title_toks)
+    tag_scores, support = _tag_evidence(tags) if tags else ({}, {})
+    context = set(title_toks) | {t for tag in tags for t in taxonomy.tokenize(tag)} | set(tags)
+    # a drum kit is several instruments by definition ("TR-909 Drum Kit", "808 Drum Kit")
+    kit = bool(set(title_toks) & _KIT)
+    scores: dict[str, float] = {}
+    for cid in set(title_scores) | set(tag_scores):
+        a, b = title_scores.get(cid, 0.0), 0.8 * tag_scores.get(cid, 0.0)
+        bonus = 0.1 * max(0, support.get(cid, 0) - 1)
+        scores[cid] = min(1.2, max(a, b) + 0.2 * min(a, b) + bonus)
+    if not scores:
+        return (None, "mix") if kit else (None, None)
+    ranked = sorted(scores, key=lambda c: (-scores[c], -title_scores.get(c, 0.0), -support.get(c, 0), _ORDER[c]))
+    best = ranked[0]
+    if scores[best] < THRESHOLD:
+        return None, None
+    # a football kick, a car crash: musical classes need a musical context
+    if context & NONMUSIC and not context & MUSIC and _GROUP[best] in _MUSICAL_GROUPS:
+        return None, None
+    if kit and _GROUP[best] in ("Drums", "Percussion"):
+        return None, "mix"
+    strong = [c for c in ranked if scores[c] >= CANDIDATE]
+    drums = [c for c in strong if _GROUP[c] in ("Drums", "Percussion")]
+    if len(strong) >= 3 or (len(drums) >= 2 and (loop or context & _MIX_CONTEXT or taxonomy.is_loop_name(tags))):
+        return None, "mix"
+    # inside a pack the parent folder ("Kicks/K1.wav", weight 0.65) is reliable on its own
+    if scores[best] < (SURE_IN_PACK if path else SURE) or (len(ranked) > 1 and scores[best] - scores[ranked[1]] < MARGIN):
+        return best, "weak"
+    return best, "sure"
+
+
 def infer(title: str, tags: list[str] | None = None, path: str = "") -> str | None:
     """Most likely taxonomy class from a result's title, tags and (inside packs) folder path."""
-    tags = tags or []
-    tagset = {t.lower() for t in tags}
-    if tagset & NONMUSIC and not tagset & MUSIC:
-        return None
-    if path:
-        scores, _ = classifier.name_scores(_rewrite(path))
-    else:
-        scores = taxonomy.keyword_scores(taxonomy.tokenize(_rewrite(title)))
-    if tags:
-        tag_toks = taxonomy.tokenize(" ".join(_rewrite(t) for t in tags))
-        for cid, s in taxonomy.keyword_scores(tag_toks).items():
-            scores[cid] = max(scores.get(cid, 0.0), 0.8 * s)
-    if not scores:
-        return None
-    best = max(scores, key=scores.get)
-    return best if scores[best] >= 0.45 else None
+    return infer_label(title, tags, path)[0]
 
 
 # ------------------------------------------------------------ name metadata
@@ -155,7 +211,7 @@ def keep(result, instruments: list[str]) -> bool:
         return True
     if result.instrument in instruments:
         return True
-    if result.instrument is None and result.matched:
+    if result.instrument is None and result.matched:  # unlabelled or a mix the server matched
         tagset = set(result.tags)
         return not (tagset & NONMUSIC and not tagset & MUSIC)
     return False
