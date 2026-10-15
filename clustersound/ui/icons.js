@@ -6,6 +6,7 @@ const PATHS = {
   'box': '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" />',
   'check': '<path d="M20 6 9 17l-5-5" />',
   'chevron-down': '<path d="m6 9 6 6 6-6" />',
+  'chevron-left': '<path d="m15 18-6-6 6-6" />',
   'chevron-right': '<path d="m9 18 6-6-6-6" />',
   'circle': '<circle cx="12" cy="12" r="10" />',
   'copy': '<rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />',

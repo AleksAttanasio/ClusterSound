@@ -25,12 +25,23 @@ per-file checks until they are expanded.
 ## Labelling by instrument
 
 The sources do not know the 34 classes: every result is labelled **with the same name parser as the library**
-(`instruments.infer`):
+(`instruments.infer_label`), which returns a class and a state: *sure*, *weak* (shown as "Class ?"), *mix* or none:
 
-1. if the tags contain non-musical context words (soccer, door, gun…) without musical words, no class;
-2. phrases rewritten into the taxonomy keywords ("bass drum" → kick);
-3. score on the title, or on the path inside a pack (with the decreasing folder weights); the tags count 0.8;
-4. the best class if the score is ≥ 0.45.
+1. phrases rewritten into the taxonomy keywords ("bass drum" → kick, "down sweep" → downlifter, "SDR" → snare);
+2. score on the title, or on the path inside a pack (with the decreasing folder weights), plus the tags at 0.8:
+   evidence from both adds up, and every extra tag that backs the same class adds 0.1;
+3. ties are broken by the title, then by the number of agreeing tags, then by taxonomy order — never by tag order
+   (Freesound sorts tags alphabetically, so "bass, kick" used to win over "kick, bass");
+4. non-musical context (soccer, car, gun…) in the title **or** the tags without musical words: no musical class
+   (FX and foley classes stay allowed);
+5. **mix**: a drum class with "kit" in the title, a beat/loop whose title does not name the drum, or several strong
+   classes at once. A one-shot (≤ 1.5 s, or tagged "one shot") is never a mix;
+6. a near tie (< 0.15) with nothing in the name: no class (pack-wide tags like "kick snare toms" say nothing about
+   one file);
+7. *sure* from 0.7 (0.6 inside a pack), *weak* from 0.45.
+
+Freesound packs are labelled from their own name, not from the sound that stands for them. The store home only
+shows *sure* results of the category it queried, so the badge always matches.
 
 A result is kept if its class is in the filter, or if the server already found it for that instrument and it has no
 non-musical context. The **type** comes from name, tags and duration (one-shot ≤ 2.5 s, loop if it has a BPM in the

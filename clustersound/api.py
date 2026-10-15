@@ -356,8 +356,9 @@ class Api:
     def online_pack(self, uid: str, page: int = 1) -> dict:
         return online.pack(uid, int(page or 1), self._settings())
 
-    def online_featured(self) -> dict:
-        return online.featured(self._settings())
+    def online_showcase(self, source: str) -> dict:
+        """Store home: a varied carousel of one source's samples (one call per source, so they load progressively)."""
+        return online.showcase_source(source, self._settings())
 
     def online_download_pack(self, uid: str) -> dict:
         """Queue every file of a pack (Freesound: HQ previews, the originals need an OAuth login)."""

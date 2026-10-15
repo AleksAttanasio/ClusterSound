@@ -70,17 +70,46 @@ def test_infer_instrument(title, tags, path, expected):
     assert inst.infer(title, tags, path) == expected
 
 
+@pytest.mark.parametrize("title,tags,path,expected", [
+    # tag order (Freesound sorts tags alphabetically) must not decide the class
+    ("Some sound", ["bass", "kick"], "", (None, None)),
+    ("Some sound", ["kick", "bass"], "", (None, None)),
+    ("Kick thing", ["bass", "kick"], "", ("kick", "sure")),
+    ("Kick 01", [], "", ("kick", "sure")),
+    ("Deep house bass", ["bass", "house", "synth"], "", ("bass", "sure")),
+    ("K1.wav", [], "Pack/Kicks/K1.wav", ("kick", "sure")),
+    # several instruments together
+    ("Trap drum loop", ["808", "hihat", "kick", "snare", "trap"], "", (None, "mix")),
+    ("TR-909 Drum Kit", [], "", (None, "mix")),
+    ("808 Drum Kit", [], "", (None, "mix")),
+    ("01 - hip hop drum beat", ["drums", "hip_hop", "beat", "beats", "snare"], "", (None, "mix")),
+    ("Kick loop 120bpm", ["kick", "loop"], "", ("kick", "sure")),
+    ("Express Yourself", ["arp", "bass", "beat", "clap", "cymbals", "dance"], "", (None, "mix")),
+    # non-musical context in the title, not only in the tags
+    ("Car crash", [], "", (None, None)),
+    ("Football kick", [], "", (None, None)),
+    # only ambiguous words
+    ("Square wave beep", [], "", ("synth", "weak")),
+    ("Metal clang", [], "", ("foley", "weak")),
+    # phrases
+    ("Down sweep", [], "", ("downlifter", "sure")),
+    ("Sub drop", [], "", ("downlifter", "sure")),
+])
+def test_infer_label(title, tags, path, expected):
+    assert inst.infer_label(title, tags, path) == expected
+
+
 def test_infer_is_deterministic():
     """Ties between classes must not depend on PYTHONHASHSEED (it changed results between runs)."""
     import subprocess
     import sys
     code = ("from clustersound.online import instruments as inst;"
             "print(inst.infer('Express Yourself', ['arp', 'bass', 'beat', 'clap', 'cymbals', 'dance']),"
-            " inst.infer('SDR-204.wav', ['16bit', 'pcm', 'drumkit', 'drums', 'hertz', 'kick']))")
+            " inst.infer('BD-204.wav', ['16bit', 'pcm', 'snare', 'hertz', 'kick']))")
     root = Path(__file__).parent.parent
     outs = {subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=root,
                            env={**os.environ, "PYTHONHASHSEED": str(seed)}).stdout for seed in (1, 2, 3)}
-    assert len(outs) == 1 and outs.pop().split() == ["synth", "kick"]
+    assert len(outs) == 1 and outs.pop().split() == ["None", "kick"]
 
 
 def test_name_metadata():
@@ -255,14 +284,6 @@ def test_store_pack_page_and_download(monkeypatch):
     assert os.path.join("Freesound", "808 Kicks Vol. 1") in downloads.target_path(root, files[0], files[0].download_url)
 
 
-def test_featured_without_key(monkeypatch):
-    monkeypatch.setattr(archive, "search", lambda p, page, s: ([], 0, False))
-    monkeypatch.setattr(openverse, "search", lambda p, page, s: ([], 0, False))
-    home = S.featured({})
-    assert home["freesound_packs"]["needs_key"] and home["archive_packs"]["error"] is None
-    assert home["cc0_new"]["source"] == "openverse"
-
-
 # ---------------------------------------------------------------- catalogue
 def test_catalog():
     from clustersound.online.base import LICENSES
@@ -270,6 +291,8 @@ def test_catalog():
     ids = {p["id"] for p in catalog.PROVIDERS}
     assert {k for k, p in ((p["id"], p) for p in catalog.PROVIDERS) if p["kind"] == "api"} == set(S.SOURCES)
     class_ids = {c.id for c in CLASSES}
+    assert set(catalog.SHOWCASE_CATEGORIES) <= class_ids
+    assert all(set(v) <= class_ids for v in catalog.SHOWCASE_LIMITED.values())
     for c in catalog.curated():
         assert c["provider"] in ids and c["url"].startswith("https://")
         assert LICENSES[c["license"]]["commercial"], c["id"]  # the showcase only lists royalty-free packs
@@ -313,3 +336,21 @@ network = pytest.mark.skipif(not os.environ.get("CLUSTERSOUND_NETWORK_TESTS"),
 def test_live_sources(source):
     res = S.search_source(source, {"instruments": ["kick"]}, 1, {})
     assert res["error"] is None and res["fetched"] > 0
+
+
+def test_showcase_source(monkeypatch):
+    """Store home carousel: only surely labelled results of each category, interleaved across categories."""
+    search = S
+
+    def fake(name, p, page, settings, packs=False):
+        cid = p["instruments"][0]
+        rows = [{"uid": f"{cid}{i}", "author": f"{cid}-a{i}", "instrument": cid, "label_state": "sure"} for i in range(3)]
+        rows.insert(0, {"uid": f"{cid}-weak", "author": "x", "instrument": cid, "label_state": "weak"})
+        rows.insert(0, {"uid": f"{cid}-other", "author": "y", "instrument": "pad", "label_state": "sure"})
+        return {"results": rows, "error": None}
+
+    monkeypatch.setattr(search, "search_source", fake)
+    d = search.showcase_source("openverse", {})
+    cats = catalog.SHOWCASE_LIMITED["openverse"]
+    assert [r["uid"] for r in d["results"]] == [f"{c}0" for c in cats] + [f"{c}1" for c in cats]
+    assert search.showcase_source("freesound", {})["needs_key"]

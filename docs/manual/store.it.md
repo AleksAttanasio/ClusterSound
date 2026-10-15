@@ -22,7 +22,11 @@ Sonniss GameAudioGDC, 99Sounds, SampleRadar. Il pulsante apre la pagina ufficial
 
 ![Risultati](../assets/screenshots/store-results.png){ .shot }
 
-- **Home**: provider, categorie rapide (Kick, Snare, Hat, 808…), pack in evidenza, nuovi suoni CC0, vetrina.
+- **Home**: un carosello dei siti (frecce per scorrere, clic per aprire la pagina del sito), poi per ogni sito con
+  ricerca live un carosello di sample di esempio presi da categorie diverse (kick, snare, hat, percussioni, bass,
+  synth, keys, voce, FX), infine la vetrina dei pack curati. La sidebar dei filtri compare solo nei risultati.
+- **Badge di categoria** su ogni card: colore e nome della classe; **Classe ?** quando l'etichetta è incerta (solo
+  parole ambigue, o quasi pareggio); **Mix** per loop, beat e kit con più strumenti.
 - **Risultati**: *Suoni* o *Pack*, in griglia (card con forma d'onda, licenza, durata, BPM, tonalità) o in lista
   raggruppata per fonte o per strumento.
 - **Filtro per strumento**: le stesse 34 classi e colori della libreria. I falsi positivi non musicali

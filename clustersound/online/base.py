@@ -48,6 +48,7 @@ class OnlineResult:
     is_pack: bool = False
     path: str = ""            # file path inside a pack
     instrument: str | None = None
+    label_state: str | None = None  # sure | weak | mix | "" (looked at, no class); None = not yet labelled
     type: str | None = None   # One-shot | Loop | Long/Texture
     suspect: bool = False     # likely commercial content re-uploaded under a free licence
     matched: bool = False     # the source matched the instrument query server-side
