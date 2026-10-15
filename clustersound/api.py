@@ -474,7 +474,7 @@ class Api:
     def _sampler_state(self) -> dict:
         s = self._sampler
         return {"session": s.describe() if s else None, "max_seconds": self._sampler_max(),
-                "tabs": [{"sid": t.sid, "title": t.title, "path": t.path, "origin": t.origin} for t in self._sessions.values()]}
+                "tabs": [t.describe() for t in self._sessions.values()]}
 
     def _session(self, sid: str | None = None):
         """An open track by its tab (the shown one without sid)."""

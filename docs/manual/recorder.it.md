@@ -5,8 +5,8 @@ nella libreria e vengono classificati come gli altri. Apre anche qualsiasi file 
 
 ![Recorder con regioni sui transienti](../assets/screenshots/recorder.png){ .shot }
 
-La schermata usa tutta la larghezza: la **barra del file** in alto, la forma d'onda, il **trasporto** sotto e le
-**Estrazioni** dell'audio aperto in fondo.
+La schermata usa tutta la larghezza: la **barra del file** in alto, una **scheda per ogni traccia aperta** sopra
+la forma d'onda, il **trasporto** sotto e le **Estrazioni** di tutte le tracce aperte in fondo.
 
 ## Registrare
 
@@ -28,34 +28,41 @@ locale…** (qualsiasi file audio del computer), **Libreria dei sample…** (sam
 o una delle **Registrazioni recenti** della sessione. Si apre anche un file audio trascinato dal Finder sulla forma
 d'onda.
 
+Ogni file aperto ha la sua **scheda** sopra la forma d'onda (un file già aperto mostra solo la sua scheda); **+**
+ne apre un altro, **×** (o il clic centrale) la chiude, chiedendo prima se ha tagli non ancora esportati. Taglio,
+stem, Migliora e trasporto lavorano sulla traccia mostrata.
+
 ## Editor e regioni
 
-- Allo stop la registrazione si apre nell'editor. **Trascina** sulla forma d'onda per creare una regione, i bordi
-  la ridimensionano, clic per ascoltarla.
-- **Taglia sui transienti** crea una regione per colpo nella parte visibile; *Sensibilità* regola quanti colpi
-  trova.
-- Trasporto: **■** stop (torna all'inizio), **▶/❚❚** riproduci e pausa (riparte da dove si era fermato), **⤢**
-  mostra tutta la traccia.
+- Allo stop la registrazione si apre in una nuova scheda. **Trascina** sulla forma d'onda per creare una regione,
+  i bordi la ridimensionano, doppio clic per ascoltarla.
+- **Clic** sulla forma d'onda per spostarci il **cursore** (e selezionare la regione sotto): la riproduzione parte
+  dal cursore, e mentre suona un clic salta lì.
+- **Taglia sui transienti** crea una regione per colpo nella parte visibile; il suo **⋯** regola la *Sensibilità*
+  (quanti colpi trova).
+- Trasporto: **■** stop (il cursore torna all'inizio della traccia), **▶/❚❚** riproduci e pausa dal cursore (la
+  pausa lascia il cursore dove si è fermato), **⤢** mostra tutta la traccia.
 - Rotella: zoom · `Maiusc`+rotella: scorri · la striscia sotto sposta la vista · `Spazio` riproduci/pausa · `↑` `↓`
   regione precedente/successiva · `Canc` elimina.
 
 ## Estrazioni
 
-Tre schede, con una spunta per riga:
+Tutto ciò che è stato estratto da **tutte le tracce aperte**, in tre schede con una spunta per riga; con più
+tracce le righe sono raggruppate sotto il suo nome (clic per mostrare quella traccia):
 
 - **✂ Tagli**: le regioni, tagliate a mano o sui transienti.
-- **Stem**: gli stem già estratti dall'audio aperto, ritrovati sul disco quando si apre.
-- **✨ Migliorati**: i file migliorati ricavati dall'audio, dai suoi tagli o dai suoi stem.
+- **Stem**: gli stem già estratti dalle tracce aperte, ritrovati sul disco quando si aprono.
+- **✨ Migliorati**: i file migliorati ricavati dalle tracce, dai loro tagli o dai loro stem.
 
 Ogni riga ha tasti solo icona: ascolta, mostra la forma d'onda (un taglio viene ingrandito; uno stem o un file
-migliorato si apre nell'editor, e le liste restano quelle della sua sorgente), ✨ Migliora (tagli e stem) e
+migliorato si apre in una nuova scheda), **Estrai stem** (tagli e file migliorati), ✨ Migliora (tagli e stem) e
 **Invia**, lo stesso menu della libreria (un bus del Sequencer o un gruppo del Drum Rack).
 
 Accanto al titolo:
 
 - **Svuota tutto** svuota la scheda, dopo una conferma (stem e file migliorati restano sul disco).
 - **Invia a**: le righe spuntate ad **Ableton Live** (una nuova traccia audio ciascuna; senza tagli spuntati,
-  tutto l'audio), al **Drum Rack** (sui pad liberi da quello selezionato) o al **Sequencer** (nuovi layer del bus
+  tutta la traccia mostrata), al **Drum Rack** (sui pad liberi da quello selezionato) o al **Sequencer** (nuovi layer del bus
   scelto). Live richiede il device ClusterSound con *Ricevi* attivo.
 - **Esporta tutto**: le righe spuntate nella **cartella di esportazione** (Impostazioni › Recorder, di base
   `~/Music/ClusterSound Samples/`). I tagli diventano WAV 24 bit con fade (1 ms in, 10 ms out) e normalizzazione
@@ -63,7 +70,7 @@ Accanto al titolo:
 
 ## Estrai stem
 
-Separa la registrazione o la regione in **Batteria, Basso, Chitarra, Piano, Voce** (quelli che spunti) più sempre
+Separa la traccia mostrata o la sua regione (o, dalla sua riga, un singolo taglio o file migliorato) in **Batteria, Basso, Chitarra, Piano, Voce** (quelli che spunti) più sempre
 **Altro** con il resto, così la somma ridà l'originale. Un WAV 24 bit per stem, apribile nell'editor. Gli stem compaiono nella scheda **Stem**. Gira in
 locale con Demucs (extra `stems`, modello da 55 MB scaricato al primo uso). Dettagli: [Demucs](../ai/demucs.md).
 

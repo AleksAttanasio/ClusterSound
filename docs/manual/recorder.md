@@ -5,8 +5,8 @@ into the library and are classified like the others. It also opens any audio fil
 
 ![Recorder with regions on the transients](../assets/screenshots/recorder.png){ .shot }
 
-The screen uses its whole width: the **file bar** on top, the waveform, the **transport** under it and the
-**Extractions** of the open audio at the bottom.
+The screen uses its whole width: the **file bar** on top, one **tab per open track** over the waveform, the
+**transport** under it and the **Extractions** of all the open tracks at the bottom.
 
 ## Recording
 
@@ -27,33 +27,40 @@ The file bar shows the path of the open audio. Its folder button asks where to o
 audio file of the computer), **Sample library…** (samples and loops by folder, pack or name) or one of the
 **Recent recordings** of the session. An audio file dragged from the Finder onto the waveform opens too.
 
+Every opened file gets its own **tab** over the waveform (a file already open just shows its tab); **+** opens
+another one, **×** (or a middle click) closes it, asking first if it has cuts not exported yet. Slicing, stems,
+Enhance and the transport work on the shown track.
+
 ## Editor and regions
 
-- When you stop, the recording opens in the editor. **Drag** on the waveform to create a region, the edges resize
-  it, click to listen to it.
-- **Slice on transients** creates one region per hit in the visible part; *Sensitivity* sets how many hits it
-  finds.
-- Transport: **■** stop (back to the start), **▶/❚❚** play and pause (play resumes where it paused), **⤢** shows
-  the whole track.
+- When you stop, the recording opens in a new tab. **Drag** on the waveform to create a region, the edges resize
+  it, double click to listen to it.
+- **Click** on the waveform to move the **cursor** there (and select the region under it): play starts from the
+  cursor, and while playing a click jumps there.
+- **Slice on transients** creates one region per hit in the visible part; its **⋯** sets the *Sensitivity* (how
+  many hits it finds).
+- Transport: **■** stop (the cursor goes back to the start of the track), **▶/❚❚** play and pause from the cursor
+  (pausing leaves the cursor where it stopped), **⤢** shows the whole track.
 - Wheel: zoom · `Shift`+wheel: scroll · the strip below moves the view · `Space` play/pause · `↑` `↓`
   previous/next region · `Del` delete.
 
 ## Extractions
 
-Three tabs, each with a tick per row:
+Everything extracted from **all the open tracks**, in three tabs with a tick per row; with more than one track the
+rows are grouped under its name (click it to show that track):
 
 - **✂ Cuts**: the regions, cut by hand or on the transients.
-- **Stems**: the stems already extracted from the open audio, found again on disk when it opens.
-- **✨ Enhanced**: the enhanced files made from the audio, from its cuts or from its stems.
+- **Stems**: the stems already extracted from the open tracks, found again on disk when they open.
+- **✨ Enhanced**: the enhanced files made from the tracks, from their cuts or from their stems.
 
 Every row has icon-only buttons: listen, show the waveform (a cut is zoomed in; a stem or an enhanced file opens
-in the editor, and the lists stay those of its source), ✨ Enhance (cuts and stems) and **Send**, the same menu as
+in a new tab), **Extract stems** (cuts and enhanced files), ✨ Enhance (cuts and stems) and **Send**, the same menu as
 in the library (a Sequencer bus or a Drum Rack group).
 
 Next to the title:
 
 - **Clear all** empties the tab, after a confirmation (stems and enhanced files stay on disk).
-- **Send to**: the ticked rows to **Ableton Live** (one new audio track each; with no cut ticked, all the audio),
+- **Send to**: the ticked rows to **Ableton Live** (one new audio track each; with no cut ticked, all the shown track),
   to the **Drum Rack** (on the free pads from the selected one) or to the **Sequencer** (new layers of the chosen
   bus). Live needs the ClusterSound device with *Receive* on.
 - **Export all**: the ticked rows into the **export folder** (Settings › Recorder, by default
@@ -62,7 +69,7 @@ Next to the title:
 
 ## Extract stems
 
-Separates the recording or the region into **Drums, Bass, Guitar, Piano, Vocals** (those you tick) plus always
+Separates the shown track or its region (or, from its row, a single cut or enhanced file) into **Drums, Bass, Guitar, Piano, Vocals** (those you tick) plus always
 **Other** with the rest, so the sum gives back the original. One 24-bit WAV per stem, which can be opened in the
 editor. The stems show up in the **Stems** tab. It runs locally with Demucs (`stems` extra, 55 MB model downloaded on first use). Details:
 [Demucs](../ai/demucs.md).
