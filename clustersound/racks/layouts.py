@@ -19,10 +19,11 @@ PADS = N * N
 BASE_NOTE = 36  # C1 in Live
 # Live's four 4×4 note blocks by their first note: C = 36-51, D = 52-67, A = 68-83, B = 84-99.
 # A 64-pad rack's "quads" names the block at each quadrant, in QUADRANTS order (bottom-left,
-# bottom-right, top-left, top-right): "CDAB" is Live's own layout (A B over C D), "CABD" the
-# Launchpad's default Drum mode (B D over C A).
+# bottom-right, top-left, top-right): "CDAB" is Live's own layout (68-83 and 84-99 above 36-51 and
+# 52-67), "DBCA" the default, as the Launchpad plays them: 36-51 top left, 68-83 top right, 52-67
+# bottom left, 84-99 bottom right.
 QUAD_BASE = {"A": 68, "B": 84, "C": 36, "D": 52}
-DEFAULT_QUADS = "CABD"
+DEFAULT_QUADS = "DBCA"
 
 # id, label, taxonomy classes (empty = anything)
 FAMILIES = [

@@ -1354,11 +1354,11 @@ export default {
   "The group has no samples to start from. Load a random {family} sample, with the options of Generate?": "Il gruppo non ha sample da cui partire. Caricare un sample {family} a caso, con le opzioni di Generate?",
   "No {family} samples with these options": "Nessun sample {family} con queste opzioni",
   "4×4 blocks": "Blocchi 4×4",
-  "Where each block of 16 notes sits on the grid, as your controller sends them (Launchpad default: B D over C A). Only for the Launchpad / Live notes.": "Dove sta sulla griglia ogni blocco di 16 note, come le invia il tuo controller (default del Launchpad: B D sopra C A). Solo per le note Launchpad / Live.",
+  "Where each block of 16 notes sits on the grid, as your controller plays them. Only for the Launchpad / Live notes.": "Dove sta sulla griglia ogni blocco di 16 note, come le suona il tuo controller. Solo per le note Launchpad / Live.",
   "Arrange blocks…": "Disponi i blocchi…",
   "Arrange the 4×4 blocks": "Disponi i blocchi 4×4",
   "Drag a block onto another to swap them, so that the grid matches the notes of your controller.": "Trascina un blocco su un altro per scambiarli, così che la griglia corrisponda alle note del tuo controller.",
-  "Launchpad (B D / C A)": "Launchpad (B D / C A)",
-  "Live (A B / C D)": "Live (A B / C D)",
+  "Launchpad": "Launchpad",
+  "Live": "Live",
   "Apply": "Applica"
 };

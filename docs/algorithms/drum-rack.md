@@ -80,8 +80,8 @@ choice.
 
 - Pads numbered `row·8 + column`, row 0 at the bottom.
 - *Launchpad* notes: \(b_{Q[q]} + 4\,(r \bmod 4) + (c \bmod 4)\), with quadrant \(q = 2[r \ge 4] + [c \ge 4]\) and
-  \(Q\) the kit's arrangement of the blocks C = 36, D = 52, A = 68, B = 84 (default `CABD`: bottom-left 36–51,
-  bottom-right 68–83, top-left 84–99, top-right 52–67, as a Launchpad's Drum mode). *Rows* notes: \(36 + p\).
+  \(Q\) the kit's arrangement of the blocks C = 36, D = 52, A = 68, B = 84 (default `DBCA`: top-left 36–51,
+  top-right 68–83, bottom-left 52–67, bottom-right 84–99, as the Launchpad plays them). *Rows* notes: \(36 + p\).
 - Layouts: 8 columns of 8, 16 blocks 2×2, 4 quadrants 4×4, 16 columns of 4 (one family per quadrant), free; every
   layout has default families (18 families in all). Choke is on by default for the hat families.
 

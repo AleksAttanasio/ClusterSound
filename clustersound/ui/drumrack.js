@@ -28,8 +28,8 @@ const ALT_LABELS = [['off', 'Together (only the 1st active)'], ['cycle', 'In tur
 
 // 4×4 note blocks of a 64-pad kit (layouts.QUAD_BASE): "quads" names the one at each quadrant,
 // bottom-left, bottom-right, top-left, top-right
-const DEFAULT_QUADS = 'CABD';                       // Launchpad Drum mode: B D over C A
-const QUAD_PRESETS = [['CABD', 'Launchpad (B D / C A)'], ['CDAB', 'Live (A B / C D)']]; // t() where shown
+const DEFAULT_QUADS = 'DBCA';                       // as the Launchpad plays them: 36-51 68-83 over 52-67 84-99
+const QUAD_PRESETS = [[DEFAULT_QUADS, 'Launchpad'], ['CDAB', 'Live']]; // t() where shown
 const QUAD_SHOWN = [2, 3, 0, 1];                    // quadrants as drawn, top row first
 const validQuads = (q) => typeof q === 'string' && [...q].sort().join('') === 'ABCD';
 const newRack = () => ({ name: 'Kit', geometry: 'cols8', mapping: 'launchpad', quads: DEFAULT_QUADS, pads: new Array(64).fill(null), groups: {} });
@@ -83,7 +83,8 @@ export class DrumRackEditor {
       }
     } catch { /* private mode / bad JSON */ }
     if (!this.geoById[this.rack.geometry]) this.rack.geometry = 'cols8';
-    if (!validQuads(this.racks.grid64.quads)) this.racks.grid64.quads = DEFAULT_QUADS;
+    // 'CABD' was the first default (never a preset): a kit still on it gets the current one
+    if (!validQuads(this.racks.grid64.quads) || this.racks.grid64.quads === 'CABD') this.racks.grid64.quads = DEFAULT_QUADS;
     try {
       const spd = JSON.parse(localStorage.getItem(LS_SPD) || 'null');
       if (spd?.rack?.pads?.length === this.meta.spdsx.pads) {
@@ -124,10 +125,10 @@ export class DrumRackEditor {
       `<wa-select id="set-rk-map" size="s" value="${kit.mapping}" label="${t('Notes')}" style="width:300px">
          <wa-option value="launchpad">${t('Launchpad / Live (4×4 quadrants)')}</wa-option>
          <wa-option value="rows">${t('Sequential rows (36 + row×8)')}</wa-option></wa-select>`)
-      + setRow(t('4×4 blocks'), t('Where each block of 16 notes sits on the grid, as your controller sends them (Launchpad default: B D over C A). Only for the Launchpad / Live notes.'),
+      + setRow(t('4×4 blocks'), t('Where each block of 16 notes sits on the grid, as your controller plays them. Only for the Launchpad / Live notes.'),
         `<div id="set-rk-quads" class="rk-quads-mini"></div>${btn(t('Arrange blocks…'), { icon: 'layout-grid', id: 'set-rk-quads-btn' })}`);
     const sync = () => {
-      body.querySelector('#set-rk-quads').innerHTML = QUAD_SHOWN.map((q) => `<span>${kit.quads[q]}</span>`).join('');
+      body.querySelector('#set-rk-quads').innerHTML = QUAD_SHOWN.map((q) => `<span>${noteName(this.meta.quad_bases[kit.quads[q]])}</span>`).join('');
       body.querySelector('#set-rk-quads-btn').disabled = kit.mapping !== 'launchpad';
     };
     sync();
@@ -147,7 +148,8 @@ export class DrumRackEditor {
     }));
   }
 
-  // Window to drag the four 4×4 note blocks onto the quadrants; onApply(quads) on Apply.
+  // Window to drag the four 4×4 note blocks onto the quadrants; onApply(quads) on Apply. Blocks are
+  // shown by their notes (the letters of QUAD_BASE stay internal).
   _openQuadsDialog(onApply) {
     let quads = this.racks.grid64.quads;
     const base = this.meta.quad_bases;
@@ -165,7 +167,7 @@ export class DrumRackEditor {
         const b = quads[q], first = base[b];
         // corner notes as on the pads: top-left, top-right, bottom-left, bottom-right
         const corners = [first + 12, first + 15, first, first + 3].map(noteName);
-        return `<div class="rk-quad" draggable="true" data-q="${q}"><b>${b}</b>
+        return `<div class="rk-quad" draggable="true" data-q="${q}"><b>${noteName(first)}–${noteName(first + 15)}</b>
           ${corners.map((n, i) => `<i class="c${i}">${n}</i>`).join('')}</div>`;
       }).join('');
     };
