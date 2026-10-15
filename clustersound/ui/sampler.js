@@ -792,7 +792,8 @@ export class SamplerEditor {
     const info = on ? (live === 1 ? t('Recording 1 output…') : t('Recording {n} outputs…', { n: live }))
       : n ? (n === 1 ? t('1 output selected: one file.') : t('{n} outputs selected: one file each.', { n })) : t('Select at least one output.');
     const label = on ? t('Stop') : t('Record the audio output');
-    b.innerHTML = icon(on ? 'square' : 'circle', label);
+    // only when the state changes: the meters poll every 200 ms, and a click whose icon was just replaced is lost
+    if (b.dataset.on !== String(on)) { b.innerHTML = icon(on ? 'square' : 'circle', label); b.dataset.on = on; }
     b.title = `${label} · ${info}\n${this._recSummary()}`;
     b.classList.toggle('on', on);
     b.disabled = !on && !n;
