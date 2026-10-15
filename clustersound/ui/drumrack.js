@@ -322,6 +322,7 @@ export class DrumRackEditor {
       const act = t.dataset.act;
       if (act === 'fill') this.fillGroup();
       else if (act === 'autofill') this.autofill(!e.altKey);
+      else if (act === 'autosample') this.autosample();
       else if (act === 'clear-group') this.clearGroup();
       else if (act === 'lock') { const g = this.groupOf(this.pad); this.setSetting(g, 'lock', !this.settings(g).lock); this.renderGrid(); this.renderInspector(); }
       else if (act === 'reveal' && this.seed) this.revealSeed();
@@ -575,6 +576,8 @@ export class DrumRackEditor {
     const canFill = o.mode === 'trail' ? this.getTrail().length > 0 : !!seed && (similarOk || pads.length === 1);
     html.push(`<div class="rk-actions">
       ${btn(o.mode === 'random' && filled ? t('Regenerate group') : t('Fill group'), { variant: 'brand', icon: o.mode === 'random' && filled ? 'refresh-cw' : 'layout-grid', 'data-act': 'fill', disabled: !canFill })}</div>
+      <div class="rk-actions">
+      ${btn(t('Auto-sample'), { icon: 'plus', 'data-act': 'autosample', disabled: filled >= pads.length, title: t('Adds one sample similar to the group on its next empty pad (same criterion as Auto-fill)') })}</div>
       ${seed && !similarOk && pads.length > 1 ? `<div class="hint">${t('Online/file sample: no similar ones, drag it onto a pad.')}</div>` : ''}`);
     $('#rk-insp').innerHTML = html.join('');
     if (o.mode === 'manual' && similarOk) this._loadCandidates();
@@ -744,6 +747,24 @@ export class DrumRackEditor {
       this.renderAll();
       if (!this.rack.pads.some(Boolean)) toast(t('No samples in the Library to use'));
     } finally { if (btn) btn.disabled = false; }
+  }
+
+  // Auto-fill's criterion for one pad: the next empty pad of the selected group gets a sample similar to the group
+  async autosample() {
+    const g = this.groupOf(this.pad);
+    const p = this.groups[g].find((q) => !this.rack.pads[q]);
+    if (p == null) { toast(t('The group is full')); return; }
+    const b = $('#rk-insp [data-act=autosample]');
+    if (b) b.loading = true;
+    try {
+      const ref = await this.api.rack_autosample(this.rack, g, this.opts.variation);
+      if (!ref) { toast(t('No similar samples with these filters')); return; }
+      if (this.rack.pads[p] || this.groupOf(p) !== g) return; // the kit changed meanwhile
+      this.rack.pads[p] = ref;
+      this.pad = p;
+      this._persist();
+      this.renderAll();
+    } finally { if (b?.isConnected) b.loading = false; }
   }
 
   // the seed's file in the Finder / File Explorer

@@ -719,7 +719,7 @@ wa-button.rk-danger:hover::part(base) { background: var(--wa-color-danger-fill-q
 .rk-warn > div { display: flex; align-items: center; gap: 6px; }
 .rk-cand b { color: var(--text-2); font-weight: 600; font-size: 11px; }
 .rk-actions { display: flex; gap: 8px; }
-.rk-actions wa-button[variant="brand"] { flex: 1; }
+.rk-actions wa-button { flex: 1; }
 .rk-ihead .pt-ib { flex: none; }
 .rk-ihead .hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .rk-ihead b { white-space: nowrap; }

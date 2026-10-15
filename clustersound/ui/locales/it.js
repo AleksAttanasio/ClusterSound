@@ -1348,4 +1348,7 @@ export default {
   "Unlock group": "Sblocca gruppo",
   "not saved yet": "non ancora salvato",
   "Ableton Drum Rack (.adg) with its samples, in a folder": "Drum Rack di Ableton (.adg) con i suoi campioni, in una cartella",
+  "Auto-sample": "Auto-sample",
+  "Adds one sample similar to the group on its next empty pad (same criterion as Auto-fill)": "Aggiunge un sample simile al gruppo sul suo prossimo pad vuoto (stesso criterio di Auto-fill)",
+  "The group is full": "Il gruppo è pieno",
 };
