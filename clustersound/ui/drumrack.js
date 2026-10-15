@@ -263,7 +263,8 @@ export class DrumRackEditor {
     if (this.isSpd) return this.meta.spdsx.notes[p];
     if (this.rack.mapping === 'rows') return this.meta.notes.rows[p];
     const r = Math.floor(p / 8), c = p % 8;
-    return this.meta.quad_bases[this.rack.quads[(r >= 4) * 2 + (c >= 4)]] + 4 * (r % 4) + (c % 4);
+    const quads = validQuads(this.rack.quads) ? this.rack.quads : DEFAULT_QUADS;
+    return this.meta.quad_bases[quads[(r >= 4) * 2 + (c >= 4)]] + 4 * (r % 4) + (c % 4);
   }
 
   // how a pad is named in menus and messages: its note on the 8×8, its number / input on the SPD-SX
@@ -1123,6 +1124,7 @@ export class DrumRackEditor {
     const r = (this.meta.saved || []).find((x) => x.id === id);
     if (!r) return;
     this.rack = JSON.parse(JSON.stringify(r));
+    if (!this.isSpd && !validQuads(this.rack.quads)) this.rack.quads = DEFAULT_QUADS; // saved before "quads"
     this._fixPad();
     this._persist();
     this.renderAll();

@@ -1,4 +1,5 @@
 import gzip
+import json
 import os
 import xml.etree.ElementTree as ET
 
@@ -238,6 +239,14 @@ def test_export_follows_the_kits_quads(tmp_path, samples):
 def test_export_empty_rack_fails(tmp_path):
     with pytest.raises(ValueError):
         ableton.export_rack(layouts.new_rack(), str(tmp_path), lambda r: None, lambda r: None)
+
+
+def test_store_lists_old_racks_with_quads(tmp_path, monkeypatch):
+    monkeypatch.setattr(store, "data_dir", lambda: tmp_path)
+    old = {k: v for k, v in layouts.new_rack("Old").items() if k != "quads"}
+    old["id"] = "rack:old"
+    (tmp_path / "racks.json").write_text(json.dumps({"version": 1, "racks": [old]}), encoding="utf-8")
+    assert store.list_racks()[0]["quads"] == layouts.DEFAULT_QUADS and store.list_racks()[0]["id"] == "rack:old"
 
 
 def test_store_round_trip(tmp_path, monkeypatch):

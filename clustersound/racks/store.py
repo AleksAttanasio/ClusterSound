@@ -29,8 +29,9 @@ def _save(items: list[dict]) -> None:
 
 
 def list_racks() -> list[dict]:
+    """Saved racks, normalised (racks saved by an older version get the new fields)."""
     with _lock:
-        return _load()
+        return [layouts.validate(r) for r in _load()]
 
 
 def save(rack: dict) -> dict:
