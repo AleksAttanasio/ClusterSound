@@ -1351,4 +1351,6 @@ export default {
   "Auto-sample": "Auto-sample",
   "Adds one sample similar to the group on its next empty pad (same criterion as Auto-fill)": "Aggiunge un sample simile al gruppo sul suo prossimo pad vuoto (stesso criterio di Auto-fill)",
   "The group is full": "Il gruppo è pieno",
+  "The group has no samples to start from. Load a random {family} sample, with the options of Generate?": "Il gruppo non ha sample da cui partire. Caricare un sample {family} a caso, con le opzioni di Generate?",
+  "No {family} samples with these options": "Nessun sample {family} con queste opzioni"
 };

@@ -754,11 +754,18 @@ export class DrumRackEditor {
     const g = this.groupOf(this.pad);
     const p = this.groups[g].find((q) => !this.rack.pads[q]);
     if (p == null) { toast(t('The group is full')); return; }
+    // no Library sample to start from: a random one of the group's family, with the Generate options
+    const seeded = this.groups[g].some((q) => this.rack.pads[q]?.kind === 'library');
+    if (!seeded && !confirm(t('The group has no samples to start from. Load a random {family} sample, with the options of Generate?',
+      { family: this.famById[this.settings(g).family].label }))) return;
     const b = $('#rk-insp [data-act=autosample]');
     if (b) b.loading = true;
     try {
-      const ref = await this.api.rack_autosample(this.rack, g, this.opts.variation);
-      if (!ref) { toast(t('No similar samples with these filters')); return; }
+      const ref = await this.api.rack_autosample(this.rack, g, this.opts.variation, { oneshot: this.opts.oneshot, avoid: this.opts.avoid });
+      if (!ref) {
+        toast(seeded ? t('No similar samples with these filters') : t('No {family} samples with these options', { family: this.famById[this.settings(g).family].label }));
+        return;
+      }
       if (this.rack.pads[p] || this.groupOf(p) !== g) return; // the kit changed meanwhile
       this.rack.pads[p] = ref;
       this.pad = p;
