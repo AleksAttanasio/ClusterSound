@@ -990,6 +990,9 @@ wa-button.icon-btn.active::part(button) { background: var(--sel-bg); border-colo
 .sp-set:hover { background: var(--bg-3); }
 .sp-set > wa-icon { color: var(--text-3); }
 .sp-set-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+wa-button.icon-btn.is-off { opacity: .35; }
+wa-button.icon-btn.is-off:hover { opacity: .6; }
+.sp-unsaved { max-width: 300px; }
 .sp-saved { display: inline-flex; justify-content: center; color: var(--text-3); font-size: 11px; opacity: .55; }
 .sp-saved.on { color: var(--cs-teal, #00b09f); opacity: 1; }
 .sp-roots { display: flex; flex-direction: column; gap: 8px; }

@@ -1059,13 +1059,17 @@ class Api:
             return {"error": i18n.tr("file not found")}
         base = os.path.join(root, LIBRARY_RECORDER_DIR)
         files: list[str] = []
+        copies: dict[str, str] = {}  # sent file -> its copy in the library
         try:
             for title, ps in groups.items():
-                files += [f for f in sampler_extractions.copy_to(ps, os.path.join(base, title)) if f]
+                for src, dst in zip(ps, sampler_extractions.copy_to(ps, os.path.join(base, title))):
+                    if dst:
+                        files.append(dst)
+                        copies[src] = dst
         except OSError as e:
             return {"error": i18n.tr("write failed ({error})", error=e)}
         self._schedule_rescan()
-        return {"error": None, "files": files, "folder": base}
+        return {"error": None, "files": files, "copies": copies, "folder": base}
 
     # ================================================================== patterns
     def patterns_init(self) -> dict:

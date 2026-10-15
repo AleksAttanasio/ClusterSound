@@ -50,6 +50,7 @@ export class SamplerEditor {
     this.ext = { stems: [], enhanced: [] }; // extracted files of the open tracks: {path, name, dur, sr, sid, source, on}
     this.hidden = new Set();  // extracted files removed from the lists with "Clear all" (they stay on disk)
     this.collapsed = new Set(); // groups of stems shown closed: "sid|name"
+    this.libCopies = new Map();  // extracted file -> its copy sent to the library (shown in the Finder until it is saved)
     this.stems = null;        // stems_status(): extra installed, model ready, last job
     this.enh = null;          // enhance_status(): models (installed, downloaded), last "Enhance" job
     this.opts = { fade_in_ms: 1, fade_out_ms: 10, normalize: false, sensitivity: 0.5, devices: null, tab: 'cuts' };
@@ -1261,7 +1262,8 @@ export class SamplerEditor {
         <span class="sp-time">${fmt(f.dur)}</span>
         ${state(f.saved)}
         ${acts({ stems: tab === 'enhanced', ai: tab === 'stems' })}
-        ${iconBtn('folder-open', t('Show in {app}', { app: FILE_MANAGER }), { 'data-act': 'reveal' })}
+        ${this._whereSaved(f) ? iconBtn('folder-open', t('Show in {app}', { app: FILE_MANAGER }), { 'data-act': 'reveal' })
+          : iconBtn('folder-open', t('Not saved yet'), { 'data-act': 'reveal', cls: 'is-off', 'aria-disabled': 'true' })}
         ${iconBtn('trash-2', f.saved ? t('Move to the Trash') : t('Delete'), { 'data-act': 'del' })}
       </div>`;
     if (tab === 'enhanced') {
@@ -1314,7 +1316,10 @@ export class SamplerEditor {
     const anchor = () => $(`#sp-regions [data-i="${k}"] [data-act="${act}"]`); // the row may have been re-rendered
     if (this.opts.tab !== 'cuts') {
       const f = this._rows()[k];
-      if (act === 'reveal') return this.api.reveal_path(f.path);
+      if (act === 'reveal') {
+        const where = this._whereSaved(f);
+        return where ? this.api.reveal_path(where) : this._unsavedMenu(anchor(), f);
+      }
       if (act === 'del') return this.deleteFile(f);
       if (act === 'zoom') return this._opened(await this.api.sampler_open_extraction(f.path));
       if (act === 'enhance') return this._enhMenu(anchor(), { path: f.path, label: f.name });
@@ -1556,16 +1561,43 @@ export class SamplerEditor {
     } else {
       const paths = this._rows().filter((f) => f.on).map((f) => f.path);
       if (!paths.length) return;
-      b.loading = true;
-      const r = await this.api.sampler_export_files(paths);
-      b.loading = false;
-      if (r.error) return this._error(r.error);
-      this._showExported(r.folder, r.paths[0]);
-      if (r.in_library) toast(t('The samples are in the library: analysing them'));
-      n = r.paths.length;
-      await this._loadExtractions(); // the saved ones moved
+      n = await this.exportFiles(paths);
     }
     if (n) toast(n === 1 ? t('1 sample saved') : t('{n} samples saved', { n }));
+  }
+
+  // Where a stem or enhanced file can be shown in the Finder: saved, or its copy in the library (else null).
+  _whereSaved(f) { return f.saved ? f.path : this.libCopies.get(f.path) || null; }
+
+  // «Show in Finder» of a temporary file: it is not saved yet; offer to send it to the library or to export it.
+  _unsavedMenu(anchor, f) {
+    const pop = showPopover(anchor, `<div class="pop-title">${icon('triangle-alert')} ${t('Not saved yet')}</div>
+      <div class="hint sp-unsaved">${t('«{name}» is temporary: it is deleted when ClusterSound closes. Save it to find it in {app}.', { name: esc(f.name), app: FILE_MANAGER })}</div>
+      <div class="pop-actions">
+        ${btn(t('Send to the library'), { icon: 'library-big', 'data-go': 'lib' })}
+        ${btn(t('Export'), { variant: 'brand', icon: 'file-down', 'data-go': 'save', title: t('Saves it in the export folder, like «Export all»') })}
+      </div>`);
+    pop.querySelectorAll('[data-go]').forEach((b) => {
+      b.onclick = async () => {
+        pop.close();
+        if (b.dataset.go === 'lib') return this.sendToLibrary(null, [{ path: f.path, sid: f.sid }]);
+        const n = await this.exportFiles([f.path]);
+        if (n) toast(t('1 sample saved'));
+      };
+    });
+  }
+
+  // Save extracted files (temporary ones move into the export folder); returns how many.
+  async exportFiles(paths) {
+    const b = $('#sp-export');
+    b.loading = true;
+    const r = await this.api.sampler_export_files(paths);
+    b.loading = false;
+    if (r.error) { this._error(r.error); return 0; }
+    this._showExported(r.folder, r.paths[0]);
+    if (r.in_library) toast(t('The samples are in the library: analysing them'));
+    await this._loadExtractions(); // the saved ones moved
+    return r.paths.length;
   }
 
   // A stem or enhanced file: a temporary one is deleted, a saved one goes to the Trash (after a confirmation).
@@ -1583,10 +1615,12 @@ export class SamplerEditor {
   }
 
   // Ticked rows into the library: ClusterSound Recorder/<track>/ of one of its folders (asked if there are more).
-  async sendToLibrary(root = null) {
-    const refs = await this._checkedRefs($('#sp-send'));
-    if (!refs?.length) return;
-    const items = refs.map((x) => ({ path: x.path, sid: x.sid }));
+  async sendToLibrary(root = null, items = null) {
+    if (!items) {
+      const refs = await this._checkedRefs($('#sp-send'));
+      if (!refs?.length) return;
+      items = refs.map((x) => ({ path: x.path, sid: x.sid }));
+    }
     let r = await this.api.sampler_send_to_library(items, root);
     if (r.choose) {
       root = await this._chooseRoot(r.choose);
@@ -1594,6 +1628,8 @@ export class SamplerEditor {
       r = await this.api.sampler_send_to_library(items, root);
     }
     if (r.error) return this._error(r.error);
+    for (const [src, dst] of Object.entries(r.copies || {})) this.libCopies.set(src, dst);
+    this.renderRegions();
     toast(r.files.length === 1 ? t('1 sample copied to the library') : t('{n} samples copied to the library', { n: r.files.length }));
   }
 

@@ -133,6 +133,7 @@ def test_api_send_to_library(api, tmp_path, rec, monkeypatch):
     r = api.sampler_send_to_library([{"path": stem}, {"path": cut, "sid": rec.sid}, {"path": "/etc/passwd"}], lib_b)
     folder = os.path.join(lib_b, "ClusterSound Recorder", "Take 1")
     assert r["error"] is None and sorted(r["files"]) == [os.path.join(folder, "Take 1 - 01.wav"), os.path.join(folder, "Take 1 - Bass.wav")]
+    assert r["copies"][stem] == os.path.join(folder, "Take 1 - Bass.wav")
     assert os.path.isfile(stem)  # a copy: the temporary file stays temporary
 
 

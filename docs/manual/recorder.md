@@ -56,8 +56,8 @@ rows are grouped under its name (click it to show that track):
 
 Every row has icon-only buttons: listen, show the waveform (a cut is zoomed in; a stem or an enhanced file opens
 in a new tab), **Extract stems** (cuts and enhanced files), ✨ Enhance (cuts and stems) and **Send**, the same menu as
-in the library (a Sequencer bus or a Drum Rack group). Stems and enhanced files also have show in the Finder and
-🗑 **delete**: a temporary file is deleted, a saved one goes to the Trash after a confirmation.
+in the library (a Sequencer bus or a Drum Rack group). Stems and enhanced files also have show in the Finder (greyed out until the file is saved
+or sent to the library: clicking it offers to do one of the two) and 🗑 **delete**: a temporary file is deleted, a saved one goes to the Trash after a confirmation.
 
 !!! info "Temporary until saved"
     New cuts, stems and enhanced files are **temporary**: they are kept in a work folder of ClusterSound while it is

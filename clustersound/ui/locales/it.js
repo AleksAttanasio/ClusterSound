@@ -1335,5 +1335,8 @@ export default {
   "{n} samples copied to the library": "{n} sample copiati nella libreria",
   "Send to the library": "Invia alla libreria",
   "The library is made of several folders: in which one should the «{dir}» folder go?": "La libreria è fatta di più cartelle: in quale va la cartella «{dir}»?",
-  "Click to open another track": "Clic per aprire un’altra traccia"
+  "Click to open another track": "Clic per aprire un’altra traccia",
+  "Not saved yet": "Non ancora salvato",
+  "«{name}» is temporary: it is deleted when ClusterSound closes. Save it to find it in {app}.": "«{name}» è temporaneo: viene eliminato alla chiusura di ClusterSound. Salvalo per trovarlo nel {app}.",
+  "Saves it in the export folder, like «Export all»": "Lo salva nella cartella di esportazione, come «Esporta tutto»"
 };

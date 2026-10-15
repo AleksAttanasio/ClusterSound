@@ -59,7 +59,8 @@ tracce le righe sono raggruppate sotto il suo nome (clic per mostrare quella tra
 Ogni riga ha tasti solo icona: ascolta, mostra la forma d'onda (un taglio viene ingrandito; uno stem o un file
 migliorato si apre in una nuova scheda), **Estrai stem** (tagli e file migliorati), ✨ Migliora (tagli e stem) e
 **Invia**, lo stesso menu della libreria (un bus del Sequencer o un gruppo del Drum Rack). Stem e file migliorati
-hanno anche mostra nel Finder e 🗑 **elimina**: un file temporaneo viene eliminato, uno salvato va nel Cestino dopo
+hanno anche mostra nel Finder (spento finché il file non è salvato o inviato alla libreria: cliccandolo
+propone di fare una delle due) e 🗑 **elimina**: un file temporaneo viene eliminato, uno salvato va nel Cestino dopo
 una conferma.
 
 !!! info "Temporanei finché non li salvi"
