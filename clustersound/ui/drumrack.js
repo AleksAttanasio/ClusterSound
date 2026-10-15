@@ -26,7 +26,13 @@ const MAX_PER_BUS = 8;
 const PEDAL_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20h16M7 20l3-12h4l3 12M10 8l-1-4h6l-1 4"/></svg>';
 const ALT_LABELS = [['off', 'Together (only the 1st active)'], ['cycle', 'In turn'], ['random', 'Random'], ['random_pass', 'Random every loop']]; // t() where shown
 
-const newRack = () => ({ name: 'Kit', geometry: 'cols8', mapping: 'launchpad', pads: new Array(64).fill(null), groups: {} });
+// 4×4 note blocks of a 64-pad kit (layouts.QUAD_BASE): "quads" names the one at each quadrant,
+// bottom-left, bottom-right, top-left, top-right
+const DEFAULT_QUADS = 'CADB';                       // as the Launchpad plays them: 52-67 84-99 over 36-51 68-83
+const QUAD_PRESETS = [[DEFAULT_QUADS, 'Launchpad'], ['CDAB', 'Live']]; // t() where shown
+const QUAD_SHOWN = [2, 3, 0, 1];                    // quadrants as drawn, top row first
+const validQuads = (q) => typeof q === 'string' && [...q].sort().join('') === 'ABCD';
+const newRack = () => ({ name: 'Kit', geometry: 'cols8', mapping: 'launchpad', quads: DEFAULT_QUADS, pads: new Array(64).fill(null), groups: {} });
 const newSpdRack = () => ({ device: 'spdsx', name: 'Kit SPD-SX', geometry: 'spd_kit', triggers: { trig1: true, trig2: false },
   pads: new Array(11).fill(null), groups: {} });
 
@@ -77,6 +83,8 @@ export class DrumRackEditor {
       }
     } catch { /* private mode / bad JSON */ }
     if (!this.geoById[this.rack.geometry]) this.rack.geometry = 'cols8';
+    // 'CABD', 'DBCA' and 'CBDA' were earlier defaults (wrong for the Launchpad): a kit still on one gets the current one
+    if (!validQuads(this.racks.grid64.quads) || ['CABD', 'DBCA', 'CBDA'].includes(this.racks.grid64.quads)) this.racks.grid64.quads = DEFAULT_QUADS;
     try {
       const spd = JSON.parse(localStorage.getItem(LS_SPD) || 'null');
       if (spd?.rack?.pads?.length === this.meta.spdsx.pads) {
@@ -116,13 +124,85 @@ export class DrumRackEditor {
     body.innerHTML = setRow(t('MIDI notes of the pads'), t('It applies to the open 8×8 kit ({kit}) and is saved with the kit: it sets the notes of the Drum Rack exported and sent to Live. The SPD-SX always uses the notes of its pads.', { kit: `<b>${esc(kit.name)}</b>` }),
       `<wa-select id="set-rk-map" size="s" value="${kit.mapping}" label="${t('Notes')}" style="width:300px">
          <wa-option value="launchpad">${t('Launchpad / Live (4×4 quadrants)')}</wa-option>
-         <wa-option value="rows">${t('Sequential rows (36 + row×8)')}</wa-option></wa-select>`);
+         <wa-option value="rows">${t('Sequential rows (36 + row×8)')}</wa-option></wa-select>`)
+      + setRow(t('4×4 blocks'), t('Where each block of 16 notes sits on the grid, as your controller plays them. Only for the Launchpad / Live notes.'),
+        `<div id="set-rk-quads" class="rk-quads-mini"></div>${btn(t('Arrange blocks…'), { icon: 'layout-grid', id: 'set-rk-quads-btn' })}`);
+    const sync = () => {
+      body.querySelector('#set-rk-quads').innerHTML = QUAD_SHOWN.map((q) => `<span>${noteName(this.meta.quad_bases[kit.quads[q]])}</span>`).join('');
+      body.querySelector('#set-rk-quads-btn').disabled = kit.mapping !== 'launchpad';
+    };
+    sync();
     body.querySelector('#set-rk-map').addEventListener('change', (e) => {
       kit.mapping = e.target.value;
       this._persist();
       if (!this.isSpd) this.renderGrid();
+      sync();
       savedFlash(body);
     });
+    body.querySelector('#set-rk-quads-btn').addEventListener('click', () => this._openQuadsDialog((quads) => {
+      kit.quads = quads;
+      this._persist();
+      if (!this.isSpd) this.renderGrid();
+      sync();
+      savedFlash(body);
+    }));
+  }
+
+  // Window to drag the four 4×4 note blocks onto the quadrants; onApply(quads) on Apply. Blocks are
+  // shown by their notes (the letters of QUAD_BASE stay internal).
+  _openQuadsDialog(onApply) {
+    let quads = this.racks.grid64.quads;
+    const base = this.meta.quad_bases;
+    const dlg = openDialog('rk-quads', {
+      label: t('Arrange the 4×4 blocks'),
+      width: '460px',
+      body: `<div class="hint">${t('Drag a block onto another to swap them, so that the grid matches the notes of your controller.')}</div>
+        <div class="rk-quads"></div>
+        <div class="rk-quads-presets">${QUAD_PRESETS.map(([q, l]) => btn(t(l), { size: 'xs', 'data-preset': q })).join('')}</div>`,
+      footer: btn(t('Cancel'), { 'data-cancel': true }) + btn(t('Apply'), { variant: 'brand', 'data-ok': true }),
+    });
+    const box = dlg.querySelector('.rk-quads');
+    const draw = () => {
+      box.innerHTML = QUAD_SHOWN.map((q) => {
+        const b = quads[q], first = base[b];
+        // corner notes as on the pads: top-left, top-right, bottom-left, bottom-right
+        const corners = [first + 12, first + 15, first, first + 3].map(noteName);
+        return `<div class="rk-quad" draggable="true" data-q="${q}"><b>${noteName(first)}–${noteName(first + 15)}</b>
+          ${corners.map((n, i) => `<i class="c${i}">${n}</i>`).join('')}</div>`;
+      }).join('');
+    };
+    draw();
+    let from = -1;
+    const clear = () => box.querySelectorAll('.rk-quad').forEach((el) => el.classList.remove('dragging', 'over'));
+    box.addEventListener('dragstart', (e) => {
+      const el = e.target.closest('.rk-quad');
+      if (!el) return;
+      from = +el.dataset.q;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', el.dataset.q);
+      el.classList.add('dragging');
+    });
+    box.addEventListener('dragend', () => { from = -1; clear(); });
+    box.addEventListener('dragover', (e) => {
+      const el = e.target.closest('.rk-quad');
+      if (!el || from < 0) return;
+      e.preventDefault();
+      box.querySelectorAll('.rk-quad.over').forEach((x) => x !== el && x.classList.remove('over'));
+      el.classList.toggle('over', +el.dataset.q !== from);
+    });
+    box.addEventListener('drop', (e) => {
+      const el = e.target.closest('.rk-quad');
+      if (!el || from < 0) return;
+      e.preventDefault();
+      const to = +el.dataset.q, a = [...quads];
+      [a[from], a[to]] = [a[to], a[from]];
+      quads = a.join('');
+      from = -1;
+      draw();
+    });
+    dlg.querySelectorAll('[data-preset]').forEach((b) => b.addEventListener('click', () => { quads = b.dataset.preset; draw(); }));
+    dlg.querySelector('[data-cancel]').addEventListener('click', () => dlg.close());
+    dlg.querySelector('[data-ok]').addEventListener('click', () => { dlg.close(); onApply(quads); });
   }
 
   _persist() {
@@ -181,7 +261,13 @@ export class DrumRackEditor {
     this._persist();
   }
 
-  note(p) { return this.isSpd ? this.meta.spdsx.notes[p] : this.meta.notes[this.rack.mapping][p]; }
+  note(p) {
+    if (this.isSpd) return this.meta.spdsx.notes[p];
+    if (this.rack.mapping === 'rows') return this.meta.notes.rows[p];
+    const r = Math.floor(p / 8), c = p % 8;
+    const quads = validQuads(this.rack.quads) ? this.rack.quads : DEFAULT_QUADS;
+    return this.meta.quad_bases[quads[(r >= 4) * 2 + (c >= 4)]] + 4 * (r % 4) + (c % 4);
+  }
 
   // how a pad is named in menus and messages: its note on the 8×8, its number / input on the SPD-SX
   padName(p) { return this.isSpd ? this.meta.spdsx.labels[p] : noteName(this.note(p)); }
@@ -1040,6 +1126,7 @@ export class DrumRackEditor {
     const r = (this.meta.saved || []).find((x) => x.id === id);
     if (!r) return;
     this.rack = JSON.parse(JSON.stringify(r));
+    if (!this.isSpd && !validQuads(this.rack.quads)) this.rack.quads = DEFAULT_QUADS; // saved before "quads"
     this._fixPad();
     this._persist();
     this.renderAll();
@@ -1049,7 +1136,7 @@ export class DrumRackEditor {
   // empty kit for the current device (saved with a name on the first Save)
   newKit() {
     this.player.stop();
-    this.rack = this.isSpd ? newSpdRack() : { ...newRack(), mapping: this.rack.mapping };
+    this.rack = this.isSpd ? newSpdRack() : { ...newRack(), mapping: this.rack.mapping, quads: this.rack.quads };
     this.manual.seedKey = '';
     this._fixPad();
     this._persist();

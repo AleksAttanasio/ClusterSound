@@ -34,7 +34,7 @@ def export_rack(rack: dict, dest_root: str, resolve, describe) -> str:
     title = safe_name(rack["name"])
     folder = unique_path(os.path.join(dest_root, title))
     os.makedirs(os.path.join(folder, "Samples"))
-    geometry, mapping = rack["geometry"], rack["mapping"]
+    geometry = rack["geometry"]
     settings = layouts.group_settings(rack)
     group_of = {p: g for g, pads in enumerate(layouts.groups(geometry)) for p in pads}
 
@@ -47,7 +47,7 @@ def export_rack(rack: dict, dest_root: str, resolve, describe) -> str:
         fam = settings[g]["family"]
         sub = safe_name(f"{g + 1:02d} {layouts.FAMILY_BY_ID[fam][1].replace('/', '-')}")
         os.makedirs(os.path.join(folder, "Samples", sub), exist_ok=True)
-        note = layouts.note_for(p, mapping)
+        note = layouts.note_of(rack, p)
         label = _label(ref, src)
         dest = unique_path(os.path.join(folder, "Samples", sub, safe_name(f"{note_name(note)} - {label}") + ".wav"))
         info = live.write_sample(src, dest)
@@ -77,15 +77,21 @@ def pad_map(rack: dict, names: dict[int, str], width: int = 14) -> list[str]:
         top, bottom = [], []
         for col in range(layouts.N):
             p = layouts.pad(row, col)
-            top.append(f" {note_name(layouts.note_for(p, rack['mapping']))}".ljust(width))
+            top.append(f" {note_name(layouts.note_of(rack, p))}".ljust(width))
             bottom.append(f" {names.get(p, '·')[: width - 2]}".ljust(width))
         out += ["|" + "|".join(top) + "|", "|" + "|".join(bottom) + "|", sep]
     return out
 
 
+def quads_text(quads: str) -> str:
+    """The 4×4 note blocks of a 'launchpad' kit, e.g. "84-99 top left, 52-67 top right, ..."."""
+    first = [layouts.QUAD_BASE[q] for q in quads]  # bottom-left, bottom-right, top-left, top-right
+    return tr("Drum layout in four 4×4 blocks ({tl} top left, {tr} top right, {bl} bottom left, {br} bottom right)",
+              **{k: f"{first[i]}-{first[i] + 15}" for k, i in (("bl", 0), ("br", 1), ("tl", 2), ("tr", 3))})
+
+
 def readme(rack: dict, adg: str, names: dict[int, str], settings: list[dict], has_licences: bool) -> str:
-    mapping = tr("Launchpad / Live Drum layout: four 4×4 quadrants (36-51 bottom left, 52-67 bottom"
-                 " right, 68-83 top left, 84-99 top right)") if rack["mapping"] == "launchpad" \
+    mapping = quads_text(rack["quads"]) if rack["mapping"] == "launchpad" \
         else tr("sequential rows: 36 bottom left, +1 per column, +8 per row")
     lines = [
         rack["name"], tr("{n} pads · layout {layout} · notes: {mapping}", n=len(names),

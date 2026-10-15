@@ -117,6 +117,7 @@ def validate(rack: dict) -> dict:
         r["geometry"] = "spd_kit"
     r["triggers"] = triggers_of(r)
     r.pop("mapping", None)
+    r.pop("quads", None)
     pads = list(r.get("pads") or [])[:PADS]
     r["pads"] = [p if isinstance(p, dict) and (p.get("path") or p.get("url")) else None for p in pads]
     r["pads"] += [None] * (PADS - len(r["pads"]))

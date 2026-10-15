@@ -13,9 +13,11 @@ SPD-SX**. Il menu in alto a sinistra sceglie lo strumento; ognuno ha il suo kit.
     - *Blocchi 4×4*: 4 quadranti da 16;
     - *4×4 a colonne*: ogni quadrante è una famiglia, ogni colonna un gruppo di 4;
     - *Libero*: un pad alla volta.
-- **Mappatura delle note** (Impostazioni › Drum Rack): *Launchpad / Live* (4 quadranti 4×4: 36–51 in basso a
-  sinistra, 52–67 in basso a destra, 68–83 in alto a sinistra, 84–99 in alto a destra) oppure *righe
-  sequenziali* (36 + riga×8 + colonna) per le Custom Mode.
+- **Mappatura delle note** (Impostazioni › Drum Rack): *Launchpad / Live* (4 blocchi di note 4×4; di default come
+  li suona il Launchpad: 52–67 in alto a sinistra, 84–99 in alto a destra, 36–51 in basso a sinistra, 68–83 in
+  basso a destra) oppure *righe sequenziali* (36 + riga×8 + colonna) per le Custom Mode.
+  **Disponi i blocchi…** apre una finestra dove trascinare i quattro blocchi, indicati dalle loro note, come sul
+  tuo controller; *Live* li rimette come li mostra Live (68–83 e 84–99 sopra 36–51 e 52–67).
 - **Gruppi** (pannello a destra): famiglia, choke group (attivo di default sugli hat), 🔒 *Blocca gruppo*.
   Trascina i pad per scambiarli e un sample dal browser per metterlo su un pad; tasto destro = menu del pad.
 

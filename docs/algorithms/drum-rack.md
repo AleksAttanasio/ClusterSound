@@ -79,8 +79,9 @@ choice.
 ## 8×8 layout
 
 - Pads numbered `row·8 + column`, row 0 at the bottom.
-- *Launchpad* notes: \(36 + 16q + 4\,(r \bmod 4) + (c \bmod 4)\), with quadrant \(q = 2[r \ge 4] + [c \ge 4]\) →
-  36–51, 52–67, 68–83, 84–99. *Rows* notes: \(36 + p\).
+- *Launchpad* notes: \(b_{Q[q]} + 4\,(r \bmod 4) + (c \bmod 4)\), with quadrant \(q = 2[r \ge 4] + [c \ge 4]\) and
+  \(Q\) the kit's arrangement of the blocks C = 36, D = 52, A = 68, B = 84 (default `CADB`: top-left 52–67,
+  top-right 84–99, bottom-left 36–51, bottom-right 68–83, as the Launchpad plays them). *Rows* notes: \(36 + p\).
 - Layouts: 8 columns of 8, 16 blocks 2×2, 4 quadrants 4×4, 16 columns of 4 (one family per quadrant), free; every
   layout has default families (18 families in all). Choke is on by default for the hat families.
 

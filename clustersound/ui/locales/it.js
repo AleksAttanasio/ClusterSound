@@ -540,7 +540,7 @@ export default {
   "Language": "Lingua",
   "Language of the interface. The app reloads to apply it.": "Lingua dell'interfaccia. L'app si ricarica per applicarla.",
   "Launchpad / Live (4×4 quadrants)": "Launchpad / Live (quadranti 4×4)",
-  "Launchpad / Live Drum layout: four 4×4 quadrants (36-51 bottom left, 52-67 bottom right, 68-83 top left, 84-99 top right)": "layout Drum del Launchpad / di Live: 4 quadranti 4×4 (36-51 in basso a sinistra, 52-67 in basso a destra, 68-83 in alto a sinistra, 84-99 in alto a destra)",
+  "Drum layout in four 4×4 blocks ({tl} top left, {tr} top right, {bl} bottom left, {br} bottom right)": "layout Drum in 4 blocchi 4×4 ({tl} in alto a sinistra, {tr} in alto a destra, {bl} in basso a sinistra, {br} in basso a destra)",
   "Layer volume": "Volume layer",
   "Layers: together = they all play on every hit; in turn / random = a different layer on every hit": "Layer: insieme = suonano tutti a ogni colpo; a giro / casuale = un layer diverso a ogni colpo",
   "Layout": "Geometria",
@@ -1352,5 +1352,13 @@ export default {
   "Adds one sample similar to the group on its next empty pad (same criterion as Auto-fill)": "Aggiunge un sample simile al gruppo sul suo prossimo pad vuoto (stesso criterio di Auto-fill)",
   "The group is full": "Il gruppo è pieno",
   "The group has no samples to start from. Load a random {family} sample, with the options of Generate?": "Il gruppo non ha sample da cui partire. Caricare un sample {family} a caso, con le opzioni di Generate?",
-  "No {family} samples with these options": "Nessun sample {family} con queste opzioni"
+  "No {family} samples with these options": "Nessun sample {family} con queste opzioni",
+  "4×4 blocks": "Blocchi 4×4",
+  "Where each block of 16 notes sits on the grid, as your controller plays them. Only for the Launchpad / Live notes.": "Dove sta sulla griglia ogni blocco di 16 note, come le suona il tuo controller. Solo per le note Launchpad / Live.",
+  "Arrange blocks…": "Disponi i blocchi…",
+  "Arrange the 4×4 blocks": "Disponi i blocchi 4×4",
+  "Drag a block onto another to swap them, so that the grid matches the notes of your controller.": "Trascina un blocco su un altro per scambiarli, così che la griglia corrisponda alle note del tuo controller.",
+  "Launchpad": "Launchpad",
+  "Live": "Live",
+  "Apply": "Applica"
 };
