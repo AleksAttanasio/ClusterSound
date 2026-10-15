@@ -395,14 +395,23 @@ export class ComposeEditor {
     await this.loadBrowser();
   }
 
+  async useBuiltin() {
+    this.meta = { ...this.meta, ...(await this.api.compose_use_builtin()) };
+    this.keyData.clear();
+    await this.loadBrowser();
+  }
+
   /** Compose section of the Settings page. */
   async renderSettings(body) {
     await this.ensure();
     const ui = this.ui;
     body.innerHTML =
-      setRow(t('Chord pack folder'), t('The chords of the browser come from here, organised by key.'),
-        `<span class="set-path" title="${esc(this.meta.dir)}">${esc(this.meta.dir)}</span>
-         <wa-button id="set-cp-dir" size="s" appearance="filled-outlined"><wa-icon slot="start" name="folder-open"></wa-icon>${t('Choose…')}</wa-button>`)
+      setRow(t('Chord pack'), t('The chords of the browser: the set built into the app, or a pack you own organised like the Unison MIDI Chord Pack.'),
+        (this.meta.builtin
+          ? `<span class="set-path">${t('Built-in (generated)')}</span>`
+          : `<span class="set-path" title="${esc(this.meta.dir)}">${esc(this.meta.dir)}</span>
+             <wa-button id="set-cp-builtin" size="s" appearance="filled-outlined"><wa-icon slot="start" name="rotate-ccw"></wa-icon>${t('Use built-in')}</wa-button>`)
+        + `<wa-button id="set-cp-dir" size="s" appearance="filled-outlined"><wa-icon slot="start" name="folder-open"></wa-icon>${t('Choose…')}</wa-button>`)
       + setRow(t('Preview sound'), t('The instrument that plays chords and melody in Compose. It is not exported.'),
         `<wa-select id="set-cp-synth" size="s" value="${ui.synth}" label="${t('Sound')}" style="width:200px">${SYNTHS.map(([v, l]) => `<wa-option value="${v}">${t(l)}</wa-option>`).join('')}</wa-select>`)
       + setRow(t('MIDI keyboard'), t('Which input to record the melody from (Import melody › Record).'),
@@ -413,6 +422,8 @@ export class ComposeEditor {
         `<wa-switch id="set-cp-pure" size="s" ${ui.pure ? 'checked' : ''}></wa-switch>`);
     const saved = () => { this._persist(); savedFlash(body); };
     body.querySelector('#set-cp-dir').onclick = async () => { await this.pickFolder(); savedFlash(body); this.renderSettings(body); };
+    const builtinBtn = body.querySelector('#set-cp-builtin');
+    if (builtinBtn) builtinBtn.onclick = async () => { await this.useBuiltin(); savedFlash(body); this.renderSettings(body); };
     body.querySelector('#set-cp-synth').addEventListener('change', (e) => { ui.synth = this.synth.preset = e.target.value; saved(); });
     body.querySelector('#set-cp-bass').addEventListener('change', (e) => {
       ui.bassFollow = e.target.checked;
@@ -477,7 +488,7 @@ export class ComposeEditor {
     const tonics = (flats) => SHARPS.map((n, i) => `<wa-option value="${i}">${flats && FLATS[i] !== n ? `${FLATS[i]}` : n}</wa-option>`).join('');
     root.innerHTML = `
       <aside class="sidebar cp-browser">
-        <div class="cp-pack"><span class="cp-pack-path" id="cp-dir"></span>${settingsLink('compose', t('Chord pack folder and preferences'))}</div>
+        <div class="cp-pack"><span class="cp-pack-path" id="cp-dir"></span>${settingsLink('compose', t('Chord pack and preferences'))}</div>
         <div class="cp-keyrow">
           <wa-select id="cp-b-tonic" size="s" class="cp-select" value="0">${tonics(true)}</wa-select>
           <wa-radio-group id="cp-b-mode" class="seg" orientation="horizontal" size="s" value="major" label="${t('Scale')}">
@@ -738,8 +749,10 @@ export class ComposeEditor {
     this.renderBrowserHead();
     if (!this.meta.exists) {
       $('#cp-list').innerHTML = `<div class="cp-empty">${t('Chord pack folder not found:')}<br><code>${esc(this.meta.dir)}</code><br>
-        ${xs(t('Choose the folder…'), { id: 'cp-dir-pick2', icon: 'folder-open' })}</div>`;
+        ${xs(t('Choose the folder…'), { id: 'cp-dir-pick2', icon: 'folder-open' })}
+        ${xs(t('Use built-in'), { id: 'cp-builtin2', icon: 'rotate-ccw' })}</div>`;
       $('#cp-dir-pick2').onclick = () => this.pickFolder();
+      $('#cp-builtin2').onclick = () => this.useBuiltin();
       return;
     }
     this.current = await this.keyChords(this.browseKey);
@@ -749,7 +762,7 @@ export class ComposeEditor {
   renderBrowserHead() {
     const k = this.browseKey;
     const locked = this.seq.keyMode === 'locked';
-    $('#cp-dir').textContent = this.meta.dir.replace(/^\/Users\/[^/]+/, '~');
+    $('#cp-dir').textContent = this.meta.builtin ? t('Built-in chord pack') : this.meta.dir.replace(/^\/Users\/[^/]+/, '~');
     $('#cp-dir').title = this.meta.dir;
     $('#cp-b-tonic').value = String(k.tonic);
     $('#cp-b-tonic').disabled = locked;

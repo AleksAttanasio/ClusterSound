@@ -15,6 +15,7 @@ import numpy as np
 import soundfile as sf
 
 from . import classifier, dynamics, export, i18n, taxonomy
+from .chords import builtin as chord_builtin
 from .chords import export as chord_export
 from .chords import harmony as chord_harmony
 from .chords import melody as chord_melody
@@ -22,7 +23,6 @@ from .chords import midi_in as chord_midi_in
 from .chords import perform as chord_perform
 from .chords import variations as chord_variations
 from .chords.library import CATEGORIES as CHORD_CATEGORIES
-from .chords.library import DEFAULT_DIR as CHORD_DIR
 from .chords.library import ChordLibrary
 from .enhance import job as enhance_job
 from .enhance import models as enhance_models
@@ -1271,14 +1271,14 @@ class Api:
 
     # ================================================================== compose (chord progressions)
     def _chord_lib(self) -> ChordLibrary:
-        root = self._settings().get("chord_pack_dir") or CHORD_DIR
+        root = self._settings().get("chord_pack_dir") or chord_builtin.builtin_dir()
         if self._chords is None or self._chords.root != root:
             self._chords = ChordLibrary(root)
         return self._chords
 
     def compose_init(self) -> dict:
         lib = self._chord_lib()
-        return {"dir": lib.root, "exists": lib.exists(), "keys": lib.available_keys() if lib.exists() else [],
+        return {"dir": lib.root, "exists": lib.exists(), "builtin": not self._settings().get("chord_pack_dir"), "keys": lib.available_keys() if lib.exists() else [],
                 **i18n.localize({
                     "categories": CHORD_CATEGORIES, "styles": chord_perform.meta(),
                     "clipKinds": chord_variations.CLIP_KINDS, "progKinds": chord_variations.PROG_KINDS,
@@ -1292,6 +1292,11 @@ class Api:
             path = self.pick_folder()
         if path:
             self._save_settings(chord_pack_dir=os.path.expanduser(path))
+        return self.compose_init()
+
+    def compose_use_builtin(self) -> dict:
+        """Back to the chord pack generated with the app."""
+        self._save_settings(chord_pack_dir="")
         return self.compose_init()
 
     def compose_rescan(self) -> dict:
