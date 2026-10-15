@@ -1577,29 +1577,33 @@ class Api:
     def _autofill_mask(self, family: str) -> np.ndarray | None:
         return self._rack_mask(None, {"filter": "family", "family": family, "oneshot": True})
 
-    def rack_autosample(self, rack: dict, group: int, variation: float = 0.3) -> dict | None:
+    def rack_autosample(self, rack: dict, group: int, variation: float = 0.3, opts: dict | None = None) -> dict | None:
         """One more sample for a group, with Auto-fill's criterion: a similarity-weighted draw among the
         nearest one-shots of the family to the group's seed (its first library sample), not in the kit yet.
-        An empty group gets Auto-fill's seed. None when nothing fits."""
+        A group with no library sample gets a random sample of its family instead, with the Generate
+        options `oneshot` and `avoid` (samples already in the kit). None when nothing fits."""
         rack = rack_layouts.validate(rack)
+        opts = opts or {}
         if not self._lib.items:
             return None
         groups = rack_layouts.groups_of(rack)
         g = int(group)
         if not 0 <= g < len(groups):
             return None
-        settings = rack_layouts.group_settings(rack)
-        fam = settings[g]["family"]
+        fam = rack_layouts.group_settings(rack)[g]["family"]
         pads = rack["pads"]
         used = {r["id"] for r in pads if r and r.get("kind") == "library"}
         mine = [pads[p]["id"] for p in groups[g] if pads[p] and pads[p].get("kind") == "library"]
         if not mine:
-            items = self._lib.items
-            subs = {(items[r["id"]]["cls"], items[r["id"]].get("sub"))
-                    for k, ps in enumerate(groups) if k != g and settings[k]["family"] == fam
-                    for r in (pads[p] for p in ps) if r and r.get("kind") == "library"}
-            seed = self._autofill_seed(fam, used, subs)
-            return self._rack_refs([(seed["id"], 1.0)])[0] if seed else None
+            classes = rack_layouts.family_classes(fam)
+            avoid = opts.get("avoid", True)
+            oneshot = opts.get("oneshot", True)
+            pool = [it["id"] for it in self._lib.items if (not classes or it["cls"] in classes)
+                    and not (avoid and it["id"] in used) and not (oneshot and it["feats"].get("type") != "One-shot")]
+            if not pool:
+                return None
+            pick = int(np.random.default_rng(opts.get("rng_seed")).choice(pool))
+            return self._rack_refs([(pick, 1.0)])[0]
         a = self._rack_arrays()
         picks = rack_select.pick(a["Xn"], mine[0], 1, "random", self._autofill_mask(fam), variation, used)
         return self._rack_refs(picks)[0] if picks else None

@@ -180,8 +180,10 @@ def test_autosample_adds_one_similar_sample(api):
     r = _rack("spd_kit", {"trig1": True, "trig2": False})
     g = next(k for k, pads in enumerate(layouts.groups_of(r)) if len(pads) > 1)
     pads = layouts.groups_of(r)[g]
-    first = api.rack_autosample(r, g)          # empty group: Auto-fill's seed
+    first = api.rack_autosample(r, g)          # empty group: a random sample of its family
     assert first and first["kind"] == "library"
+    classes = layouts.family_classes(layouts.group_settings(r)[g]["family"])
+    assert not classes or first["cls"] in classes
     r["pads"][pads[0]] = first
     for _ in range(len(pads) - 1):
         ref = api.rack_autosample(r, g)
@@ -189,6 +191,19 @@ def test_autosample_adds_one_similar_sample(api):
         assert ref and ref["id"] not in used and _sub(ref) == _sub(first)  # same sub-cluster as the seed
         r["pads"][next(p for p in pads if not r["pads"][p])] = ref
     assert api.rack_autosample(r, 99) is None
+
+
+def test_autosample_random_respects_avoid(api):
+    r = _rack("spd_kit", {"trig1": True, "trig2": False})
+    g = layouts.groups_of(r).index([spdsx.TRIG1])     # the pedal: kick family
+    fam = layouts.family_classes(layouts.group_settings(r)[g]["family"])
+    kicks = [it["id"] for it in api._lib.items if it["cls"] in fam]
+    for p, i in enumerate(kicks[:9]):                 # 9 kicks already on the pads
+        r["pads"][p] = api._rack_refs([(i, 1.0)])[0]
+    got = {api.rack_autosample(r, g, opts={"avoid": True, "rng_seed": s})["id"] for s in range(40)}
+    assert got <= set(kicks[9:])
+    got = {api.rack_autosample(r, g, opts={"avoid": False, "rng_seed": s})["id"] for s in range(200)}
+    assert got & set(kicks[:9])
 
 # ---------------------------------------------------------------- export
 def test_export_spdsx(tmp_path):
