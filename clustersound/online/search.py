@@ -40,7 +40,7 @@ def server_filters() -> dict[str, list[str]]:
 def enrich(r: OnlineResult) -> OnlineResult:
     """Fill instrument/type/bpm/key from title and tags when the source didn't."""
     if r.instrument is None and r.label_state is None:
-        cid, state = inst.infer_label(r.title, r.tags, "" if r.is_pack else r.path)
+        cid, state = inst.infer_label(r.title, r.tags, "" if r.is_pack else r.path, r.duration)
         r.instrument, r.label_state = cid, state or ""
     if r.bpm is None:
         r.bpm = inst.bpm_from_text(r.title)
@@ -222,21 +222,6 @@ def pack_files(uid: str, settings: dict) -> list[OnlineResult]:
 
 
 # ------------------------------------------------------------------ store: home
-def featured(settings: dict) -> dict:
-    """Home rows of the store. Each row is independent: a failing source just leaves its row empty."""
-    has_key = bool((settings or {}).get("freesound_key"))
-    jobs = {
-        "freesound_packs": lambda: search_source("freesound", {"sort": "downloads"}, 1, settings, packs=True)
-        if has_key else {"results": [], "error": tr("API key missing"), "needs_key": True},
-        "archive_packs": lambda: search_source("archive", {"sort": "downloads"}, 1, settings),
-        "cc0_new": lambda: search_source("freesound" if has_key else "openverse",
-                                         {"licenses": ["cc0"], "sort": "newest"}, 1, settings),
-    }
-    with ThreadPoolExecutor(max_workers=len(jobs)) as ex:
-        futs = {k: ex.submit(fn) for k, fn in jobs.items()}
-        return {k: f.result() for k, f in futs.items()}
-
-
 def showcase_source(name: str, settings: dict) -> dict:
     """Store home: a varied carousel of one source's samples, a few per category.
 

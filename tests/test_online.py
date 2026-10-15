@@ -72,8 +72,9 @@ def test_infer_instrument(title, tags, path, expected):
 
 @pytest.mark.parametrize("title,tags,path,expected", [
     # tag order (Freesound sorts tags alphabetically) must not decide the class
-    ("Some sound", ["bass", "kick"], "", ("kick", "weak")),
-    ("Some sound", ["kick", "bass"], "", ("kick", "weak")),
+    ("Some sound", ["bass", "kick"], "", (None, None)),
+    ("Some sound", ["kick", "bass"], "", (None, None)),
+    ("Kick thing", ["bass", "kick"], "", ("kick", "sure")),
     ("Kick 01", [], "", ("kick", "sure")),
     ("Deep house bass", ["bass", "house", "synth"], "", ("bass", "sure")),
     ("K1.wav", [], "Pack/Kicks/K1.wav", ("kick", "sure")),
@@ -104,7 +105,7 @@ def test_infer_is_deterministic():
     import sys
     code = ("from clustersound.online import instruments as inst;"
             "print(inst.infer('Express Yourself', ['arp', 'bass', 'beat', 'clap', 'cymbals', 'dance']),"
-            " inst.infer('SDR-204.wav', ['16bit', 'pcm', 'drumkit', 'drums', 'hertz', 'kick']))")
+            " inst.infer('BD-204.wav', ['16bit', 'pcm', 'snare', 'hertz', 'kick']))")
     root = Path(__file__).parent.parent
     outs = {subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=root,
                            env={**os.environ, "PYTHONHASHSEED": str(seed)}).stdout for seed in (1, 2, 3)}
@@ -283,14 +284,6 @@ def test_store_pack_page_and_download(monkeypatch):
     assert os.path.join("Freesound", "808 Kicks Vol. 1") in downloads.target_path(root, files[0], files[0].download_url)
 
 
-def test_featured_without_key(monkeypatch):
-    monkeypatch.setattr(archive, "search", lambda p, page, s: ([], 0, False))
-    monkeypatch.setattr(openverse, "search", lambda p, page, s: ([], 0, False))
-    home = S.featured({})
-    assert home["freesound_packs"]["needs_key"] and home["archive_packs"]["error"] is None
-    assert home["cc0_new"]["source"] == "openverse"
-
-
 # ---------------------------------------------------------------- catalogue
 def test_catalog():
     from clustersound.online.base import LICENSES
@@ -298,6 +291,8 @@ def test_catalog():
     ids = {p["id"] for p in catalog.PROVIDERS}
     assert {k for k, p in ((p["id"], p) for p in catalog.PROVIDERS) if p["kind"] == "api"} == set(S.SOURCES)
     class_ids = {c.id for c in CLASSES}
+    assert set(catalog.SHOWCASE_CATEGORIES) <= class_ids
+    assert all(set(v) <= class_ids for v in catalog.SHOWCASE_LIMITED.values())
     for c in catalog.curated():
         assert c["provider"] in ids and c["url"].startswith("https://")
         assert LICENSES[c["license"]]["commercial"], c["id"]  # the showcase only lists royalty-free packs

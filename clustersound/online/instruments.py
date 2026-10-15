@@ -53,6 +53,7 @@ _PHRASES = [
     (r"build[\s_-]?up", "buildup"), (r"electric[\s_-]?piano", "epiano"),
     (r"down[\s_-]?sweep", "downsweep"), (r"sub[\s_-]?drop", "downlifter"),
     (r"open[\s_-]?hihat", "open hihat"),
+    (r"(?<![a-z])sdr(?![a-z])", "snare"), (r"(?<![a-z])bdr(?![a-z])", "kick"),  # SDR-204.wav, BDR-01.wav
 ]
 
 # Context that means "not a musical sample" (a football kick, a door hit, …)
@@ -86,6 +87,7 @@ SURE_IN_PACK = 0.6
 CANDIDATE = 0.7
 MARGIN = 0.15
 THRESHOLD = 0.45
+ONE_SHOT_MAX = 1.5  # seconds
 
 
 def _tag_evidence(tags: list[str]) -> tuple[dict[str, float], dict[str, int]]:
@@ -99,12 +101,14 @@ def _tag_evidence(tags: list[str]) -> tuple[dict[str, float], dict[str, int]]:
     return joined, support
 
 
-def infer_label(title: str, tags: list[str] | None = None, path: str = "") -> tuple[str | None, str | None]:
+def infer_label(title: str, tags: list[str] | None = None, path: str = "",
+                duration: float | None = None) -> tuple[str | None, str | None]:
     """Class of a result and how sure it is: (cid, "sure" | "weak"), (None, "mix") or (None, None).
 
     "mix" = several instruments together (a drum loop, a kit); "weak" = only ambiguous words or a
     near tie. Ties are broken by the title, then by how many tags agree, then by taxonomy order:
-    never by tag order (Freesound sorts tags alphabetically).
+    never by tag order (Freesound sorts tags alphabetically). A one-shot is never a mix: a
+    one-shot tagged "kick snare toms" (pack-wide tags) with nothing in its name stays unlabelled.
     """
     tags = [t.lower() for t in (tags or [])]
     if path:
@@ -131,20 +135,30 @@ def infer_label(title: str, tags: list[str] | None = None, path: str = "") -> tu
     # a football kick, a car crash: musical classes need a musical context
     if context & NONMUSIC and not context & MUSIC and _GROUP[best] in _MUSICAL_GROUPS:
         return None, None
-    if _GROUP[best] in ("Drums", "Percussion"):
-        if kit:
-            return None, "mix"
-        # a beat tagged "snare" is still a whole beat, unless its title names the drum ("Kick loop")
-        if (loop or context & _BEAT) and title_scores.get(best, 0.0) < CANDIDATE:
-            return None, "mix"
-    strong = [c for c in ranked if scores[c] >= CANDIDATE]
-    drums = [c for c in strong if _GROUP[c] in ("Drums", "Percussion")]
-    if len(strong) >= 3 or (len(drums) >= 2 and (loop or context & _MIX_CONTEXT or taxonomy.is_loop_name(tags))):
+    one_shot = (duration is not None and duration <= ONE_SHOT_MAX) or bool(context & {"oneshot", "one-shot"}) \
+        or {"one", "shot"} <= context
+    if not one_shot and _is_mix(best, ranked, scores, title_scores, kit, loop, context, tags):
         return None, "mix"
+    close = len(ranked) > 1 and scores[best] - scores[ranked[1]] < MARGIN
+    if close and not title_scores.get(best):
+        return None, None  # only conflicting tags, nothing in the name to choose by
     # inside a pack the parent folder ("Kicks/K1.wav", weight 0.65) is reliable on its own
-    if scores[best] < (SURE_IN_PACK if path else SURE) or (len(ranked) > 1 and scores[best] - scores[ranked[1]] < MARGIN):
+    if scores[best] < (SURE_IN_PACK if path else SURE) or close:
         return best, "weak"
     return best, "sure"
+
+
+def _is_mix(best, ranked, scores, title_scores, kit, loop, context, tags) -> bool:
+    """Several instruments together: a kit, a beat, or many strong classes at once."""
+    if _GROUP[best] in ("Drums", "Percussion"):
+        if kit:
+            return True
+        # a beat tagged "snare" is still a whole beat, unless its title names the drum ("Kick loop")
+        if (loop or context & _BEAT) and title_scores.get(best, 0.0) < CANDIDATE:
+            return True
+    strong = [c for c in ranked if scores[c] >= CANDIDATE]
+    drums = [c for c in strong if _GROUP[c] in ("Drums", "Percussion")]
+    return len(strong) >= 3 or (len(drums) >= 2 and bool(loop or context & _MIX_CONTEXT or taxonomy.is_loop_name(tags)))
 
 
 def infer(title: str, tags: list[str] | None = None, path: str = "") -> str | None:
