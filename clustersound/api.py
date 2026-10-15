@@ -1,9 +1,11 @@
 """Bridge exposed to the web UI through pywebview's js_api."""
+import atexit
 import base64
 import io
 import json
 import mimetypes
 import os
+import shutil
 import threading
 import time
 import urllib.parse
@@ -41,7 +43,7 @@ from .patterns import midi as pat_midi
 from .patterns import model as pat_model
 from .patterns import render as pat_render
 from .patterns import store as pat_store
-from .paths import data_dir, is_inside, open_folder, reveal
+from .paths import data_dir, is_inside, open_folder, reveal, trash
 from .racks import ableton as rack_ableton
 from .racks import dynamics_match
 from .racks import layouts as rack_layouts
@@ -61,6 +63,7 @@ PREVIEW_MAX_SECONDS = 60
 LIBRARY_BROWSE_MAX = 200  # search results shown by "Dalla libreria…"
 FOLDER_HISTORY_MAX = 20  # library folders remembered in the header dropdown
 EXPORT_DIR = os.path.expanduser("~/Music/ClusterSound Patterns")
+LIBRARY_RECORDER_DIR = "ClusterSound Recorder"  # what the Recorder sends to the library goes in here
 AUDIO_TYPES = ("Audio (*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg)",)
 
 
@@ -111,6 +114,10 @@ class Api:
         self._enh_source: sampler_session.SamplerSession | None = None  # what the last job enhanced
         self._enh_cancel = threading.Event()
         self._extr_paths: dict[str, sampler_session.SamplerSession] = {}  # listed extracted file -> its source
+        # new cuts, stems and enhanced files stay here until «Export all» saves them; dropped when the app quits
+        self._work = sampler_extractions.work_dir(str(data_dir()))
+        threading.Thread(target=sampler_extractions.clean_stale, args=(str(data_dir()),), daemon=True).start()
+        atexit.register(self._drop_work)
         i18n.set_language(self._settings().get("language"))
         threading.Thread(target=online_cache.prune, args=(self._cache_mb(),), daemon=True).start()
 
@@ -471,6 +478,10 @@ class Api:
         return self.get_settings()
 
     # ================================================================== sampler
+    def _drop_work(self) -> None:
+        """The results never saved with «Export all» are deleted at the end of the run."""
+        shutil.rmtree(self._work, ignore_errors=True)
+
     def _sampler_state(self) -> dict:
         s = self._sampler
         return {"session": s.describe() if s else None, "max_seconds": self._sampler_max(),
@@ -655,12 +666,13 @@ class Api:
                            float(o.get("fade_in_ms", 1)), float(o.get("fade_out_ms", 10)), bool(o.get("normalize")))
         return _array_data_url(y, s.sr) if y.shape[0] else None
 
-    def sampler_export(self, regions: list, opts: dict | None = None, sid: str | None = None) -> dict:
+    def sampler_export(self, regions: list, opts: dict | None = None, sid: str | None = None, temp: bool = False) -> dict:
+        """Cuts of a track as WAV files: saved into the export folder, or (temp) into the work folder of this run."""
         s = self._session(sid)
         if not s:
             return {"error": i18n.tr("no audio open in the Sampler")}
         o = opts or {}
-        root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
+        root = self._work if temp else (self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR)
         try:
             files = sampler_export.export(s, regions or [], root, self._sampler_max(),
                                           float(o.get("fade_in_ms", 1)), float(o.get("fade_out_ms", 10)),
@@ -668,11 +680,11 @@ class Api:
         except OSError as e:
             return {"error": i18n.tr("write failed ({error})", error=e)}
         paths = [p for p in files if p]
-        in_library = bool(paths) and self._inside_library(os.path.dirname(paths[0]))
+        in_library = not temp and bool(paths) and self._inside_library(os.path.dirname(paths[0]))
         if in_library:
             self._schedule_rescan()
         # files: one per region (None if it was outside the audio), e.g. for the Drum Rack
-        return {"error": None, "paths": paths, "files": files,
+        return {"error": None, "paths": paths, "files": files, "saved": not temp,
                 "folder": os.path.dirname(paths[0]) if paths else root, "in_library": in_library}
 
     # ------------------------------------------------------------------ recorder
@@ -775,9 +787,8 @@ class Api:
             scope, a, b, base = "all", 0.0, s.duration, s.title or i18n.tr("recording")
         if b - a < 0.1:
             return {**self.stems_status(), "error": i18n.tr("region too short")}
-        root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
         home = s.parent or s  # an extracted file's stems go with its source's samples
-        folder = sampler_stems.out_folder(home, scope if home is s else "region", root)
+        folder = sampler_extractions.stem_folder(home, self._work)  # temporary until «Export all»
         with self._stems_lock:
             if self._stems_busy():
                 return {**sampler_stems.status(), "job": dict(self._stems_job), "error": i18n.tr("separation already in progress")}
@@ -892,9 +903,8 @@ class Api:
             scope, a, b, base = "all", 0.0, s.duration, s.title or i18n.tr("recording")
         if b - a < 0.05:
             return self._enh_error(i18n.tr("region too short"))
-        root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
         home = s.parent or s  # an extracted file's result goes with its source's samples
-        dst = enhance_job.out_path(home, scope if home is s else "region", base, root)
+        dst = enhance_job.out_path(home, "region", base, self._work)  # temporary until «Export all»
         with self._enh_lock:
             if self._enh_busy():
                 return {**enhance_models.status(), "job": dict(self._enh_job), "error": i18n.tr("enhancement already in progress")}
@@ -951,7 +961,7 @@ class Api:
         out: dict = {"stems": [], "enhanced": []}
         self._extr_paths = {}
         for src in sources:
-            found = sampler_extractions.scan(src, root)
+            found = sampler_extractions.scan(src, root, self._work)
             for k in out:
                 for it in found[k]:
                     if it["path"] in self._extr_paths:
@@ -987,23 +997,75 @@ class Api:
         return {"error": None, **self._sampler_state()}
 
     def sampler_export_files(self, paths: list) -> dict:
-        """Copy listed extracted files (with their notes) into the export folder of their source. Aligned with paths."""
-        paths = [p for p in paths or [] if p in self._extr_paths]
-        if not paths:
-            return {"error": i18n.tr("file not found")}
+        """Save listed extracted files: the temporary ones move into the export folder (with their notes), the saved
+        ones stay where they are. Aligned with paths (None for a file that isn't listed)."""
         root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
         files: list[str | None] = []
         try:
-            for p in paths:
-                files += sampler_extractions.copy_to([p], sampler_export.folder_for(self._extr_paths[p], root))
+            for p in paths or []:
+                src = self._extr_paths.get(p)
+                if not src or not os.path.isfile(p):
+                    files.append(None)
+                elif is_inside(p, self._work):
+                    dst = sampler_extractions.move_to(p, sampler_extractions.saved_path(p, self._work, root))
+                    self._extr_paths[dst] = self._extr_paths.pop(p)
+                    files.append(dst)
+                else:
+                    files.append(p)
         except OSError as e:
             return {"error": i18n.tr("write failed ({error})", error=e)}
         done = [p for p in files if p]
-        folder = os.path.dirname(done[0]) if done else root
-        in_library = bool(done) and self._inside_library(folder)
+        if not done:
+            return {"error": i18n.tr("file not found")}
+        folder = os.path.dirname(done[0])
+        in_library = self._inside_library(folder)
         if in_library:
             self._schedule_rescan()
         return {"error": None, "paths": done, "files": files, "folder": folder, "in_library": in_library}
+
+    def sampler_delete_extraction(self, path: str) -> dict:
+        """Delete a listed extracted file: a temporary one is removed, a saved one goes to the Trash."""
+        if path not in self._extr_paths or not os.path.isfile(path):
+            return {"error": i18n.tr("file not found")}
+        try:
+            sampler_extractions.remove(path, None if is_inside(path, self._work) else trash)
+        except OSError as e:
+            return {"error": str(e)}
+        self._extr_paths.pop(path, None)
+        return {"error": None}
+
+    def sampler_send_to_library(self, items: list, root: str | None = None) -> dict:
+        """Copy extracted files (items: {path, sid?}) into the library, in ClusterSound Recorder/<source track>/ of
+        one of its folders; with several library folders and no root, answers {choose: [folders]}."""
+        roots = list(self._lib.roots)
+        if not roots:
+            return {"error": i18n.tr("no library open: choose one in the Library tab")}
+        if root not in roots:
+            if len(roots) > 1:
+                return {"error": None, "choose": roots}
+            root = roots[0]
+        sampler_root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
+        groups: dict[str, list[str]] = {}
+        for it in items or []:
+            p = (it or {}).get("path") or ""
+            src = self._extr_paths.get(p)
+            if not src and (is_inside(p, self._work) or is_inside(p, sampler_root)):  # a cut, exported
+                src = self._sessions.get((it or {}).get("sid") or "")
+            if not os.path.isfile(p) or not (src or is_inside(p, self._work) or is_inside(p, sampler_root)):
+                continue
+            title = safe_name(src.title if src else "Recorder")
+            groups.setdefault(title, []).append(p)
+        if not groups:
+            return {"error": i18n.tr("file not found")}
+        base = os.path.join(root, LIBRARY_RECORDER_DIR)
+        files: list[str] = []
+        try:
+            for title, ps in groups.items():
+                files += [f for f in sampler_extractions.copy_to(ps, os.path.join(base, title)) if f]
+        except OSError as e:
+            return {"error": i18n.tr("write failed ({error})", error=e)}
+        self._schedule_rescan()
+        return {"error": None, "files": files, "folder": base}
 
     # ================================================================== patterns
     def patterns_init(self) -> dict:

@@ -69,6 +69,7 @@ def api(tmp_path, monkeypatch):
     a = object.__new__(Api)
     a._sampler = None
     a._sessions, a._sid_next, a._extr_paths = {}, 0, {}
+    a._work = str(tmp_path / "work")
     monkeypatch.setattr(Api, "_settings", lambda self: {"sampler_dir": str(tmp_path / "samples")})
     monkeypatch.setattr(Api, "_inside_library", lambda self, folder: False)
     return a
@@ -89,8 +90,50 @@ def test_api_list_open_export(api, tmp_path, rec):
     # the stem's tab counts as its source: the list doesn't change, nor duplicates
     assert [i["path"] for i in api.sampler_extractions()["stems"]] == [stem]
     exp = api.sampler_export_files([stem, "/etc/passwd"])
-    assert exp["error"] is None and exp["files"] == [os.path.join(sampler_export.folder_for(rec, root), "Take 1 - Drums.wav")]
+    assert exp["error"] is None and exp["files"] == [stem, None]  # already saved: it stays where it is
     assert api.sampler_export_files(["/etc/passwd"])["error"] == "file not found"
+
+
+def test_api_temporary_save_delete(api, tmp_path, rec, monkeypatch):
+    root, work = str(tmp_path / "samples"), api._work
+    api._add_session(rec)
+    tmp_stem = _wav(os.path.join(extractions.stem_folder(rec, work), "Take 1 - Bass.wav"))
+    with open(tmp_stem + ".source.txt", "w") as f:
+        f.write("note")
+    tmp_enh = _wav(os.path.join(sampler_export.folder_for(rec, work), "Take 1 (enhanced).wav"))
+    out = api.sampler_extractions()
+    assert [(i["path"], i["saved"]) for i in out["stems"]] == [(tmp_stem, False)]
+    assert [(i["path"], i["saved"]) for i in out["enhanced"]] == [(tmp_enh, False)]
+    # «Export all»: into the export folder, same layout, with the note
+    exp = api.sampler_export_files([tmp_stem])
+    saved = os.path.join(root, os.path.relpath(tmp_stem, work))
+    assert exp["files"] == [saved] and os.path.isfile(saved + ".source.txt") and not os.path.exists(tmp_stem)
+    assert [(i["path"], i["saved"]) for i in api.sampler_extractions()["stems"]] == [(saved, True)]
+    # delete: a temporary file is removed, a saved one goes to the Trash
+    trashed = []
+    monkeypatch.setattr("clustersound.api.trash", lambda p: (trashed.append(p), os.remove(p)))
+    assert api.sampler_delete_extraction(tmp_enh)["error"] is None and not os.path.exists(tmp_enh) and not trashed
+    assert api.sampler_delete_extraction(saved)["error"] is None and trashed == [saved, saved + ".source.txt"]
+    assert api.sampler_delete_extraction(saved)["error"] == "file not found"
+    api._drop_work()
+    assert not os.path.exists(work)
+
+
+def test_api_send_to_library(api, tmp_path, rec, monkeypatch):
+    api._add_session(rec)
+    lib_a, lib_b = str(tmp_path / "libA"), str(tmp_path / "libB")
+    api._lib = type("L", (), {"roots": []})()
+    monkeypatch.setattr(type(api), "_schedule_rescan", lambda self: None)
+    stem = _wav(os.path.join(extractions.stem_folder(rec, api._work), "Take 1 - Bass.wav"))
+    api.sampler_extractions()
+    assert api.sampler_send_to_library([{"path": stem}])["error"].startswith("no library open")
+    api._lib.roots = [lib_a, lib_b]
+    assert api.sampler_send_to_library([{"path": stem}])["choose"] == [lib_a, lib_b]
+    cut = _wav(os.path.join(sampler_export.folder_for(rec, api._work), "Take 1 - 01.wav"))
+    r = api.sampler_send_to_library([{"path": stem}, {"path": cut, "sid": rec.sid}, {"path": "/etc/passwd"}], lib_b)
+    folder = os.path.join(lib_b, "ClusterSound Recorder", "Take 1")
+    assert r["error"] is None and sorted(r["files"]) == [os.path.join(folder, "Take 1 - 01.wav"), os.path.join(folder, "Take 1 - Bass.wav")]
+    assert os.path.isfile(stem)  # a copy: the temporary file stays temporary
 
 
 def test_api_tabs(api, tmp_path):

@@ -141,6 +141,7 @@ def api(tmp_path, fake, monkeypatch):
     a._stems_cancel = threading.Event()
     a._sampler = None
     a._sessions, a._sid_next, a._extr_paths = {}, 0, {}
+    a._work = str(tmp_path / "work")
     monkeypatch.setattr(Api, "_settings", lambda self: {"sampler_dir": str(tmp_path / "samples")})
     monkeypatch.setattr(Api, "_inside_library", lambda self, folder: False)
     monkeypatch.setattr(stems, "status", lambda: {"installed": True, "model_ready": True})
@@ -163,7 +164,7 @@ def test_api_region_job_and_open(api, tmp_path):
     assert api.stems_start("region", 0.5, 1.5)["error"] is None
     job = api.wait()
     assert job["state"] == "done" and job["scope"] == "region" and len(job["stems"]) == len(stems.STEMS)
-    assert job["stems"][0]["path"].startswith(str(tmp_path / "samples"))
+    assert job["stems"][0]["path"].startswith(str(tmp_path / "work"))  # temporary until «Export all»
     assert api.stems_open(str(tmp_path / "other.wav"))["error"] == "stem not found"
     r = api.stems_open(job["stems"][0]["path"])
     assert r["error"] is None and r["session"]["title"] == "Rec · Drums" and r["session"]["origin"] == "capture"
