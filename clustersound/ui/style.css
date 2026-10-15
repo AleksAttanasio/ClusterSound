@@ -641,7 +641,7 @@ wa-select.pop-field, wa-input.pop-field { display: block; }
 .pt-lock.on { background: var(--wa-color-warning-fill-quiet); border-color: var(--wa-color-warning-border-normal); color: var(--wa-color-warning-on-quiet); }
 .pt-alt { width: 104px; }
 .rk-frame.lock { border-style: dashed; }
-.rk-frame.lock span { display: block; }
+.rk-frame.lock span { display: inline-flex; }
 .rk-load { display: flex; flex-direction: column; gap: 12px; }
 .rk-load-rows { display: flex; flex-direction: column; gap: 4px; max-height: 50vh; overflow-y: auto; }
 .rk-load-row { display: grid; grid-template-columns: 170px 1fr 210px; align-items: center; gap: 10px; padding: 5px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
@@ -652,7 +652,7 @@ wa-select.pop-field, wa-input.pop-field { display: block; }
 .rack-layout .rk-browser { gap: 8px; }
 wa-select.rk-select { max-width: 100%; }
 .rk-bar wa-select.rk-select { width: auto; min-width: 0; }
-.rk-bar #rk-device { width: 150px; }
+.rk-bar #rk-device { width: 185px; }
 .rk-bar wa-button::part(label) { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .rk-browser .links wa-checkbox { color: var(--text-2); }
 .rk-blist { flex: 1; min-height: 120px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
@@ -666,7 +666,7 @@ wa-select.rk-select { max-width: 100%; }
 .rk-trail button { background: var(--bg-3); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; font-size: 11px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rk-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 10px 14px; gap: 10px; }
 .rk-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.rk-bar #rk-geo { width: 125px; }
+.rk-bar #rk-geo { width: 115px; }
 .rk-kit { display: inline-flex; align-items: center; gap: 6px; height: var(--wa-form-control-height, 32px); max-width: 180px; padding: 0 10px; border: 1px solid var(--wa-form-control-border-color); border-radius: var(--wa-form-control-border-radius, 6px);
   background: var(--wa-form-control-background-color); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
 .rk-kit:hover { border-color: var(--line-2); }

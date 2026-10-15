@@ -5,7 +5,7 @@ import { toast, suggestBus, showPopover } from './sendmenu.js';
 import { sendToLive } from './live.js';
 import { NO_ALT, dynControls, wireDynControls, readDynControls } from './pattern.js';
 import { btn, iconBtn, openDialog, FILE_MANAGER } from './kit.js';
-import { settingsLink, setRow, savedFlash } from './settings.js';
+import { setRow, savedFlash } from './settings.js';
 import { svg } from './icons.js';
 import { t } from './i18n.js';
 
@@ -210,8 +210,6 @@ export class DrumRackEditor {
           ${iconBtn('trash-2', t('Clear all the pads'), { id: 'rk-clear', cls: 'rk-ibtn rk-danger' })}
           ${btn(`${t('Send to')} ${svg('chevron-down', 11)}`, { id: 'rk-send' })}
           ${btn(t('Random'), { id: 'rk-random', variant: 'success', icon: 'dices' })}
-          <div class="spacer"></div>
-          ${settingsLink('rack', t('Drum Rack settings'))}
         </div>
         <div class="rk-stage">
           <div id="rk-grid" class="rk-grid"></div>
