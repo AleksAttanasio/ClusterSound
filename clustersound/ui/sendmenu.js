@@ -143,10 +143,10 @@ export function showSendMenu({ x, y, ref, buses, counts = {}, onPick, rack, onOp
 }
 
 // Small floating panel under `anchor` (closes on outside click / Esc); returns it, with .close().
-export function showPopover(anchor, html) {
+export function showPopover(anchor, html, cls = '') {
   document.querySelector('.popover')?.close?.();
   const el = document.createElement('div');
-  el.className = 'popover';
+  el.className = `popover ${cls}`.trim(); // before measuring: the class can change the width
   el.innerHTML = html;
   document.body.appendChild(el);
   const a = anchor.getBoundingClientRect(), r = el.getBoundingClientRect();

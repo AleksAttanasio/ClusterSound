@@ -87,7 +87,7 @@ export class Panel {
       </div>
       <div class="p-actions">
         ${btn(playLabel(playing), { variant: 'brand', 'data-act': 'play', title: t('Play / stop') })}
-        ${btn(t('Send'), { icon: 'send', 'data-act': 'send', 'with-caret': true, title: t('Add the sample to a Sequencer bus or to the Drum Rack') })}
+        ${btn(t('Send to'), { icon: 'arrow-right', 'data-act': 'send', 'with-caret': true, title: t('Add the sample to a Sequencer bus or to the Drum Rack') })}
         ${btn(t('Find similar'), { icon: 'search', 'data-act': 'similar' })}
       </div>
 
@@ -170,8 +170,7 @@ export class Panel {
   _copyMenu(anchor) {
     const cur = this._copyWhat();
     const pop = showPopover(anchor, [['name', t('Sample name')], ['path', t('Absolute path')]].map(([v, l]) =>
-      `<div class="p-copy-opt ${v === cur ? 'on' : ''}" data-v="${v}"><wa-icon name="check"></wa-icon>${l}</div>`).join(''));
-    pop.classList.add('p-copy-pop');
+      `<div class="p-copy-opt ${v === cur ? 'on' : ''}" data-v="${v}"><wa-icon name="check"></wa-icon>${l}</div>`).join(''), 'p-copy-pop');
     pop.onclick = (e) => {
       const o = e.target.closest('[data-v]');
       if (!o) return;

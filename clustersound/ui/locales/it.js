@@ -981,6 +981,7 @@ export default {
   "Select one or more chords on the lane: the rest of the melody stays as it is": "Seleziona uno o più accordi sulla corsia: il resto della melodia resta com'è",
   "Selected region": "Regione selezionata",
   "Send": "Invia",
+  "Send to": "Invia a",
   "Send to Live": "Invia a Live",
   "Send to the Sequencer or the Drum Rack (temporary file)": "Invia al Sequencer o al Drum Rack (file temporaneo)",
   "Send to the Sequencer or the Drum Rack (temporary file, no download)": "Invia al Sequencer o al Drum Rack (file temporaneo, nessun download)",
