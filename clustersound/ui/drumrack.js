@@ -1123,7 +1123,8 @@ export class DrumRackEditor {
 
   async sendRackToLive() {
     if (!this.rack.pads.some(Boolean)) { toast(t('The kit is empty')); return; }
-    await sendToLive(this.api, 'rack', this.rack);
+    // a kit never saved goes to Live as "New Kit", as in the kit picker
+    await sendToLive(this.api, 'rack', this.rack.id ? this.rack : { ...this.rack, name: t('New Kit') });
   }
 
   async exportRack() {
