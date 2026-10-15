@@ -175,6 +175,21 @@ def test_autofill_spd(api):
     assert r["pads"][spdsx.TRIG1]["cls"] == "kick" and r["pads"][spdsx.TRIG2]["cls"] in ("ride", "crash")
 
 
+
+def test_autosample_adds_one_similar_sample(api):
+    r = _rack("spd_kit", {"trig1": True, "trig2": False})
+    g = next(k for k, pads in enumerate(layouts.groups_of(r)) if len(pads) > 1)
+    pads = layouts.groups_of(r)[g]
+    first = api.rack_autosample(r, g)          # empty group: Auto-fill's seed
+    assert first and first["kind"] == "library"
+    r["pads"][pads[0]] = first
+    for _ in range(len(pads) - 1):
+        ref = api.rack_autosample(r, g)
+        used = {x["id"] for x in r["pads"] if x}
+        assert ref and ref["id"] not in used and _sub(ref) == _sub(first)  # same sub-cluster as the seed
+        r["pads"][next(p for p in pads if not r["pads"][p])] = ref
+    assert api.rack_autosample(r, 99) is None
+
 # ---------------------------------------------------------------- export
 def test_export_spdsx(tmp_path):
     rng = np.random.default_rng(3)
