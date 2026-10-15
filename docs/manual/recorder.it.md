@@ -83,8 +83,15 @@ Accanto al titolo:
 
 ## Estrai stem
 
-Separa la traccia mostrata o la sua regione (o, dalla sua riga, un singolo taglio o file migliorato) in **Batteria, Basso, Chitarra, Piano, Voce** (quelli che spunti) più sempre
-**Altro** con il resto, così la somma ridà l'originale. Un WAV 24 bit per stem, apribile nell'editor. Gli stem compaiono nella scheda **Stem**. Gira in
+Separa la traccia mostrata o la sua regione (o, dalla sua riga, un singolo taglio o file migliorato) in **tracce**,
+ognuna un WAV 24 bit con i suoi stem sommati. A sinistra ci sono gli stem (**Batteria, Basso, Chitarra, Piano, Voce,
+Altro**): trascinali nelle colonne a destra, una colonna per traccia. Il nome della colonna segue i suoi stem
+(*Chitarra + Voce*), lo stesso stem può andare in più tracce e la colonna grigia **Nuova traccia** a destra diventa una
+nuova traccia appena ci lasci uno stem. **×** toglie uno stem da una traccia o l'intera traccia. Gli stem che non sono
+in nessuna traccia finiscono comunque in una traccia in più, **Altro** (**Resto** se *Altro* è già usato), così la somma
+ridà l'originale. Se due tracce hanno gli stessi stem, **Estrai** chiede se produrle tutte o solo una per ciascuna. La
+disposizione viene ricordata per la volta dopo; la prima volta c'è una traccia per stem. Le tracce si aprono
+nell'editor e compaiono nella scheda **Stem**. Gira in
 locale con Demucs (extra `stems`, modello da 55 MB scaricato al primo uso). Dettagli: [Demucs](../ai/demucs.md).
 
 ## Migliora

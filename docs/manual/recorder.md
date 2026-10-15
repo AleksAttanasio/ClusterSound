@@ -77,9 +77,15 @@ Next to the title:
 
 ## Extract stems
 
-Separates the shown track or its region (or, from its row, a single cut or enhanced file) into **Drums, Bass, Guitar, Piano, Vocals** (those you tick) plus always
-**Other** with the rest, so the sum gives back the original. One 24-bit WAV per stem, which can be opened in the
-editor. The stems show up in the **Stems** tab. It runs locally with Demucs (`stems` extra, 55 MB model downloaded on first use). Details:
+Separates the shown track or its region (or, from its row, a single cut or enhanced file) into **tracks**, each one a
+24-bit WAV with its stems summed. On the left are the stems (**Drums, Bass, Guitar, Piano, Vocals, Other**): drag them
+into the columns on the right, one column per track. The column name follows its stems (*Guitar + Vocals*), the same
+stem can go into several tracks, and the grey **New Track** column on the right becomes a new track as soon as you drop
+a stem on it. **×** removes a stem from a track or the whole track. The stems that are in no track still get one more
+track, **Other** (**Rest** when *Other* is already used), so the sum gives back the original. If two tracks have the
+same stems, **Extract** asks whether to make them all or only one of each. The layout is remembered for the next
+time; the first time there is one track per stem. The tracks can be opened in the editor and show up in the **Stems**
+tab. It runs locally with Demucs (`stems` extra, 55 MB model downloaded on first use). Details:
 [Demucs](../ai/demucs.md).
 
 ## Enhance
