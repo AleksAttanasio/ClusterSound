@@ -156,6 +156,7 @@ def expand(parent: OnlineResult) -> tuple[list[OnlineResult], list[dict]]:
             duration=dur, preview_url=url, download_url=url, page_url=parent.page_url,
             format=base.rsplit(".", 1)[-1].lower(), filesize=size, path=name, suspect=parent.suspect,
             extra={"pack_title": parent.title})
-        r.instrument = inst.infer(base, [], path=name)
+        cid, state = inst.infer_label(base, [], path=name, duration=dur)
+        r.instrument, r.label_state = cid, state or ""
         out.append(r)
     return out, archives

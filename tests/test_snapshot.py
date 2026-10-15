@@ -92,3 +92,58 @@ def test_snapshot_only_restore(folder):
     lib = Library(Cache(folder / "cache.sqlite"))
     lib.scan(str(folder / "lib"), snapshot_only=True)
     assert from_snapshot(lib) and lib.items and lib.xyz.shape == (len(lib.items), 3)
+
+
+# ---------------------------------------------------------------- several folders
+@pytest.fixture()
+def two_folders(folder):
+    rng = np.random.default_rng(5)
+    other = folder / "more"
+    for i in range(6):
+        p = other / "Snares" / f"Snare_{i:02d}.wav"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        sf.write(p, synth.snare(rng), synth.SR)
+    return folder, [str(folder / "lib"), str(other)]
+
+
+def test_union_of_folders(two_folders, monkeypatch):
+    tmp, roots = two_folders
+    lib = Library(Cache(tmp / "cache.sqlite"))
+    lib.scan(roots)
+    assert lib.progress["phase"] == "done" and lib.roots == sorted(roots)
+    assert len(lib.items) == 24 + 6
+    assert {it["rel"].split("/")[0] for it in lib.items} == {"lib", "more"}
+    assert lib.xyz.shape == (30, 3)
+    # same selection again: from the snapshot of the union
+    monkeypatch.setattr(classifier, "train_head", None)
+    again = Library(Cache(tmp / "cache.sqlite"))
+    again.scan(list(reversed(roots)))
+    assert from_snapshot(again) and len(again.items) == 30
+
+
+def test_deselect_reads_the_cache(two_folders, monkeypatch):
+    from clustersound import library
+    tmp, roots = two_folders
+    lib = Library(Cache(tmp / "cache.sqlite"))
+    lib.scan(roots)
+
+    def boom(path):
+        raise AssertionError(f"re-analysed {path}")
+    monkeypatch.setattr(library, "analyse_file", boom)
+    lib.scan(roots[1:])  # only the second folder: never scanned alone, every file is in the cache
+    assert lib.progress["phase"] == "done" and len(lib.items) == 6 and not lib.errors
+    assert all(not it["rel"].startswith("more/") for it in lib.items)  # one folder: plain relative paths
+
+
+def test_nested_and_missing_roots(folder):
+    from clustersound.library import normalize_roots
+    lib = str(folder / "lib")
+    assert normalize_roots([lib, lib + "/Kick", str(folder / "nope"), lib]) == [lib]
+    assert normalize_roots(lib) == [lib]
+
+
+def test_empty_selection_clears(folder):
+    lib = scan(folder)
+    v = lib.version
+    lib.scan([])
+    assert not lib.items and lib.roots == [] and lib.xyz.shape == (0, 3) and lib.version > v

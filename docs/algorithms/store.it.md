@@ -25,12 +25,24 @@ per file finché non vengono espansi.
 ## Etichettatura per strumento
 
 Le fonti non conoscono le 34 classi: ogni risultato viene etichettato **con lo stesso parser dei nomi della
-libreria** (`instruments.infer`):
+libreria** (`instruments.infer_label`), che restituisce una classe e uno stato: *sicura*, *debole* (mostrata come
+"Classe ?"), *mix* o nessuna:
 
-1. se i tag contengono parole di contesto non musicale (soccer, door, gun…) senza parole musicali, nessuna classe;
-2. frasi riscritte nelle keyword della tassonomia ("bass drum" → kick);
-3. punteggio sul titolo, o sul percorso dentro un pack (con i pesi decrescenti delle cartelle); i tag contano 0,8;
-4. la classe migliore se il punteggio è ≥ 0,45.
+1. frasi riscritte nelle keyword della tassonomia ("bass drum" → kick, "down sweep" → downlifter, "SDR" → snare);
+2. punteggio sul titolo, o sul percorso dentro un pack (con i pesi decrescenti delle cartelle), più i tag a 0,8:
+   le prove si sommano, e ogni tag in più che conferma la stessa classe aggiunge 0,1;
+3. i pareggi si risolvono col titolo, poi col numero di tag concordi, poi con l'ordine della tassonomia — mai con
+   l'ordine dei tag (Freesound li ordina alfabeticamente, quindi "bass, kick" vinceva su "kick, bass");
+4. contesto non musicale (soccer, car, gun…) nel titolo **o** nei tag senza parole musicali: nessuna classe musicale
+   (FX e foley restano ammesse);
+5. **mix**: una classe di batteria con "kit" nel titolo, un beat/loop il cui titolo non nomina il pezzo, o più classi
+   forti insieme. Un one-shot (≤ 1,5 s, o con tag "one shot") non è mai un mix;
+6. quasi pareggio (< 0,15) senza indizi nel nome: nessuna classe (tag di tutto il pack come "kick snare toms" non
+   dicono nulla del singolo file);
+7. *sicura* da 0,7 (0,6 dentro un pack), *debole* da 0,45.
+
+I pack Freesound sono etichettati dal proprio nome, non dal suono che li rappresenta. La home dello Store mostra solo
+risultati *sicuri* della categoria cercata, così il badge corrisponde sempre.
 
 Un risultato è tenuto se la classe è nel filtro, oppure se il server l'ha già trovato per quello strumento e non ha
 contesto non musicale. Il **tipo** viene da nome, tag e durata (one-shot ≤ 2,5 s, loop se ha un BPM nel titolo, …);

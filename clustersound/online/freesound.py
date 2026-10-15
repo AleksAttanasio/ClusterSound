@@ -117,8 +117,10 @@ def parse_pack(d: dict, sample: OnlineResult | None = None) -> OnlineResult:
                "description": d.get("description") or "", "created": d.get("created")})
     if sample is not None:  # the search hit that stands for the pack
         r.license, r.license_url, r.tags = sample.license, sample.license_url, sample.tags
-        r.instrument = sample.instrument
         r.waveform_img, r.preview_url = sample.waveform_img, sample.preview_url
+    # the pack's own name only: one sound's tags say little about a whole pack
+    cid, state = inst.infer_label(r.title, [])
+    r.instrument, r.label_state = cid, state or ""
     return r
 
 

@@ -1,6 +1,6 @@
 // "Store" mode of the Library: browse free samples and packs (Freesound, Openverse, Internet Archive,
 // ccMixter) plus a curated showcase of royalty-free packs from sites without an API.
-// Views: home (provider strip, categories, featured rows) · results (sounds or packs, grid or list)
+// Views: home (sites carousel, one carousel of varied samples per site, curated showcase) · results (sounds or packs, grid or list)
 // · pack page · provider page.
 import { svg } from './icons.js';
 import { FILE_MANAGER } from './kit.js';
@@ -59,7 +59,7 @@ export class Online {
     this.packData = {};           // source -> pack search response
     this.packPage = null;         // open pack page response
     this.provData = null;         // open provider page: {sounds, packs}
-    this.featured = null;
+    this.showcase = {};           // home: source -> carousel of samples, a few per category
     this.queue = null;            // "listen to all" on a pack page: {uids, i}
     player.subscribe((playing, id, ended) => { this._syncPlayButtons(playing, id); if (ended) this._queueNext(id); });
   }
@@ -75,7 +75,7 @@ export class Online {
       this._bind();
       this._renderKeyHint();
       this.render();
-      this._loadFeatured();
+      this._loadShowcase();
       this._pollDownloads();
     })();
     return this._ready;
@@ -354,6 +354,7 @@ export class Online {
     }
     $('#online-results').hidden = !list;
     $('#store-view').hidden = list;
+    $('#online').classList.toggle('store-home', this.view.name === 'home'); // filters only make sense on results
     $('#online-presets-bar').hidden = !(this.view.name === 'home' || results);
     $('#online-group').classList.toggle('tab-hidden', !list);
     this._renderNav();
@@ -429,7 +430,7 @@ export class Online {
     return `<div class="o-row ${child ? 'child' : ''} ${r.suspect ? 'suspect' : ''}" data-uid="${esc(r.uid)}">
       ${r.is_pack && !child ? `<button class="o-btn o-expand" data-expand="${esc(r.uid)}" title="${t('Show the files of the pack')}">${svg(ex ? 'chevron-down' : 'chevron-right')}</button>`
         : `<button class="o-btn o-play" data-play="${esc(r.uid)}" ${playable ? '' : 'disabled'} title="${t('Listen')}">${svg('play', 12)}</button>`}
-      <span class="dot" style="background:${c ? c.color : 'transparent'};${c ? '' : 'box-shadow:0 0 0 1px var(--line-2) inset'}" title="${esc(c ? c.label : t('Instrument not determined'))}"></span>
+      <span class="dot ${r.label_state === 'weak' ? 'weak' : ''}" style="background:${c ? c.color : 'transparent'};${c ? '' : 'box-shadow:0 0 0 1px var(--line-2) inset'}" title="${esc(c ? c.label + (r.label_state === 'weak' ? ' ?' : '') : r.label_state === 'mix' ? t('Several instruments together (a loop, a kit)') : t('Instrument not determined'))}"></span>
       <div class="o-main">
         <div class="o-title" title="${esc(r.title)}">${esc(r.title)} ${packInfo} ${r.suspect ? `<span class="warn" title="${t('Probably a re-uploaded commercial library: check the rights')}">${svg('triangle-alert', 11)} ${t('suspect')}</span>` : ''}</div>
         <div class="o-sub">${sub}${tags ? ` <span class="tags">${tags}</span>` : ''}</div>
@@ -464,6 +465,10 @@ export class Online {
     if (!t) return;
     if (t.tagName === 'A' && (t.dataset.nav || t.dataset.provider || t.dataset.home !== undefined)) e.preventDefault();
     if (t.dataset.play) { this.queue = null; return this.togglePlay(t.dataset.play, t); }
+    if (t.dataset.scroll) {
+      const row = document.getElementById(t.dataset.row);
+      return row?.scrollBy({ left: +t.dataset.scroll * row.clientWidth * 0.8, behavior: 'smooth' });
+    }
     if (t.dataset.dlArchive) return this.download(t.dataset.pack, t.dataset.dlArchive);
     if (t.dataset.home !== undefined) return this._home();
     if (t.dataset.back !== undefined) return this._back();
@@ -565,6 +570,15 @@ export class Online {
       : `<span class="pv-logo pv-${size} pv-mono" style="--pc:${p.color}" title="${esc(p.name)}">${esc(p.name.slice(0, 2))}</span>`;
   }
 
+  /** Category pill: the class, "Class ?" when the label is uncertain, "Mix" for several instruments. */
+  _clsBadge(r) {
+    if (r.label_state === 'mix') return `<span class="sc-cls mix" title="${t('Several instruments together (a loop, a kit)')}">Mix</span>`;
+    const c = r.instrument ? this.byId[r.instrument] : null;
+    if (!c) return '';
+    const weak = r.label_state === 'weak';
+    return `<span class="sc-cls ${weak ? 'weak' : ''}" style="--cc:${c.color}" title="${weak ? esc(t('Uncertain label: guessed from ambiguous words')) : esc(c.label)}"><span class="dot"></span>${esc(c.label)}${weak ? ' ?' : ''}</span>`;
+  }
+
   _cover(r, { icon = null, big = false } = {}) {
     const c = r.instrument ? this.byId[r.instrument] : null;
     const h = hue(r.title + r.author);
@@ -572,19 +586,19 @@ export class Online {
     return `<div class="sc-cover ${big ? 'big' : ''}" style="background:${bg}">
       ${r.waveform_img ? `<img class="sc-wave" src="${esc(r.waveform_img)}" alt="" loading="lazy">` : ''}
       ${icon ? `<span class="sc-icon">${svg(icon, big ? 40 : 26)}</span>` : ''}
+      ${big ? '' : `<span class="sc-tagpos">${this._clsBadge(r)}</span>`}
       ${r.preview_url ? `<button class="sc-play" data-play="${esc(r.uid)}" title="${t('Listen')}">${svg('play', 16)}</button>` : ''}
     </div>`;
   }
 
   _soundCard(r) {
     const meta = [fmtDur(r.duration), r.bpm ? `${Math.round(r.bpm)} BPM` : '', r.key || ''].filter(Boolean).join(' · ');
-    const c = r.instrument ? this.byId[r.instrument] : null;
     return `<div class="sc-card" data-uid="${esc(r.uid)}">
       ${this._cover(r)}
       <div class="sc-body">
         <div class="sc-title" title="${esc(r.title)}">${esc(r.title)}</div>
         <div class="sc-sub">${this._logo(r.source, 's')}<span>${esc(r.author || r.source_label)}</span></div>
-        <div class="sc-meta">${this._licBadge(r)}${c ? `<span class="sc-cls"><span class="dot" style="background:${c.color}"></span>${esc(c.label)}</span>` : ''}<span class="num">${esc(meta)}</span></div>
+        <div class="sc-meta">${this._licBadge(r)}<span class="num">${esc(meta)}</span></div>
         <div class="sc-actions">
           ${r.preview_url || r.download_url ? `<button class="o-btn" data-send="${esc(r.uid)}" title="${t('Send to the Sequencer or the Drum Rack (temporary file)')}">${svg('arrow-right')}</button>` : ''}
           ${r.download_url ? `<button class="o-btn" data-dl="${esc(r.uid)}" title="${t('Download')}${r.download_note ? ' — ' + esc(r.download_note) : ''}">${svg('download')}</button>` : ''}
@@ -633,47 +647,49 @@ export class Online {
   _rowOf(cards, empty = '') { return cards.length ? `<div class="sc-row">${cards.join('')}</div>` : `<div class="o-none">${empty}</div>`; }
 
   // ---------------------------------------------------------------- store: home
-  async _loadFeatured() {
-    this.featured = null;
-    if (this.view.name === 'home') this.render();
-    const f = await this.api.online_featured();
-    this.featured = f;
-    for (const k of Object.keys(f)) {
-      if (f[k].results) f[k].results = f[k].results.filter((r) => r.is_pack || k === 'cc0_new');
+  /** One request per site, so each carousel fills as soon as its site answers. */
+  _loadShowcase() {
+    this.showcase = {};
+    for (const s of this.meta.sources) {
+      this.api.online_showcase(s.id).then((d) => {
+        this.showcase[s.id] = d;
+        const box = document.getElementById(`sh-${s.id}`);
+        if (box && this.view.name === 'home') box.innerHTML = this._showcaseRow(s.id);
+        this._syncPlayButtons(this.player.playing, this.player.id);
+      });
     }
-    if (this.view.name === 'home') this.render();
   }
 
-  _featuredRow(key, card, empty) {
-    const f = this.featured?.[key];
-    if (!f) return `<div class="o-none">${SPIN} ${t('loading…')}</div>`;
-    if (f.needs_key) return `<div class="sc-keycta">${this._logo('freesound', 'm')}<div><b>${t('Unlock the Freesound packs')}</b><br><span class="hint">${t('It needs a free API key: over 600,000 sounds, organised in packs.')}</span></div><wa-button size="s" variant="brand" data-settings="1"><wa-icon slot="start" name="settings"></wa-icon>${t('Enter API key')}</wa-button></div>`;
-    if (f.error) return `<div class="o-none error">${esc(f.error)}</div>`;
-    return this._rowOf(f.results.slice(0, 16).map(card), empty);
+  _showcaseRow(id) {
+    const d = this.showcase[id];
+    if (!d) return `<div class="sc-row">${'<div class="sc-card skel"><div class="sc-cover"></div><div class="sc-body"><i></i><i></i></div></div>'.repeat(6)}</div>`;
+    if (d.needs_key) return `<div class="sc-keycta">${this._logo('freesound', 'm')}<div><b>${t('Unlock the Freesound packs')}</b><br><span class="hint">${t('It needs a free API key: over 600,000 sounds, organised in packs.')}</span></div><wa-button size="s" variant="brand" data-settings="1"><wa-icon slot="start" name="settings"></wa-icon>${t('Enter API key')}</wa-button></div>`;
+    if (d.error) return `<div class="o-none error">${esc(d.error)}</div>`;
+    const cards = d.results.map((r) => (r.is_pack ? this._packCard(r) : this._soundCard(r)));
+    return cards.length ? `<div class="sc-row" id="row-${id}">${cards.join('')}</div>` : `<div class="o-none">${t('No sounds')}</div>`;
+  }
+
+  _arrows(rowId) {
+    return `<span class="shelf-nav"><button data-scroll="-1" data-row="${rowId}" title="${t('Previous')}">${svg('chevron-left', 14)}</button><button data-scroll="1" data-row="${rowId}" title="${t('Next')}">${svg('chevron-right', 14)}</button></span>`;
+  }
+
+  _siteCard(p) {
+    const cats = p.kind === 'api' ? '' : this.meta.curated.filter((c) => c.provider === p.id).length;
+    return `<div class="site-card" data-provider="${p.id}" title="${esc(p.description)}" style="--pc:${p.color}">
+      <div class="site-cover">${this._logo(p.id, 'xl')}</div>
+      <div class="site-name">${esc(p.name)}</div>
+      <div class="site-sub"><span class="pv-kind ${p.kind}">${t(KIND_LABEL[p.kind])}</span>${cats ? `<span>${t('{n} packs', { n: cats })}</span>` : ''}</div>
+    </div>`;
   }
 
   _renderHome() {
-    const providers = this.meta.providers.map((p) => `
-      <div class="pv-card" data-provider="${p.id}" title="${esc(p.description)}">
-        ${this._logo(p.id, 'l')}
-        <div class="pv-name">${esc(p.name)}</div>
-        <div class="pv-kind ${p.kind}">${t(KIND_LABEL[p.kind])}</div>
-      </div>`).join('');
-    const cats = PRESETS.map(([label, ids]) => {
-      const c = this.byId[ids[0]];
-      return `<div class="cat-tile" data-cat='${JSON.stringify(ids)}' style="--cc:${c?.color || '#888'}"><span>${esc(label)}</span></div>`;
-    }).join('');
-    const fsLink = `<a href="#" data-provider="freesound">${t('All →')}</a>`;
-    $('#store-view').innerHTML = `
-      <div class="store-hero">
-        <div><h2>${t('Free samples, ready for the library')}</h2>
-          <div class="hint">${t('Free sources only: public domain, Creative Commons and royalty-free packs. Every download comes with its .license.txt.')}</div></div>
-      </div>
-      ${this._shelf(t('Providers'), `<div class="pv-strip">${providers}</div>`)}
-      ${this._shelf(t('Categories'), `<div class="cat-grid">${cats}</div>`)}
-      ${this._shelf(t('Featured packs on Freesound'), this._featuredRow('freesound_packs', (r) => this._packCard(r), t('No packs')), { link: fsLink })}
-      ${this._shelf(t('Packs from Internet Archive'), this._featuredRow('archive_packs', (r) => this._packCard(r), t('No packs')), { link: `<a href="#" data-provider="archive">${t('All →')}</a>` })}
-      ${this._shelf(t('New CC0 sounds'), this._featuredRow('cc0_new', (r) => this._soundCard(r), t('No sounds')), { note: t('Public domain, no attribution') })}
+    const head = (title, { logo = '', link = '', note = '', rowId = '' } = {}) => `<header class="shelf-head">${logo}<h3>${title}</h3>${note ? `<span class="hint">${note}</span>` : ''}<span class="spacer"></span>${link}${rowId ? this._arrows(rowId) : ''}</header>`;
+    const sites = `<section class="shelf shelf-sites">${head(t('Sites'), { note: t('Free sources only: public domain, Creative Commons and royalty-free packs. Every download comes with its .license.txt.'), rowId: 'row-sites' })}
+      <div class="sc-row site-row" id="row-sites">${this.meta.providers.map((p) => this._siteCard(p)).join('')}</div></section>`;
+    const perSite = this.meta.sources.map((s) => `<section class="shelf">
+      ${head(esc(this.prov[s.id]?.name || s.label), { logo: this._logo(s.id, 'm'), note: t('Examples by category'), link: `<a href="#" data-provider="${s.id}">${t('See all')}</a>`, rowId: `row-${s.id}` })}
+      <div id="sh-${s.id}">${this._showcaseRow(s.id)}</div></section>`).join('');
+    $('#store-view').innerHTML = `${sites}${perSite}
       ${this._shelf(t('Free showcase'), `<div class="sc-grid">${this.meta.curated.map((c) => this._curatedCard(c)).join('')}</div>`,
     { note: t('royalty-free packs from sites without an API: they are downloaded from the official page') })}`;
   }

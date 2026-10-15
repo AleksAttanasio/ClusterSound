@@ -786,30 +786,47 @@ export class DrumRackEditor {
     };
   }
 
-  // label of the target of "Send → Drum Rack"
-  async sendTarget() {
+  // ---------------------------------------------------------------- Library / Online "Send" menu
+  // The menu works on one group (default: the one of the selected pad) and can switch to the others.
+  groupLabel(g) { return `${t('Group {n}', { n: g + 1 })} · ${this.famById[this.settings(g).family].label}`; }
+
+  async groupList() {
     await this.ensure();
-    const g = this.groupOf(this.pad);
-    return `${t('Group {n}', { n: g + 1 })} · ${this.famById[this.settings(g).family].label}`;
+    return this.groups.map((pads, g) => ({ g, label: this.groupLabel(g), count: pads.filter((p) => this.rack.pads[p]).length }));
   }
 
-  // From the Library / Online "Send" menu: the sample alone on a pad, or with its similars on the group.
-  async addSample(ref, { similar = false } = {}) {
+  get currentGroup() { return this.groupOf(this.pad); }
+
+  groupSamples(g = this.currentGroup) {
+    return this.groups[g].filter((p) => this.rack.pads[p]).map((p) => ({ pad: p, padName: this.padName(p), ref: this.rack.pads[p] }));
+  }
+
+  // n library samples similar to the group's seed (the last one added there, else its last library sample)
+  // that are not in the kit yet nor in `skip`
+  async suggestForGroup(g = this.currentGroup, n = 3, skip = []) {
+    const lib = this.groupSamples(g).map((x) => x.ref).filter((r) => r.kind === 'library');
+    if (!lib.length) return [];
+    const seed = lib.find((r) => this.seed && refKey(r) === refKey(this.seed)) || lib[lib.length - 1];
+    const used = new Set([...this.rack.pads.filter((r) => r?.kind === 'library').map((r) => r.id), ...skip]);
+    const cands = await this.api.rack_candidates(seed.id, Math.min(60, n + used.size + 4), this._apiOpts(false, g));
+    return cands.filter((c) => !used.has(c.id)).slice(0, n);
+  }
+
+  // The sample on group g: the selected pad if free and in the group, else the first free pad of the group;
+  // group full: the selected pad (or the group's first) is replaced. Returns the pad.
+  async addSample(ref, { group = this.currentGroup } = {}) {
     await this.ensure();
-    if (similar && ref.kind === 'library') { await this.sendSeed(ref); return; }
-    const g = this.groupOf(this.pad);
-    const pads = this.rack.pads;
-    // selected pad if free, else the first free pad of its group, else of the kit; kit full: the selected pad
-    const firstFree = this.isSpd ? this.groups.flat().find((q) => !pads[q]) ?? -1 : pads.findIndex((r) => !r);
-    let p = !pads[this.pad] ? this.pad : this.groups[g].find((q) => !pads[q]) ?? firstFree;
-    if (p < 0) p = this.pad;
+    const pads = this.rack.pads, gp = this.groups[group];
+    const sel = gp.includes(this.pad) ? this.pad : gp[0];
+    const p = !pads[sel] ? sel : gp.find((q) => !pads[q]) ?? sel;
     const replaced = !!pads[p];
     pads[p] = ref;
     this.pad = p;
     this.seed = ref;
     this._persist();
     if (!$('#rack').hidden) this.renderAll();
-    toast(`Drum Rack · pad ${this.padName(p)} (${t('group {n}', { n: this.groupOf(p) + 1 })})${replaced ? `, ${t('kit full: replaced')}` : ''}: ${ref.name}`);
+    if (replaced) toast(`Drum Rack · pad ${this.padName(p)}: ${t('group full: replaced')} · ${ref.name}`);
+    return p;
   }
 
   // From the Recorder: several samples at once on the free pads, from the selected pad on: in note order on
