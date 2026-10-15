@@ -140,6 +140,7 @@ def api(tmp_path, fake, monkeypatch):
     a._stems_source = None
     a._stems_cancel = threading.Event()
     a._sampler = None
+    a._sessions, a._sid_next, a._extr_paths = {}, 0, {}
     monkeypatch.setattr(Api, "_settings", lambda self: {"sampler_dir": str(tmp_path / "samples")})
     monkeypatch.setattr(Api, "_inside_library", lambda self, folder: False)
     monkeypatch.setattr(stems, "status", lambda: {"installed": True, "model_ready": True})

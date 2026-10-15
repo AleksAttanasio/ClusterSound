@@ -98,7 +98,9 @@ class Api:
         self._chords: ChordLibrary | None = None
         self._midi_recorder = chord_midi_in.Recorder()  # Compose: melody from a MIDI keyboard
         self._live = live_server.Bridge(self._live_stage(), self._resolve, self._describe, self._title)
-        self._sampler: sampler_session.SamplerSession | None = None
+        self._sampler: sampler_session.SamplerSession | None = None  # the track shown in the Recorder
+        self._sessions: dict[str, sampler_session.SamplerSession] = {}  # every open track (tab), by sid
+        self._sid_next = 0
         self._recorder = sampler_recorder.Recorder()
         self._stems_lock = threading.Lock()
         self._stems_job: dict = {"state": "idle", "progress": 0.0, "scope": None, "stems": [], "error": None}
@@ -108,9 +110,7 @@ class Api:
         self._enh_job: dict = {"state": "idle", "progress": 0.0, "model": None, "result": None, "error": None}
         self._enh_source: sampler_session.SamplerSession | None = None  # what the last job enhanced
         self._enh_cancel = threading.Event()
-        self._extr_parent: sampler_session.SamplerSession | None = None  # the source whose extractions are listed
-        self._extr_child: sampler_session.SamplerSession | None = None   # one of them, open in the editor
-        self._extr_paths: set[str] = set()
+        self._extr_paths: dict[str, sampler_session.SamplerSession] = {}  # listed extracted file -> its source
         i18n.set_language(self._settings().get("language"))
         threading.Thread(target=online_cache.prune, args=(self._cache_mb(),), daemon=True).start()
 
@@ -473,7 +473,44 @@ class Api:
     # ================================================================== sampler
     def _sampler_state(self) -> dict:
         s = self._sampler
-        return {"session": s.describe() if s else None, "max_seconds": self._sampler_max()}
+        return {"session": s.describe() if s else None, "max_seconds": self._sampler_max(),
+                "tabs": [{"sid": t.sid, "title": t.title, "path": t.path, "origin": t.origin} for t in self._sessions.values()]}
+
+    def _session(self, sid: str | None = None):
+        """An open track by its tab (the shown one without sid)."""
+        return self._sessions.get(sid) if sid else self._sampler
+
+    def _add_session(self, s: sampler_session.SamplerSession) -> None:
+        """A new tab, shown at once."""
+        self._sid_next += 1
+        s.sid = f"t{self._sid_next}"
+        self._sessions[s.sid] = s
+        self._sampler = s
+
+    def _open_tab(self, path: str):
+        """The tab that already shows the file at path, if any."""
+        real = os.path.realpath(path)
+        return next((t for t in self._sessions.values() if t.path and os.path.realpath(t.path) == real), None)
+
+    def sampler_select(self, sid: str) -> dict:
+        """Show another open track."""
+        s = self._sessions.get(sid)
+        if not s:
+            return {"error": i18n.tr("file not found"), **self._sampler_state()}
+        self._sampler = s
+        return {"error": None, **self._sampler_state()}
+
+    def sampler_close(self, sid: str) -> dict:
+        """Close a track; the one before it (or the next one) is shown if it was the shown one."""
+        order = list(self._sessions)
+        if sid not in self._sessions:
+            return {"error": None, **self._sampler_state()}
+        closing = self._sessions.pop(sid)
+        if self._sampler is closing:
+            rest = list(self._sessions)
+            i = order.index(sid)
+            self._sampler = self._sessions[rest[max(0, i - 1)]] if rest else None
+        return {"error": None, **self._sampler_state()}
 
     def sampler_init(self) -> dict:
         return {**self._sampler_state(), "supported": sampler_links.SUPPORTED,
@@ -485,10 +522,16 @@ class Api:
                 "settings": self.get_settings()}
 
     def _sampler_open(self, path: str, **kw) -> dict:
+        """Open a file in a new tab (or show the tab that already has it)."""
+        s = self._open_tab(path)
+        if s:
+            self._sampler = s
+            return {"error": None, "existing": True, **self._sampler_state()}
         try:
-            self._sampler = sampler_session.load_file(path, **kw)
+            s = sampler_session.load_file(path, **kw)
         except Exception as e:
             return {"error": i18n.tr("cannot read the audio file ({error})", error=e)}
+        self._add_session(s)
         return {"error": None, **self._sampler_state()}
 
     def sampler_open_file(self, path: str | None = None) -> dict:
@@ -602,22 +645,24 @@ class Api:
         return slicing.auto_slices(self._sampler, float(sensitivity), self._sampler_max(), float(start),
                                    None if end is None else float(end))
 
-    def sampler_audio(self, start: float, end: float, opts: dict | None = None) -> str | None:
-        """A region as it would be exported (fades, normalisation), for listening."""
-        if not self._sampler:
+    def sampler_audio(self, start: float, end: float, opts: dict | None = None, sid: str | None = None) -> str | None:
+        """A region (of the shown track, or of the tab sid) as it would be exported (fades, normalisation), for listening."""
+        s = self._session(sid)
+        if not s:
             return None
         o = opts or {}
-        y = slicing.render(self._sampler, float(start), float(end), PREVIEW_MAX_SECONDS,
+        y = slicing.render(s, float(start), float(end), PREVIEW_MAX_SECONDS,
                            float(o.get("fade_in_ms", 1)), float(o.get("fade_out_ms", 10)), bool(o.get("normalize")))
-        return _array_data_url(y, self._sampler.sr) if y.shape[0] else None
+        return _array_data_url(y, s.sr) if y.shape[0] else None
 
-    def sampler_export(self, regions: list, opts: dict | None = None) -> dict:
-        if not self._sampler:
+    def sampler_export(self, regions: list, opts: dict | None = None, sid: str | None = None) -> dict:
+        s = self._session(sid)
+        if not s:
             return {"error": i18n.tr("no audio open in the Sampler")}
         o = opts or {}
         root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
         try:
-            files = sampler_export.export(self._sampler, regions or [], root, self._sampler_max(),
+            files = sampler_export.export(s, regions or [], root, self._sampler_max(),
                                           float(o.get("fade_in_ms", 1)), float(o.get("fade_out_ms", 10)),
                                           bool(o.get("normalize")))
         except OSError as e:
@@ -700,10 +745,16 @@ class Api:
         return {**self.stems_status(), "error": None}
 
     def stems_start(self, scope: str = "all", start: float | None = None, end: float | None = None,
-                    keys: list | None = None) -> dict:
-        """Separate the open audio (scope "all") or one region of it ("region") in the background,
-        into the chosen stems (all when keys is None) plus "other" with the rest."""
-        s = self._sampler
+                    keys: list | None = None, sid: str | None = None, path: str | None = None) -> dict:
+        """Separate the shown track (or the tab sid) in the background, all of it (scope "all") or one region
+        ("region"), into the chosen stems (all when keys is None) plus "other" with the rest. With path: one listed
+        extracted file (e.g. an enhanced one), whose stems go with its source's samples."""
+        s = self._session(sid)
+        if path:
+            s = self._extraction_session(path)
+            if isinstance(s, str):
+                return {**self.stems_status(), "error": s}
+            scope = "all"
         try:
             keys = sampler_stems.chosen(None if keys is None else [str(k) for k in keys])
         except ValueError as e:
@@ -725,7 +776,8 @@ class Api:
         if b - a < 0.1:
             return {**self.stems_status(), "error": i18n.tr("region too short")}
         root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
-        folder = sampler_stems.out_folder(s, scope, root)
+        home = s.parent or s  # an extracted file's stems go with its source's samples
+        folder = sampler_stems.out_folder(home, scope if home is s else "region", root)
         with self._stems_lock:
             if self._stems_busy():
                 return {**sampler_stems.status(), "job": dict(self._stems_job), "error": i18n.tr("separation already in progress")}
@@ -769,7 +821,8 @@ class Api:
             return {"error": i18n.tr("cannot read the audio file ({error})", error=e)}
         s.title = f"{src.title} · {stem['label']}"
         s.meta = dict(src.meta)
-        self._sampler = s
+        s.parent = src
+        self._add_session(s)
         return {"error": None, **self._sampler_state()}
 
     # ------------------------------------------------------------------ enhance ("Enhance")
@@ -810,15 +863,16 @@ class Api:
         return {**self.enhance_status(), "error": None}
 
     def enhance_start(self, scope: str = "region", start: float | None = None, end: float | None = None,
-                      model: str | None = None, path: str | None = None) -> dict:
+                      model: str | None = None, path: str | None = None, sid: str | None = None) -> dict:
         """Enhance one region of the open audio ("region") or all of it ("all") in a background child process;
-        the result is a new WAV next to the samples, the source stays as it is. With path: one extracted file
-        (a stem) of the listed source, whose result goes with that source's samples."""
-        s = self._sampler
+        the result is a new WAV next to the samples, the source stays as it is. sid: another open tab than the shown
+        one. With path: one listed extracted file (a stem), whose result goes with its source's samples."""
+        s = self._session(sid)
         if path:
             s = self._extraction_session(path)
             if isinstance(s, str):
                 return self._enh_error(s)
+            scope = "all"
         try:
             m = enhance_models.get(model)
         except ValueError as e:
@@ -839,11 +893,8 @@ class Api:
         if b - a < 0.05:
             return self._enh_error(i18n.tr("region too short"))
         root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
-        if path:  # next to the listed source's samples, named after the file
-            scope, base = "file", os.path.splitext(os.path.basename(path))[0]
-            dst = enhance_job.out_path(self._extr_parent, "region", base, root)
-        else:
-            dst = enhance_job.out_path(s, scope, base, root)
+        home = s.parent or s  # an extracted file's result goes with its source's samples
+        dst = enhance_job.out_path(home, scope if home is s else "region", base, root)
         with self._enh_lock:
             if self._enh_busy():
                 return {**enhance_models.status(), "job": dict(self._enh_job), "error": i18n.tr("enhancement already in progress")}
@@ -887,28 +938,32 @@ class Api:
             return {"error": i18n.tr("cannot read the audio file ({error})", error=e)}
         s.title = f"{src.title} · {i18n.tr('enhanced')}"
         s.meta = dict(src.meta)
-        self._sampler = s
+        s.parent = src
+        self._add_session(s)
         return {"error": None, **self._sampler_state()}
 
     # ------------------------------------------------------------------ extractions (stems, enhanced files on disk)
     def sampler_extractions(self) -> dict:
-        """The stems and enhanced files already made from the open source, found on disk. While one of them is
-        open in the editor, the list stays the one of its source."""
-        if self._sampler is not None and self._sampler is not self._extr_child:
-            self._extr_parent, self._extr_child = self._sampler, None
-        s = self._extr_parent
-        if not s:
-            return {"error": None, "stems": [], "enhanced": []}
-        out = sampler_extractions.scan(s, self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR)
-        self._extr_paths = {it["path"] for it in out["stems"] + out["enhanced"]}
-        return {"error": None, "title": s.title, **out}
+        """The stems and enhanced files already made from every open track, found on disk; each item says its
+        source (sid, title). An extracted file open in its own tab counts as its source."""
+        root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
+        sources = list({id(h): h for h in ((t.parent or t) for t in self._sessions.values())}.values())
+        out: dict = {"stems": [], "enhanced": []}
+        self._extr_paths = {}
+        for src in sources:
+            found = sampler_extractions.scan(src, root)
+            for k in out:
+                for it in found[k]:
+                    if it["path"] in self._extr_paths:
+                        continue
+                    self._extr_paths[it["path"]] = src
+                    out[k].append({**it, "sid": src.sid, "source": src.title})
+        return {"error": None, **out}
 
     def _extraction_session(self, path: str):
         """A listed extracted file as a session with its source's origin, licence and provenance (or an error)."""
-        src = self._extr_parent
-        if not src or path not in self._extr_paths:
-            return i18n.tr("file not found")
-        if not os.path.isfile(path):
+        src = self._extr_paths.get(path)
+        if not src or not os.path.isfile(path):
             return i18n.tr("file not found")
         try:
             s = sampler_session.load_file(path, origin=src.origin, result=src.result)
@@ -916,29 +971,35 @@ class Api:
             return i18n.tr("cannot read the audio file ({error})", error=e)
         s.title = os.path.splitext(os.path.basename(path))[0]
         s.meta = dict(src.meta)
+        s.parent = src
         return s
 
     def sampler_open_extraction(self, path: str) -> dict:
-        """An extracted file into the editor; the Stems / Enhanced lists keep showing its source."""
+        """An extracted file in its own tab (or the tab that already has it)."""
+        s = self._open_tab(path) if path in self._extr_paths else None
+        if s:
+            self._sampler = s
+            return {"error": None, "existing": True, **self._sampler_state()}
         s = self._extraction_session(path)
         if isinstance(s, str):
             return {"error": s}
-        self._sampler = self._extr_child = s
-        return {"error": None, "extraction": True, **self._sampler_state()}
+        self._add_session(s)
+        return {"error": None, **self._sampler_state()}
 
     def sampler_export_files(self, paths: list) -> dict:
-        """Copy listed extracted files (with their notes) into the export folder of their source."""
-        src = self._extr_parent
+        """Copy listed extracted files (with their notes) into the export folder of their source. Aligned with paths."""
         paths = [p for p in paths or [] if p in self._extr_paths]
-        if not src or not paths:
+        if not paths:
             return {"error": i18n.tr("file not found")}
         root = self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR
-        folder = sampler_export.folder_for(src, root)
+        files: list[str | None] = []
         try:
-            files = sampler_extractions.copy_to(paths, folder)
+            for p in paths:
+                files += sampler_extractions.copy_to([p], sampler_export.folder_for(self._extr_paths[p], root))
         except OSError as e:
             return {"error": i18n.tr("write failed ({error})", error=e)}
         done = [p for p in files if p]
+        folder = os.path.dirname(done[0]) if done else root
         in_library = bool(done) and self._inside_library(folder)
         if in_library:
             self._schedule_rescan()
@@ -1568,10 +1629,10 @@ class Api:
         live_server.save_current_kit(p)
 
     def sampler_send_to_live(self, start: float | None = None, end: float | None = None, opts: dict | None = None,
-                             path: str | None = None) -> dict:
-        """The audio open in the Recorder (or one region of it, or one of its extracted files) onto a new audio
-        track in Live, via the device."""
-        s = self._sampler
+                             path: str | None = None, sid: str | None = None) -> dict:
+        """A track open in the Recorder (the shown one, or the tab sid; all of it or one region), or one of the
+        listed extracted files, onto a new audio track in Live, via the device."""
+        s = self._session(sid)
         if path:
             s = self._extraction_session(path)
             if isinstance(s, str):

@@ -68,8 +68,7 @@ def api(tmp_path, monkeypatch):
     from clustersound.api import Api
     a = object.__new__(Api)
     a._sampler = None
-    a._extr_parent = a._extr_child = None
-    a._extr_paths = set()
+    a._sessions, a._sid_next, a._extr_paths = {}, 0, {}
     monkeypatch.setattr(Api, "_settings", lambda self: {"sampler_dir": str(tmp_path / "samples")})
     monkeypatch.setattr(Api, "_inside_library", lambda self, folder: False)
     return a
@@ -79,15 +78,31 @@ def test_api_list_open_export(api, tmp_path, rec):
     assert api.sampler_extractions()["stems"] == []
     root = str(tmp_path / "samples")
     stem = _wav(os.path.join(stems.out_folder(rec, "all", root), "Take 1 - Drums.wav"))
-    api._sampler = rec
+    api._add_session(rec)
     out = api.sampler_extractions()
-    assert [i["path"] for i in out["stems"]] == [stem] and out["title"] == "Take 1"
+    assert [(i["path"], i["sid"], i["source"]) for i in out["stems"]] == [(stem, rec.sid, "Take 1")]
     assert api.sampler_open_extraction(str(tmp_path / "other.wav"))["error"] == "file not found"
     r = api.sampler_open_extraction(stem)
-    assert r["error"] is None and r["extraction"] and r["session"]["origin"] == "capture"
-    assert api._sampler.meta["device"] == "Cuffie"
-    # while a stem is open the list is still the recording's
+    assert r["error"] is None and r["session"]["origin"] == "capture" and r["session"]["parent"] == rec.sid
+    assert len(r["tabs"]) == 2 and api._sampler.meta["device"] == "Cuffie"
+    assert api.sampler_open_extraction(stem)["existing"] and len(api._sessions) == 2  # same tab again
+    # the stem's tab counts as its source: the list doesn't change, nor duplicates
     assert [i["path"] for i in api.sampler_extractions()["stems"]] == [stem]
     exp = api.sampler_export_files([stem, "/etc/passwd"])
     assert exp["error"] is None and exp["files"] == [os.path.join(sampler_export.folder_for(rec, root), "Take 1 - Drums.wav")]
     assert api.sampler_export_files(["/etc/passwd"])["error"] == "file not found"
+
+
+def test_api_tabs(api, tmp_path):
+    a = _wav(str(tmp_path / "a.wav"))
+    b = _wav(str(tmp_path / "b.wav"), 1.0)
+    ra = api.sampler_open_file(a)
+    rb = api.sampler_open_file(b)
+    assert [t["title"] for t in rb["tabs"]] == ["a", "b"] and rb["session"]["title"] == "b"
+    sa, sb = ra["session"]["sid"], rb["session"]["sid"]
+    assert api.sampler_open_file(a)["session"]["sid"] == sa  # already open: its tab is shown
+    assert api.sampler_audio(0, 0.5, None, sb) and api._sampler.sid == sa  # another tab, without showing it
+    assert api.sampler_select(sb)["session"]["sid"] == sb
+    r = api.sampler_close(sb)
+    assert r["session"]["sid"] == sa and [t["sid"] for t in r["tabs"]] == [sa]
+    assert api.sampler_close(sa)["session"] is None

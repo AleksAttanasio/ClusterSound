@@ -168,6 +168,7 @@ def api(tmp_path, monkeypatch):
     a._enh_source = None
     a._enh_cancel = threading.Event()
     a._sampler = None
+    a._sessions, a._sid_next, a._extr_paths = {}, 0, {}
     monkeypatch.setattr(Api, "_settings", lambda self: {"sampler_dir": str(tmp_path / "samples")})
     monkeypatch.setattr(Api, "_inside_library", lambda self, folder: False)
 
