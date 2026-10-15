@@ -3,7 +3,7 @@ import struct
 
 import pytest
 
-from clustersound.chords import export, harmony, perform, theory, variations
+from clustersound.chords import builtin, export, harmony, perform, theory, variations
 from clustersound.chords.library import DEFAULT_DIR, ChordLibrary
 from clustersound.patterns.midi import _track, read_note_spans, read_notes
 
@@ -269,3 +269,22 @@ def test_real_pack():
         d = lib.chords_for_key(tonic, "major")
         assert d["chords"] and d["progressions"]
         assert any(c["degree"] == "I" for c in d["chords"])
+
+
+def test_builtin_pack(tmp_path):
+    lib = ChordLibrary(builtin.generate(str(tmp_path / "pack")))
+    keys = lib.available_keys()
+    assert len(keys) == 24
+    files = lib.scan()
+    for k in keys:
+        cats = {f["category"] for f in files if f["key"] == {"tonic": k["tonic"], "mode": k["mode"]}}
+        assert cats == {"triad", "extended", "borrowed", "progression"}
+    progs = [f for f in files if f["category"] == "progression" and not f["stem"].startswith("All Triads")]
+    assert progs and all(f["tokens"] and len(f["tokens"]) == len(f["segments"]) for f in progs)
+    assert lib.bigrams("major") and lib.bigrams("minor")
+    by_name = {c["name"]: c for c in lib.chords_for_key(0, "major")["chords"]}
+    assert by_name["G7"]["quality"] == "dom" and by_name["G7"]["degree"] == "V7"
+    assert by_name["B dim"]["degree"] == "vii°"
+    assert {"Ab Maj", "Bb Maj", "F min"} <= set(by_name)  # borrowed, spelled with flats
+    by_name = {c["name"]: c for c in lib.chords_for_key(9, "minor")["chords"]}
+    assert by_name["E7"]["degree"] == "V7" and by_name["A min"]["degree"] == "i"
