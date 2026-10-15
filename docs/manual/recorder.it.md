@@ -51,22 +51,34 @@ Tutto ciò che è stato estratto da **tutte le tracce aperte**, in tre schede co
 tracce le righe sono raggruppate sotto il suo nome (clic per mostrare quella traccia):
 
 - **✂ Tagli**: le regioni, tagliate a mano o sui transienti.
-- **Stem**: gli stem già estratti dalle tracce aperte, ritrovati sul disco quando si aprono.
+- **Stem**: gli stem delle tracce aperte, ritrovati sul disco quando si aprono. Gli stem dello stesso audio
+  separato (una traccia, un taglio, un file migliorato) sono raggruppati: clic su un gruppo per aprirlo o chiuderlo,
+  la sua spunta li spunta tutti.
 - **✨ Migliorati**: i file migliorati ricavati dalle tracce, dai loro tagli o dai loro stem.
 
 Ogni riga ha tasti solo icona: ascolta, mostra la forma d'onda (un taglio viene ingrandito; uno stem o un file
 migliorato si apre in una nuova scheda), **Estrai stem** (tagli e file migliorati), ✨ Migliora (tagli e stem) e
-**Invia**, lo stesso menu della libreria (un bus del Sequencer o un gruppo del Drum Rack).
+**Invia**, lo stesso menu della libreria (un bus del Sequencer o un gruppo del Drum Rack). Stem e file migliorati
+hanno anche mostra nel Finder e 🗑 **elimina**: un file temporaneo viene eliminato, uno salvato va nel Cestino dopo
+una conferma.
+
+!!! info "Temporanei finché non li salvi"
+    Tagli, stem e file migliorati nuovi sono **temporanei**: restano in una cartella di lavoro di ClusterSound
+    finché è aperto, e vengono eliminati alla chiusura (○ accanto alla durata). **Esporta tutto** li salva (✓).
+    Anche i tagli mandati al Drum Rack o al Sequencer senza salvarli restano temporanei: dopo un riavvio quei pad
+    sono vuoti.
 
 Accanto al titolo:
 
 - **Svuota tutto** svuota la scheda, dopo una conferma (stem e file migliorati restano sul disco).
 - **Invia a**: le righe spuntate ad **Ableton Live** (una nuova traccia audio ciascuna; senza tagli spuntati,
   tutta la traccia mostrata), al **Drum Rack** (sui pad liberi da quello selezionato) o al **Sequencer** (nuovi layer del bus
-  scelto). Live richiede il device ClusterSound con *Ricevi* attivo.
-- **Esporta tutto**: le righe spuntate nella **cartella di esportazione** (Impostazioni › Recorder, di base
+  scelto), oppure alla **Libreria**: una copia in `ClusterSound Recorder/<traccia>/` della cartella della libreria
+  (chiesta se la libreria è fatta di più cartelle), analizzata come gli altri sample. Live richiede il device
+  ClusterSound con *Ricevi* attivo.
+- **Esporta tutto** salva le righe spuntate nella **cartella di esportazione** (Impostazioni › Recorder, di base
   `~/Music/ClusterSound Samples/`). I tagli diventano WAV 24 bit con fade (1 ms in, 10 ms out) e normalizzazione
-  opzionale, massimo 30 s ciascuno; stem e file migliorati vengono copiati con la loro nota di provenienza.
+  opzionale, massimo 30 s ciascuno; stem e file migliorati ci vengono spostati con la loro nota di provenienza.
 
 ## Estrai stem
 

@@ -1320,5 +1320,19 @@ export default {
   "Nothing enhanced from the open tracks yet: use «Enhance» on a track, on a cut or on a stem.": "Ancora niente di migliorato dalle tracce aperte: usa «Migliora» su una traccia, su un taglio o su uno stem.",
   "Open its waveform in a new tab": "Apri la sua forma d’onda in una nuova scheda",
   "Remove all the {n} cuts of the open tracks?": "Rimuovere tutti i {n} tagli delle tracce aperte?",
-  "All the shown track, on a new audio track": "Tutta la traccia mostrata, su una nuova traccia audio"
+  "All the shown track, on a new audio track": "Tutta la traccia mostrata, su una nuova traccia audio",
+  "Saves the ticked rows in the export folder: new cuts, stems and enhanced files are temporary until then, and are deleted when ClusterSound closes": "Salva le righe spuntate nella cartella di esportazione: fino ad allora tagli, stem e file migliorati nuovi sono temporanei, e vengono eliminati alla chiusura di ClusterSound",
+  "Saved in the export folder": "Salvato nella cartella di esportazione",
+  "Temporary: «Export all» saves it, otherwise it is deleted when ClusterSound closes": "Temporaneo: «Esporta tutto» lo salva, altrimenti viene eliminato alla chiusura di ClusterSound",
+  "Move to the Trash": "Sposta nel Cestino",
+  "Copied into «{dir}», a folder per track": "Copiati in «{dir}», una cartella per traccia",
+  "1 sample saved": "1 sample salvato",
+  "{n} samples saved": "{n} sample salvati",
+  "Move «{name}» to the Trash? It is saved in the export folder.": "Spostare «{name}» nel Cestino? È salvato nella cartella di esportazione.",
+  "Moved to the Trash": "Spostato nel Cestino",
+  "Deleted": "Eliminato",
+  "1 sample copied to the library": "1 sample copiato nella libreria",
+  "{n} samples copied to the library": "{n} sample copiati nella libreria",
+  "Send to the library": "Invia alla libreria",
+  "The library is made of several folders: in which one should the «{dir}» folder go?": "La libreria è fatta di più cartelle: in quale va la cartella «{dir}»?"
 };

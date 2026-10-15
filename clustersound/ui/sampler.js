@@ -49,6 +49,7 @@ export class SamplerEditor {
     this.sampDir = '';
     this.ext = { stems: [], enhanced: [] }; // extracted files of the open tracks: {path, name, dur, sr, sid, source, on}
     this.hidden = new Set();  // extracted files removed from the lists with "Clear all" (they stay on disk)
+    this.collapsed = new Set(); // groups of stems shown closed: "sid|name"
     this.stems = null;        // stems_status(): extra installed, model ready, last job
     this.enh = null;          // enhance_status(): models (installed, downloaded), last "Enhance" job
     this.opts = { fade_in_ms: 1, fade_out_ms: 10, normalize: false, sensitivity: 0.5, devices: null, tab: 'cuts' };
@@ -149,7 +150,7 @@ export class SamplerEditor {
           <span class="spacer"></span>
           ${btn(t('Clear all'), { icon: 'trash-2', id: 'sp-clear' })}
           ${btn(`${t('Send to')} ${icon('chevron-down')}`, { icon: 'arrow-right', id: 'sp-send' })}
-          ${btn(t('Export all'), { variant: 'brand', icon: 'file-down', id: 'sp-export' })}
+          ${btn(t('Export all'), { variant: 'brand', icon: 'file-down', id: 'sp-export', title: t('Saves the ticked rows in the export folder: new cuts, stems and enhanced files are temporary until then, and are deleted when ClusterSound closes') })}
           <span id="sp-ext-set">${settingsLink('sampler', t('Fades, normalisation and export folder'))}</span>
         </div>
         <div class="sp-regions" id="sp-regions"></div>
@@ -299,12 +300,19 @@ export class SamplerEditor {
     };
     $('#sp-regions').addEventListener('click', (e) => this._rowClick(e));
     $('#sp-regions').addEventListener('change', (e) => {
+      const set = e.target.closest('[data-set]');
+      if (set && e.target.matches('[data-set-check]')) { // tick or untick every stem of the group
+        const st = this._stemSets().find((x) => `${this.ext.stems[x.idx[0]].sid}|${x.name}` === set.dataset.set);
+        st?.idx.forEach((i) => { this.ext.stems[i].on = e.target.checked; });
+        return this.renderRegions();
+      }
       const row = e.target.closest('[data-i]');
       if (!row) return;
       const r = this._rows()[+row.dataset.i];
       if (!r) return;
       if (e.target.matches('wa-checkbox')) r.on = e.target.checked;
       if (e.target.matches('wa-input')) r.name = e.target.value;
+      if (this.opts.tab === 'stems') return this.renderRegions(); // the tick of its group follows
       this._renderCount();
     });
     // waveform
@@ -869,11 +877,25 @@ export class SamplerEditor {
 
   async toggleRecording() {
     const b = $('#rc-rec');
-    b.loading = true;
-    const st = this.rec.running ? await this.api.recorder_stop()
-      : await this.api.recorder_start(this._selectedDevices(), this.recFmt);
-    b.loading = false;
+    if (b.loading) return;
+    // a meter poll already on its way would bring back the state from before the click: it is dropped
+    clearTimeout(this.recTimer);
+    this.recGen = (this.recGen || 0) + 1;
     const was = this.rec.running;
+    b.loading = true;
+    let st;
+    try {
+      st = was ? await this.api.recorder_stop() : await this.api.recorder_start(this._selectedDevices(), this.recFmt);
+    } catch (e) {
+      st = { error: String(e?.message || e) };
+    } finally {
+      b.loading = false;
+    }
+    if (!st || st.running === undefined) { // the call failed: show what the recorder is really doing
+      const err = st?.error;
+      st = await this.api.recorder_status().catch(() => ({ running: false, tracks: [], elapsed: 0 }));
+      if (err) st.error = err;
+    }
     Object.assign(this.rec, st);
     if (st.error) this._error(st.error);
     this._renderRecorder();
@@ -887,8 +909,11 @@ export class SamplerEditor {
 
   _pollRec() {
     clearTimeout(this.recTimer);
+    const gen = this.recGen;
     this.recTimer = setTimeout(async () => {
-      Object.assign(this.rec, await this.api.recorder_status());
+      const st = await this.api.recorder_status();
+      if (gen !== this.recGen) return; // Record/Stop was pressed meanwhile
+      Object.assign(this.rec, st);
       this._renderDevices();
       this._renderRecButton();
       if (this.rec.running) this._pollRec();
@@ -1198,6 +1223,8 @@ export class SamplerEditor {
         ${stems ? iconBtn('layers', t('Extract stems'), { 'data-act': 'stems' }) : '<span></span>'}
         ${ai ? iconBtn('sparkles', t('Enhance with AI'), { 'data-act': 'enhance', cls: 'cs-ai-icon' }) : '<span></span>'}
         ${iconBtn('send', t('Send to the Sequencer or the Drum Rack'), { 'data-act': 'send' })}`;
+    const state = (saved) => `<span class="sp-saved${saved ? ' on' : ''}" title="${esc(saved ? t('Saved in the export folder')
+      : t('Temporary: «Export all» saves it, otherwise it is deleted when ClusterSound closes'))}">${icon(saved ? 'check' : 'circle')}</span>`;
     // a title over the rows of every track (or source) when there is more than one
     const groups = new Set((tab === 'cuts' ? this._cuts().map((c) => c.tr.sid) : rows.map((f) => f.sid)));
     let last = null;
@@ -1214,21 +1241,54 @@ export class SamplerEditor {
           <wa-input size="s" value="${esc(r.name)}" placeholder="${esc(this._defaultName(tr, i))}" label="${t('Name')}"></wa-input>
           <span class="sp-time sp-start">${fmt(r.start)}</span>
           <span class="sp-time ${r.end - r.start >= this.maxS - 1e-3 ? 'error' : ''}">${fmt(r.end - r.start)}</span>
+          ${state(this._cutSaved(tr, i))}
           ${acts({ stems: true, ai: true })}
+          <span></span>
           ${iconBtn('x', t('Delete'), { 'data-act': 'del' })}
         </div>`).join('');
       return;
     }
-    box.innerHTML = job + rows.map((f, i) => `${head(f.sid, f.source, f.sid)}
+    const fileRow = (f, i) => `
       <div class="sp-row sp-file-row${f.path === this.session?.path ? ' sel' : ''}${tab === 'enhanced' ? ' en-row' : ''}" data-i="${i}" title="${esc(f.path)}">
         ${check('', f.on, { label: t('Select') })}
         <span class="sp-num">${i + 1}</span>
-        <span class="sp-file-name">${esc(f.name)}</span>
+        <span class="sp-file-name">${esc(tab === 'stems' ? f.name.split(' - ').pop() : f.name)}</span>
         <span class="sp-time sp-start">${f.sr ? `${(f.sr / 1000).toFixed(1)} kHz` : ''}</span>
         <span class="sp-time">${fmt(f.dur)}</span>
+        ${state(f.saved)}
         ${acts({ stems: tab === 'enhanced', ai: tab === 'stems' })}
         ${iconBtn('folder-open', t('Show in {app}', { app: FILE_MANAGER }), { 'data-act': 'reveal' })}
-      </div>`).join('');
+        ${iconBtn('trash-2', f.saved ? t('Move to the Trash') : t('Delete'), { 'data-act': 'del' })}
+      </div>`;
+    if (tab === 'enhanced') {
+      box.innerHTML = job + rows.map((f, i) => head(f.sid, f.source, f.sid) + fileRow(f, i)).join('');
+      return;
+    }
+    // stems: the ones of the same separated audio (a track, a cut, an enhanced file) together, collapsible
+    let html = job;
+    for (const set of this._stemSets()) {
+      const f0 = rows[set.idx[0]], key = `${f0.sid}|${set.name}`, open = !this.collapsed.has(key);
+      const on = set.idx.filter((i) => rows[i].on).length;
+      html += head(f0.sid, f0.source, f0.sid) + `
+        <div class="sp-set${open ? ' open' : ''}" data-set="${esc(key)}">
+          ${icon(open ? 'chevron-down' : 'chevron-right')}
+          ${check('', on === set.idx.length, { label: t('Select'), indeterminate: on > 0 && on < set.idx.length, 'data-set-check': '' })}
+          <span class="sp-set-name">${esc(set.name)}</span><span class="sp-tab-n">${set.idx.length}</span>
+        </div>` + (open ? set.idx.map((i) => fileRow(rows[i], i)).join('') : '');
+    }
+    box.innerHTML = html;
+  }
+
+  // Stems grouped by what was separated (the name before « - Drums»), in list order: [{name, idx: [i…]}].
+  _stemSets() {
+    const sets = new Map();
+    this.ext.stems.forEach((f, i) => {
+      const parts = f.name.split(' - '), name = parts.length > 1 ? parts.slice(0, -1).join(' - ') : f.name;
+      const k = `${f.sid}|${name}`;
+      if (!sets.has(k)) sets.set(k, { name, idx: [] });
+      sets.get(k).idx.push(i);
+    });
+    return [...sets.values()];
   }
 
   _defaultName(tr, i) { return `${tr.session?.title || 'sample'} - ${String(i + 1).padStart(2, '0')}`; }
@@ -1237,6 +1297,13 @@ export class SamplerEditor {
     if (e.target.closest('[data-job]')) return this._cancelJob();
     const g = e.target.closest('[data-group]');
     if (g) return this.tracks.some((x) => x.sid === g.dataset.group) && this.selectTrack(g.dataset.group);
+    const set = e.target.closest('[data-set]');
+    if (set) {
+      if (e.target.closest('[data-set-check]')) return; // the tick of the group: see the change handler
+      const k = set.dataset.set;
+      if (this.collapsed.has(k)) this.collapsed.delete(k); else this.collapsed.add(k);
+      return this.renderRegions();
+    }
     const row = e.target.closest('[data-i]');
     if (!row) return;
     const k = +row.dataset.i, act = e.target.closest('[data-act]')?.dataset.act;
@@ -1244,6 +1311,7 @@ export class SamplerEditor {
     if (this.opts.tab !== 'cuts') {
       const f = this._rows()[k];
       if (act === 'reveal') return this.api.reveal_path(f.path);
+      if (act === 'del') return this.deleteFile(f);
       if (act === 'zoom') return this._opened(await this.api.sampler_open_extraction(f.path));
       if (act === 'enhance') return this._enhMenu(anchor(), { path: f.path, label: f.name });
       if (act === 'stems') return this._stemsMenu(anchor(), { path: f.path, label: f.name });
@@ -1313,6 +1381,7 @@ export class SamplerEditor {
         ${item('live', 'music', 'Ableton Live', n > 1 ? t('{n} new audio tracks', { n }) : n ? t('A new audio track') : t('All the shown track, on a new audio track'), !this.session && !n)}
         ${item('rack', 'layout-grid', 'Drum Rack', t('On the free pads, from the selected one'), !n)}
         ${item('seq', 'audio-lines', 'Sequencer', t('As new layers of a bus'), !n || !this.getBuses)}
+        ${item('lib', 'library-big', t('Library'), t('Copied into «{dir}», a folder per track', { dir: 'ClusterSound Recorder' }), !n)}
       </div><div class="sp-send-buses"></div>`);
     pop.onclick = async (e) => {
       const b = e.target.closest('[data-go], [data-bus]');
@@ -1321,6 +1390,7 @@ export class SamplerEditor {
       const go = b.dataset.go;
       if (go === 'live') { pop.close(); return this.sendToLive(); }
       if (go === 'rack') { pop.close(); return this.sendToRack(); }
+      if (go === 'lib') { pop.close(); return this.sendToLibrary(); }
       const box = pop.querySelector('.sp-send-buses');
       box.innerHTML = `<div class="hint">${t('Loading…')}</div>`;
       const buses = await this.getBuses();
@@ -1404,31 +1474,40 @@ export class SamplerEditor {
   }
 
   // ---------------------------------------------------------------- export
-  // Cuts of a track as WAV files, aligned with `idx`. A cut already exported with the same bounds, name and
-  // fades/normalisation reuses its file (sending to the Drum Rack twice doesn't duplicate it).
-  async _files(tr, idx, button) {
-    const key = (r, i) => JSON.stringify([r.start, r.end, r.name || this._defaultName(tr, i), this.opts.fade_in_ms,
-      this.opts.fade_out_ms, this.opts.normalize]);
-    const todo = idx.filter((i) => tr.regions[i].file?.key !== key(tr.regions[i], i));
+  _cutKey(tr, r, i) {
+    return JSON.stringify([r.start, r.end, r.name || this._defaultName(tr, i), this.opts.fade_in_ms, this.opts.fade_out_ms, this.opts.normalize]);
+  }
+
+  _cutSaved(tr, i) { const r = tr.regions[i]; return !!r.file?.saved && r.file.key === this._cutKey(tr, r, i); }
+
+  // Cuts of a track as WAV files, aligned with `idx`: saved into the export folder, or (temp) into the temporary
+  // folder of this run. A cut already written with the same bounds, name and fades/normalisation reuses its file
+  // (a saved one also when a temporary one would do).
+  async _files(tr, idx, button, temp = false) {
+    const todo = idx.filter((i) => {
+      const r = tr.regions[i];
+      return r.file?.key !== this._cutKey(tr, r, i) || (!temp && !r.file.saved);
+    });
     if (todo.length) {
       // empty names get the placeholder shown in the list, so numbers match the region numbers
       const regions = todo.map((i) => ({ start: tr.regions[i].start, end: tr.regions[i].end, name: tr.regions[i].name || this._defaultName(tr, i) }));
       if (button) button.loading = true;
-      const r = await this.api.sampler_export(regions, this.opts, tr.sid);
+      const r = await this.api.sampler_export(regions, this.opts, tr.sid, temp);
       if (button) button.loading = false;
       if (r.error) { this._error(r.error); return null; }
-      todo.forEach((i, k) => { if (r.files[k]) tr.regions[i].file = { key: key(tr.regions[i], i), path: r.files[k] }; });
-      this._showExported(r.folder, r.paths[0]);
+      todo.forEach((i, k) => { if (r.files[k]) tr.regions[i].file = { key: this._cutKey(tr, tr.regions[i], i), path: r.files[k], saved: !temp }; });
+      if (!temp) this._showExported(r.folder, r.paths[0]);
       if (r.in_library) toast(t('The samples are in the library: analysing them'));
     }
     return idx.map((i) => tr.regions[i].file?.path || null);
   }
 
+  // Cuts as sample refs, for sending them somewhere (temporary files unless already saved).
   async _regionRefs(tr, idx, button) {
-    const files = await this._files(tr, idx, button);
+    const files = await this._files(tr, idx, button, true);
     if (!files) return null;
     return idx.map((i, k) => files[k] && {
-      kind: 'file', path: files[k], name: files[k].split('/').pop(), cls: null, root: null,
+      kind: 'file', path: files[k], name: files[k].split('/').pop(), cls: null, root: null, sid: tr.sid,
       dur: +(tr.regions[i].end - tr.regions[i].start).toFixed(3) }).filter(Boolean);
   }
 
@@ -1437,9 +1516,9 @@ export class SamplerEditor {
     return this.tracks.map((tr) => [tr, tr.regions.map((r, i) => (r.on ? i : -1)).filter((i) => i >= 0)]).filter(([, idx]) => idx.length);
   }
 
-  // Ticked rows of the active tab as sample refs (cuts are exported first).
+  // Ticked rows of the active tab as sample refs (cuts are written first, as temporary files).
   async _checkedRefs(button) {
-    if (this.opts.tab !== 'cuts') return this._rows().filter((f) => f.on).map((f) => this._fileRef(f));
+    if (this.opts.tab !== 'cuts') return this._rows().filter((f) => f.on).map((f) => ({ ...this._fileRef(f), sid: f.sid }));
     const out = [];
     for (const [tr, idx] of this._checkedCuts()) {
       const refs = await this._regionRefs(tr, idx, button);
@@ -1457,7 +1536,8 @@ export class SamplerEditor {
     $('#sp-regions').before(head);
   }
 
-  // "Export all": the ticked rows of the tab into the export folder chosen in Settings.
+  // "Export all": saves the ticked rows of the tab into the export folder chosen in Settings. What is not saved
+  // stays temporary and is deleted when ClusterSound closes.
   async export() {
     const b = $('#sp-export');
     let n = 0;
@@ -1468,6 +1548,7 @@ export class SamplerEditor {
         n += files.filter(Boolean).length;
       }
       this._renderTracks();
+      this.renderRegions();
     } else {
       const paths = this._rows().filter((f) => f.on).map((f) => f.path);
       if (!paths.length) return;
@@ -1478,8 +1559,54 @@ export class SamplerEditor {
       this._showExported(r.folder, r.paths[0]);
       if (r.in_library) toast(t('The samples are in the library: analysing them'));
       n = r.paths.length;
+      await this._loadExtractions(); // the saved ones moved
     }
-    if (n) toast(n === 1 ? t('1 sample exported') : t('{n} samples exported', { n }));
+    if (n) toast(n === 1 ? t('1 sample saved') : t('{n} samples saved', { n }));
+  }
+
+  // A stem or enhanced file: a temporary one is deleted, a saved one goes to the Trash (after a confirmation).
+  async deleteFile(f) {
+    if (f.saved && !(await this._confirm(t('Move to the Trash'), t('Move «{name}» to the Trash? It is saved in the export folder.', { name: esc(f.name) }), t('Move to the Trash')))) return;
+    if (this.playing?.path === f.path) this.player.stop();
+    const r = await this.api.sampler_delete_extraction(f.path);
+    if (r.error) return this._error(r.error);
+    if (this.session?.path === f.path) { // its own tab, if open, has nothing to show any more
+      const tr = this.cur;
+      await this._opened(await this.api.sampler_close(tr.sid));
+    }
+    await this._loadExtractions();
+    toast(f.saved ? t('Moved to the Trash') : t('Deleted'));
+  }
+
+  // Ticked rows into the library: ClusterSound Recorder/<track>/ of one of its folders (asked if there are more).
+  async sendToLibrary(root = null) {
+    const refs = await this._checkedRefs($('#sp-send'));
+    if (!refs?.length) return;
+    const items = refs.map((x) => ({ path: x.path, sid: x.sid }));
+    let r = await this.api.sampler_send_to_library(items, root);
+    if (r.choose) {
+      root = await this._chooseRoot(r.choose);
+      if (!root) return;
+      r = await this.api.sampler_send_to_library(items, root);
+    }
+    if (r.error) return this._error(r.error);
+    toast(r.files.length === 1 ? t('1 sample copied to the library') : t('{n} samples copied to the library', { n: r.files.length }));
+  }
+
+  // Which library folder, when the library is made of several.
+  _chooseRoot(roots) {
+    return new Promise((done) => {
+      let picked = null;
+      const dlg = openDialog('sp-root-dlg', { label: t('Send to the library'), width: '480px', onHide: () => done(picked),
+        body: `<p class="hint">${t('The library is made of several folders: in which one should the «{dir}» folder go?', { dir: 'ClusterSound Recorder' })}</p>
+          <div class="sp-roots">${roots.map((x) => `<button class="sp-open-choice" data-root="${esc(x)}">${icon('folder-open')}<b>${esc(x.split('/').pop() || x)}</b><span class="hint">${esc(x)}</span></button>`).join('')}</div>` });
+      dlg.querySelector('.sp-roots').onclick = (e) => {
+        const b = e.target.closest('[data-root]');
+        if (!b) return;
+        picked = b.dataset.root;
+        dlg.close();
+      };
+    });
   }
 
   // The ticked rows (cuts of every track, or files) to Live, one new audio track each; with no cut ticked,

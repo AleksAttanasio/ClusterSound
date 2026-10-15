@@ -50,22 +50,30 @@ Everything extracted from **all the open tracks**, in three tabs with a tick per
 rows are grouped under its name (click it to show that track):
 
 - **✂ Cuts**: the regions, cut by hand or on the transients.
-- **Stems**: the stems already extracted from the open tracks, found again on disk when they open.
+- **Stems**: the stems of the open tracks, found again on disk when they open. The stems of the same separated
+  audio (a track, a cut, an enhanced file) are grouped: click a group to open or close it, its tick ticks them all.
 - **✨ Enhanced**: the enhanced files made from the tracks, from their cuts or from their stems.
 
 Every row has icon-only buttons: listen, show the waveform (a cut is zoomed in; a stem or an enhanced file opens
 in a new tab), **Extract stems** (cuts and enhanced files), ✨ Enhance (cuts and stems) and **Send**, the same menu as
-in the library (a Sequencer bus or a Drum Rack group).
+in the library (a Sequencer bus or a Drum Rack group). Stems and enhanced files also have show in the Finder and
+🗑 **delete**: a temporary file is deleted, a saved one goes to the Trash after a confirmation.
+
+!!! info "Temporary until saved"
+    New cuts, stems and enhanced files are **temporary**: they are kept in a work folder of ClusterSound while it is
+    open, and deleted when it closes (○ next to the duration). **Export all** saves them (✓). Cuts sent to the Drum
+    Rack or the Sequencer without saving them stay temporary too, so those pads are empty after a restart.
 
 Next to the title:
 
 - **Clear all** empties the tab, after a confirmation (stems and enhanced files stay on disk).
 - **Send to**: the ticked rows to **Ableton Live** (one new audio track each; with no cut ticked, all the shown track),
   to the **Drum Rack** (on the free pads from the selected one) or to the **Sequencer** (new layers of the chosen
-  bus). Live needs the ClusterSound device with *Receive* on.
-- **Export all**: the ticked rows into the **export folder** (Settings › Recorder, by default
+  bus), or to the **Library**: a copy in `ClusterSound Recorder/<track>/` of the library folder (asked when the
+  library is made of several), analysed like the other samples. Live needs the ClusterSound device with *Receive* on.
+- **Export all** saves the ticked rows into the **export folder** (Settings › Recorder, by default
   `~/Music/ClusterSound Samples/`). Cuts become 24-bit WAVs with fades (1 ms in, 10 ms out) and optional
-  normalisation, at most 30 s each; stems and enhanced files are copied with their provenance note.
+  normalisation, at most 30 s each; stems and enhanced files move there with their provenance note.
 
 ## Extract stems
 
