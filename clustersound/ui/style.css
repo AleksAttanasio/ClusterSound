@@ -643,6 +643,19 @@ wa-select.pop-field, wa-input.pop-field { display: block; }
 .rk-frame.lock { border-style: dashed; }
 .rk-frame.lock span { display: inline-flex; }
 .rk-load { display: flex; flex-direction: column; gap: 12px; }
+/* Settings › Drum Rack: the 4×4 note blocks, a 2×2 preview and the window to drag them */
+.rk-quads-mini { display: grid; grid-template-columns: repeat(2, 22px); gap: 2px; margin-right: 10px; }
+.rk-quads-mini span { display: grid; place-items: center; height: 18px; border-radius: 3px; background: var(--bg-3); font: 600 11px var(--mono); }
+.rk-quads { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0 12px; }
+.rk-quad { position: relative; aspect-ratio: 1; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--line); cursor: grab; display: grid; place-items: center; -webkit-user-select: none; user-select: none; }
+.rk-quad:hover { border-color: var(--line-2); }
+.rk-quad.dragging { opacity: .4; }
+.rk-quad.over { border-color: var(--sel-line); background: var(--sel-bg); }
+.rk-quad b { font-size: 34px; font-weight: 600; color: var(--accent); }
+.rk-quad i { position: absolute; font: 11px var(--mono); font-style: normal; color: var(--text-2); }
+.rk-quad .c0 { top: 6px; left: 8px; } .rk-quad .c1 { top: 6px; right: 8px; }
+.rk-quad .c2 { bottom: 6px; left: 8px; } .rk-quad .c3 { bottom: 6px; right: 8px; }
+.rk-quads-presets { display: flex; gap: 6px; }
 .rk-load-rows { display: flex; flex-direction: column; gap: 4px; max-height: 50vh; overflow-y: auto; }
 .rk-load-row { display: grid; grid-template-columns: 170px 1fr 210px; align-items: center; gap: 10px; padding: 5px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
 .rk-load-opts { display: flex; flex-direction: column; gap: 10px; }
