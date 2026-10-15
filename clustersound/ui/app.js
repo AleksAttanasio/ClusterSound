@@ -73,9 +73,15 @@ async function main() {
   rack = new DrumRackEditor({ api: state.api, player, classes: state.classes, getTrail,
     getSequencer: () => pattern, onOpenSequencer: () => setTab('pattern') });
   compose = new ComposeEditor({ api: state.api, player, getPattern: () => pattern, onOpenSequencer: () => setTab('pattern') });
-  sampler = new SamplerEditor({ api: state.api, player, classes: state.classes, onSendToRack: async (refs) => {
-    if (await rack.addSamples(refs)) setTab('rack');
-  } });
+  sampler = new SamplerEditor({ api: state.api, player, classes: state.classes,
+    onSendToRack: async (refs) => { if (await rack.addSamples(refs)) setTab('rack'); },
+    onSend: (ref, x, y) => sendRef(ref, x, y),
+    getBuses: async () => { await pattern.ensure(); return pattern.buses; },
+    onSendToBus: async (refs, bus) => {
+      await pattern.ensure();
+      for (const ref of refs) await pattern.addSample(bus, ref, 'add');
+      setTab('pattern');
+    } });
   online.onSend = (ref, x, y) => sendRef(ref, x, y);
   online.onLibrary = (path) => { setTab('library'); addFolder(path); };
   nav = new Nav($('#nav'), { onSelect: (tab) => setTab(tab) });

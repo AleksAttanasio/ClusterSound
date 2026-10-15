@@ -59,6 +59,32 @@ def open_folder(path: str) -> None:
         subprocess.run(["open", path], check=False)
 
 
+def trash(path: str) -> None:
+    """Move a file to the system Trash / Recycle Bin (it can be restored from there)."""
+    if IS_WIN:
+        import ctypes
+        from ctypes import wintypes
+
+        class SHFILEOPSTRUCTW(ctypes.Structure):
+            _fields_ = [("hwnd", wintypes.HWND), ("wFunc", wintypes.UINT), ("pFrom", wintypes.LPCWSTR),
+                        ("pTo", wintypes.LPCWSTR), ("fFlags", ctypes.c_uint16), ("fAnyOperationsAborted", wintypes.BOOL),
+                        ("hNameMappings", ctypes.c_void_p), ("lpszProgressTitle", wintypes.LPCWSTR)]
+        FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_SILENT = 3, 0x40, 0x10, 0x4
+        op = SHFILEOPSTRUCTW(None, FO_DELETE, os.path.abspath(path) + "\0", None,
+                             FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT, False, None, None)
+        if ctypes.windll.shell32.SHFileOperationW(ctypes.byref(op)):
+            raise OSError(f"cannot move {path} to the Recycle Bin")
+        return
+    folder = os.path.expanduser("~/.Trash") if IS_MAC else os.path.expanduser("~/.local/share/Trash/files")
+    os.makedirs(folder, exist_ok=True)
+    base, ext = os.path.splitext(os.path.basename(path))
+    dst, n = os.path.join(folder, base + ext), 2
+    while os.path.exists(dst):
+        dst, n = os.path.join(folder, f"{base} {n}{ext}"), n + 1
+    import shutil
+    shutil.move(path, dst)
+
+
 def is_inside(path: str, root: str) -> bool:
     """path is root or below it (resolved; case-insensitive where the filesystem is, as on Windows)."""
     path, root = os.path.normcase(os.path.realpath(path)), os.path.normcase(os.path.realpath(root))

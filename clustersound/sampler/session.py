@@ -22,6 +22,8 @@ class SamplerSession:
     result: OnlineResult | None = None  # licence and attribution (link origin)
     truncated: bool = False
     meta: dict = field(default_factory=dict)
+    sid: str = ""                # its tab in the Recorder
+    parent: "SamplerSession | None" = None  # the source of an extracted file (stem, enhanced) opened on its own
 
     @property
     def frames(self) -> int:
@@ -60,7 +62,8 @@ class SamplerSession:
 
     def describe(self) -> dict:
         r = self.result
-        return {"origin": self.origin, "title": self.title, "path": self.path, "duration": round(self.duration, 3),
+        return {"sid": self.sid, "parent": self.parent.sid if self.parent else None,
+                "origin": self.origin, "title": self.title, "path": self.path, "duration": round(self.duration, 3),
                 "sr": self.sr, "channels": int(self.audio.shape[1]), "truncated": self.truncated,
                 "source": r.to_dict() if r else None}
 
