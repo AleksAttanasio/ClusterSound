@@ -3,7 +3,7 @@
 Pads are numbered row * 8 + col, row 0 at the bottom (the side closest to the player on a Launchpad).
 A rack is plain JSON shared with the UI:
 {
-  "name", "geometry": one of GEOMETRIES, "mapping": "launchpad" | "rows",
+  "name", "geometry": one of GEOMETRIES, "mapping": "launchpad" | "rows", "quads": see QUAD_BASE,
   "pads": [64 × sample ref or null],
   "groups": {"<geometry>:<group index>": {"family": FAMILIES id, "choke": 0..16, "lock": bool}}
 }
@@ -17,6 +17,13 @@ from ..i18n import N_, tr
 N = 8
 PADS = N * N
 BASE_NOTE = 36  # C1 in Live
+# Live's four 4×4 note blocks by their first note: C = 36-51, D = 52-67, A = 68-83, B = 84-99.
+# A 64-pad rack's "quads" names the block at each quadrant, in QUADRANTS order (bottom-left,
+# bottom-right, top-left, top-right): "CDAB" is Live's own layout (68-83 and 84-99 above 36-51 and
+# 52-67), "CADB" the default, as the Launchpad plays them: 52-67 top left, 84-99 top right, 36-51
+# bottom left, 68-83 bottom right.
+QUAD_BASE = {"A": 68, "B": 84, "C": 36, "D": 52}
+DEFAULT_QUADS = "CADB"
 
 # id, label, taxonomy classes (empty = anything)
 FAMILIES = [
@@ -60,22 +67,26 @@ def rc(p: int) -> tuple[int, int]:
     return divmod(p, N)
 
 
-def note_for(p: int, mapping: str = "launchpad") -> int:
-    """MIDI note of pad p. 'launchpad': Live's 64-pad drum layout, four 4×4 quadrants
-    (bottom-left 36-51, bottom-right 52-67, top-left 68-83, top-right 84-99), each row by row
-    from its bottom-left pad. 'rows': 36 bottom-left, +1 per column, +8 per row."""
+def valid_quads(quads) -> bool:
+    return isinstance(quads, str) and sorted(quads) == sorted(QUAD_BASE)
+
+
+def note_for(p: int, mapping: str = "launchpad", quads: str = DEFAULT_QUADS) -> int:
+    """MIDI note of pad p. 'launchpad': four 4×4 blocks of 16 notes placed by quads (see QUAD_BASE),
+    each row by row from its bottom-left pad. 'rows': 36 bottom-left, +1 per column, +8 per row."""
     r, c = rc(p)
     if mapping == "rows":
         return BASE_NOTE + p
+    quads = quads if valid_quads(quads) else DEFAULT_QUADS
     quadrant = (r >= 4) * 2 + (c >= 4)
-    return BASE_NOTE + 16 * quadrant + 4 * (r % 4) + c % 4
+    return QUAD_BASE[quads[quadrant]] + 4 * (r % 4) + c % 4
 
 
 def _block(r0: int, c0: int, h: int, w: int) -> list[int]:
     return [pad(r, c) for r in range(r0, r0 + h) for c in range(c0, c0 + w)]
 
 
-# quadrants in note order: bottom-left, bottom-right, top-left, top-right
+# quadrants: bottom-left, bottom-right, top-left, top-right
 QUADRANTS = [(0, 0), (0, 4), (4, 0), (4, 4)]
 
 
@@ -167,7 +178,8 @@ def family_color(fam: str) -> str:
 def new_rack(name: str = "Kit", device: str = "grid64") -> dict:
     if device == "spdsx":
         return spdsx.new_rack(name)
-    return {"name": name, "geometry": "cols8", "mapping": "launchpad", "pads": [None] * PADS, "groups": {}}
+    return {"name": name, "geometry": "cols8", "mapping": "launchpad", "quads": DEFAULT_QUADS,
+            "pads": [None] * PADS, "groups": {}}
 
 
 def validate(rack: dict) -> dict:
@@ -179,6 +191,8 @@ def validate(rack: dict) -> dict:
         r["geometry"] = "cols8"
     if r.get("mapping") not in ("launchpad", "rows"):
         r["mapping"] = "launchpad"
+    if not valid_quads(r.get("quads")):
+        r["quads"] = DEFAULT_QUADS
     pads = list(r.get("pads") or [])[:PADS]
     r["pads"] = [p if isinstance(p, dict) and (p.get("path") or p.get("url")) else None for p in pads]
     r["pads"] += [None] * (PADS - len(r["pads"]))
@@ -191,7 +205,7 @@ def pad_count(rack: dict) -> int:
 
 
 def note_of(rack: dict, p: int) -> int:
-    return spdsx.NOTES[p] if is_spd(rack) else note_for(p, rack.get("mapping", "launchpad"))
+    return spdsx.NOTES[p] if is_spd(rack) else note_for(p, rack.get("mapping", "launchpad"), rack.get("quads", DEFAULT_QUADS))
 
 
 def ui_layouts() -> dict:
@@ -201,6 +215,8 @@ def ui_layouts() -> dict:
         "families": [{"id": f, "label": tr(label), "classes": classes, "color": family_color(f)}
                      for f, label, classes in FAMILIES],
         "notes": {m: [note_for(p, m) for p in range(PADS)] for m in ("launchpad", "rows")},
+        "quad_bases": QUAD_BASE,
+        "default_quads": DEFAULT_QUADS,
         "spdsx": spdsx.ui_layout(),
     }
 

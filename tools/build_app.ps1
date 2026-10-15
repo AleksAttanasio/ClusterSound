@@ -5,6 +5,8 @@ $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 $py = ".venv\Scripts\python.exe"
 if (-not (Test-Path $py)) { throw "Ambiente non trovato: crea .venv e installa con pip install -e "".[dev]""" }
+& $py -m clustersound.chords.builtin clustersound\chords\builtin_pack  # Compose chords
+if ($LASTEXITCODE -ne 0) { throw "Chord pack non generato ($LASTEXITCODE)" }
 & $py -m PyInstaller --noconfirm ClusterSound.spec
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller non riuscito ($LASTEXITCODE)" }
 Write-Host "Ready: dist\ClusterSound\ClusterSound.exe"

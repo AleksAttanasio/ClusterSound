@@ -15,6 +15,7 @@ import numpy as np
 import soundfile as sf
 
 from . import classifier, dynamics, export, i18n, taxonomy
+from .chords import builtin as chord_builtin
 from .chords import export as chord_export
 from .chords import harmony as chord_harmony
 from .chords import melody as chord_melody
@@ -22,7 +23,6 @@ from .chords import midi_in as chord_midi_in
 from .chords import perform as chord_perform
 from .chords import variations as chord_variations
 from .chords.library import CATEGORIES as CHORD_CATEGORIES
-from .chords.library import DEFAULT_DIR as CHORD_DIR
 from .chords.library import ChordLibrary
 from .enhance import job as enhance_job
 from .enhance import models as enhance_models
@@ -1271,14 +1271,14 @@ class Api:
 
     # ================================================================== compose (chord progressions)
     def _chord_lib(self) -> ChordLibrary:
-        root = self._settings().get("chord_pack_dir") or CHORD_DIR
+        root = self._settings().get("chord_pack_dir") or chord_builtin.builtin_dir()
         if self._chords is None or self._chords.root != root:
             self._chords = ChordLibrary(root)
         return self._chords
 
     def compose_init(self) -> dict:
         lib = self._chord_lib()
-        return {"dir": lib.root, "exists": lib.exists(), "keys": lib.available_keys() if lib.exists() else [],
+        return {"dir": lib.root, "exists": lib.exists(), "builtin": not self._settings().get("chord_pack_dir"), "keys": lib.available_keys() if lib.exists() else [],
                 **i18n.localize({
                     "categories": CHORD_CATEGORIES, "styles": chord_perform.meta(),
                     "clipKinds": chord_variations.CLIP_KINDS, "progKinds": chord_variations.PROG_KINDS,
@@ -1292,6 +1292,11 @@ class Api:
             path = self.pick_folder()
         if path:
             self._save_settings(chord_pack_dir=os.path.expanduser(path))
+        return self.compose_init()
+
+    def compose_use_builtin(self) -> dict:
+        """Back to the chord pack generated with the app."""
+        self._save_settings(chord_pack_dir="")
         return self.compose_init()
 
     def compose_rescan(self) -> dict:
@@ -1551,22 +1556,62 @@ class Api:
             if settings[g]["lock"] or (only_empty and any(rack["pads"][p] for p in pads)):
                 continue
             fam = settings[g]["family"]
-            classes = rack_layouts.family_classes(fam)
-            pool = [it for it in items if (not classes or it["cls"] in classes) and it["id"] not in used
-                    and it["feats"].get("type") == "One-shot"]
-            if not pool:
-                continue
-            pool = self._ranked(pool, classes)[:300]
             subs = used_subs.setdefault(fam, set())
-            seed = next((it for it in pool if (it["cls"], it.get("sub")) not in subs), pool[0])
+            seed = self._autofill_seed(fam, used, subs)
+            if seed is None:
+                continue
             subs.add((seed["cls"], seed.get("sub")))
-            opts = {"filter": "family", "family": fam, "oneshot": True}
-            picks = rack_select.pick(a["Xn"], seed["id"], len(pads) - 1, "random", self._rack_mask(None, opts),
+            picks = rack_select.pick(a["Xn"], seed["id"], len(pads) - 1, "random", self._autofill_mask(fam),
                                      variation, used | {seed["id"]})
             for p, ref in zip(pads, self._rack_refs([(seed["id"], 1.0)] + picks)):
                 rack["pads"][p] = ref
                 used.add(ref["id"])
         return rack
+
+    def _autofill_seed(self, family: str, used: set, subs: set) -> dict | None:
+        """Auto-fill's seed for a group: the best one-shot of the family not in the kit yet, from a
+        sub-cluster (`subs`: (class, sub) pairs) no other group of the same family uses, if possible."""
+        classes = rack_layouts.family_classes(family)
+        pool = [it for it in self._lib.items if (not classes or it["cls"] in classes) and it["id"] not in used
+                and it["feats"].get("type") == "One-shot"]
+        if not pool:
+            return None
+        pool = self._ranked(pool, classes)[:300]
+        return next((it for it in pool if (it["cls"], it.get("sub")) not in subs), pool[0])
+
+    def _autofill_mask(self, family: str) -> np.ndarray | None:
+        return self._rack_mask(None, {"filter": "family", "family": family, "oneshot": True})
+
+    def rack_autosample(self, rack: dict, group: int, variation: float = 0.3, opts: dict | None = None) -> dict | None:
+        """One more sample for a group, with Auto-fill's criterion: a similarity-weighted draw among the
+        nearest one-shots of the family to the group's seed (its first library sample), not in the kit yet.
+        A group with no library sample gets a random sample of its family instead, with the Generate
+        options `oneshot` and `avoid` (samples already in the kit). None when nothing fits."""
+        rack = rack_layouts.validate(rack)
+        opts = opts or {}
+        if not self._lib.items:
+            return None
+        groups = rack_layouts.groups_of(rack)
+        g = int(group)
+        if not 0 <= g < len(groups):
+            return None
+        fam = rack_layouts.group_settings(rack)[g]["family"]
+        pads = rack["pads"]
+        used = {r["id"] for r in pads if r and r.get("kind") == "library"}
+        mine = [pads[p]["id"] for p in groups[g] if pads[p] and pads[p].get("kind") == "library"]
+        if not mine:
+            classes = rack_layouts.family_classes(fam)
+            avoid = opts.get("avoid", True)
+            oneshot = opts.get("oneshot", True)
+            pool = [it["id"] for it in self._lib.items if (not classes or it["cls"] in classes)
+                    and not (avoid and it["id"] in used) and not (oneshot and it["feats"].get("type") != "One-shot")]
+            if not pool:
+                return None
+            pick = int(np.random.default_rng(opts.get("rng_seed")).choice(pool))
+            return self._rack_refs([(pick, 1.0)])[0]
+        a = self._rack_arrays()
+        picks = rack_select.pick(a["Xn"], mine[0], 1, "random", self._autofill_mask(fam), variation, used)
+        return self._rack_refs(picks)[0] if picks else None
 
     def _random_mask(self, classes: list[str], opts: dict) -> np.ndarray:
         a = self._rack_arrays()

@@ -17,6 +17,6 @@ restano nel `localStorage` della WebView.
 | `sampler_max_seconds` | 30 | Recorder | durata massima di un sample estratto |
 | `recorder_dir` | `~/Music/ClusterSound Recordings` | Recorder | cartella delle registrazioni |
 | `recorder_format` | — | Recorder | formato, bit, bitrate, frequenza e canali |
-| `chord_pack_dir` | `~/Documents/Unison MIDI Chord Pack` | Compose | cartella del chord pack (impostata da *Scegli la cartella…*) |
+| `chord_pack_dir` | vuoto (pack incluso) | Compose | cartella del tuo chord pack (impostata da *Scegli…*, svuotata da *Usa quello incluso*) |
 
 La mappatura delle note del Drum Rack è salvata con il kit, non in `settings.json`.

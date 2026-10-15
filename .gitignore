@@ -7,3 +7,4 @@ __pycache__/
 .pytest_cache/
 .DS_Store
 clustersound/bin/
+clustersound/chords/builtin_pack/
