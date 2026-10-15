@@ -17,7 +17,7 @@ WebView's `localStorage`.
 | `sampler_max_seconds` | 30 | Recorder | maximum length of an extracted sample |
 | `recorder_dir` | `~/Music/ClusterSound Recordings` | Recorder | recordings folder |
 | `recorder_format` | — | Recorder | format, bits, bitrate, sample rate and channels |
-| `chord_pack_dir` | `~/Documents/Unison MIDI Chord Pack` | Compose | chord pack folder (set by *Choose the folder…*) |
+| `chord_pack_dir` | empty (built-in pack) | Compose | folder of your own chord pack (set by *Choose…*, cleared by *Use built-in*) |
 
 The Drum Rack note mapping is saved with the kit, not in `settings.json`.
 
