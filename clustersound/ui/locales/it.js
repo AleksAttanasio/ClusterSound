@@ -788,6 +788,7 @@ export default {
   "Organ": "Organo",
   "Origin": "Origine",
   "Other": "Altro",
+  "Rest": "Resto",
   "Outputs to record": "Uscite da registrare",
   "Outputs, format and folder": "Uscite, formato e cartella",
   "Over 600,000 sounds uploaded by the community, organised in packs. Needs a free API key.": "Oltre 600.000 suoni caricati dalla community, organizzati in pack. Richiede una API key gratuita.",
