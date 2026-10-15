@@ -540,7 +540,7 @@ export default {
   "Language": "Lingua",
   "Language of the interface. The app reloads to apply it.": "Lingua dell'interfaccia. L'app si ricarica per applicarla.",
   "Launchpad / Live (4×4 quadrants)": "Launchpad / Live (quadranti 4×4)",
-  "Launchpad / Live Drum layout: four 4×4 quadrants (36-51 bottom left, 52-67 bottom right, 68-83 top left, 84-99 top right)": "layout Drum del Launchpad / di Live: 4 quadranti 4×4 (36-51 in basso a sinistra, 52-67 in basso a destra, 68-83 in alto a sinistra, 84-99 in alto a destra)",
+  "Drum layout in four 4×4 blocks ({tl} top left, {tr} top right, {bl} bottom left, {br} bottom right)": "layout Drum in 4 blocchi 4×4 ({tl} in alto a sinistra, {tr} in alto a destra, {bl} in basso a sinistra, {br} in basso a destra)",
   "Layer volume": "Volume layer",
   "Layers: together = they all play on every hit; in turn / random = a different layer on every hit": "Layer: insieme = suonano tutti a ogni colpo; a giro / casuale = un layer diverso a ogni colpo",
   "Layout": "Geometria",

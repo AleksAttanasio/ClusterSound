@@ -222,6 +222,17 @@ def test_export_rack(tmp_path, samples):
     assert len(wavs) == 5
     text = open(os.path.join(folder, "README.txt"), encoding="utf-8").read()
     assert "PAD MAP" in text and "C1" in text and "Active choke groups: 1" in text
+    assert "84-99 top left, 52-67 top right, 36-51 bottom left, 68-83 bottom right" in text
+
+
+def test_export_follows_the_kits_quads(tmp_path, samples):
+    rack = layouts.new_rack("Live Kit")
+    rack["quads"] = "CDAB"
+    rack["pads"][layouts.pad(0, 4)] = samples[0]
+    folder = ableton.export_rack(rack, str(tmp_path), lambda r: r["path"], lambda r: None)
+    doc = ET.fromstring(gzip.open(os.path.join(folder, "Live Kit Drum Rack.adg")).read())
+    assert [128 - int(b.find("ZoneSettings/ReceivingNote").get("Value")) for b in doc.findall(".//DrumBranchPreset")] == [52]
+    assert "E2" in open(os.path.join(folder, "README.txt"), encoding="utf-8").read()
 
 
 def test_export_empty_rack_fails(tmp_path):
