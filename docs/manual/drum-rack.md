@@ -15,7 +15,7 @@ SPD-SX**. The menu at the top left chooses the instrument; each one has its own 
     - *4×4 in columns*: every quadrant is a family, every column a group of 4;
     - *Free*: one pad at a time.
 - **Note mapping** (Settings › Drum Rack): *Launchpad / Live* (four 4×4 blocks of notes; by default as the
-  Launchpad plays them: 52–67 top left, 68–83 top right, 36–51 bottom left, 84–99 bottom right) or
+  Launchpad plays them: 52–67 top left, 84–99 top right, 36–51 bottom left, 68–83 bottom right) or
   *sequential rows* (36 + row×8 + column) for Custom Modes. **Arrange blocks…** opens a window where the four
   blocks, shown by their notes, are dragged to match your controller; *Live* puts them back as Live shows
   them (68–83 and 84–99 above 36–51 and 52–67).
