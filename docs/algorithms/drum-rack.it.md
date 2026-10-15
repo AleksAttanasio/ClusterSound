@@ -78,8 +78,8 @@ tiene la frazione più vicina dei candidati (almeno 8), che poi passa alla scelt
 
 - Pad numerati `riga·8 + colonna`, riga 0 in basso.
 - Note *Launchpad*: \(b_{Q[q]} + 4\,(r \bmod 4) + (c \bmod 4)\), con quadrante \(q = 2[r \ge 4] + [c \ge 4]\) e
-  \(Q\) la disposizione dei blocchi del kit, C = 36, D = 52, A = 68, B = 84 (default `DBCA`: in alto a sinistra
-  36–51, in alto a destra 68–83, in basso a sinistra 52–67, in basso a destra 84–99, come li suona il
+  \(Q\) la disposizione dei blocchi del kit, C = 36, D = 52, A = 68, B = 84 (default `CBDA`: in alto a sinistra
+  52–67, in alto a destra 68–83, in basso a sinistra 36–51, in basso a destra 84–99, come li suona il
   Launchpad). Note *righe*: \(36 + p\).
 - Geometrie: 8 colonne da 8, 16 blocchi 2×2, 4 quadranti 4×4, 16 colonne da 4 (una famiglia per quadrante),
   libero; ogni geometria ha famiglie di default (18 famiglie in tutto). Il choke è attivo di default per le famiglie

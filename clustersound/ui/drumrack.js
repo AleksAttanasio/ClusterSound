@@ -28,7 +28,7 @@ const ALT_LABELS = [['off', 'Together (only the 1st active)'], ['cycle', 'In tur
 
 // 4×4 note blocks of a 64-pad kit (layouts.QUAD_BASE): "quads" names the one at each quadrant,
 // bottom-left, bottom-right, top-left, top-right
-const DEFAULT_QUADS = 'DBCA';                       // as the Launchpad plays them: 36-51 68-83 over 52-67 84-99
+const DEFAULT_QUADS = 'CBDA';                       // as the Launchpad plays them: 52-67 68-83 over 36-51 84-99
 const QUAD_PRESETS = [[DEFAULT_QUADS, 'Launchpad'], ['CDAB', 'Live']]; // t() where shown
 const QUAD_SHOWN = [2, 3, 0, 1];                    // quadrants as drawn, top row first
 const validQuads = (q) => typeof q === 'string' && [...q].sort().join('') === 'ABCD';
@@ -83,8 +83,8 @@ export class DrumRackEditor {
       }
     } catch { /* private mode / bad JSON */ }
     if (!this.geoById[this.rack.geometry]) this.rack.geometry = 'cols8';
-    // 'CABD' was the first default (never a preset): a kit still on it gets the current one
-    if (!validQuads(this.racks.grid64.quads) || this.racks.grid64.quads === 'CABD') this.racks.grid64.quads = DEFAULT_QUADS;
+    // 'CABD' and 'DBCA' were earlier defaults (wrong for the Launchpad): a kit still on one gets the current one
+    if (!validQuads(this.racks.grid64.quads) || ['CABD', 'DBCA'].includes(this.racks.grid64.quads)) this.racks.grid64.quads = DEFAULT_QUADS;
     try {
       const spd = JSON.parse(localStorage.getItem(LS_SPD) || 'null');
       if (spd?.rack?.pads?.length === this.meta.spdsx.pads) {

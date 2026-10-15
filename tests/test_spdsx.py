@@ -46,7 +46,7 @@ def test_notes_are_spdsx_defaults():
     assert spdsx.NOTES == list(range(60, 71))
     r = _rack()
     assert [layouts.note_of(r, p) for p in range(spdsx.PADS)] == list(range(60, 71))
-    assert layouts.note_of(layouts.new_rack(), 0) == 52  # 64 pads: bottom-left block 52-67 by default
+    assert layouts.note_of(layouts.new_rack(), 0) == 36
 
 
 def test_validate_and_dispatch():
