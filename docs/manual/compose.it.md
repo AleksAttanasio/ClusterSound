@@ -1,8 +1,10 @@
 # Compose
 
-Costruisce **progressioni di accordi** con le clip MIDI di un chord pack organizzato come l'**Unison MIDI Chord
-Pack** (default `~/Documents/Unison MIDI Chord Pack`; un'altra cartella in Impostazioni › Compose). Il pack non
-viene mai modificato: i file sono letti e indicizzati in memoria.
+Costruisce **progressioni di accordi** con le clip MIDI di un chord pack. L'app include un **pack generato**
+per tutte le 12 tonalità (triadi, accordi estesi, accordi presi in prestito e modali, progressioni), usato di
+default. Se hai un pack organizzato come l'**Unison MIDI Chord Pack**, scegli la sua cartella in Impostazioni ›
+Compose (*Usa quello incluso* torna indietro). Il pack non viene mai modificato: i file sono letti e indicizzati in
+memoria.
 
 ![Compose: vista Armonia](../assets/screenshots/compose-harmony.png){ .shot }
 

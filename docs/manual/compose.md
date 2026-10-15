@@ -1,8 +1,9 @@
 # Compose
 
-Builds **chord progressions** with the MIDI clips of a chord pack organised like the **Unison MIDI Chord Pack**
-(default `~/Documents/Unison MIDI Chord Pack`; another folder in Settings › Compose). The pack is never modified:
-the files are read and indexed in memory.
+Builds **chord progressions** with the MIDI clips of a chord pack. The app ships a **built-in pack**, generated
+for all 12 keys (triads, extended chords, borrowed and modal chords, progressions), used by default. If you own a
+pack organised like the **Unison MIDI Chord Pack**, choose its folder in Settings › Compose (*Use built-in* goes
+back). The pack is never modified: the files are read and indexed in memory.
 
 ![Compose: Harmony view](../assets/screenshots/compose-harmony.png){ .shot }
 
