@@ -629,7 +629,7 @@ export class ComposeEditor {
     $('#cp-redo').onclick = () => this.redo();
     $('#cp-save').onclick = () => this.save();
     $('#cp-open').onclick = (e) => this.openDialog(e.currentTarget);
-    $('#cp-send').onclick = (e) => this.exportMenu(e.currentTarget);
+    $('#cp-send').onclick = (e) => this.sendMenu(e.currentTarget);
     $('#cp-even').onclick = () => this.distribute();
     $('#cp-clear').onclick = () => {
       if (this.ui.view === 'melody') { if (this.melNotes.length) this.edit(() => { this.melNotes = []; this.melSel.clear(); }); return; }
@@ -2437,11 +2437,47 @@ export class ComposeEditor {
     };
   }
 
+  // "Send to ▾": the progression to the Sequencer (as its bass line), to Live or exported as .mid (as in the Drum Rack)
+  sendMenu(anchor) {
+    const noChords = !this.seq.clips.length; // the bass line needs chords; Live and .mid also carry the melody
+    const item = (go, ic, label, hint) => `<button class="sp-send-item" data-go="${go}"${go === 'seq' && noChords ? ' disabled' : ''}><wa-icon name="${ic}"></wa-icon><span><b>${label}</b><span class="hint">${hint}</span></span></button>`;
+    const pop = showPopover(anchor, `<div class="pop-title"><wa-icon name="arrow-right"></wa-icon> ${t('Send to')}</div>
+      <div class="sp-send-list">
+        ${item('seq', 'audio-lines', 'Sequencer', t('Writes the roots of the chords as the bass line of the Sequencer pattern'))}
+        ${item('live', 'music', 'Ableton Live', t('Creates the tracks with the clips in Live (needs the ClusterSound device in the set)'))}
+        ${item('export', 'file-down', t('Export for Ableton'), t('MIDI file (.mid) to drag onto a MIDI track'))}
+      </div>`);
+    pop.onclick = (e) => {
+      const b = e.target.closest('[data-go]');
+      if (!b || b.disabled) return;
+      pop.close();
+      if (b.dataset.go === 'seq') this.sendToSequencer();
+      else if (b.dataset.go === 'live') this.liveMenu(anchor);
+      else this.exportMenu(anchor);
+    };
+  }
+
+  _label(v, mk) {
+    const p = this.project;
+    return `${p.name}${p.order.length > 1 ? ` ${v}` : ''}${p.modeOrder.length > 1 ? ` - ${p.modes[mk].name}` : ''}`;
+  }
+
+  liveMenu(anchor) {
+    const p = this.project;
+    const one = () => sendToLive(this.api, 'compose', { ...this.playSeq, name: this._label(p.active, p.modeActive) }, { pure: this.ui.pure });
+    if (p.order.length < 2) { one(); return; }
+    const pop = showPopover(anchor, `<div class="pop-title"><wa-icon name="music"></wa-icon> Ableton Live</div>
+      ${btn(`${t('Version {v}', { v: p.active })} → Live`, { variant: 'brand', 'data-live': true })}
+      ${btn(t('All the versions → Live (one clip each)'), { 'data-live-all': true })}`);
+    pop.querySelector('[data-live]').onclick = () => { pop.close(); one(); };
+    pop.querySelector('[data-live-all]').onclick = () => { pop.close(); sendToLive(this.api, 'compose', clone(p), { pure: this.ui.pure }); };
+  }
+
   exportMenu(anchor) {
     const p = this.project;
     const many = p.order.length > 1;
     const manyModes = p.modeOrder.length > 1;
-    const label = (v, mk) => `${p.name}${many ? ` ${v}` : ''}${manyModes ? ` - ${p.modes[mk].name}` : ''}`;
+    const label = (v, mk) => this._label(v, mk);
     const hasMel = Object.values(p.versions).some((v) => melodyOf(v.melody).layers.some((l) => l.notes.length));
     const parts = hasMel ? this.ui.parts : 'chords';
     const pop = showPopover(anchor, `
@@ -2450,9 +2486,7 @@ export class ComposeEditor {
       ${manyModes ? btn(t('Version {v} with all the modes → folder', { v: p.active }), { icon: 'folder-open', 'data-modes': true }) : ''}
       ${hasMel ? `<wa-radio-group class="seg cp-seg" orientation="horizontal" size="xs" data-parts value="${this.ui.parts}" label="${t('Parts')}">${PARTS.map(([k, l]) => `<wa-radio appearance="button" value="${k}">${t(l)}</wa-radio>`).join('')}</wa-radio-group>
         <div class="hint">${t('Chords + melody: one .mid with a track for the chords and one for every layer (muted layers are left out).')}</div>` : ''}
-      ${btn(`${t('Version {v}', { v: p.active })} → Live`, { 'data-live': true })}
-      ${many ? btn(t('All the versions → Live (one clip each)'), { 'data-live-all': true }) : ''}
-      <div class="hint">${t('In Ableton: drag the file onto a MIDI track. The tempo of the file is {bpm} BPM. «→ Live» creates the track with the clips through the ClusterSound device.', { bpm: p.bpm })}</div>
+      <div class="hint">${t('In Ableton: drag the file onto a MIDI track. The tempo of the file is {bpm} BPM.', { bpm: p.bpm })}</div>
       <div class="hint">${this.ui.pure ? t('Exports the chords only (without rhythm, strum, arpeggios and humanize).') : t('Exports the full performance (rhythm, strum, arpeggios and humanize).')} <a href="#" data-settings-link="compose">${t('Export options…')}</a></div>`);
     pop.querySelector('[data-settings-link]').addEventListener('click', () => pop.close());
     pop.querySelector('[data-parts]')?.addEventListener('change', (e) => {
@@ -2467,14 +2501,6 @@ export class ComposeEditor {
       const r = await this.api.compose_export_midi({ ...this.playSeq, name: label(p.active, p.modeActive) }, this.ui.pure, parts);
       if (r) toast(t('MIDI saved: {file}', { file: r.split('/').pop() }));
     };
-    pop.querySelector('[data-live]').onclick = () => {
-      pop.close();
-      sendToLive(this.api, 'compose', { ...this.playSeq, name: label(p.active, p.modeActive) }, { pure: this.ui.pure });
-    };
-    pop.querySelector('[data-live-all]')?.addEventListener('click', () => {
-      pop.close();
-      sendToLive(this.api, 'compose', clone(p), { pure: this.ui.pure });
-    });
     const many_ = async (seqs) => {
       pop.close();
       const r = await this.api.compose_export_versions(seqs, this.ui.pure, parts);
