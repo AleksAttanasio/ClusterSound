@@ -97,6 +97,14 @@ def test_clamp_and_render():
     assert slicing.render(s, 0, 10, max_s=0.2).shape[0] == int(0.2 * SR)
 
 
+def test_render_blocks_of_a_long_region():
+    x = np.linspace(-0.5, 0.5, 4 * SR, dtype=np.float32)
+    s = S.from_array(x, SR)
+    whole = slicing.render(s, 0.5, 3.5, fade_in_ms=10, fade_out_ms=10, normalize=True)
+    blocks = [slicing.render(s, a, b, fade_in_ms=10, fade_out_ms=10, normalize=True, span=(0.5, 3.5)) for a, b in ((0.5, 2), (2, 3.5))]
+    assert np.allclose(np.concatenate(blocks), whole, atol=1e-6)
+
+
 # ---------------------------------------------------------------- export
 def test_export_has_no_length_limit(tmp_path):
     s = S.from_array(np.full(50 * SR, 0.1, dtype=np.float32), SR, title="Long")

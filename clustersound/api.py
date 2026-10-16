@@ -647,13 +647,15 @@ class Api:
                                    None if end is None else float(end))
 
     def sampler_audio(self, start: float, end: float, opts: dict | None = None, sid: str | None = None) -> str | None:
-        """A region (of the shown track, or of the tab sid) as it would be exported (fades, normalisation), for listening."""
+        """A region (of the shown track, or of the tab sid) as it would be exported (fades, normalisation), for listening;
+        with opts["span"] = [a, b], [start, end) is one block of the longer region [a, b)."""
         s = self._session(sid)
         if not s:
             return None
         o = opts or {}
+        span = tuple(float(v) for v in o["span"]) if o.get("span") else None
         y = slicing.render(s, float(start), float(end), PREVIEW_MAX_SECONDS,
-                           float(o.get("fade_in_ms", 1)), float(o.get("fade_out_ms", 10)), bool(o.get("normalize")))
+                           float(o.get("fade_in_ms", 1)), float(o.get("fade_out_ms", 10)), bool(o.get("normalize")), span)
         return _array_data_url(y, s.sr) if y.shape[0] else None
 
     def sampler_export(self, regions: list, opts: dict | None = None, sid: str | None = None, temp: bool = False) -> dict:

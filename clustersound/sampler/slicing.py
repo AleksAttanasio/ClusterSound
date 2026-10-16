@@ -81,24 +81,45 @@ def _zero_cross(x: np.ndarray, i: int, radius: int) -> int:
     return lo + int(zc[-1]) if zc.size else i
 
 
-def render(s: SamplerSession, start: float, end: float, max_s: float = float("inf"),
-           fade_in_ms: float = 1.0, fade_out_ms: float = 10.0, normalize: bool = False) -> np.ndarray:
-    """The audio of one region, ready to write: clamped, start on a zero crossing, short fades."""
-    start, end = clamp(start, end, max_s, s.duration)
+def _peak(s: SamplerSession, start: float, end: float, fade_in_ms: float, fade_out_ms: float) -> float:
+    """The peak of render(start, end) before normalising, without rendering it (a region can be minutes long)."""
+    start, end = clamp(start, end, total=s.duration)
     a, b = int(start * s.sr), int(end * s.sr)
     a = _zero_cross(s.mono(), a, int(0.002 * s.sr)) if a > 0 else 0
+    y = s.audio[a:b]
+    n = y.shape[0]
+    fi, fo = min(n // 2, int(fade_in_ms / 1000 * s.sr)), min(n // 2, int(fade_out_ms / 1000 * s.sr))
+    peaks = [float(np.abs(y[fi:n - fo]).max(initial=0))]
+    if fi:
+        peaks.append(float(np.abs(y[:fi] * np.linspace(0, 1, fi, dtype=np.float32)[:, None]).max()))
+    if fo:
+        peaks.append(float(np.abs(y[n - fo:] * np.linspace(1, 0, fo, dtype=np.float32)[:, None]).max()))
+    return max(peaks)
+
+
+def render(s: SamplerSession, start: float, end: float, max_s: float = float("inf"),
+           fade_in_ms: float = 1.0, fade_out_ms: float = 10.0, normalize: bool = False,
+           span: tuple[float, float] | None = None) -> np.ndarray:
+    """The audio of one region, ready to write: clamped, start on a zero crossing, short fades. With span (the
+    whole region), [start, end) is one block of it, for listening to a long region piece by piece: the zero
+    crossing and the fades only where the region begins and ends, the normalisation of the whole region."""
+    start, end = clamp(start, end, max_s, s.duration)
+    first = span is None or start <= span[0] + 1e-6
+    last = span is None or end >= min(span[1], s.duration) - 1e-6
+    a, b = int(start * s.sr), int(end * s.sr)
+    a = _zero_cross(s.mono(), a, int(0.002 * s.sr)) if a > 0 and first else a
     y = s.audio[a:b].copy()
     n = y.shape[0]
     if n == 0:
         return y
-    fi = min(n // 2, int(fade_in_ms / 1000 * s.sr))
-    fo = min(n // 2, int(fade_out_ms / 1000 * s.sr))
+    fi = min(n // 2, int(fade_in_ms / 1000 * s.sr)) if first else 0
+    fo = min(n // 2, int(fade_out_ms / 1000 * s.sr)) if last else 0
     if fi:
         y[:fi] *= np.linspace(0, 1, fi, dtype=np.float32)[:, None]
     if fo:
         y[-fo:] *= np.linspace(1, 0, fo, dtype=np.float32)[:, None]
     if normalize:
-        peak = float(np.abs(y).max())
+        peak = _peak(s, *span, fade_in_ms, fade_out_ms) if span else float(np.abs(y).max())
         if peak > 0:
             y *= 10 ** (-0.3 / 20) / peak  # -0.3 dBFS
     return np.clip(y, -1, 1)
