@@ -1135,10 +1135,40 @@ export class ComposeEditor {
     const L = this.seq.bars * 16;
     const pos = ((abs % L) + L) % L;
     const c = this.seq.clips.find((x) => x.start <= pos && pos < x.start + x.len);
-    if (!c) return 0;
+    return c ? this._rootShift(c, sq.noteIndex(key)) : 0;
+  }
+
+  // semitones (-5…+6) from a pitch class to the root of a clip
+  _rootShift(c, from) {
     const root = (((c.root + (c.transpose || 0)) % 12) + 12) % 12;
-    const d = (((root - sq.noteIndex(key)) % 12) + 12) % 12;
+    const d = (((root - from) % 12) + 12) % 12;
     return d > 6 ? d - 12 : d;
+  }
+
+  // the roots of the chords become the bass line of the Sequencer pattern (key, BPM and bars follow the progression)
+  async sendToSequencer() {
+    const pe = this.getPattern?.();
+    if (!pe || !this.seq.clips.length) return;
+    if (!pe.ready) toast(t('Preparing the Sequencer…'));
+    await pe.ensure();
+    const bass = pe.p.buses.bass;
+    if (bass.notes.length && !confirm(t('Replace the bass line of the Sequencer pattern with the roots of the chords?'))) return;
+    this.stop();
+    const bars = this.seq.bars <= 1 ? 1 : this.seq.bars <= 2 ? 2 : 4; // the pattern has 1, 2 or 4 bars
+    const n = bars * 16;
+    if (bars !== pe.p.bars) pe.setBars(bars);
+    pe.p.key = pe.meta.note_names[this.seq.key.tonic];
+    pe.p.bpm = this.project.bpm;
+    const from = pe.seq.noteIndex(pe.p.key);
+    pe.p.buses.bass.notes = this.sorted().filter((c) => c.start < n).map((c) => ({
+      step: c.start, len: Math.min(c.len, n - c.start), semi: this._rootShift(c, from), vel: 100, glide: false,
+    }));
+    pe._persist();
+    pe.renderAll();
+    toast(this.seq.bars > 4
+      ? t('Bass line of the first 4 bars sent to the Sequencer (a pattern has at most 4 bars)')
+      : t('Bass line sent to the Sequencer'));
+    this.onOpenSequencer?.();
   }
 
   async patternMenu(anchor) {
