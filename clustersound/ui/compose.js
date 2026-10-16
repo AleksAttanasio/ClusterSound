@@ -493,6 +493,7 @@ export class ComposeEditor {
           <wa-select id="cp-b-tonic" size="s" class="cp-select" value="0">${tonics(true)}</wa-select>
           <wa-radio-group id="cp-b-mode" class="seg" orientation="horizontal" size="s" value="major" label="${t('Scale')}">
             <wa-radio appearance="button" value="major">${t('Major')}</wa-radio><wa-radio appearance="button" value="minor">${t('Minor')}</wa-radio></wa-radio-group>
+          <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-keylock"><wa-icon name="lock" label="${t('Key')}"></wa-icon></wa-button>
         </div>
         <div class="hint" id="cp-b-hint"></div>
         <wa-input id="cp-q" class="search" type="search" size="s" with-clear placeholder="${t('Search (e.g. maj9, sus, Am, bVII)…')}" autocomplete="off"><wa-icon slot="start" name="search"></wa-icon></wa-input>
@@ -508,10 +509,6 @@ export class ComposeEditor {
           <label class="cp-field">BPM <wa-number-input id="cp-bpm" size="s" without-steppers min="40" max="240" step="1"></wa-number-input></label>
           <label class="cp-field">${t('Bars')} <wa-number-input id="cp-bars" size="s" without-steppers min="1" max="128" step="1"></wa-number-input></label>
           <label class="cp-field">${t('Grid')} <wa-select id="cp-snap" size="s" class="cp-select">${SNAPS.map(([v, l]) => `<wa-option value="${v}">${t(l)}</wa-option>`).join('')}</wa-select></label>
-          <wa-radio-group id="cp-keymode" class="seg" orientation="horizontal" size="s" value="locked" label="${t('Key')}" title="${t('Locked: only chords of the key, changing key transposes everything. Free: chords from any key, transposable one by one.')}">
-            <wa-radio appearance="button" value="locked"><wa-icon name="lock"></wa-icon>${t('Key')}</wa-radio><wa-radio appearance="button" value="free"><wa-icon name="lock-open"></wa-icon>${t('Unlocked')}</wa-radio></wa-radio-group>
-          <wa-select id="cp-tonic" size="s" class="cp-select cp-key" title="${t('Key of the progression')}">${tonics(true)}</wa-select>
-          <wa-select id="cp-mode" size="s" class="cp-select cp-kmode"><wa-option value="major">${t('Major')}</wa-option><wa-option value="minor">${t('Minor')}</wa-option></wa-select>
           <div class="spacer"></div>
           <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-melmute" title="${t('Melody: on / mute')}"><wa-icon name="music" label="${t('Melody')}"></wa-icon></wa-button>
           <wa-button class="cp-play" variant="brand" size="s" id="cp-play" title="${t('Play / stop (Space)')}"><wa-icon name="play" label="Play"></wa-icon></wa-button>
@@ -558,11 +555,30 @@ export class ComposeEditor {
   }
 
   _bindShell() {
-    $('#cp-b-tonic').onchange = (e) => { this.browse.tonic = +e.target.value; this._persist(); this.loadBrowser(); };
+    // locked: the key of the progression (changing it transposes everything); free: only the key browsed
+    const pickKey = (tonic, mode) => {
+      if (this.seq.keyMode === 'locked') { this.setKey(tonic, mode); return; }
+      this.browse.tonic = tonic; this.browse.mode = mode; this._persist(); this.loadBrowser();
+    };
+    $('#cp-b-tonic').onchange = (e) => pickKey(+e.target.value, this.browseKey.mode);
     $('#cp-b-mode').addEventListener('change', (e) => {
       if (e.target.id !== 'cp-b-mode') return;
-      this.browse.mode = e.target.value; this._persist(); this.loadBrowser();
+      pickKey(this.browseKey.tonic, e.target.value);
     });
+    $('#cp-keylock').onclick = () => {
+      const km = this.seq.keyMode === 'locked' ? 'free' : 'locked';
+      this.edit(() => {
+        this.seq.keyMode = km;
+        if (km === 'locked') {
+          // locking: the key browsed becomes the key of the progression, the per-clip transpositions go into the notes
+          this.seq.key = { tonic: this.browse.tonic, mode: this.browse.mode };
+          for (const c of this.seq.clips) this._bakeTranspose(c);
+        } else {
+          this.browse.tonic = this.seq.key.tonic; this.browse.mode = this.seq.key.mode;
+        }
+      });
+      this.loadBrowser();
+    };
     $('#cp-q').oninput = (e) => { this.browse.q = e.target.value || ''; this.renderList(); };
     $('#cp-cats').onclick = (e) => {
       const b = e.target.closest('[data-cat]'); if (!b) return;
@@ -590,21 +606,6 @@ export class ComposeEditor {
     $('#cp-bpm').onchange = (e) => this.edit(() => { this.project.bpm = Math.max(40, Math.min(240, +e.target.value || 100)); });
     $('#cp-bars').onchange = (e) => this.edit(() => { this.seq.bars = Math.max(1, Math.min(128, Math.round(+e.target.value) || 4)); });
     $('#cp-snap').onchange = (e) => { this.ui.snap = +e.target.value; this._persist(); };
-    $('#cp-keymode').addEventListener('change', (e) => {
-      const km = e.target.value;
-      if (e.target.id !== 'cp-keymode' || km === this.seq.keyMode) return;
-      this.edit(() => {
-        this.seq.keyMode = km;
-        if (km === 'locked') {
-          // locking folds the per-clip transpositions into the notes
-          for (const c of this.seq.clips) this._bakeTranspose(c);
-          this.browse.tonic = this.seq.key.tonic; this.browse.mode = this.seq.key.mode;
-        }
-      });
-      this.loadBrowser();
-    });
-    $('#cp-tonic').onchange = (e) => this.setKey(+e.target.value, this.seq.key.mode);
-    $('#cp-mode').onchange = (e) => this.setKey(this.seq.key.tonic, e.target.value);
     $('#cp-view').addEventListener('change', (e) => { if (e.target.id === 'cp-view') this.setView(e.target.value); });
     $('#cp-melmute').onclick = () => {
       this.ui.melMute = !this.ui.melMute;
@@ -755,6 +756,7 @@ export class ComposeEditor {
       $('#cp-builtin2').onclick = () => this.useBuiltin();
       return;
     }
+    this._browsed = `${this.browseKey.tonic}:${this.browseKey.mode}`;
     this.current = await this.keyChords(this.browseKey);
     this.renderList();
   }
@@ -764,12 +766,17 @@ export class ComposeEditor {
     const locked = this.seq.keyMode === 'locked';
     $('#cp-dir').textContent = this.meta.builtin ? t('Built-in chord pack') : this.meta.dir.replace(/^\/Users\/[^/]+/, '~');
     $('#cp-dir').title = this.meta.dir;
-    $('#cp-b-tonic').value = String(k.tonic);
-    $('#cp-b-tonic').disabled = locked;
-    $('#cp-b-mode').value = k.mode;
-    $('#cp-b-mode').disabled = locked;
+    const set = (id, v) => { const el = $(id); if (document.activeElement !== el) el.value = v; };
+    set('#cp-b-tonic', String(k.tonic));
+    set('#cp-b-mode', k.mode);
+    const lock = $('#cp-keylock');
+    lock.classList.toggle('active', locked);
+    lock.innerHTML = `<wa-icon name="${locked ? 'lock' : 'lock-open'}" label="${locked ? t('Key locked') : t('Key unlocked')}"></wa-icon>`;
+    lock.title = locked
+      ? t('Key locked: only chords of the key, changing key transposes the progression. Click to unlock.')
+      : t('Key unlocked: chords from any key, transposable one by one. Click to lock the progression to the key shown.');
     const tr = this.current?.transposed;
-    $('#cp-b-hint').textContent = (locked ? t('Key locked to {key}: change it from the bar at the top.', { key: keyName(k) }) : t('Browsing {key} · every chord stays transposable.', { key: keyName(k) }))
+    $('#cp-b-hint').textContent = (locked ? t('Key of the progression: {key}. Changing it transposes the chords.', { key: keyName(k) }) : t('Browsing {key} · every chord stays transposable.', { key: keyName(k) }))
       + (tr ? ' ' + t('Key missing from the pack: transposed by {n}.', { n: `${tr > 0 ? '+' : ''}${tr}` }) : '')
       + (this.current?.partial ? ' ' + t('The pack is incomplete for this key: some categories are transposed from nearby keys.') : '');
     this.renderCats();
@@ -1168,6 +1175,9 @@ export class ComposeEditor {
 
   // ---------------------------------------------------------------- draw
   renderAll() {
+    // undo / redo / another version can change the key the browser shows
+    if (this.current && this._browsed !== `${this.browseKey.tonic}:${this.browseKey.mode}`) this.loadBrowser();
+    else if (this.current) this.renderBrowserHead();
     this.renderView();
     this.renderToolbar();
     this.renderVersions();
@@ -1185,9 +1195,6 @@ export class ComposeEditor {
     set('#cp-bpm', this.project.bpm);
     set('#cp-bars', s.bars);
     set('#cp-snap', String(this.ui.snap));
-    set('#cp-tonic', String(s.key.tonic));
-    set('#cp-mode', s.key.mode);
-    $('#cp-keymode').value = s.keyMode;
     const play = $('#cp-play');
     const state = this._rec ? 'rec' : this.transport.playing ? 'stop' : 'play';
     if (play.dataset.state !== state) {

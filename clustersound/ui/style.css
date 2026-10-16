@@ -767,8 +767,6 @@ wa-button.rk-wide { width: 100%; }
 .cp-keyrow .seg wa-radio { flex: 1; }
 .cp-keyrow .seg::part(form-control-input) { width: 100%; }
 .cp-toolbar #cp-snap { width: 104px; }
-.cp-toolbar .cp-key { width: 70px; }
-.cp-toolbar .cp-kmode { width: 112px; }
 .cp-toolbar .cp-synth { width: 150px; }
 .cp-modes .cp-preset { width: 190px; }
 .cp-modes .cp-rbars { width: 112px; }
