@@ -1,7 +1,7 @@
 #!/bin/sh
 # Builds brand/ClusterSound.icns (the app's Dock/Finder icon) and brand/ClusterSound.ico (Windows) from
-# brand/logo-app.svg:
-# the drop mark on a black squircle, already drawn with the ~10% margin macOS icons expect.
+# brand/logo-mark.png:
+# the drop mark on a dark grey squircle (the UI's lowered surface, #1c1c1c), with the ~10% margin macOS icons expect.
 set -e
 cd "$(dirname "$0")/.."
 if [ -z "$SDKROOT" ]; then
@@ -14,7 +14,7 @@ if [ -z "$SDKROOT" ]; then
 fi
 work=$(mktemp -d)
 src=$work/logo-app.png
-swift tools/render_svg.swift brand/logo-app.svg "$src" 1024
+swift tools/render_icon.swift brand/logo-mark.png "$src" 1024 1c1c1c
 set_dir=$work/ClusterSound.iconset
 mkdir -p "$set_dir"
 for s in 16 32 128 256 512; do
