@@ -301,26 +301,15 @@ class Api:
                 "download_dir": s.get("download_dir") or DEFAULT_DIR, "live_port": self._live_port(),
                 "live_library": s.get("live_library") or live_payload.USER_LIBRARY,
                 "sampler_dir": s.get("sampler_dir") or sampler_export.DEFAULT_DIR,
-                "sampler_max_seconds": self._sampler_max(),
                 "recorder_dir": s.get("recorder_dir") or sampler_recorder.DEFAULT_DIR,
                 "recorder_format": sampler_recorder.normalize_format(s.get("recorder_format"))}
 
-    def _sampler_max(self) -> float:
-        return float(self._settings().get("sampler_max_seconds") or sampler_session.DEFAULT_MAX_SAMPLE_SECONDS)
-
     def set_setting(self, key: str, value) -> dict:
         if key not in ("freesound_key", "download_dir", "cache_mb", "live_port", "live_library", "sampler_dir",
-                       "sampler_max_seconds", "recorder_dir", "recorder_format", "language"):
+                       "recorder_dir", "recorder_format", "language"):
             return self.get_settings()
         if key == "language":
             self._save_settings(language=i18n.set_language(value))
-            return self.get_settings()
-        if key == "sampler_max_seconds":
-            try:
-                value = max(1, min(sampler_session.DEFAULT_MAX_SAMPLE_SECONDS, float(value)))
-            except (TypeError, ValueError):
-                return self.get_settings()
-            self._save_settings(**{key: value})
             return self.get_settings()
         if key == "recorder_format":
             self._save_settings(recorder_format=sampler_recorder.normalize_format(value if isinstance(value, dict) else None))
@@ -485,7 +474,7 @@ class Api:
 
     def _sampler_state(self) -> dict:
         s = self._sampler
-        return {"session": s.describe() if s else None, "max_seconds": self._sampler_max(),
+        return {"session": s.describe() if s else None,
                 "tabs": [t.describe() for t in self._sessions.values()]}
 
     def _session(self, sid: str | None = None):
@@ -654,7 +643,7 @@ class Api:
     def sampler_auto_slices(self, sensitivity: float = 0.5, start: float = 0.0, end: float | None = None) -> list[dict]:
         if not self._sampler:
             return []
-        return slicing.auto_slices(self._sampler, float(sensitivity), self._sampler_max(), float(start),
+        return slicing.auto_slices(self._sampler, float(sensitivity), float(start),
                                    None if end is None else float(end))
 
     def sampler_audio(self, start: float, end: float, opts: dict | None = None, sid: str | None = None) -> str | None:
@@ -675,7 +664,7 @@ class Api:
         o = opts or {}
         root = self._work if temp else (self._settings().get("sampler_dir") or sampler_export.DEFAULT_DIR)
         try:
-            files = sampler_export.export(s, regions or [], root, self._sampler_max(),
+            files = sampler_export.export(s, regions or [], root,
                                           float(o.get("fade_in_ms", 1)), float(o.get("fade_out_ms", 10)),
                                           bool(o.get("normalize")))
         except OSError as e:

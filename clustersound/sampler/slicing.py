@@ -2,7 +2,7 @@
 import numpy as np
 
 from .. import features
-from .session import DEFAULT_MAX_SAMPLE_SECONDS, SamplerSession
+from .session import SamplerSession
 
 CHUNK_S = 30.0     # onset detection runs on chunks: a 20-minute STFT would not fit in memory
 OVERLAP_S = 1.0
@@ -38,7 +38,7 @@ def onset_times(x: np.ndarray, sr: int, sensitivity: float = 0.5) -> np.ndarray:
     return np.array(out)
 
 
-def clamp(start: float, end: float, max_s: float = DEFAULT_MAX_SAMPLE_SECONDS, total: float | None = None) -> tuple[float, float]:
+def clamp(start: float, end: float, max_s: float = float("inf"), total: float | None = None) -> tuple[float, float]:
     start, end = sorted((float(start), float(end)))
     start = max(0.0, start)
     if total is not None:
@@ -57,17 +57,15 @@ def _tail_end(x: np.ndarray, sr: int) -> int:
     return min(x.size, (loud[-1] + 2) * win) if loud.size else x.size
 
 
-def auto_slices(s: SamplerSession, sensitivity: float = 0.5, max_s: float = DEFAULT_MAX_SAMPLE_SECONDS,
-                start: float = 0.0, end: float | None = None) -> list[dict]:
+def auto_slices(s: SamplerSession, sensitivity: float = 0.5, start: float = 0.0, end: float | None = None) -> list[dict]:
     """One region per transient between start and end, each cut where the next one begins."""
-    a, b = clamp(start, s.duration if end is None else end, max_s=float("inf"), total=s.duration)
+    a, b = clamp(start, s.duration if end is None else end, total=s.duration)
     x = s.mono()[int(a * s.sr):int(b * s.sr)]
     times = onset_times(x, s.sr, sensitivity)
     regions = []
     for i, t in enumerate(times):
         r0 = max(0.0, t - PRE_ROLL_S)
         r1 = times[i + 1] - PRE_ROLL_S if i + 1 < len(times) else x.size / s.sr
-        r0, r1 = clamp(r0, r1, max_s)
         seg = x[int(r0 * s.sr):int(r1 * s.sr)]
         r1 = r0 + _tail_end(seg, s.sr) / s.sr
         if r1 - r0 >= MIN_REGION_S:
@@ -83,7 +81,7 @@ def _zero_cross(x: np.ndarray, i: int, radius: int) -> int:
     return lo + int(zc[-1]) if zc.size else i
 
 
-def render(s: SamplerSession, start: float, end: float, max_s: float = DEFAULT_MAX_SAMPLE_SECONDS,
+def render(s: SamplerSession, start: float, end: float, max_s: float = float("inf"),
            fade_in_ms: float = 1.0, fade_out_ms: float = 10.0, normalize: bool = False) -> np.ndarray:
     """The audio of one region, ready to write: clamped, start on a zero crossing, short fades."""
     start, end = clamp(start, end, max_s, s.duration)

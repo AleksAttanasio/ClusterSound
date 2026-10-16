@@ -7,7 +7,7 @@ import soundfile as sf
 from ..i18n import N_, tr
 from ..online.downloads import license_text, safe_name, unique_path
 from . import slicing
-from .session import DEFAULT_MAX_SAMPLE_SECONDS, SamplerSession
+from .session import SamplerSession
 
 DEFAULT_DIR = os.path.expanduser("~/Music/ClusterSound Samples")
 ORIGIN_FOLDER = {"file": "From file", "capture": "Audio capture"}
@@ -51,8 +51,7 @@ def write_note(s: SamplerSession, path: str, start: float, end: float) -> None:
             f.write(source_text(s, start, end))
 
 
-def export(s: SamplerSession, regions: list[dict], root: str = DEFAULT_DIR,
-           max_s: float = DEFAULT_MAX_SAMPLE_SECONDS, fade_in_ms: float = 1.0, fade_out_ms: float = 10.0,
+def export(s: SamplerSession, regions: list[dict], root: str = DEFAULT_DIR, fade_in_ms: float = 1.0, fade_out_ms: float = 10.0,
            normalize: bool = False) -> list[str | None]:
     """One WAV per region ({start, end, name?}); returns the written paths, aligned with the regions
     (None for a region outside the audio)."""
@@ -60,8 +59,8 @@ def export(s: SamplerSession, regions: list[dict], root: str = DEFAULT_DIR,
     os.makedirs(folder, exist_ok=True)
     out = []
     for i, r in enumerate(regions, 1):
-        start, end = slicing.clamp(r["start"], r["end"], max_s, s.duration)
-        y = slicing.render(s, start, end, max_s, fade_in_ms, fade_out_ms, normalize)
+        start, end = slicing.clamp(r["start"], r["end"], total=s.duration)
+        y = slicing.render(s, start, end, fade_in_ms=fade_in_ms, fade_out_ms=fade_out_ms, normalize=normalize)
         if y.shape[0] == 0:
             out.append(None)
             continue
