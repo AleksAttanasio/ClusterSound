@@ -9,8 +9,8 @@ copyright: ClusterSound
 theme:
   name: material
   language: en
-  logo: assets/logo.svg
-  favicon: assets/favicon.svg
+  logo: assets/logo.png
+  favicon: assets/favicon.png
   font:
     text: Inter
     code: JetBrains Mono
