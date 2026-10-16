@@ -142,8 +142,9 @@ export function showSendMenu({ x, y, ref, buses, counts = {}, onPick, rack, onOp
   setTimeout(() => document.addEventListener('pointerdown', onOutside, true), 0);
 }
 
-// Small floating panel under `anchor` (closes on outside click / Esc); returns it, with .close().
-export function showPopover(anchor, html, cls = '') {
+// Small floating panel under `anchor` (closes on outside click / Esc); returns it, with .close(). align: 'end' (its
+// right edge on the anchor's, growing leftwards) or 'start' (its left edge on the anchor's, growing rightwards).
+export function showPopover(anchor, html, cls = '', { align = 'end' } = {}) {
   document.querySelector('.popover')?.close?.();
   const el = document.createElement('div');
   el.className = `popover ${cls}`.trim(); // before measuring: the class can change the width
@@ -152,7 +153,7 @@ export function showPopover(anchor, html, cls = '') {
   // under the anchor, or over it when there is no room; again when the content grows (web components render late)
   const place = () => {
     const a = anchor.getBoundingClientRect(), r = el.getBoundingClientRect(), H = window.innerHeight;
-    el.style.left = `${Math.max(8, Math.min(a.right - r.width, window.innerWidth - r.width - 8))}px`;
+    el.style.left = `${Math.max(8, Math.min(align === 'start' ? a.left : a.right - r.width, window.innerWidth - r.width - 8))}px`;
     const below = a.bottom + 6, above = a.top - r.height - 6;
     const top = below + r.height <= H - 8 ? below : above >= 8 ? above : H - r.height - 8;
     el.style.top = `${Math.max(8, Math.min(top, H - r.height - 8))}px`;

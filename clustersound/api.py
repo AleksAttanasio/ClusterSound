@@ -758,10 +758,12 @@ class Api:
         return {**self.stems_status(), "error": None}
 
     def stems_start(self, scope: str = "all", start: float | None = None, end: float | None = None,
-                    keys: list | None = None, sid: str | None = None, path: str | None = None) -> dict:
+                    keys: list | None = None, sid: str | None = None, path: str | None = None,
+                    tracks: list | None = None, rest: bool = True) -> dict:
         """Separate the shown track (or the tab sid) in the background, all of it (scope "all") or one region
-        ("region"), into the chosen stems (all when keys is None) plus "other" with the rest. With path: one listed
-        extracted file (e.g. an enhanced one), whose stems go with its source's samples."""
+        ("region"), into tracks: each a group of stems summed (tracks, e.g. [["guitar", "vocals"], ["drums"]]),
+        or one per chosen stem (keys; all when both are None), plus (rest) one with the stems in no track. With path:
+        one listed extracted file (e.g. an enhanced one), whose stems go with its source's samples."""
         s = self._session(sid)
         if path:
             s = self._extraction_session(path)
@@ -769,7 +771,9 @@ class Api:
                 return {**self.stems_status(), "error": s}
             scope = "all"
         try:
-            keys = sampler_stems.chosen(None if keys is None else [str(k) for k in keys])
+            groups = ([[str(k) for k in g] for g in tracks] if tracks is not None
+                      else sampler_stems.legacy_groups(None if keys is None else [str(k) for k in keys]))
+            plan = sampler_stems.plan_tracks(groups, bool(rest))
         except ValueError as e:
             return {**self.stems_status(), "error": str(e)}
         st = sampler_stems.status()
@@ -794,13 +798,13 @@ class Api:
             if self._stems_busy():
                 return {**sampler_stems.status(), "job": dict(self._stems_job), "error": i18n.tr("separation already in progress")}
             self._stems_job = {"state": "running", "progress": 0.0, "scope": scope, "stems": [], "error": None,
-                               "title": s.title, "folder": folder, "keys": keys}
+                               "title": s.title, "folder": folder, "tracks": groups}
         self._stems_cancel.clear()
 
         def work():  # keeps its own reference to s: opening other audio meanwhile doesn't affect it
             try:
                 res = sampler_stems.separate(s, a, b, folder, base, lambda p: self._stems_set(progress=round(p, 3)),
-                                             self._stems_cancel.is_set, keys[:-1])
+                                             self._stems_cancel.is_set, tracks=plan)
             except sampler_stems.Cancelled:
                 self._stems_set(state="cancelled")
                 return

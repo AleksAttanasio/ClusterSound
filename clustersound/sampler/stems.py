@@ -24,7 +24,8 @@ MODEL_DIR = str(data_dir_path() / "models" / "demucs")
 MODEL_MB = 55
 STEMS = [("drums", N_("Drums")), ("bass", N_("Bass")), ("guitar", N_("Guitar")), ("piano", "Piano"), ("vocals", N_("Vocals")),
          ("other", N_("Other"))]
-CHOOSABLE = [k for k, _ in STEMS if k != "other"]  # "other" is always written: whatever wasn't chosen
+CHOOSABLE = [k for k, _ in STEMS if k != "other"]
+INSTRUMENTAL = N_("Instrumental")  # the name of a track with every stem but the vocals  # "other" is always written: whatever wasn't chosen
 INSTALL_HINT = 'pip install -e ".[stems]"'
 BLOCK_S = 60.0   # separated per block: a 20-minute source at once would need several GB
 OVERLAP_S = 2.0  # blocks overlap and are crossfaded, so the seams don't click
@@ -131,18 +132,20 @@ def _load_model():
         return _model
 
 
-def _split(model, x: np.ndarray, sr: int, keys: list[str]) -> np.ndarray:
-    """One block (frames, channels) at sr -> (len(keys), frames, channels), stems summing to x.
-    keys ends with "other", which gets every source that isn't in keys."""
+def _split(model, x: np.ndarray, sr: int, groups: list[list[str]]) -> np.ndarray:
+    """One block (frames, channels) at sr -> (len(groups), frames, channels): each track is the sum of the
+    sources in its group (a source can be in several groups; one in no group is dropped)."""
     n, ch = x.shape
     st = np.repeat(x, 2, axis=1) if ch == 1 else x
     msr = model.samplerate
     if msr != sr:
         st = soxr.resample(st, sr, msr)
     src = model.separate(st.T)
-    out = np.zeros((len(keys), st.shape[0], 2), dtype=np.float32)
+    out = np.zeros((len(groups), st.shape[0], 2), dtype=np.float32)
     for name, y in src.items():
-        out[keys.index(name) if name in keys else keys.index("other")] += y.T[: st.shape[0]]
+        for i, g in enumerate(groups):
+            if name in g:
+                out[i] += y.T[: st.shape[0]]
     if msr != sr:
         out = np.stack([soxr.resample(o, msr, sr) for o in out])
     out = out[:, :n]
@@ -168,20 +171,58 @@ def chosen(keys: list[str] | None) -> list[str]:
     return [k for k in CHOOSABLE if k in keys] + ["other"]
 
 
+def plan_tracks(groups: list[list[str]], rest: bool = True) -> list[dict]:
+    """The tracks to write, one per group of stems (any of STEMS, "other" too), in the given order: each group
+    de-duplicated and in STEMS order, label "Guitar + Vocals" ("Instrumental": everything but the vocals).
+    Repeated groups stay (the user chose them). With rest, if some source is in no group, one more track gets
+    it: "Other" (as when choosing stems one by one), or "Rest" when "other" itself is in a group; without, those
+    sources are dropped. Returns [{key, keys, label}]."""
+    order = [k for k, _ in STEMS]
+    labels = dict(STEMS)
+    if not groups or any(not g for g in groups):
+        raise ValueError(tr("choose at least one stem"))
+    bad = {str(k) for g in groups for k in g} - set(order)
+    if bad:
+        raise ValueError(tr("unknown stems: {stems}", stems=", ".join(sorted(bad))))
+    tracks = []
+    for g in groups:
+        keys = [k for k in order if k in g]
+        label = tr(INSTRUMENTAL) if keys == [k for k in order if k != "vocals"] else " + ".join(tr(labels[k]) for k in keys)
+        tracks.append({"key": "+".join(keys), "keys": keys, "label": label})
+    used = {k for t in tracks for k in t["keys"]}
+    left = [k for k in order if k not in used]
+    if rest and left:
+        key = "rest" if "other" in used else "other"
+        tracks.append({"key": key, "keys": left, "label": tr(N_("Rest") if key == "rest" else labels["other"])})
+    return tracks
+
+
+def legacy_groups(keys: list[str] | None) -> list[list[str]]:
+    """Stems chosen one by one (the old way): one track each; all six when keys is None."""
+    ks = chosen(keys)
+    return [[k] for k in (ks if keys is None else ks[:-1])]
+
+
 def separate(s: SamplerSession, start: float, end: float, folder: str, base_name: str,
              on_progress: Callable[[float], None] | None = None,
-             cancelled: Callable[[], bool] | None = None, keys: list[str] | None = None) -> list[dict]:
-    """Separate [start, end) s of the session into one 24-bit WAV per chosen stem (+ "other") in folder.
-    Returns [{key, label, path}]; on cancel or error no partial file is left."""
-    keys = chosen(keys)
-    labels = {k: tr(v) for k, v in STEMS}
+             cancelled: Callable[[], bool] | None = None, keys: list[str] | None = None,
+             tracks: list[dict] | None = None) -> list[dict]:
+    """Separate [start, end) s of the session into one 24-bit WAV per track in folder: tracks from plan_tracks,
+    or (without them) one per chosen stem + "other". Returns [{key, keys, label, path}]; on cancel or error no
+    partial file is left."""
+    if tracks is None:
+        tracks = plan_tracks(legacy_groups(keys))
+    groups = [t["keys"] for t in tracks]
     a, b = s._span(start, end)
     x = s.audio[a:b]
     if x.shape[0] == 0:
         raise ValueError(tr("empty region"))
     model = _load_model()
     os.makedirs(folder, exist_ok=True)
-    paths = [unique_path(os.path.join(folder, safe_name(f"{base_name} - {labels[k]}") + ".wav")) for k in keys]
+    paths = []
+    for t in tracks:  # one at a time: a repeated track gets "… (2).wav"
+        paths.append(unique_path(os.path.join(folder, safe_name(f"{base_name} - {t['label']}") + ".wav")))
+        open(paths[-1], "wb").close()
     files = [sf.SoundFile(p, "w", s.sr, x.shape[1], subtype="PCM_24") for p in paths]
     hop, ov, n = int(BLOCK_S * s.sr), int(OVERLAP_S * s.sr), x.shape[0]
     try:
@@ -189,7 +230,7 @@ def separate(s: SamplerSession, start: float, end: float, folder: str, base_name
         for i in range(0, n, hop):
             if cancelled and cancelled():
                 raise Cancelled()
-            y = _split(model, x[i:i + hop + ov], s.sr, keys)
+            y = _split(model, x[i:i + hop + ov], s.sr, groups)
             if tail is not None:  # crossfade the previous block's overlap into this one's head
                 k = tail.shape[1]
                 fade = np.linspace(0, 1, k, dtype=np.float32)[None, :, None]
@@ -212,4 +253,4 @@ def separate(s: SamplerSession, start: float, end: float, folder: str, base_name
     t0, t1 = a / s.sr, b / s.sr
     for p in paths:
         sampler_export.write_note(s, p, t0, t1)
-    return [{"key": k, "label": labels[k], "path": p} for k, p in zip(keys, paths)]
+    return [{**t, "path": p} for t, p in zip(tracks, paths)]

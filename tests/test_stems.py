@@ -91,6 +91,52 @@ def test_chosen_rejects(keys):
         stems.chosen(keys)
 
 
+def test_tracks_sum_their_stems(tmp_path, fake):
+    x = _noise(1.0)
+    s = S.from_array(x, SR)
+    tracks = stems.plan_tracks([["vocals", "guitar"], ["vocals"], ["drums", "drums"]])
+    res = stems.separate(s, 0, 1, str(tmp_path), "t", tracks=tracks)
+    assert [r["label"] for r in res] == ["Guitar + Vocals", "Vocals", "Drums", "Other"]
+    assert [r["keys"] for r in res][-1] == ["bass", "piano", "other"]
+    y = [sf.read(r["path"], dtype="float32", always_2d=True)[0] for r in res]
+    assert np.allclose(y[0], (.15 + .15) * x, atol=1e-4)
+    assert np.allclose(y[1], .15 * x, atol=1e-4)  # vocals in two tracks
+    assert np.allclose(y[3], (.2 + .1 + .1) * x, atol=1e-4)
+    assert os.path.basename(res[0]["path"]) == "t - Guitar + Vocals.wav"
+
+
+def test_repeated_tracks_and_rest():
+    every = [[k] for k, _ in stems.STEMS]
+    assert [t["key"] for t in stems.plan_tracks(every)] == [k for k, _ in stems.STEMS]  # no rest
+    rest = stems.plan_tracks([["other", "drums"]])[-1]
+    assert rest["key"] == "rest" and rest["label"] == "Rest" and "other" not in rest["keys"]
+    assert len(stems.plan_tracks([["bass"], ["bass"]])) == 3
+
+
+def test_repeated_tracks_get_their_own_file(tmp_path, fake):
+    s = S.from_array(_noise(0.5), SR)
+    res = stems.separate(s, 0, 0.5, str(tmp_path), "d", tracks=stems.plan_tracks([["bass"], ["bass"]]))
+    assert [os.path.basename(r["path"]) for r in res] == ["d - Bass.wav", "d - Bass (2).wav", "d - Other.wav"]
+
+
+def test_presets_vocals_only_and_instrumental(tmp_path, fake):
+    x = _noise(0.5)
+    s = S.from_array(x, SR)
+    only = stems.plan_tracks([["vocals"]], rest=False)
+    assert [t["label"] for t in only] == ["Vocals"]
+    duo = stems.plan_tracks([["vocals"], ["drums", "bass", "guitar", "piano", "other"]], rest=False)
+    res = stems.separate(s, 0, 0.5, str(tmp_path), "p", tracks=duo)
+    assert [r["label"] for r in res] == ["Vocals", "Instrumental"]
+    y = _read(res)
+    assert np.allclose(y["drums+bass+guitar+piano+other"], (1 - .15) * x, atol=1e-4)
+
+
+@pytest.mark.parametrize("groups", [[], [[]], [["brass"]]])
+def test_plan_tracks_rejects(groups):
+    with pytest.raises(ValueError):
+        stems.plan_tracks(groups)
+
+
 def test_cancel_leaves_no_files(tmp_path, fake, monkeypatch):
     monkeypatch.setattr(stems, "BLOCK_S", 0.5)
     s = S.from_array(_noise(2.0), SR)
@@ -171,3 +217,14 @@ def test_api_region_job_and_open(api, tmp_path):
     assert api._sampler.meta["device"] == "Cuffie" and abs(api._sampler.duration - 1.0) < 1e-3
     assert api.stems_start("all", keys=["vocals"])["error"] is None
     assert [r["label"] for r in api.wait()["stems"]] == ["Vocals", "Other"]
+
+
+def test_api_tracks(api):
+    api._sampler = S.from_array(_noise(1.0), SR, title="Rec")
+    assert api.stems_start("all", tracks=[["guitar", "vocals"], []])["error"] == "choose at least one stem"
+    assert api.stems_start("all", tracks=[["guitar", "vocals"], ["vocals"]])["error"] is None
+    job = api.wait()
+    assert [r["label"] for r in job["stems"]] == ["Guitar + Vocals", "Vocals", "Other"]
+    assert api.stems_open(job["stems"][0]["path"])["session"]["title"] == "Rec · Guitar + Vocals"
+    assert api.stems_start("all", tracks=[["vocals"]], rest=False)["error"] is None
+    assert [r["label"] for r in api.wait()["stems"]] == ["Vocals"]

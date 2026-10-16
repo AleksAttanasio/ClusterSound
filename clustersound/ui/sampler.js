@@ -11,6 +11,7 @@ import { t } from './i18n.js';
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const LS_KEY = 'clustersound.sampler';
+const STEM_DRAG = 'application/x-clustersound-stem';
 const EDGE_PX = 6;         // grab distance of a region edge
 const MIN_VIEW_S = 0.02;   // deepest zoom
 const PLAY_BLOCK_S = 30;   // a track plays in blocks this long (rendered by the backend one at a time)
@@ -423,15 +424,20 @@ export class SamplerEditor {
   }
 
   // A small yes/no dialog; resolves to true on yes.
-  _confirm(label, msg, yes) {
+  async _confirm(label, msg, yes) {
+    return (await this._ask(label, msg, [['yes', yes, 'danger']])) === 'yes';
+  }
+
+  // A small dialog with Cancel and some choices [[go, label, variant]]; resolves to the chosen go, null on Cancel.
+  _ask(label, msg, choices) {
     return new Promise((done) => {
-      let answer = false;
+      let answer = null;
       const dlg = openDialog('sp-confirm-dlg', { label, width: '420px', body: `<p>${msg}</p>`, onHide: () => done(answer),
-        footer: `${btn(t('Cancel'), { 'data-go': 'no' })}${btn(yes, { variant: 'danger', 'data-go': 'yes' })}` });
+        footer: `${btn(t('Cancel'), { 'data-go': 'no' })}${choices.map(([go, l, variant]) => btn(l, { variant, 'data-go': go })).join('')}` });
       dlg.querySelector('.modal-actions').onclick = (e) => {
         const go = e.target.closest('[data-go]')?.dataset.go;
         if (!go) return;
-        answer = go === 'yes';
+        answer = go === 'no' ? null : go;
         dlg.close();
       };
     });
@@ -521,50 +527,159 @@ export class SamplerEditor {
       body = `<div class="hint">${t('It needs the Demucs model (~{mb} MB), downloaded only once. After that the separation works offline: the audio never leaves the computer.', { mb: st.model_mb })}</div>
         <div class="pop-actions">${btn(t('Download the model'), { variant: 'brand', icon: 'download', 'data-go': 'download' })}</div>`;
     } else {
-      const choosable = st.stems.filter((x) => x.choosable);
-      const keys = new Set(this.opts.stemKeys || choosable.map((x) => x.key));
       const scope = r && this.opts.stemScope === 'region' ? 'region' : 'all';
-      body = `<div class="hint">${t('One WAV file per stem, on this computer, with no external services.')}</div>
-        <div class="st-keys">${choosable.map((x) => check(esc(x.label), keys.has(x.key), { 'data-key': x.key })).join('')}</div>
-        <div class="hint">${t('+ <b>Other</b>: everything you did not choose, so nothing is lost.')}</div>
+      body = `<div class="hint">${t('Drag the stems into the tracks: each track is one WAV file, with its stems summed. A stem can go into several tracks.')}</div>
+        <div class="st-presets">${[['vocals', t('Vocals only')], ['duo', t('Vocals + instrumental')], ['all', t('All stems')]]
+          .map(([k, l]) => btn(l, { size: 'xs', 'data-preset': k })).join('')}</div>
+        <div class="st-board"></div>
+        <div class="st-rest"></div>
         ${target ? `<div class="hint"><b>${esc(target.label)}</b></div>`
           : seg([['all', t('Whole recording')], ['region', t('Selected region'), { disabled: !r, title: r ? `${fmt(r.start)} – ${fmt(r.end)}` : t('Select a region') }]],
             scope, { 'data-o': 'scope', cls: 'st-scope' })}
-        <div class="pop-actions">${btn(t('Extract'), { variant: 'brand', icon: 'audio-lines', 'data-go': 'extract', disabled: !keys.size })}</div>`;
+        <div class="pop-actions">${btn(t('Extract'), { variant: 'brand', icon: 'audio-lines', 'data-go': 'extract' })}</div>`;
     }
-    const pop = showPopover(anchor, `<div class="pop-title">${icon('audio-lines')} ${t('Extract stems')}</div>${body}`);
-    const picked = () => [...pop.querySelectorAll('[data-key]')].filter((c) => c.checked).map((c) => c.dataset.key);
-    pop.querySelector('.st-keys')?.addEventListener('change', () => {
-      pop.querySelector('[data-go=extract]').disabled = !picked().length;
-    });
+    const pop = showPopover(anchor, `<div class="pop-title">${icon('audio-lines')} ${t('Extract stems')}</div>${body}`,
+      st?.installed && st.model_ready ? 'st-pop' : '', { align: 'start' });
+    const tracks = st?.installed && st.model_ready ? this._stemTracks() : [];
+    if (pop.querySelector('.st-board')) this._stemBoard(pop, tracks);
     pop.querySelectorAll('[data-go]').forEach((b) => {
       b.onclick = async () => {
         if (b.disabled) return;
-        const go = b.dataset.go;
-        let out;
-        if (go === 'download') {
+        if (b.dataset.go === 'download') {
           pop.close();
-          out = await this.api.stems_download_model();
-        } else if (target) {
-          const keys = picked();
-          Object.assign(this.opts, { stemKeys: keys });
-          this._persist();
-          pop.close();
-          out = target.path ? await this.api.stems_start('all', null, null, keys, null, target.path)
-            : await this.api.stems_start('region', target.start, target.end, keys, target.sid);
-        } else {
-          const keys = picked(), scope = pop.querySelector('[data-o=scope]').value === 'region' && r ? 'region' : 'all';
-          Object.assign(this.opts, { stemKeys: keys, stemScope: scope });
-          this._persist();
-          pop.close();
-          out = await this.api.stems_start(scope, scope === 'region' ? r.start : null, scope === 'region' ? r.end : null, keys);
+          return this._stemsStarted(await this.api.stems_download_model());
         }
-        this.stems = out;
-        if (out.error) this._error(out.error);
-        this._renderStems();
-        if (this._stemsBusy()) this._pollStems();
+        const scope = target ? null : pop.querySelector('[data-o=scope]').value === 'region' && r ? 'region' : 'all';
+        if (scope) Object.assign(this.opts, { stemScope: scope });
+        this._persist();
+        pop.close();
+        const groups = await this._stemDuplicates(tracks), rest = this.opts.stemRest !== false;
+        if (!groups) return;
+        let out;
+        if (target?.path) out = await this.api.stems_start('all', null, null, null, null, target.path, groups, rest);
+        else if (target) out = await this.api.stems_start('region', target.start, target.end, null, target.sid, null, groups, rest);
+        else out = await this.api.stems_start(scope, scope === 'region' ? r.start : null, scope === 'region' ? r.end : null, null, null, null, groups, rest);
+        this._stemsStarted(out);
       };
     });
+  }
+
+  _stemsStarted(out) {
+    this.stems = out;
+    if (out.error) this._error(out.error);
+    this._renderStems();
+    if (this._stemsBusy()) this._pollStems();
+  }
+
+  // The tracks of the last «Extract stems» (each a list of stem keys); the first time one per stem, as when they
+  // were chosen one by one (stemKeys), so «Other» gets the rest.
+  _stemTracks() {
+    const all = this.stems.stems, known = new Set(all.map((x) => x.key));
+    const saved = Array.isArray(this.opts.stemTracks) ? this.opts.stemTracks
+      : (this.opts.stemKeys || all.filter((x) => x.choosable).map((x) => x.key)).map((k) => [k]);
+    return saved.map((g) => all.map((x) => x.key).filter((k) => g.includes(k) && known.has(k))).filter((g) => g.length);
+  }
+
+  // The stems on the left, dragged (copied) into the track rows on the right; the last row, «New Track», becomes
+  // a track when a stem is dropped on it. Above, three ready layouts; below, whether the stems in no track
+  // get one more track. tracks is edited in place and saved at every change.
+  _stemBoard(pop, tracks) {
+    const all = this.stems.stems, label = Object.fromEntries(all.map((x) => [x.key, x.label]));
+    const order = all.map((x) => x.key), band = order.filter((k) => k !== 'vocals');
+    const name = (g) => (g.join() === band.join() ? t('Instrumental') : g.map((k) => label[k]).join(' + '));
+    const PRESETS = { vocals: [[['vocals']], false], duo: [[['vocals'], band], false], all: [order.map((k) => [k]), true] };
+    const board = pop.querySelector('.st-board');
+    const render = () => {
+      const chip = (k, i) => `<span class="st-chip"${i == null ? ` draggable="true" data-stem="${k}"` : ''}>${esc(label[k])}${
+        i == null ? '' : `<button class="st-x" data-del="${i}" data-key="${k}" title="${esc(t('Remove {stem}', { stem: label[k] }))}">${icon('x')}</button>`}</span>`;
+      board.innerHTML = `<div class="st-palette">${order.map((k) => chip(k)).join('')}</div>
+        <div class="st-rows">${tracks.map((g, i) => `<div class="st-row" data-row="${i}">
+            <span class="st-row-name" title="${esc(name(g))}">${esc(name(g))}</span>
+            <div class="st-row-body">${g.map((k) => chip(k, i)).join('')}</div>
+            <button class="st-x" data-del="${i}" title="${esc(t('Remove the track'))}">${icon('x')}</button></div>`).join('')}
+          <div class="st-row ghost" data-row="new"><span class="st-row-name">${t('New Track')}</span>
+            <div class="st-row-body"><span class="hint">${t('Drag a stem here')}</span></div></div></div>`;
+      const used = new Set(tracks.flat()), rest = order.filter((k) => !used.has(k));
+      const restName = `<b>${esc(used.has('other') ? t('Rest') : label.other)}</b>`;
+      pop.querySelector('.st-rest').innerHTML = !rest.length ? '' : check(rest.join() === 'other'
+        ? t('+ «{name}», in no track, so nothing is lost.', { name: restName })
+        : t('+ «{name}»: {stems}, in no track, so nothing is lost.', { name: restName, stems: esc(rest.map((k) => label[k]).join(', ')) }),
+      this.opts.stemRest !== false, { 'data-o': 'rest' });
+      pop.querySelector('[data-go=extract]').disabled = !tracks.length;
+    };
+    const changed = () => {
+      this.opts.stemTracks = tracks.map((g) => [...g]);
+      this._persist();
+      render();
+    };
+    pop.querySelector('.st-presets').addEventListener('click', (e) => {
+      const p = PRESETS[e.target.closest('[data-preset]')?.dataset.preset];
+      if (!p) return;
+      tracks.splice(0, tracks.length, ...p[0].map((g) => [...g]));
+      this.opts.stemRest = p[1];
+      changed();
+    });
+    pop.querySelector('.st-rest').addEventListener('change', (e) => {
+      this.opts.stemRest = e.target.checked;
+      this._persist();
+    });
+    board.addEventListener('dragstart', (e) => {
+      const k = e.target.closest?.('[data-stem]')?.dataset.stem;
+      if (!k) return;
+      e.dataTransfer.setData(STEM_DRAG, k);
+      e.dataTransfer.effectAllowed = 'copy';
+    });
+    const rowOf = (e) => (e.dataTransfer.types.includes(STEM_DRAG) ? e.target.closest?.('.st-row') : null);
+    board.addEventListener('dragover', (e) => {
+      const row = rowOf(e);
+      if (!row) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      board.querySelectorAll('.st-row.over').forEach((c) => c !== row && c.classList.remove('over'));
+      row.classList.add('over');
+    });
+    board.addEventListener('dragleave', (e) => {
+      const row = e.target.closest?.('.st-row');
+      if (row && !row.contains(e.relatedTarget)) row.classList.remove('over');
+    });
+    board.addEventListener('drop', (e) => {
+      const row = rowOf(e), k = e.dataTransfer.getData(STEM_DRAG);
+      if (!row || !label[k]) return;
+      e.preventDefault();
+      if (row.dataset.row === 'new') tracks.push([k]);
+      else {
+        const g = tracks[+row.dataset.row];
+        if (g.includes(k)) return render();
+        g.push(k);
+        g.sort((x, y) => order.indexOf(x) - order.indexOf(y));
+      }
+      changed();
+    });
+    board.addEventListener('click', (e) => {
+      const x = e.target.closest('[data-del]');
+      if (!x) return;
+      const i = +x.dataset.del;
+      if (x.dataset.key) tracks[i] = tracks[i].filter((k) => k !== x.dataset.key);
+      if (!x.dataset.key || !tracks[i].length) tracks.splice(i, 1);
+      changed();
+    });
+    render();
+  }
+
+  // Tracks with the same stems would make the same file: ask whether to make them all or one of each.
+  // Resolves to the groups to send, or null when cancelled.
+  async _stemDuplicates(tracks) {
+    const label = Object.fromEntries(this.stems.stems.map((x) => [x.key, x.label]));
+    const sig = (g) => [...g].sort().join('+'), seen = new Map();
+    tracks.forEach((g) => seen.set(sig(g), (seen.get(sig(g)) || 0) + 1));
+    const twins = tracks.filter((g, i) => seen.get(sig(g)) > 1 && tracks.findIndex((h) => sig(h) === sig(g)) === i);
+    if (!twins.length) return tracks;
+    const names = twins.map((g) => `<b>${esc(g.map((k) => label[k]).join(' + '))}</b> ×${seen.get(sig(g))}`).join(', ');
+    const go = await this._ask(t('Repeated tracks'),
+      t('Some tracks have the same stems: {names}. Make them all anyway, or only one of each?', { names }),
+      [['all', t('Make them all')], ['one', t('One of each'), 'brand']]);
+    if (go === 'one') return tracks.filter((g, i) => tracks.findIndex((h) => sig(h) === sig(g)) === i);
+    return go === 'all' ? tracks : null;
   }
 
   _pollStems() {
