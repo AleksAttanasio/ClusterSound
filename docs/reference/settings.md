@@ -14,7 +14,6 @@ WebView's `localStorage`.
 | `live_port` | 8770 | General | port of the bridge for the Max for Live device (1024–65535) |
 | `live_library` | Live's User Library | General | where to write the racks for Live |
 | `sampler_dir` | `~/Music/ClusterSound Samples` | Recorder | export folder: cuts, stems and enhanced files (Settings › Recorder › *Export folder*) |
-| `sampler_max_seconds` | 30 | Recorder | maximum length of an extracted sample |
 | `recorder_dir` | `~/Music/ClusterSound Recordings` | Recorder | recordings folder |
 | `recorder_format` | — | Recorder | format, bits, bitrate, sample rate and channels |
 | `chord_pack_dir` | empty (built-in pack) | Compose | folder of your own chord pack (set by *Choose…*, cleared by *Use built-in*) |

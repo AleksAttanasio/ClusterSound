@@ -72,11 +72,9 @@ def test_auto_slices_one_region_per_hit():
         assert r["end"] <= t + 0.5  # cut before the next hit (silent tail trimmed)
 
 
-def test_auto_slices_respects_max_and_window():
+def test_auto_slices_window():
     x, starts = _hits()
     s = S.from_array(x, SR)
-    regions = slicing.auto_slices(s, max_s=0.1)
-    assert all(r["end"] - r["start"] <= 0.1 + 1e-6 for r in regions)
     inner = slicing.auto_slices(s, start=1.0, end=2.0)
     assert inner and all(1.0 <= r["start"] < 2.0 for r in inner)
 
@@ -99,7 +97,22 @@ def test_clamp_and_render():
     assert slicing.render(s, 0, 10, max_s=0.2).shape[0] == int(0.2 * SR)
 
 
+def test_render_blocks_of_a_long_region():
+    x = np.linspace(-0.5, 0.5, 4 * SR, dtype=np.float32)
+    s = S.from_array(x, SR)
+    whole = slicing.render(s, 0.5, 3.5, fade_in_ms=10, fade_out_ms=10, normalize=True)
+    blocks = [slicing.render(s, a, b, fade_in_ms=10, fade_out_ms=10, normalize=True, span=(0.5, 3.5)) for a, b in ((0.5, 2), (2, 3.5))]
+    assert np.allclose(np.concatenate(blocks), whole, atol=1e-6)
+
+
 # ---------------------------------------------------------------- export
+def test_export_has_no_length_limit(tmp_path):
+    s = S.from_array(np.full(50 * SR, 0.1, dtype=np.float32), SR, title="Long")
+    p = sampler_export.export(s, [{"start": 2, "end": 47}], root=str(tmp_path))[0]
+    assert abs(sf.info(p).duration - 45) < 0.01
+    assert sampler_export.export(s, [{"start": 40, "end": 99}], root=str(tmp_path))[0] and slicing.clamp(40, 99, total=50) == (40.0, 50.0)
+
+
 def test_export_file_origin(tmp_path):
     x, _ = _hits()
     s = S.from_array(x, SR, title="Break", origin="file")
@@ -120,8 +133,8 @@ def test_export_link_and_capture_sidecars(tmp_path):
                      author="Someone", license="by", page_url="https://archive.org/details/x",
                      download_url="https://archive.org/download/x/a.flac")
     link = S.from_array(x, SR, origin="link", title="Old Tape", result=r)
-    p = sampler_export.export(link, [{"start": 0, "end": 99}], root=str(tmp_path), max_s=1.0)[0]
-    assert sf.info(p).duration <= 1.0 + 1e-3
+    p = sampler_export.export(link, [{"start": 0, "end": 1}], root=str(tmp_path))[0]
+    assert abs(sf.info(p).duration - 1.0) < 1e-3
     lic = open(p + ".license.txt").read()
     assert "CC BY" in lic and "Attribution required" in lic and "Region: 0.000–1.000 s" in lic
     assert "Internet Archive" in p
@@ -235,7 +248,6 @@ def lib_api(tmp_path):
     a._sampler = None
     a._sessions, a._sid_next, a._extr_paths = {}, 0, {}
     a._work = str(tmp_path / "work")
-    a._sampler_max = lambda: 30.0
     return a
 
 

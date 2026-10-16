@@ -30,8 +30,8 @@ Usa il detector di onset [multi-banda](audio-analysis.md#onset-multi-banda), ada
 2. **Blocchi** di 30 s con 1 s di sovrapposizione: ogni blocco "possiede" l'intervallo \([a + 0{,}5,\; a + \text{hop} +
    0{,}5)\) s, così un onset vicino al bordo è contato una volta sola; al primo blocco si antepongono 50 ms di silenzio
    perché un colpo a t = 0 mostri una salita. Onset entro 30 ms sono fusi.
-3. **Regioni**: da 5 ms prima dell'onset (pre-roll) fino al successivo meno il pre-roll, limitate alla durata
-   massima (30 s); ogni regione è poi accorciata all'ultima finestra RMS di 10 ms sopra **−50 dB** rispetto al suo
+3. **Regioni**: da 5 ms prima dell'onset (pre-roll) fino al successivo meno il pre-roll (senza durata
+   massima); ogni regione è poi accorciata all'ultima finestra RMS di 10 ms sopra **−50 dB** rispetto al suo
    picco (via le code di silenzio). Regioni sotto 30 ms vengono scartate.
 
 ## Rendering dei sample

@@ -8,7 +8,6 @@ import soundfile as sf
 from ..online.base import OnlineResult
 
 MAX_SOURCE_SECONDS = 20 * 60  # longer sources are opened on their first 20 minutes
-DEFAULT_MAX_SAMPLE_SECONDS = 30.0
 ORIGINS = ("file", "link", "capture")
 
 

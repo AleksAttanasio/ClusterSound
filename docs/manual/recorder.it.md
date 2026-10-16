@@ -79,7 +79,7 @@ Accanto al titolo:
   ClusterSound con *Ricevi* attivo.
 - **Esporta tutto** salva le righe spuntate nella **cartella di esportazione** (Impostazioni › Recorder, di base
   `~/Music/ClusterSound Samples/`). I tagli diventano WAV 24 bit con fade (1 ms in, 10 ms out) e normalizzazione
-  opzionale, massimo 30 s ciascuno; stem e file migliorati ci vengono spostati con la loro nota di provenienza.
+  opzionale, di qualunque durata; stem e file migliorati ci vengono spostati con la loro nota di provenienza.
 
 ## Estrai stem
 
