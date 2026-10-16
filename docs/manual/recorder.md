@@ -73,7 +73,7 @@ Next to the title:
   library is made of several), analysed like the other samples. Live needs the ClusterSound device with *Receive* on.
 - **Export all** saves the ticked rows into the **export folder** (Settings › Recorder, by default
   `~/Music/ClusterSound Samples/`). Cuts become 24-bit WAVs with fades (1 ms in, 10 ms out) and optional
-  normalisation, at most 30 s each; stems and enhanced files move there with their provenance note.
+  normalisation, of any length; stems and enhanced files move there with their provenance note.
 
 ## Extract stems
 

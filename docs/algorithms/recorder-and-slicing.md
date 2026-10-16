@@ -30,8 +30,8 @@ It uses the [multi-band](audio-analysis.md#multi-band-onsets) onset detector, ad
 2. **Blocks** of 30 s with 1 s of overlap: every block "owns" the interval \([a + 0.5,\; a + \text{hop} + 0.5)\) s, so an
    onset close to the edge is counted only once; 50 ms of silence are prepended to the first block so that a hit at
    t = 0 shows a rise. Onsets within 30 ms are merged.
-3. **Regions**: from 5 ms before the onset (pre-roll) to the next one minus the pre-roll, limited to the maximum
-   length (30 s); every region is then shortened to the last 10 ms RMS window above **−50 dB** relative to its peak
+3. **Regions**: from 5 ms before the onset (pre-roll) to the next one minus the pre-roll (no maximum
+   length); every region is then shortened to the last 10 ms RMS window above **−50 dB** relative to its peak
    (no silent tails). Regions under 30 ms are discarded.
 
 ## Rendering the samples
