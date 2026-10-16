@@ -198,7 +198,7 @@ span.chip:hover { border-color: var(--wa-color-brand-border-loud); color: var(--
 .scene-tools { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; }
 .layout-badge { position: absolute; left: 12px; top: 12px; font-size: 11px; color: var(--text-2); background: rgba(34,34,34,.85); border: 1px solid var(--line); padding: 3px 8px; border-radius: 5px; }
 .empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--text-2); text-align: center; padding: 40px; pointer-events: none; }
-.empty-logo { width: 112px; height: 112px; margin-bottom: 6px; filter: drop-shadow(0 8px 28px rgb(0 176 159 / .3)); }
+.empty-logo { width: 112px; height: 112px; margin-bottom: 6px; filter: drop-shadow(0 8px 28px rgb(1 153 145 / .3)); }
 .empty-title { font-size: 18px; color: var(--text); font-weight: 600; }
 .empty-sub { max-width: 460px; }
 
