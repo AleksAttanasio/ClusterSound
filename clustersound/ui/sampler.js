@@ -529,8 +529,10 @@ export class SamplerEditor {
     } else {
       const scope = r && this.opts.stemScope === 'region' ? 'region' : 'all';
       body = `<div class="hint">${t('Drag the stems into the tracks: each track is one WAV file, with its stems summed. A stem can go into several tracks.')}</div>
+        <div class="st-presets">${[['vocals', t('Vocals only')], ['duo', t('Vocals + instrumental')], ['all', t('All stems')]]
+          .map(([k, l]) => btn(l, { size: 'xs', 'data-preset': k })).join('')}</div>
         <div class="st-board"></div>
-        <div class="hint st-rest"></div>
+        <div class="st-rest"></div>
         ${target ? `<div class="hint"><b>${esc(target.label)}</b></div>`
           : seg([['all', t('Whole recording')], ['region', t('Selected region'), { disabled: !r, title: r ? `${fmt(r.start)} – ${fmt(r.end)}` : t('Select a region') }]],
             scope, { 'data-o': 'scope', cls: 'st-scope' })}
@@ -551,12 +553,12 @@ export class SamplerEditor {
         if (scope) Object.assign(this.opts, { stemScope: scope });
         this._persist();
         pop.close();
-        const groups = await this._stemDuplicates(tracks);
+        const groups = await this._stemDuplicates(tracks), rest = this.opts.stemRest !== false;
         if (!groups) return;
         let out;
-        if (target?.path) out = await this.api.stems_start('all', null, null, null, null, target.path, groups);
-        else if (target) out = await this.api.stems_start('region', target.start, target.end, null, target.sid, null, groups);
-        else out = await this.api.stems_start(scope, scope === 'region' ? r.start : null, scope === 'region' ? r.end : null, null, null, null, groups);
+        if (target?.path) out = await this.api.stems_start('all', null, null, null, null, target.path, groups, rest);
+        else if (target) out = await this.api.stems_start('region', target.start, target.end, null, target.sid, null, groups, rest);
+        else out = await this.api.stems_start(scope, scope === 'region' ? r.start : null, scope === 'region' ? r.end : null, null, null, null, groups, rest);
         this._stemsStarted(out);
       };
     });
@@ -579,11 +581,13 @@ export class SamplerEditor {
   }
 
   // The stems on the left, dragged (copied) into the track columns on the right; the last column, «New Track»,
-  // becomes a track when a stem is dropped on it. tracks is edited in place and saved at every change.
+  // becomes a track when a stem is dropped on it. Above, three ready layouts; below, whether the stems in no track
+  // get one more track. tracks is edited in place and saved at every change.
   _stemBoard(pop, tracks) {
     const all = this.stems.stems, label = Object.fromEntries(all.map((x) => [x.key, x.label]));
-    const order = all.map((x) => x.key);
-    const name = (g) => g.map((k) => label[k]).join(' + ');
+    const order = all.map((x) => x.key), band = order.filter((k) => k !== 'vocals');
+    const name = (g) => (g.join() === band.join() ? t('Instrumental') : g.map((k) => label[k]).join(' + '));
+    const PRESETS = { vocals: [[['vocals']], false], duo: [[['vocals'], band], false], all: [order.map((k) => [k]), true] };
     const board = pop.querySelector('.st-board');
     const render = () => {
       const chip = (k, i) => `<span class="st-chip"${i == null ? ` draggable="true" data-stem="${k}"` : ''}>${esc(label[k])}${
@@ -597,9 +601,10 @@ export class SamplerEditor {
             <div class="st-col-body"><span class="hint">${t('Drag a stem here')}</span></div></div></div>`;
       const used = new Set(tracks.flat()), rest = order.filter((k) => !used.has(k));
       const restName = `<b>${esc(used.has('other') ? t('Rest') : label.other)}</b>`;
-      pop.querySelector('.st-rest').innerHTML = !rest.length ? ''
-        : rest.join() === 'other' ? t('+ «{name}», in no track, so nothing is lost.', { name: restName })
-          : t('+ «{name}»: {stems}, in no track, so nothing is lost.', { name: restName, stems: esc(rest.map((k) => label[k]).join(', ')) });
+      pop.querySelector('.st-rest').innerHTML = !rest.length ? '' : check(rest.join() === 'other'
+        ? t('+ «{name}», in no track, so nothing is lost.', { name: restName })
+        : t('+ «{name}»: {stems}, in no track, so nothing is lost.', { name: restName, stems: esc(rest.map((k) => label[k]).join(', ')) }),
+      this.opts.stemRest !== false, { 'data-o': 'rest' });
       pop.querySelector('[data-go=extract]').disabled = !tracks.length;
     };
     const changed = () => {
@@ -607,6 +612,17 @@ export class SamplerEditor {
       this._persist();
       render();
     };
+    pop.querySelector('.st-presets').addEventListener('click', (e) => {
+      const p = PRESETS[e.target.closest('[data-preset]')?.dataset.preset];
+      if (!p) return;
+      tracks.splice(0, tracks.length, ...p[0].map((g) => [...g]));
+      this.opts.stemRest = p[1];
+      changed();
+    });
+    pop.querySelector('.st-rest').addEventListener('change', (e) => {
+      this.opts.stemRest = e.target.checked;
+      this._persist();
+    });
     board.addEventListener('dragstart', (e) => {
       const k = e.target.closest?.('[data-stem]')?.dataset.stem;
       if (!k) return;

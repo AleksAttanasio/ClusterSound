@@ -82,7 +82,9 @@ Separates the shown track or its region (or, from its row, a single cut or enhan
 into the columns on the right, one column per track. The column name follows its stems (*Guitar + Vocals*), the same
 stem can go into several tracks, and the grey **New Track** column on the right becomes a new track as soon as you drop
 a stem on it. **×** removes a stem from a track or the whole track. The stems that are in no track still get one more
-track, **Other** (**Rest** when *Other* is already used), so the sum gives back the original. If two tracks have the
+track, **Other** (**Rest** when *Other* is already used), so the sum gives back the original; untick it to leave them
+out. Three buttons set a ready layout: **Vocals only**, **Vocals + instrumental** (the second track, every stem but the
+vocals, is called *Instrumental*) and **All stems** (one track each). If two tracks have the
 same stems, **Extract** asks whether to make them all or only one of each. The layout is remembered for the next
 time; the first time there is one track per stem. The tracks can be opened in the editor and show up in the **Stems**
 tab. It runs locally with Demucs (`stems` extra, 55 MB model downloaded on first use). Details:
