@@ -503,25 +503,29 @@ export class ComposeEditor {
       </aside>
       <main class="cp-main">
         <div class="cp-toolbar">
-          <wa-radio-group id="cp-view" class="seg" orientation="horizontal" size="s" value="harmony" label="${t('View')}" title="${t('Harmony: the chords · Melody: the melody over the chords')}">
-            <wa-radio appearance="button" value="harmony">${t('Harmony')}</wa-radio><wa-radio appearance="button" value="melody">${t('Melody')}</wa-radio></wa-radio-group>
-          <wa-input id="cp-name" class="cp-name" size="s" spellcheck="false" title="${t('Name of the progression')}"></wa-input>
-          <label class="cp-field">BPM <wa-number-input id="cp-bpm" size="s" without-steppers min="40" max="240" step="1"></wa-number-input></label>
-          <label class="cp-field">${t('Bars')} <wa-number-input id="cp-bars" size="s" without-steppers min="1" max="128" step="1"></wa-number-input></label>
-          <label class="cp-field">${t('Grid')} <wa-select id="cp-snap" size="s" class="cp-select">${SNAPS.map(([v, l]) => `<wa-option value="${v}">${t(l)}</wa-option>`).join('')}</wa-select></label>
-          <div class="spacer"></div>
-          <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-melmute" title="${t('Melody: on / mute')}"><wa-icon name="music" label="${t('Melody')}"></wa-icon></wa-button>
-          <wa-button class="cp-play" variant="brand" size="s" id="cp-play" title="${t('Play / stop (Space)')}"><wa-icon name="play" label="Play"></wa-icon></wa-button>
-          <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-loop" title="Loop"><wa-icon name="rotate-ccw" label="Loop"></wa-icon></wa-button>
-          <wa-button-group class="cp-pat" label="Pattern">
-            ${btn('Pattern', { id: 'cp-withpat', icon: 'drum', title: t('Plays together with the Sequencer pattern') })}${btn(`<wa-icon name="chevron-down" label="${t('Pattern settings')}"></wa-icon>`, { id: 'cp-patset', title: t('Pattern: bass, volumes, BPM') })}
-          </wa-button-group>
-          <wa-button-group label="${t('History')}">
-            <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-undo" title="${t('Undo')} (${MOD}Z)"><wa-icon name="undo-2" label="${t('Undo')}"></wa-icon></wa-button><wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-redo" title="${t('Redo')} (${SHIFT_MOD}Z)"><wa-icon name="redo-2" label="${t('Redo')}"></wa-icon></wa-button>
-          </wa-button-group>
-          ${btn(t('Open…'), { id: 'cp-open', icon: 'folder-open' })}
-          ${btn(t('Save'), { id: 'cp-save', icon: 'save' })}
-          ${btn(t('Export MIDI'), { id: 'cp-export', variant: 'brand', icon: 'file-down', 'with-caret': true })}
+          <div class="cp-tbrow">
+            <wa-radio-group id="cp-view" class="seg" orientation="horizontal" size="s" value="harmony" label="${t('View')}" title="${t('Harmony: the chords · Melody: the melody over the chords')}">
+              <wa-radio appearance="button" value="harmony">${t('Harmony')}</wa-radio><wa-radio appearance="button" value="melody">${t('Melody')}</wa-radio></wa-radio-group>
+            <wa-input id="cp-name" class="cp-name" size="s" spellcheck="false" title="${t('Name of the progression')}"></wa-input>
+            <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-open" title="${t('Open…')}"><wa-icon name="folder-open" label="${t('Open…')}"></wa-icon></wa-button>
+            <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-save" title="${t('Save')}"><wa-icon name="save" label="${t('Save')}"></wa-icon></wa-button>
+            <div class="spacer"></div>
+            ${btn(`${t('Send to')} ${svg('chevron-down', 11)}`, { id: 'cp-send' })}
+          </div>
+          <div class="cp-tbrow">
+            <wa-button class="cp-play" variant="brand" size="s" id="cp-play" title="${t('Play / stop (Space)')}"><wa-icon name="play" label="Play"></wa-icon></wa-button>
+            <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-loop" title="Loop"><wa-icon name="rotate-ccw" label="Loop"></wa-icon></wa-button>
+            <label class="cp-field">BPM <wa-number-input id="cp-bpm" size="s" without-steppers min="40" max="240" step="1"></wa-number-input></label>
+            <label class="cp-field">${t('Grid')} <wa-select id="cp-snap" size="s" class="cp-select">${SNAPS.map(([v, l]) => `<wa-option value="${v}">${t(l)}</wa-option>`).join('')}</wa-select></label>
+            <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-melmute" title="${t('Melody: on / mute')}"><wa-icon name="music" label="${t('Melody')}"></wa-icon></wa-button>
+            <wa-button-group class="cp-pat" label="Pattern">
+              ${btn('Pattern', { id: 'cp-withpat', icon: 'drum', title: t('Plays together with the Sequencer pattern') })}${btn(`<wa-icon name="chevron-down" label="${t('Pattern settings')}"></wa-icon>`, { id: 'cp-patset', title: t('Pattern: bass, volumes, BPM') })}
+            </wa-button-group>
+            <div class="spacer"></div>
+            <wa-button-group label="${t('History')}">
+              <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-undo" title="${t('Undo')} (${MOD}Z)"><wa-icon name="undo-2" label="${t('Undo')}"></wa-icon></wa-button><wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-redo" title="${t('Redo')} (${SHIFT_MOD}Z)"><wa-icon name="redo-2" label="${t('Redo')}"></wa-icon></wa-button>
+            </wa-button-group>
+          </div>
         </div>
         <div class="cp-versions" id="cp-versions"></div>
         <div class="cp-tlwrap" id="cp-tlwrap">
@@ -604,7 +608,6 @@ export class ComposeEditor {
 
     $('#cp-name').onchange = (e) => this.edit(() => { this.project.name = (e.target.value || '').trim() || t('Progression'); }, { redraw: false });
     $('#cp-bpm').onchange = (e) => this.edit(() => { this.project.bpm = Math.max(40, Math.min(240, +e.target.value || 100)); });
-    $('#cp-bars').onchange = (e) => this.edit(() => { this.seq.bars = Math.max(1, Math.min(128, Math.round(+e.target.value) || 4)); });
     $('#cp-snap').onchange = (e) => { this.ui.snap = +e.target.value; this._persist(); };
     $('#cp-view').addEventListener('change', (e) => { if (e.target.id === 'cp-view') this.setView(e.target.value); });
     $('#cp-melmute').onclick = () => {
@@ -626,7 +629,7 @@ export class ComposeEditor {
     $('#cp-redo').onclick = () => this.redo();
     $('#cp-save').onclick = () => this.save();
     $('#cp-open').onclick = (e) => this.openDialog(e.currentTarget);
-    $('#cp-export').onclick = (e) => this.exportMenu(e.currentTarget);
+    $('#cp-send').onclick = (e) => this.exportMenu(e.currentTarget);
     $('#cp-even').onclick = () => this.distribute();
     $('#cp-clear').onclick = () => {
       if (this.ui.view === 'melody') { if (this.melNotes.length) this.edit(() => { this.melNotes = []; this.melSel.clear(); }); return; }
@@ -634,6 +637,9 @@ export class ComposeEditor {
     };
     this._bindMelody();
 
+    $('#cp-versions').onchange = (e) => {
+      if (e.target.id === 'cp-bars') this.edit(() => { this.seq.bars = Math.max(1, Math.min(128, Math.round(+e.target.value) || 4)); });
+    };
     $('#cp-versions').onclick = (e) => {
       const a = e.target.closest('[data-act]');
       if (!a) {
@@ -1193,7 +1199,6 @@ export class ComposeEditor {
     const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = v; };
     set('#cp-name', this.project.name);
     set('#cp-bpm', this.project.bpm);
-    set('#cp-bars', s.bars);
     set('#cp-snap', String(this.ui.snap));
     const play = $('#cp-play');
     const state = this._rec ? 'rec' : this.transport.playing ? 'stop' : 'play';
@@ -1221,7 +1226,9 @@ export class ComposeEditor {
         return `<div class="cp-vtab active" data-v="${v}"><span title="${title}">${v}</span>
           ${tabTools('data-act', 'cp-vary-ver', varyVerTip(), { dupTitle: t('Duplicate the version'), addTitle: t('New empty harmony'), delTitle: t('Delete the version'), canDel: p.order.length > 1 })}</div>`;
       }).join('')}
-      ${this.melNotes.length && this.ui.view === 'harmony' ? xs(t('Harmonise the melody…'), { icon: 'music', 'data-act': 'harm', title: t('New versions with the chords derived from the melody') }) : ''}`;
+      ${this.melNotes.length && this.ui.view === 'harmony' ? xs(t('Harmonise the melody…'), { icon: 'music', 'data-act': 'harm', title: t('New versions with the chords derived from the melody') }) : ''}
+      <div class="spacer"></div>
+      <label class="cp-field" title="${t('Length of version {v}', { v: p.active })}">${t('Bars')} <wa-number-input id="cp-bars" size="s" without-steppers min="1" max="128" step="1" value="${this.seq.bars}"></wa-number-input></label>`;
   }
 
   get pxStep() { return this._pxStep || 10; }
