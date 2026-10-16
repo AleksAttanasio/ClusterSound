@@ -79,8 +79,8 @@ Next to the title:
 
 Separates the shown track or its region (or, from its row, a single cut or enhanced file) into **tracks**, each one a
 24-bit WAV with its stems summed. On the left are the stems (**Drums, Bass, Guitar, Piano, Vocals, Other**): drag them
-into the columns on the right, one column per track. The column name follows its stems (*Guitar + Vocals*), the same
-stem can go into several tracks, and the grey **New Track** column on the right becomes a new track as soon as you drop
+into the rows on the right, one row per track. The row name follows its stems (*Guitar + Vocals*), the same
+stem can go into several tracks, and the grey **New Track** row at the bottom becomes a new track as soon as you drop
 a stem on it. **×** removes a stem from a track or the whole track. The stems that are in no track still get one more
 track, **Other** (**Rest** when *Other* is already used), so the sum gives back the original; untick it to leave them
 out. Three buttons set a ready layout: **Vocals only**, **Vocals + instrumental** (the second track, every stem but the

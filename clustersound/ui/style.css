@@ -1147,7 +1147,7 @@ wa-button.rc-rec.on::part(base) { background: #ef5350; border-color: #ef5350; co
 .sp-lib-row:hover { background: var(--bg); border-color: var(--line); }
 .sp-lib-row.busy { opacity: .5; pointer-events: none; }
 .sp-lib-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.popover.st-pop { width: 600px; max-width: calc(100vw - 16px); }
+.popover.st-pop { width: 540px; max-width: calc(100vw - 16px); }
 .st-board { display: grid; grid-template-columns: auto 1fr; gap: 10px; min-width: 0; }
 .st-palette { display: flex; flex-direction: column; gap: 5px; padding-right: 10px; border-right: 1px solid var(--line); }
 .st-palette .st-chip { cursor: grab; }
@@ -1156,14 +1156,13 @@ wa-button.rc-rec.on::part(base) { background: #ef5350; border-color: #ef5350; co
 .st-palette .st-chip { padding-right: 8px; }
 .st-x { display: inline-flex; padding: 2px; border: 0; border-radius: 999px; background: none; color: var(--text-3); cursor: pointer; font-size: 11px; }
 .st-x:hover { color: var(--text); background: var(--bg); }
-.st-cols { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; min-width: 0; }
-.st-col { flex: 0 0 132px; display: flex; flex-direction: column; gap: 6px; min-height: 150px; padding: 6px; border: 1px solid var(--line-2); border-radius: var(--radius); background: var(--bg); }
-.st-col-head { display: flex; align-items: center; gap: 4px; min-height: 20px; }
-.st-col-name { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.st-col-body { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
-.st-col.ghost { opacity: .55; border-style: dashed; background: none; }
-.st-col.ghost .st-col-name { color: var(--text-3); font-weight: 500; }
-.st-col.over { opacity: 1; border-color: var(--sel-line); background: var(--sel-bg); }
+.st-rows { display: flex; flex-direction: column; gap: 6px; min-width: 0; max-height: 320px; overflow-y: auto; }
+.st-row { display: grid; grid-template-columns: 112px 1fr auto; align-items: center; gap: 8px; min-height: 36px; padding: 4px 6px 4px 10px; border: 1px solid var(--line-2); border-radius: var(--radius); background: var(--bg); }
+.st-row-name { min-width: 0; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-row-body { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; min-width: 0; }
+.st-row.ghost { opacity: .55; border-style: dashed; background: none; }
+.st-row.ghost .st-row-name { color: var(--text-3); font-weight: 500; }
+.st-row.over { opacity: 1; border-color: var(--sel-line); background: var(--sel-bg); }
 .st-rest:empty { display: none; }
 .st-presets { display: flex; flex-wrap: wrap; gap: 6px; }
 .st-rest wa-checkbox { font-size: 11px; color: var(--text-3); }

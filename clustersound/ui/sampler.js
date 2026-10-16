@@ -539,7 +539,7 @@ export class SamplerEditor {
         <div class="pop-actions">${btn(t('Extract'), { variant: 'brand', icon: 'audio-lines', 'data-go': 'extract' })}</div>`;
     }
     const pop = showPopover(anchor, `<div class="pop-title">${icon('audio-lines')} ${t('Extract stems')}</div>${body}`,
-      st?.installed && st.model_ready ? 'st-pop' : '');
+      st?.installed && st.model_ready ? 'st-pop' : '', { align: 'start' });
     const tracks = st?.installed && st.model_ready ? this._stemTracks() : [];
     if (pop.querySelector('.st-board')) this._stemBoard(pop, tracks);
     pop.querySelectorAll('[data-go]').forEach((b) => {
@@ -580,8 +580,8 @@ export class SamplerEditor {
     return saved.map((g) => all.map((x) => x.key).filter((k) => g.includes(k) && known.has(k))).filter((g) => g.length);
   }
 
-  // The stems on the left, dragged (copied) into the track columns on the right; the last column, «New Track»,
-  // becomes a track when a stem is dropped on it. Above, three ready layouts; below, whether the stems in no track
+  // The stems on the left, dragged (copied) into the track rows on the right; the last row, «New Track», becomes
+  // a track when a stem is dropped on it. Above, three ready layouts; below, whether the stems in no track
   // get one more track. tracks is edited in place and saved at every change.
   _stemBoard(pop, tracks) {
     const all = this.stems.stems, label = Object.fromEntries(all.map((x) => [x.key, x.label]));
@@ -593,12 +593,12 @@ export class SamplerEditor {
       const chip = (k, i) => `<span class="st-chip"${i == null ? ` draggable="true" data-stem="${k}"` : ''}>${esc(label[k])}${
         i == null ? '' : `<button class="st-x" data-del="${i}" data-key="${k}" title="${esc(t('Remove {stem}', { stem: label[k] }))}">${icon('x')}</button>`}</span>`;
       board.innerHTML = `<div class="st-palette">${order.map((k) => chip(k)).join('')}</div>
-        <div class="st-cols">${tracks.map((g, i) => `<div class="st-col" data-col="${i}">
-            <div class="st-col-head"><span class="st-col-name" title="${esc(name(g))}">${esc(name(g))}</span>
-              <button class="st-x" data-del="${i}" title="${esc(t('Remove the track'))}">${icon('x')}</button></div>
-            <div class="st-col-body">${g.map((k) => chip(k, i)).join('')}</div></div>`).join('')}
-          <div class="st-col ghost" data-col="new"><div class="st-col-head"><span class="st-col-name">${t('New Track')}</span></div>
-            <div class="st-col-body"><span class="hint">${t('Drag a stem here')}</span></div></div></div>`;
+        <div class="st-rows">${tracks.map((g, i) => `<div class="st-row" data-row="${i}">
+            <span class="st-row-name" title="${esc(name(g))}">${esc(name(g))}</span>
+            <div class="st-row-body">${g.map((k) => chip(k, i)).join('')}</div>
+            <button class="st-x" data-del="${i}" title="${esc(t('Remove the track'))}">${icon('x')}</button></div>`).join('')}
+          <div class="st-row ghost" data-row="new"><span class="st-row-name">${t('New Track')}</span>
+            <div class="st-row-body"><span class="hint">${t('Drag a stem here')}</span></div></div></div>`;
       const used = new Set(tracks.flat()), rest = order.filter((k) => !used.has(k));
       const restName = `<b>${esc(used.has('other') ? t('Rest') : label.other)}</b>`;
       pop.querySelector('.st-rest').innerHTML = !rest.length ? '' : check(rest.join() === 'other'
@@ -629,26 +629,26 @@ export class SamplerEditor {
       e.dataTransfer.setData(STEM_DRAG, k);
       e.dataTransfer.effectAllowed = 'copy';
     });
-    const colOf = (e) => (e.dataTransfer.types.includes(STEM_DRAG) ? e.target.closest?.('.st-col') : null);
+    const rowOf = (e) => (e.dataTransfer.types.includes(STEM_DRAG) ? e.target.closest?.('.st-row') : null);
     board.addEventListener('dragover', (e) => {
-      const col = colOf(e);
-      if (!col) return;
+      const row = rowOf(e);
+      if (!row) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
-      board.querySelectorAll('.st-col.over').forEach((c) => c !== col && c.classList.remove('over'));
-      col.classList.add('over');
+      board.querySelectorAll('.st-row.over').forEach((c) => c !== row && c.classList.remove('over'));
+      row.classList.add('over');
     });
     board.addEventListener('dragleave', (e) => {
-      const col = e.target.closest?.('.st-col');
-      if (col && !col.contains(e.relatedTarget)) col.classList.remove('over');
+      const row = e.target.closest?.('.st-row');
+      if (row && !row.contains(e.relatedTarget)) row.classList.remove('over');
     });
     board.addEventListener('drop', (e) => {
-      const col = colOf(e), k = e.dataTransfer.getData(STEM_DRAG);
-      if (!col || !label[k]) return;
+      const row = rowOf(e), k = e.dataTransfer.getData(STEM_DRAG);
+      if (!row || !label[k]) return;
       e.preventDefault();
-      if (col.dataset.col === 'new') tracks.push([k]);
+      if (row.dataset.row === 'new') tracks.push([k]);
       else {
-        const g = tracks[+col.dataset.col];
+        const g = tracks[+row.dataset.row];
         if (g.includes(k)) return render();
         g.push(k);
         g.sort((x, y) => order.indexOf(x) - order.indexOf(y));

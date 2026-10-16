@@ -85,8 +85,8 @@ Accanto al titolo:
 
 Separa la traccia mostrata o la sua regione (o, dalla sua riga, un singolo taglio o file migliorato) in **tracce**,
 ognuna un WAV 24 bit con i suoi stem sommati. A sinistra ci sono gli stem (**Batteria, Basso, Chitarra, Piano, Voce,
-Altro**): trascinali nelle colonne a destra, una colonna per traccia. Il nome della colonna segue i suoi stem
-(*Chitarra + Voce*), lo stesso stem può andare in più tracce e la colonna grigia **Nuova traccia** a destra diventa una
+Altro**): trascinali nelle righe a destra, una riga per traccia. Il nome della riga segue i suoi stem
+(*Chitarra + Voce*), lo stesso stem può andare in più tracce e la riga grigia **Nuova traccia** in fondo diventa una
 nuova traccia appena ci lasci uno stem. **×** toglie uno stem da una traccia o l'intera traccia. Gli stem che non sono
 in nessuna traccia finiscono comunque in una traccia in più, **Altro** (**Resto** se *Altro* è già usato), così la somma
 ridà l'originale; togli la spunta per lasciarli fuori. Tre pulsanti impostano una disposizione pronta: **Solo voce**,
