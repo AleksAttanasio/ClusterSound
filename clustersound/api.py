@@ -759,10 +759,10 @@ class Api:
 
     def stems_start(self, scope: str = "all", start: float | None = None, end: float | None = None,
                     keys: list | None = None, sid: str | None = None, path: str | None = None,
-                    tracks: list | None = None) -> dict:
+                    tracks: list | None = None, rest: bool = True) -> dict:
         """Separate the shown track (or the tab sid) in the background, all of it (scope "all") or one region
         ("region"), into tracks: each a group of stems summed (tracks, e.g. [["guitar", "vocals"], ["drums"]]),
-        or one per chosen stem (keys; all when both are None), plus one with the stems in no track. With path:
+        or one per chosen stem (keys; all when both are None), plus (rest) one with the stems in no track. With path:
         one listed extracted file (e.g. an enhanced one), whose stems go with its source's samples."""
         s = self._session(sid)
         if path:
@@ -773,7 +773,7 @@ class Api:
         try:
             groups = ([[str(k) for k in g] for g in tracks] if tracks is not None
                       else sampler_stems.legacy_groups(None if keys is None else [str(k) for k in keys]))
-            plan = sampler_stems.plan_tracks(groups)
+            plan = sampler_stems.plan_tracks(groups, bool(rest))
         except ValueError as e:
             return {**self.stems_status(), "error": str(e)}
         st = sampler_stems.status()

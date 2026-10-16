@@ -119,6 +119,18 @@ def test_repeated_tracks_get_their_own_file(tmp_path, fake):
     assert [os.path.basename(r["path"]) for r in res] == ["d - Bass.wav", "d - Bass (2).wav", "d - Other.wav"]
 
 
+def test_presets_vocals_only_and_instrumental(tmp_path, fake):
+    x = _noise(0.5)
+    s = S.from_array(x, SR)
+    only = stems.plan_tracks([["vocals"]], rest=False)
+    assert [t["label"] for t in only] == ["Vocals"]
+    duo = stems.plan_tracks([["vocals"], ["drums", "bass", "guitar", "piano", "other"]], rest=False)
+    res = stems.separate(s, 0, 0.5, str(tmp_path), "p", tracks=duo)
+    assert [r["label"] for r in res] == ["Vocals", "Instrumental"]
+    y = _read(res)
+    assert np.allclose(y["drums+bass+guitar+piano+other"], (1 - .15) * x, atol=1e-4)
+
+
 @pytest.mark.parametrize("groups", [[], [[]], [["brass"]]])
 def test_plan_tracks_rejects(groups):
     with pytest.raises(ValueError):
@@ -214,3 +226,5 @@ def test_api_tracks(api):
     job = api.wait()
     assert [r["label"] for r in job["stems"]] == ["Guitar + Vocals", "Vocals", "Other"]
     assert api.stems_open(job["stems"][0]["path"])["session"]["title"] == "Rec · Guitar + Vocals"
+    assert api.stems_start("all", tracks=[["vocals"]], rest=False)["error"] is None
+    assert [r["label"] for r in api.wait()["stems"]] == ["Vocals"]

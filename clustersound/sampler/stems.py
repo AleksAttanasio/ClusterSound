@@ -24,7 +24,8 @@ MODEL_DIR = str(data_dir_path() / "models" / "demucs")
 MODEL_MB = 55
 STEMS = [("drums", N_("Drums")), ("bass", N_("Bass")), ("guitar", N_("Guitar")), ("piano", "Piano"), ("vocals", N_("Vocals")),
          ("other", N_("Other"))]
-CHOOSABLE = [k for k, _ in STEMS if k != "other"]  # "other" is always written: whatever wasn't chosen
+CHOOSABLE = [k for k, _ in STEMS if k != "other"]
+INSTRUMENTAL = N_("Instrumental")  # the name of a track with every stem but the vocals  # "other" is always written: whatever wasn't chosen
 INSTALL_HINT = 'pip install -e ".[stems]"'
 BLOCK_S = 60.0   # separated per block: a 20-minute source at once would need several GB
 OVERLAP_S = 2.0  # blocks overlap and are crossfaded, so the seams don't click
@@ -170,11 +171,12 @@ def chosen(keys: list[str] | None) -> list[str]:
     return [k for k in CHOOSABLE if k in keys] + ["other"]
 
 
-def plan_tracks(groups: list[list[str]]) -> list[dict]:
+def plan_tracks(groups: list[list[str]], rest: bool = True) -> list[dict]:
     """The tracks to write, one per group of stems (any of STEMS, "other" too), in the given order: each group
-    de-duplicated and in STEMS order, label "Guitar + Vocals". Repeated groups stay (the user chose them). If
-    some source is in no group, one more track gets the rest: "Other" (as when choosing stems one by one),
-    or "Rest" when "other" itself is in a group. Returns [{key, keys, label}]."""
+    de-duplicated and in STEMS order, label "Guitar + Vocals" ("Instrumental": everything but the vocals).
+    Repeated groups stay (the user chose them). With rest, if some source is in no group, one more track gets
+    it: "Other" (as when choosing stems one by one), or "Rest" when "other" itself is in a group; without, those
+    sources are dropped. Returns [{key, keys, label}]."""
     order = [k for k, _ in STEMS]
     labels = dict(STEMS)
     if not groups or any(not g for g in groups):
@@ -185,12 +187,13 @@ def plan_tracks(groups: list[list[str]]) -> list[dict]:
     tracks = []
     for g in groups:
         keys = [k for k in order if k in g]
-        tracks.append({"key": "+".join(keys), "keys": keys, "label": " + ".join(tr(labels[k]) for k in keys)})
+        label = tr(INSTRUMENTAL) if keys == [k for k in order if k != "vocals"] else " + ".join(tr(labels[k]) for k in keys)
+        tracks.append({"key": "+".join(keys), "keys": keys, "label": label})
     used = {k for t in tracks for k in t["keys"]}
-    rest = [k for k in order if k not in used]
-    if rest:
+    left = [k for k in order if k not in used]
+    if rest and left:
         key = "rest" if "other" in used else "other"
-        tracks.append({"key": key, "keys": rest, "label": tr(N_("Rest") if key == "rest" else labels["other"])})
+        tracks.append({"key": key, "keys": left, "label": tr(N_("Rest") if key == "rest" else labels["other"])})
     return tracks
 
 
