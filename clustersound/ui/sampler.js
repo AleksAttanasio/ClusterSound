@@ -41,7 +41,6 @@ export class SamplerEditor {
     this.cur = null;          // session, regions, sel, view, overview, detail and cursor read through it (see TRACK)
     this.token = 0;           // bumps when another track is shown (late peaks are dropped)
     this.audioRev = 0;        // bumps when fades / normalisation change (player cache keys)
-    this.maxS = 30;
     this.drag = null;
     this.playing = null;      // {sid, start, end, key} of a track being played, or {path} of an extracted file
     this.rec = { devices: [], formats: {}, running: false, tracks: [], recordings: [] };
@@ -65,6 +64,10 @@ export class SamplerEditor {
         if (tr && p.end < tr.session.duration - 1e-3) { this._playFrom(tr, p.end); return; }
         if (tr) tr.cursor = 0;
       }
+      if (ended && p?.span && p.end < p.span[1] - 1e-3) { // a long cut goes on in its next block
+        const tr = this.tracks.find((x) => x.sid === p.sid);
+        if (tr) { this._playSpan(tr, p.end, Math.min(p.span[1], p.end + PLAY_BLOCK_S), p.key, p.span); return; }
+      }
       this._syncPlay();
     });
   }
@@ -77,7 +80,6 @@ export class SamplerEditor {
   async _init() {
     const init = await this.api.sampler_init();
     this.supported = init.supported;
-    this.maxS = init.max_seconds;
     this.rec = init.recorder;
     this.recFmt = init.settings.recorder_format;
     this.recDir = init.settings.recorder_dir;
@@ -127,7 +129,7 @@ export class SamplerEditor {
           <canvas id="sp-overview" class="sp-overview"></canvas>
           <div class="empty sp-empty" id="sp-empty">
             <div class="empty-title">${t('Record the audio output, or open a file')}</div>
-            <div class="empty-sub">${t('Press ● under the waveform to record the outputs chosen in Settings: every output goes into a file. Or choose an audio file or a library sample with the folder button above, or drag it here from {app}. Then drag on the waveform to cut a region (max {max}) or use «Slice on transients». Wheel: zoom · Shift+wheel: scroll.', { app: FILE_MANAGER, max: '<span class="sp-max"></span>' })}</div>
+            <div class="empty-sub">${t('Press ● under the waveform to record the outputs chosen in Settings: every output goes into a file. Or choose an audio file or a library sample with the folder button above, or drag it here from {app}. Then drag on the waveform to cut a region or use «Slice on transients». Wheel: zoom · Shift+wheel: scroll.', { app: FILE_MANAGER })}</div>
           </div>
         </div>
         <div class="sp-transport">
@@ -155,14 +157,12 @@ export class SamplerEditor {
           ${btn(t('Clear all'), { icon: 'trash-2', id: 'sp-clear' })}
           ${btn(`${t('Send to')} ${icon('chevron-down')}`, { icon: 'arrow-right', id: 'sp-send' })}
           ${btn(t('Export all'), { variant: 'brand', icon: 'file-down', id: 'sp-export', title: t('Saves the ticked rows in the export folder: new cuts, stems and enhanced files are temporary until then, and are deleted when ClusterSound closes') })}
-          <span id="sp-ext-set">${settingsLink('sampler', t('Fades, normalisation and export folder'))}</span>
         </div>
         <div class="sp-regions" id="sp-regions"></div>
       </main>`;
     this.cv = $('#sp-wave');
     this.ov = $('#sp-overview');
     this._bind();
-    this._renderMax();
     this.renderInfo();
     this._renderTabs();
     this.renderRegions();
@@ -380,7 +380,6 @@ export class SamplerEditor {
   async _opened(r) {
     if (!r || r.cancelled) return;
     if (r.error) return this._error(r.error);
-    this.maxS = r.max_seconds || this.maxS;
     // the tabs follow the backend's: new ones get a track, closed ones lose it
     const old = new Map(this.tracks.map((x) => [x.sid, x]));
     this.tracks = (r.tabs || []).map((s) => old.get(s.sid)
@@ -396,7 +395,6 @@ export class SamplerEditor {
     this.token += 1;
     if (tr && !tr.overview) tr.overview = await this.api.sampler_view(0, null, 2000);
     if (tr) tr.detail = null;
-    this._renderMax();
     this.renderInfo();
     this._renderTracks();
     this.renderRegions();
@@ -490,19 +488,6 @@ export class SamplerEditor {
       ${src?.suspect ? `<span class="sp-badge warn" title="${t('It looks like commercial material re-uploaded with a free licence')}">${t('Check the rights')}</span>` : ''}`;
     const a = box.querySelector('.sp-page');
     if (a) a.onclick = (e) => { e.preventDefault(); this.api.open_url(a.dataset.url); };
-  }
-
-  // The tooltip of the ⋯ next to "Extractions": what the exported samples get, and where they go.
-  _renderOptsSummary() {
-    const o = this.opts, b = $('#sp-ext-set wa-button');
-    if (!b) return;
-    b.title = `Fade ${o.fade_in_ms} ms in · ${o.fade_out_ms} ms out${o.normalize ? ` · ${t('normalised to −0.3 dBFS')}` : ''}. `
-      + t('Every sample lasts at most {max} s. They go into {folder}, with the provenance of the recording next to them.', { max: this.maxS, folder: this.sampDir });
-  }
-
-  _renderMax() {
-    document.querySelectorAll('#sampler .sp-max').forEach((el) => { el.textContent = `${this.maxS} s`; });
-    this._renderOptsSummary();
   }
 
   // ---------------------------------------------------------------- recorder
@@ -839,7 +824,6 @@ export class SamplerEditor {
   }
 
   _renderRecorder() {
-    this._renderOptsSummary();
     this._renderDevices();
     this._renderRecButton();
     if (this._setBody?.isConnected) this._renderSetDevices();
@@ -965,16 +949,15 @@ export class SamplerEditor {
       this.sampDir = (await this.api.set_setting('sampler_dir', p)).sampler_dir;
       body.querySelector('#set-sp-path').textContent = this.sampDir;
       body.querySelector('#set-sp-path').title = this.sampDir;
-      this._renderOptsSummary();
       this._loadExtractions();
       savedFlash(body);
     };
     const optNum = (id, key) => body.querySelector(id).addEventListener('change', (e) => {
-      this.opts[key] = Math.max(0, +e.target.value || 0); saved(); this._dropAudio(); this._renderOptsSummary();
+      this.opts[key] = Math.max(0, +e.target.value || 0); saved(); this._dropAudio();
     });
     optNum('#set-sp-fi', 'fade_in_ms');
     optNum('#set-sp-fo', 'fade_out_ms');
-    body.querySelector('#set-sp-norm').addEventListener('change', (e) => { this.opts.normalize = e.target.checked; saved(); this._dropAudio(); this._renderOptsSummary(); });
+    body.querySelector('#set-sp-norm').addEventListener('change', (e) => { this.opts.normalize = e.target.checked; saved(); this._dropAudio(); });
     body.querySelector('#set-en-model')?.addEventListener('change', (e) => { this.opts.enhModel = e.target.value; saved(); });
   }
 
@@ -1220,14 +1203,11 @@ export class SamplerEditor {
     if (!this.drag) { this.cv.style.cursor = this._edgeAt(e) ? 'ew-resize' : 'crosshair'; return; }
     if (this.drag.kind === 'edge') {
       const r = this.regions[this.drag.i];
-      if (this.drag.side === 'start') r.start = Math.max(r.end - this.maxS, Math.min(at, r.end - 0.005));
-      else r.end = Math.min(r.start + this.maxS, Math.max(at, r.start + 0.005));
+      if (this.drag.side === 'start') r.start = Math.min(at, r.end - 0.005);
+      else r.end = Math.max(at, r.start + 0.005);
       this.sel = this.drag.i;
     } else {
-      const lim = this.maxS;
-      this.drag.limited = Math.abs(at - this.drag.a) > lim;
-      this.drag.b = this.drag.a + Math.sign(at - this.drag.a) * Math.min(lim, Math.abs(at - this.drag.a));
-      $('#sp-view-info').innerHTML = `${t('New region:')} <span class="${this.drag.limited ? 'error' : ''}">${fmt(Math.abs(this.drag.b - this.drag.a))}</span> / max ${this.maxS} s`;
+      this.drag.b = at;
     }
     this.draw();
   }
@@ -1360,7 +1340,7 @@ export class SamplerEditor {
           <span class="sp-num">${i + 1}</span>
           <wa-input size="s" value="${esc(r.name)}" placeholder="${esc(this._defaultName(tr, i))}" label="${t('Name')}"></wa-input>
           <span class="sp-time sp-start">${fmt(r.start)}</span>
-          <span class="sp-time ${r.end - r.start >= this.maxS - 1e-3 ? 'error' : ''}">${fmt(r.end - r.start)}</span>
+          <span class="sp-time">${fmt(r.end - r.start)}</span>
           ${state(this._cutSaved(tr, i))}
           ${acts({ stems: true, ai: true })}
           <span></span>
@@ -1530,19 +1510,22 @@ export class SamplerEditor {
 
   _main() { return !!this.playing && !this.playing.path && this.player.playing; } // a track (or a cut) is playing
 
-  // Play [start, end) of a track; key 'cur' is the track itself from the cursor (no fades), else a cut.
-  async _playSpan(tr, start, end, key) {
+  // Play [start, end) of a track; key 'cur' is the track itself from the cursor (no fades), else a cut. span: the
+  // whole cut when [start, end) is one block of a long one (played block after block, like the track).
+  async _playSpan(tr, start, end, key, span = null) {
     const raw = key === 'cur';
+    const opts = raw ? { fade_in_ms: 0, fade_out_ms: 0, normalize: false } : span ? { ...this.opts, span } : this.opts;
     const load = (a, b) => this.player.load(`sp:${tr.sid}.${raw ? 'raw' : this.audioRev}:${key}:${a.toFixed(4)}-${b.toFixed(4)}`,
-      () => this.api.sampler_audio(a, b, raw ? { fade_in_ms: 0, fade_out_ms: 0, normalize: false } : this.opts, tr.sid));
+      () => this.api.sampler_audio(a, b, opts, tr.sid));
     const buf = await load(start, end);
     if (!buf) return;
     this.player.play(`sampler:${tr.sid}:${key}`, buf, 0);
-    this.playing = { sid: tr.sid, start, end, key };
+    this.playing = { sid: tr.sid, start, end, key, span };
     this._syncPlay();
     const tick = () => { if (this.playing && !this.playing.path) { this.draw(); requestAnimationFrame(tick); } };
     requestAnimationFrame(tick);
     if (raw && end < tr.session.duration - 1e-3) load(end, Math.min(tr.session.duration, end + PLAY_BLOCK_S)); // the next block, ready in time
+    if (span && end < span[1] - 1e-3) load(end, Math.min(span[1], end + PLAY_BLOCK_S));
   }
 
   // The track from a point on, in blocks of PLAY_BLOCK_S (the backend renders at most 60 s at a time).
@@ -1567,7 +1550,8 @@ export class SamplerEditor {
     tr.sel = i;
     this.renderRegions();
     this.draw();
-    this._playSpan(tr, r.start, r.end, `r${i}`);
+    const long = r.end - r.start > PLAY_BLOCK_S; // the backend renders at most 60 s at a time
+    this._playSpan(tr, r.start, long ? r.start + PLAY_BLOCK_S : r.end, `r${i}`, long ? [r.start, r.end] : null);
   }
 
   // Play / pause the shown track from its cursor; pausing leaves the cursor where it stopped.
