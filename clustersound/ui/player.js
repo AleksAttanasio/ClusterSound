@@ -68,7 +68,25 @@ export class Player {
     }
   }
 
+  // Seconds between a sample being scheduled (ctx.currentTime) and reaching the speakers: system buffers,
+  // Bluetooth headphones… (often 50-250 ms on macOS). Playheads following ctx.currentTime run ahead of the sound.
+  latency() {
+    const ctx = this.ctx;
+    if (!ctx) return 0;
+    let lat = (ctx.baseLatency || 0) + (ctx.outputLatency || 0);
+    if (!ctx.outputLatency && ctx.getOutputTimestamp) { // WebKit: no outputLatency, but the output timestamp
+      const ts = ctx.getOutputTimestamp();
+      if (ts.contextTime > 0 && ts.performanceTime > 0)
+        lat = ctx.currentTime - (ts.contextTime + (performance.now() - ts.performanceTime) / 1000);
+    }
+    return Math.min(1, Math.max(0, lat));
+  }
+
+  // AudioContext time of what is heard now
+  heardTime() { return this.ctx ? this.ctx.currentTime - this.latency() : 0; }
+
+  // position in the buffer of what is heard now
   get currentTime() {
-    return this.playing ? this.offset + (this.ctx.currentTime - this.startedAt) : 0;
+    return this.playing ? this.offset + Math.max(0, this.heardTime() - this.startedAt) : 0;
   }
 }
