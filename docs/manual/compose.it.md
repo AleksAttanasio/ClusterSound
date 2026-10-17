@@ -18,13 +18,17 @@ memoria.
 
 ## Tonalità
 
-- **🔒 Tonalità**: mostra solo gli accordi di quella tonalità; cambiarla traspone l'intera progressione.
-- **Libera**: accordi da qualsiasi tonalità, ognuno trasponibile ±12 semitoni.
-- In entrambi i casi la tonalità in alto è il riferimento per gradi e suggerimenti.
+La tonalità si sceglie in cima al browser degli accordi (tonica, *Maggiore*/*Minore*), con il lucchetto accanto.
+
+- **🔒 Bloccata**: mostra solo gli accordi di quella tonalità; cambiarla traspone l'intera progressione.
+- **🔓 Libera**: la tonalità cambia solo gli accordi sfogliati, da qualsiasi tonalità, ognuno trasponibile ±12
+  semitoni. Bloccandola di nuovo, la tonalità mostrata diventa quella della progressione.
+- In entrambi i casi la tonalità della progressione è il riferimento per gradi e suggerimenti.
 
 ## Timeline
 
-Lunghezza in battute e griglia (1 battuta … 1/16) a scelta. Trascina un blocco per spostarlo, il bordo destro per
+Griglia (1 battuta … 1/16) nella toolbar; lunghezza in **Battute** a destra delle schede delle versioni, distinta
+per ogni versione. Trascina un blocco per spostarlo, il bordo destro per
 cambiarne la durata: gli accordi successivi scorrono invece di sovrapporsi. *⇔ Distribuisci* dà a tutti la stessa
 durata. Ogni blocco mostra le note che suonano davvero (dopo strum, arpeggi e ritmo). Versioni **A, B, C…** nelle
 schede sopra la timeline.
@@ -62,11 +66,17 @@ Anteprima ed export usano gli stessi eventi, calcolati in Python.
 
 ## Esportare
 
-- **Esporta MIDI**: un `.mid` (tipo 0, 480 PPQ, con il tempo) per la versione corrente o uno per versione;
+La toolbar ha due righe: *Armonia*/*Melodia*, nome, *Apri…*, *Salva* e **Invia a ▾** sopra; stop, play/pausa, loop, annulla/ripeti, BPM,
+griglia, melodia on/muta e *Pattern* sotto. **Invia a ▾** propone:
+
+- **Sequencer**: le fondamentali degli accordi diventano la linea di basso del pattern del Sequencer (una nota per
+  accordo), che prende tonalità, BPM e battute della progressione (1, 2 o 4: le progressioni più lunghe inviano le
+  prime 4 battute). Chiede prima di sostituire una linea di basso già presente.
+- **Esporta per Ableton**: un `.mid` (tipo 0, 480 PPQ, con il tempo) per la versione corrente o uno per versione;
   *solo accordi* esporta i voicing a block senza stile. Con una melodia: *Accordi + melodia* (tipo 1), *Solo
   accordi* o *Solo melodia*.
-- **Invia a Live**: traccia *Accordi* con una clip per versione, più una traccia per ogni layer di melodia.
+- **Ableton Live**: traccia *Accordi* con una clip per versione, più una traccia per ogni layer di melodia.
 - **Pattern**: suona la progressione insieme al pattern del Sequencer.
 - *Salva* / *Apri…* tengono le progressioni con tutte le versioni; `⌘Z` / `⇧⌘Z` annullano e ripetono.
 
-Scorciatoie: `Spazio` play/stop, `←` `→` accordo precedente/successivo, `Canc` elimina, `⌘D` duplica, `V` variazioni.
+Scorciatoie: `Spazio` play/pausa, `←` `→` accordo precedente/successivo, `Canc` elimina, `⌘D` duplica, `V` variazioni.

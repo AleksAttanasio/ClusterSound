@@ -766,9 +766,7 @@ wa-button.rk-wide { width: 100%; }
 .cp-keyrow .seg { flex: 1; }
 .cp-keyrow .seg wa-radio { flex: 1; }
 .cp-keyrow .seg::part(form-control-input) { width: 100%; }
-.cp-toolbar #cp-snap { width: 104px; }
-.cp-toolbar .cp-key { width: 70px; }
-.cp-toolbar .cp-kmode { width: 112px; }
+.cp-toolbar #cp-snap { width: 84px; }
 .cp-toolbar .cp-synth { width: 150px; }
 .cp-modes .cp-preset { width: 190px; }
 .cp-modes .cp-rbars { width: 112px; }
@@ -799,8 +797,11 @@ wa-button.rk-wide { width: 100%; }
 .cp-empty code { font-size: 11px; word-break: break-all; }
 
 .cp-main { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
-.cp-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-.cp-name { width: 170px; }
+.cp-toolbar { display: flex; flex-direction: column; gap: 6px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+.cp-tbrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cp-tbrow #cp-send { flex: none; }
+.cp-tbrow #cp-send .ico { display: inline-block; vertical-align: -1px; }
+.cp-name { flex: 1; min-width: 140px; max-width: 320px; }
 .cp-name::part(input) { font-weight: 700; font-size: 14px; }
 .cp-field { display: flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 12px; }
 .cp-field wa-number-input { width: 66px; --wa-form-control-padding-inline: 8px; }

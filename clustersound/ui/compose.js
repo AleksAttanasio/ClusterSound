@@ -493,6 +493,7 @@ export class ComposeEditor {
           <wa-select id="cp-b-tonic" size="s" class="cp-select" value="0">${tonics(true)}</wa-select>
           <wa-radio-group id="cp-b-mode" class="seg" orientation="horizontal" size="s" value="major" label="${t('Scale')}">
             <wa-radio appearance="button" value="major">${t('Major')}</wa-radio><wa-radio appearance="button" value="minor">${t('Minor')}</wa-radio></wa-radio-group>
+          <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-keylock"><wa-icon name="lock" label="${t('Key')}"></wa-icon></wa-button>
         </div>
         <div class="hint" id="cp-b-hint"></div>
         <wa-input id="cp-q" class="search" type="search" size="s" with-clear placeholder="${t('Search (e.g. maj9, sus, Am, bVII)…')}" autocomplete="off"><wa-icon slot="start" name="search"></wa-icon></wa-input>
@@ -502,29 +503,29 @@ export class ComposeEditor {
       </aside>
       <main class="cp-main">
         <div class="cp-toolbar">
-          <wa-radio-group id="cp-view" class="seg" orientation="horizontal" size="s" value="harmony" label="${t('View')}" title="${t('Harmony: the chords · Melody: the melody over the chords')}">
-            <wa-radio appearance="button" value="harmony">${t('Harmony')}</wa-radio><wa-radio appearance="button" value="melody">${t('Melody')}</wa-radio></wa-radio-group>
-          <wa-input id="cp-name" class="cp-name" size="s" spellcheck="false" title="${t('Name of the progression')}"></wa-input>
-          <label class="cp-field">BPM <wa-number-input id="cp-bpm" size="s" without-steppers min="40" max="240" step="1"></wa-number-input></label>
-          <label class="cp-field">${t('Bars')} <wa-number-input id="cp-bars" size="s" without-steppers min="1" max="128" step="1"></wa-number-input></label>
-          <label class="cp-field">${t('Grid')} <wa-select id="cp-snap" size="s" class="cp-select">${SNAPS.map(([v, l]) => `<wa-option value="${v}">${t(l)}</wa-option>`).join('')}</wa-select></label>
-          <wa-radio-group id="cp-keymode" class="seg" orientation="horizontal" size="s" value="locked" label="${t('Key')}" title="${t('Locked: only chords of the key, changing key transposes everything. Free: chords from any key, transposable one by one.')}">
-            <wa-radio appearance="button" value="locked"><wa-icon name="lock"></wa-icon>${t('Key')}</wa-radio><wa-radio appearance="button" value="free"><wa-icon name="lock-open"></wa-icon>${t('Unlocked')}</wa-radio></wa-radio-group>
-          <wa-select id="cp-tonic" size="s" class="cp-select cp-key" title="${t('Key of the progression')}">${tonics(true)}</wa-select>
-          <wa-select id="cp-mode" size="s" class="cp-select cp-kmode"><wa-option value="major">${t('Major')}</wa-option><wa-option value="minor">${t('Minor')}</wa-option></wa-select>
-          <div class="spacer"></div>
-          <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-melmute" title="${t('Melody: on / mute')}"><wa-icon name="music" label="${t('Melody')}"></wa-icon></wa-button>
-          <wa-button class="cp-play" variant="brand" size="s" id="cp-play" title="${t('Play / stop (Space)')}"><wa-icon name="play" label="Play"></wa-icon></wa-button>
-          <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-loop" title="Loop"><wa-icon name="rotate-ccw" label="Loop"></wa-icon></wa-button>
-          <wa-button-group class="cp-pat" label="Pattern">
-            ${btn('Pattern', { id: 'cp-withpat', icon: 'drum', title: t('Plays together with the Sequencer pattern') })}${btn(`<wa-icon name="chevron-down" label="${t('Pattern settings')}"></wa-icon>`, { id: 'cp-patset', title: t('Pattern: bass, volumes, BPM') })}
-          </wa-button-group>
-          <wa-button-group label="${t('History')}">
-            <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-undo" title="${t('Undo')} (${MOD}Z)"><wa-icon name="undo-2" label="${t('Undo')}"></wa-icon></wa-button><wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-redo" title="${t('Redo')} (${SHIFT_MOD}Z)"><wa-icon name="redo-2" label="${t('Redo')}"></wa-icon></wa-button>
-          </wa-button-group>
-          ${btn(t('Open…'), { id: 'cp-open', icon: 'folder-open' })}
-          ${btn(t('Save'), { id: 'cp-save', icon: 'save' })}
-          ${btn(t('Export MIDI'), { id: 'cp-export', variant: 'brand', icon: 'file-down', 'with-caret': true })}
+          <div class="cp-tbrow">
+            <wa-radio-group id="cp-view" class="seg" orientation="horizontal" size="s" value="harmony" label="${t('View')}" title="${t('Harmony: the chords · Melody: the melody over the chords')}">
+              <wa-radio appearance="button" value="harmony">${t('Harmony')}</wa-radio><wa-radio appearance="button" value="melody">${t('Melody')}</wa-radio></wa-radio-group>
+            <wa-input id="cp-name" class="cp-name" size="s" spellcheck="false" title="${t('Name of the progression')}"></wa-input>
+            <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-open" title="${t('Open…')}"><wa-icon name="folder-open" label="${t('Open…')}"></wa-icon></wa-button>
+            <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-save" title="${t('Save')}"><wa-icon name="save" label="${t('Save')}"></wa-icon></wa-button>
+            <div class="spacer"></div>
+            ${btn(`${t('Send to')} ${svg('chevron-down', 11)}`, { id: 'cp-send' })}
+          </div>
+          <div class="cp-tbrow">
+            <wa-button-group label="${t('Transport')}">
+              <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-stop" title="Stop"><wa-icon name="square" label="Stop"></wa-icon></wa-button><wa-button class="cp-play" variant="brand" size="s" id="cp-play" title="${t('Play / pause (Space)')}"><wa-icon name="play" label="Play"></wa-icon></wa-button><wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-loop" title="Loop"><wa-icon name="rotate-ccw" label="Loop"></wa-icon></wa-button>
+            </wa-button-group>
+            <wa-button-group label="${t('History')}">
+              <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-undo" title="${t('Undo')} (${MOD}Z)"><wa-icon name="undo-2" label="${t('Undo')}"></wa-icon></wa-button><wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-redo" title="${t('Redo')} (${SHIFT_MOD}Z)"><wa-icon name="redo-2" label="${t('Redo')}"></wa-icon></wa-button>
+            </wa-button-group>
+            <label class="cp-field">BPM <wa-number-input id="cp-bpm" size="s" without-steppers min="40" max="240" step="1"></wa-number-input></label>
+            <label class="cp-field">${t('Grid')} <wa-select id="cp-snap" size="s" class="cp-select">${SNAPS.map(([v, l]) => `<wa-option value="${v}">${t(l)}</wa-option>`).join('')}</wa-select></label>
+            <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-melmute" title="${t('Melody: on / mute')}"><wa-icon name="music" label="${t('Melody')}"></wa-icon></wa-button>
+            <wa-button-group class="cp-pat" label="Pattern">
+              ${btn('Pattern', { id: 'cp-withpat', icon: 'drum', title: t('Plays together with the Sequencer pattern') })}${btn(`<wa-icon name="chevron-down" label="${t('Pattern settings')}"></wa-icon>`, { id: 'cp-patset', title: t('Pattern: bass, volumes, BPM') })}
+            </wa-button-group>
+          </div>
         </div>
         <div class="cp-versions" id="cp-versions"></div>
         <div class="cp-tlwrap" id="cp-tlwrap">
@@ -558,11 +559,30 @@ export class ComposeEditor {
   }
 
   _bindShell() {
-    $('#cp-b-tonic').onchange = (e) => { this.browse.tonic = +e.target.value; this._persist(); this.loadBrowser(); };
+    // locked: the key of the progression (changing it transposes everything); free: only the key browsed
+    const pickKey = (tonic, mode) => {
+      if (this.seq.keyMode === 'locked') { this.setKey(tonic, mode); return; }
+      this.browse.tonic = tonic; this.browse.mode = mode; this._persist(); this.loadBrowser();
+    };
+    $('#cp-b-tonic').onchange = (e) => pickKey(+e.target.value, this.browseKey.mode);
     $('#cp-b-mode').addEventListener('change', (e) => {
       if (e.target.id !== 'cp-b-mode') return;
-      this.browse.mode = e.target.value; this._persist(); this.loadBrowser();
+      pickKey(this.browseKey.tonic, e.target.value);
     });
+    $('#cp-keylock').onclick = () => {
+      const km = this.seq.keyMode === 'locked' ? 'free' : 'locked';
+      this.edit(() => {
+        this.seq.keyMode = km;
+        if (km === 'locked') {
+          // locking: the key browsed becomes the key of the progression, the per-clip transpositions go into the notes
+          this.seq.key = { tonic: this.browse.tonic, mode: this.browse.mode };
+          for (const c of this.seq.clips) this._bakeTranspose(c);
+        } else {
+          this.browse.tonic = this.seq.key.tonic; this.browse.mode = this.seq.key.mode;
+        }
+      });
+      this.loadBrowser();
+    };
     $('#cp-q').oninput = (e) => { this.browse.q = e.target.value || ''; this.renderList(); };
     $('#cp-cats').onclick = (e) => {
       const b = e.target.closest('[data-cat]'); if (!b) return;
@@ -588,23 +608,7 @@ export class ComposeEditor {
 
     $('#cp-name').onchange = (e) => this.edit(() => { this.project.name = (e.target.value || '').trim() || t('Progression'); }, { redraw: false });
     $('#cp-bpm').onchange = (e) => this.edit(() => { this.project.bpm = Math.max(40, Math.min(240, +e.target.value || 100)); });
-    $('#cp-bars').onchange = (e) => this.edit(() => { this.seq.bars = Math.max(1, Math.min(128, Math.round(+e.target.value) || 4)); });
     $('#cp-snap').onchange = (e) => { this.ui.snap = +e.target.value; this._persist(); };
-    $('#cp-keymode').addEventListener('change', (e) => {
-      const km = e.target.value;
-      if (e.target.id !== 'cp-keymode' || km === this.seq.keyMode) return;
-      this.edit(() => {
-        this.seq.keyMode = km;
-        if (km === 'locked') {
-          // locking folds the per-clip transpositions into the notes
-          for (const c of this.seq.clips) this._bakeTranspose(c);
-          this.browse.tonic = this.seq.key.tonic; this.browse.mode = this.seq.key.mode;
-        }
-      });
-      this.loadBrowser();
-    });
-    $('#cp-tonic').onchange = (e) => this.setKey(+e.target.value, this.seq.key.mode);
-    $('#cp-mode').onchange = (e) => this.setKey(this.seq.key.tonic, e.target.value);
     $('#cp-view').addEventListener('change', (e) => { if (e.target.id === 'cp-view') this.setView(e.target.value); });
     $('#cp-melmute').onclick = () => {
       this.ui.melMute = !this.ui.melMute;
@@ -613,6 +617,7 @@ export class ComposeEditor {
       this.transport.update(this.playEvents);
     };
     $('#cp-play').onclick = () => this.togglePlay();
+    $('#cp-stop').onclick = () => { this._pausedAt = null; this.stop(); };
     $('#cp-withpat').onclick = () => {
       this.ui.withPattern = !this.ui.withPattern;
       this._persist();
@@ -625,7 +630,7 @@ export class ComposeEditor {
     $('#cp-redo').onclick = () => this.redo();
     $('#cp-save').onclick = () => this.save();
     $('#cp-open').onclick = (e) => this.openDialog(e.currentTarget);
-    $('#cp-export').onclick = (e) => this.exportMenu(e.currentTarget);
+    $('#cp-send').onclick = (e) => this.sendMenu(e.currentTarget);
     $('#cp-even').onclick = () => this.distribute();
     $('#cp-clear').onclick = () => {
       if (this.ui.view === 'melody') { if (this.melNotes.length) this.edit(() => { this.melNotes = []; this.melSel.clear(); }); return; }
@@ -633,6 +638,9 @@ export class ComposeEditor {
     };
     this._bindMelody();
 
+    $('#cp-versions').onchange = (e) => {
+      if (e.target.id === 'cp-bars') this.edit(() => { this.seq.bars = Math.max(1, Math.min(128, Math.round(+e.target.value) || 4)); });
+    };
     $('#cp-versions').onclick = (e) => {
       const a = e.target.closest('[data-act]');
       if (!a) {
@@ -755,6 +763,7 @@ export class ComposeEditor {
       $('#cp-builtin2').onclick = () => this.useBuiltin();
       return;
     }
+    this._browsed = `${this.browseKey.tonic}:${this.browseKey.mode}`;
     this.current = await this.keyChords(this.browseKey);
     this.renderList();
   }
@@ -764,12 +773,17 @@ export class ComposeEditor {
     const locked = this.seq.keyMode === 'locked';
     $('#cp-dir').textContent = this.meta.builtin ? t('Built-in chord pack') : this.meta.dir.replace(/^\/Users\/[^/]+/, '~');
     $('#cp-dir').title = this.meta.dir;
-    $('#cp-b-tonic').value = String(k.tonic);
-    $('#cp-b-tonic').disabled = locked;
-    $('#cp-b-mode').value = k.mode;
-    $('#cp-b-mode').disabled = locked;
+    const set = (id, v) => { const el = $(id); if (document.activeElement !== el) el.value = v; };
+    set('#cp-b-tonic', String(k.tonic));
+    set('#cp-b-mode', k.mode);
+    const lock = $('#cp-keylock');
+    lock.classList.toggle('active', locked);
+    lock.innerHTML = `<wa-icon name="${locked ? 'lock' : 'lock-open'}" label="${locked ? t('Key locked') : t('Key unlocked')}"></wa-icon>`;
+    lock.title = locked
+      ? t('Key locked: only chords of the key, changing key transposes the progression. Click to unlock.')
+      : t('Key unlocked: chords from any key, transposable one by one. Click to lock the progression to the key shown.');
     const tr = this.current?.transposed;
-    $('#cp-b-hint').textContent = (locked ? t('Key locked to {key}: change it from the bar at the top.', { key: keyName(k) }) : t('Browsing {key} · every chord stays transposable.', { key: keyName(k) }))
+    $('#cp-b-hint').textContent = (locked ? t('Key of the progression: {key}. Changing it transposes the chords.', { key: keyName(k) }) : t('Browsing {key} · every chord stays transposable.', { key: keyName(k) }))
       + (tr ? ' ' + t('Key missing from the pack: transposed by {n}.', { n: `${tr > 0 ? '+' : ''}${tr}` }) : '')
       + (this.current?.partial ? ' ' + t('The pack is incomplete for this key: some categories are transposed from nearby keys.') : '');
     this.renderCats();
@@ -1049,18 +1063,26 @@ export class ComposeEditor {
     this.transport.play({ events: res.events, bpm: this.project.bpm, from: 0, to: seq.bars * 16 * STEP_TICKS, loop: false, onEnd: () => this.renderToolbar() });
   }
 
-  togglePlay() { if (this.transport.playing) this.stop(); else this.play(); }
+  // play / pause: pausing keeps the position, play resumes from it (Stop goes back to the start)
+  togglePlay() {
+    if (this._rec) { this.stop(); return; }
+    if (this.transport.playing) { this._pausedAt = this.transport.position; this.stop(); return; }
+    this.play(0, this._pausedAt);
+  }
 
-  async play(from = 0) {
+  // resume (a tick past `from`): starts sounding there, the loop still goes back to `from`
+  async play(from = 0, resume = null) {
     const to = this.seq.bars * 16 * STEP_TICKS;
     from = Math.max(0, Math.min(from, to - 1));
+    const pos = resume != null && resume > from && resume < to ? resume : from;
+    this._pausedAt = null;
     this.stop();
     const pe = this.ui.withPattern ? await this._preparePattern() : null;
     const at = this.synth.ctx.currentTime + 0.08;
-    if (pe) this._startPattern(pe, at, from);
+    if (pe) this._startPattern(pe, at, pos);
     this.synth.setVolume(this.ui.chordVol);
     this._melVolumes();
-    this.transport.play({ events: this.playEvents, bpm: this.project.bpm, from, to, loop: this.ui.loop, at,
+    this.transport.play({ events: this.playEvents, bpm: this.project.bpm, from, to, loop: this.ui.loop, at: at - (pos - from) * (60 / this.project.bpm / PPQ),
       onEnd: () => { this._stopPattern(); this.renderToolbar(); } });
     this.renderToolbar();
     this._animate();
@@ -1122,10 +1144,40 @@ export class ComposeEditor {
     const L = this.seq.bars * 16;
     const pos = ((abs % L) + L) % L;
     const c = this.seq.clips.find((x) => x.start <= pos && pos < x.start + x.len);
-    if (!c) return 0;
+    return c ? this._rootShift(c, sq.noteIndex(key)) : 0;
+  }
+
+  // semitones (-5…+6) from a pitch class to the root of a clip
+  _rootShift(c, from) {
     const root = (((c.root + (c.transpose || 0)) % 12) + 12) % 12;
-    const d = (((root - sq.noteIndex(key)) % 12) + 12) % 12;
+    const d = (((root - from) % 12) + 12) % 12;
     return d > 6 ? d - 12 : d;
+  }
+
+  // the roots of the chords become the bass line of the Sequencer pattern (key, BPM and bars follow the progression)
+  async sendToSequencer() {
+    const pe = this.getPattern?.();
+    if (!pe || !this.seq.clips.length) return;
+    if (!pe.ready) toast(t('Preparing the Sequencer…'));
+    await pe.ensure();
+    const bass = pe.p.buses.bass;
+    if (bass.notes.length && !confirm(t('Replace the bass line of the Sequencer pattern with the roots of the chords?'))) return;
+    this.stop();
+    const bars = this.seq.bars <= 1 ? 1 : this.seq.bars <= 2 ? 2 : 4; // the pattern has 1, 2 or 4 bars
+    const n = bars * 16;
+    if (bars !== pe.p.bars) pe.setBars(bars);
+    pe.p.key = pe.meta.note_names[this.seq.key.tonic];
+    pe.p.bpm = this.project.bpm;
+    const from = pe.seq.noteIndex(pe.p.key);
+    pe.p.buses.bass.notes = this.sorted().filter((c) => c.start < n).map((c) => ({
+      step: c.start, len: Math.min(c.len, n - c.start), semi: this._rootShift(c, from), vel: 100, glide: false,
+    }));
+    pe._persist();
+    pe.renderAll();
+    toast(this.seq.bars > 4
+      ? t('Bass line of the first 4 bars sent to the Sequencer (a pattern has at most 4 bars)')
+      : t('Bass line sent to the Sequencer'));
+    this.onOpenSequencer?.();
   }
 
   async patternMenu(anchor) {
@@ -1168,6 +1220,9 @@ export class ComposeEditor {
 
   // ---------------------------------------------------------------- draw
   renderAll() {
+    // undo / redo / another version can change the key the browser shows
+    if (this.current && this._browsed !== `${this.browseKey.tonic}:${this.browseKey.mode}`) this.loadBrowser();
+    else if (this.current) this.renderBrowserHead();
     this.renderView();
     this.renderToolbar();
     this.renderVersions();
@@ -1183,17 +1238,13 @@ export class ComposeEditor {
     const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = v; };
     set('#cp-name', this.project.name);
     set('#cp-bpm', this.project.bpm);
-    set('#cp-bars', s.bars);
     set('#cp-snap', String(this.ui.snap));
-    set('#cp-tonic', String(s.key.tonic));
-    set('#cp-mode', s.key.mode);
-    $('#cp-keymode').value = s.keyMode;
     const play = $('#cp-play');
     const state = this._rec ? 'rec' : this.transport.playing ? 'stop' : 'play';
     if (play.dataset.state !== state) {
       play.dataset.state = state;
-      play.innerHTML = `<wa-icon name="${{ rec: 'circle', stop: 'square', play: 'play' }[state]}" label="${state === 'play' ? 'Play' : 'Stop'}"></wa-icon>`;
-      play.variant = state === 'play' ? 'brand' : 'danger';
+      play.innerHTML = `<wa-icon name="${{ rec: 'circle', stop: 'pause', play: 'play' }[state]}" label="${{ rec: 'Stop', stop: 'Pause', play: 'Play' }[state]}"></wa-icon>`;
+      play.variant = state === 'rec' ? 'danger' : 'brand';
     }
     play.classList.toggle('rec', !!this._rec);
     $('#cp-view').value = this.ui.view;
@@ -1214,7 +1265,9 @@ export class ComposeEditor {
         return `<div class="cp-vtab active" data-v="${v}"><span title="${title}">${v}</span>
           ${tabTools('data-act', 'cp-vary-ver', varyVerTip(), { dupTitle: t('Duplicate the version'), addTitle: t('New empty harmony'), delTitle: t('Delete the version'), canDel: p.order.length > 1 })}</div>`;
       }).join('')}
-      ${this.melNotes.length && this.ui.view === 'harmony' ? xs(t('Harmonise the melody…'), { icon: 'music', 'data-act': 'harm', title: t('New versions with the chords derived from the melody') }) : ''}`;
+      ${this.melNotes.length && this.ui.view === 'harmony' ? xs(t('Harmonise the melody…'), { icon: 'music', 'data-act': 'harm', title: t('New versions with the chords derived from the melody') }) : ''}
+      <div class="spacer"></div>
+      <label class="cp-field" title="${t('Length of version {v}', { v: p.active })}">${t('Bars')} <wa-number-input id="cp-bars" size="s" without-steppers min="1" max="128" step="1" value="${this.seq.bars}"></wa-number-input></label>`;
   }
 
   get pxStep() { return this._pxStep || 10; }
@@ -2423,11 +2476,47 @@ export class ComposeEditor {
     };
   }
 
+  // "Send to ▾": the progression to the Sequencer (as its bass line), to Live or exported as .mid (as in the Drum Rack)
+  sendMenu(anchor) {
+    const noChords = !this.seq.clips.length; // the bass line needs chords; Live and .mid also carry the melody
+    const item = (go, ic, label, hint) => `<button class="sp-send-item" data-go="${go}"${go === 'seq' && noChords ? ' disabled' : ''}><wa-icon name="${ic}"></wa-icon><span><b>${label}</b><span class="hint">${hint}</span></span></button>`;
+    const pop = showPopover(anchor, `<div class="pop-title"><wa-icon name="arrow-right"></wa-icon> ${t('Send to')}</div>
+      <div class="sp-send-list">
+        ${item('seq', 'audio-lines', 'Sequencer', t('Writes the roots of the chords as the bass line of the Sequencer pattern'))}
+        ${item('live', 'music', 'Ableton Live', t('Creates the tracks with the clips in Live (needs the ClusterSound device in the set)'))}
+        ${item('export', 'file-down', t('Export for Ableton'), t('MIDI file (.mid) to drag onto a MIDI track'))}
+      </div>`);
+    pop.onclick = (e) => {
+      const b = e.target.closest('[data-go]');
+      if (!b || b.disabled) return;
+      pop.close();
+      if (b.dataset.go === 'seq') this.sendToSequencer();
+      else if (b.dataset.go === 'live') this.liveMenu(anchor);
+      else this.exportMenu(anchor);
+    };
+  }
+
+  _label(v, mk) {
+    const p = this.project;
+    return `${p.name}${p.order.length > 1 ? ` ${v}` : ''}${p.modeOrder.length > 1 ? ` - ${p.modes[mk].name}` : ''}`;
+  }
+
+  liveMenu(anchor) {
+    const p = this.project;
+    const one = () => sendToLive(this.api, 'compose', { ...this.playSeq, name: this._label(p.active, p.modeActive) }, { pure: this.ui.pure });
+    if (p.order.length < 2) { one(); return; }
+    const pop = showPopover(anchor, `<div class="pop-title"><wa-icon name="music"></wa-icon> Ableton Live</div>
+      ${btn(`${t('Version {v}', { v: p.active })} → Live`, { variant: 'brand', 'data-live': true })}
+      ${btn(t('All the versions → Live (one clip each)'), { 'data-live-all': true })}`);
+    pop.querySelector('[data-live]').onclick = () => { pop.close(); one(); };
+    pop.querySelector('[data-live-all]').onclick = () => { pop.close(); sendToLive(this.api, 'compose', clone(p), { pure: this.ui.pure }); };
+  }
+
   exportMenu(anchor) {
     const p = this.project;
     const many = p.order.length > 1;
     const manyModes = p.modeOrder.length > 1;
-    const label = (v, mk) => `${p.name}${many ? ` ${v}` : ''}${manyModes ? ` - ${p.modes[mk].name}` : ''}`;
+    const label = (v, mk) => this._label(v, mk);
     const hasMel = Object.values(p.versions).some((v) => melodyOf(v.melody).layers.some((l) => l.notes.length));
     const parts = hasMel ? this.ui.parts : 'chords';
     const pop = showPopover(anchor, `
@@ -2436,9 +2525,7 @@ export class ComposeEditor {
       ${manyModes ? btn(t('Version {v} with all the modes → folder', { v: p.active }), { icon: 'folder-open', 'data-modes': true }) : ''}
       ${hasMel ? `<wa-radio-group class="seg cp-seg" orientation="horizontal" size="xs" data-parts value="${this.ui.parts}" label="${t('Parts')}">${PARTS.map(([k, l]) => `<wa-radio appearance="button" value="${k}">${t(l)}</wa-radio>`).join('')}</wa-radio-group>
         <div class="hint">${t('Chords + melody: one .mid with a track for the chords and one for every layer (muted layers are left out).')}</div>` : ''}
-      ${btn(`${t('Version {v}', { v: p.active })} → Live`, { 'data-live': true })}
-      ${many ? btn(t('All the versions → Live (one clip each)'), { 'data-live-all': true }) : ''}
-      <div class="hint">${t('In Ableton: drag the file onto a MIDI track. The tempo of the file is {bpm} BPM. «→ Live» creates the track with the clips through the ClusterSound device.', { bpm: p.bpm })}</div>
+      <div class="hint">${t('In Ableton: drag the file onto a MIDI track. The tempo of the file is {bpm} BPM.', { bpm: p.bpm })}</div>
       <div class="hint">${this.ui.pure ? t('Exports the chords only (without rhythm, strum, arpeggios and humanize).') : t('Exports the full performance (rhythm, strum, arpeggios and humanize).')} <a href="#" data-settings-link="compose">${t('Export options…')}</a></div>`);
     pop.querySelector('[data-settings-link]').addEventListener('click', () => pop.close());
     pop.querySelector('[data-parts]')?.addEventListener('change', (e) => {
@@ -2453,14 +2540,6 @@ export class ComposeEditor {
       const r = await this.api.compose_export_midi({ ...this.playSeq, name: label(p.active, p.modeActive) }, this.ui.pure, parts);
       if (r) toast(t('MIDI saved: {file}', { file: r.split('/').pop() }));
     };
-    pop.querySelector('[data-live]').onclick = () => {
-      pop.close();
-      sendToLive(this.api, 'compose', { ...this.playSeq, name: label(p.active, p.modeActive) }, { pure: this.ui.pure });
-    };
-    pop.querySelector('[data-live-all]')?.addEventListener('click', () => {
-      pop.close();
-      sendToLive(this.api, 'compose', clone(p), { pure: this.ui.pure });
-    });
     const many_ = async (seqs) => {
       pop.close();
       const r = await this.api.compose_export_versions(seqs, this.ui.pure, parts);

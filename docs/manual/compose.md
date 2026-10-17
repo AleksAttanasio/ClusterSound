@@ -17,13 +17,17 @@ back). The pack is never modified: the files are read and indexed in memory.
 
 ## Key
 
-- **🔒 Key**: shows only the chords of that key; changing it transposes the whole progression.
-- **Unlocked**: chords from any key, each transposable ±12 semitones.
-- In both cases the key at the top is the reference for degrees and suggestions.
+The key is chosen at the top of the chord browser (tonic, *Major*/*Minor*), with the lock next to it.
+
+- **🔒 Locked**: shows only the chords of that key; changing it transposes the whole progression.
+- **🔓 Unlocked**: the key only changes the chords browsed, from any key, each transposable ±12 semitones.
+  Locking again makes the key shown the key of the progression.
+- In both cases the key of the progression is the reference for degrees and suggestions.
 
 ## Timeline
 
-Length in bars and grid (1 bar … 1/16) to choose. Drag a block to move it, its right edge to change its length:
+Grid (1 bar … 1/16) in the toolbar; length in **Bars** at the right of the version tabs, separate for every
+version. Drag a block to move it, its right edge to change its length:
 the following chords slide instead of overlapping. *⇔ Spread evenly* gives all of them the same length. Every
 block shows the notes that really play (after strum, arpeggios and rhythm). Versions **A, B, C…** in the tabs
 above the timeline.
@@ -61,11 +65,17 @@ Preview and export use the same events, computed in Python.
 
 ## Exporting
 
-- **Export MIDI**: one `.mid` (type 0, 480 PPQ, with the tempo) for the current version or one per version;
+The toolbar has two rows: *Harmony*/*Melody*, name, *Open…*, *Save* and **Send to ▾** above; stop, play/pause, loop, undo/redo, BPM,
+grid, melody on/mute and *Pattern* below. **Send to ▾** offers:
+
+- **Sequencer**: the roots of the chords become the bass line of the Sequencer pattern (one note per chord), which
+  takes key, BPM and bars of the progression (1, 2 or 4: longer progressions send the first 4 bars). It asks
+  before replacing a bass line already there.
+- **Export for Ableton**: one `.mid` (type 0, 480 PPQ, with the tempo) for the current version or one per version;
   *chords only* exports the block voicings without style. With a melody: *Chords + melody* (type 1), *Chords only*
   or *Melody only*.
-- **Send to Live**: *Chords* track with one clip per version, plus one track per melody layer.
+- **Ableton Live**: *Chords* track with one clip per version, plus one track per melody layer.
 - **Pattern**: plays the progression together with the Sequencer pattern.
 - *Save* / *Open…* keep the progressions with all their versions; `⌘Z` / `⇧⌘Z` undo and redo.
 
-Shortcuts: `Space` play/stop, `←` `→` previous/next chord, `Del` delete, `⌘D` duplicate, `V` variations.
+Shortcuts: `Space` play/pause, `←` `→` previous/next chord, `Del` delete, `⌘D` duplicate, `V` variations.
