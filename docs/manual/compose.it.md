@@ -66,8 +66,8 @@ Anteprima ed export usano gli stessi eventi, calcolati in Python.
 
 ## Esportare
 
-La toolbar ha due righe: *Armonia*/*Melodia*, nome, *Apri…*, *Salva* e **Invia a ▾** sopra; play, loop, BPM,
-griglia, melodia on/muta, *Pattern* e annulla/ripeti sotto. **Invia a ▾** propone:
+La toolbar ha due righe: *Armonia*/*Melodia*, nome, *Apri…*, *Salva* e **Invia a ▾** sopra; play, loop, annulla/ripeti, BPM,
+griglia, melodia on/muta e *Pattern* sotto. **Invia a ▾** propone:
 
 - **Sequencer**: le fondamentali degli accordi diventano la linea di basso del pattern del Sequencer (una nota per
   accordo), che prende tonalità, BPM e battute della progressione (1, 2 o 4: le progressioni più lunghe inviano le

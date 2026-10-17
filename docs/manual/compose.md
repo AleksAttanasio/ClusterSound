@@ -65,8 +65,8 @@ Preview and export use the same events, computed in Python.
 
 ## Exporting
 
-The toolbar has two rows: *Harmony*/*Melody*, name, *Open…*, *Save* and **Send to ▾** above; play, loop, BPM,
-grid, melody on/mute, *Pattern* and undo/redo below. **Send to ▾** offers:
+The toolbar has two rows: *Harmony*/*Melody*, name, *Open…*, *Save* and **Send to ▾** above; play, loop, undo/redo, BPM,
+grid, melody on/mute and *Pattern* below. **Send to ▾** offers:
 
 - **Sequencer**: the roots of the chords become the bass line of the Sequencer pattern (one note per chord), which
   takes key, BPM and bars of the progression (1, 2 or 4: longer progressions send the first 4 bars). It asks

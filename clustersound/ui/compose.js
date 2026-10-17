@@ -515,15 +515,14 @@ export class ComposeEditor {
           <div class="cp-tbrow">
             <wa-button class="cp-play" variant="brand" size="s" id="cp-play" title="${t('Play / stop (Space)')}"><wa-icon name="play" label="Play"></wa-icon></wa-button>
             <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-loop" title="Loop"><wa-icon name="rotate-ccw" label="Loop"></wa-icon></wa-button>
+            <wa-button-group label="${t('History')}">
+              <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-undo" title="${t('Undo')} (${MOD}Z)"><wa-icon name="undo-2" label="${t('Undo')}"></wa-icon></wa-button><wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-redo" title="${t('Redo')} (${SHIFT_MOD}Z)"><wa-icon name="redo-2" label="${t('Redo')}"></wa-icon></wa-button>
+            </wa-button-group>
             <label class="cp-field">BPM <wa-number-input id="cp-bpm" size="s" without-steppers min="40" max="240" step="1"></wa-number-input></label>
             <label class="cp-field">${t('Grid')} <wa-select id="cp-snap" size="s" class="cp-select">${SNAPS.map(([v, l]) => `<wa-option value="${v}">${t(l)}</wa-option>`).join('')}</wa-select></label>
             <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-melmute" title="${t('Melody: on / mute')}"><wa-icon name="music" label="${t('Melody')}"></wa-icon></wa-button>
             <wa-button-group class="cp-pat" label="Pattern">
               ${btn('Pattern', { id: 'cp-withpat', icon: 'drum', title: t('Plays together with the Sequencer pattern') })}${btn(`<wa-icon name="chevron-down" label="${t('Pattern settings')}"></wa-icon>`, { id: 'cp-patset', title: t('Pattern: bass, volumes, BPM') })}
-            </wa-button-group>
-            <div class="spacer"></div>
-            <wa-button-group label="${t('History')}">
-              <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-undo" title="${t('Undo')} (${MOD}Z)"><wa-icon name="undo-2" label="${t('Undo')}"></wa-icon></wa-button><wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-redo" title="${t('Redo')} (${SHIFT_MOD}Z)"><wa-icon name="redo-2" label="${t('Redo')}"></wa-icon></wa-button>
             </wa-button-group>
           </div>
         </div>
