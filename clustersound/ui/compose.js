@@ -276,9 +276,14 @@ class Transport {
     }
   }
 
-  get position() {
+  get position() { return this._at(this.ctx.currentTime); }
+
+  // where the sound reaching the speakers is: position (the scheduling one) runs ahead by the output latency
+  get heardPosition() { return this._at(this.synth.player.heardTime()); }
+
+  _at(time) {
     if (!this.playing) return -1;
-    let s = this.ctx.currentTime - this.base;
+    let s = time - this.base;
     if (this.loop) s = ((s % this.lenSec) + this.lenSec) % this.lenSec;
     return this.from + Math.max(0, s) / this.spt;
   }
@@ -1066,7 +1071,7 @@ export class ComposeEditor {
   // play / pause: pausing keeps the position, play resumes from it (Stop goes back to the start)
   togglePlay() {
     if (this._rec) { this.stop(); return; }
-    if (this.transport.playing) { this._pausedAt = this.transport.position; this.stop(); return; }
+    if (this.transport.playing) { this._pausedAt = this.transport.heardPosition; this.stop(); return; }
     this.play(0, this._pausedAt);
   }
 
@@ -1209,7 +1214,7 @@ export class ComposeEditor {
     cancelAnimationFrame(this._raf);
     const ph = $('#cp-playhead');
     const step = () => {
-      const pos = this.transport.position;
+      const pos = this.transport.heardPosition;
       if (pos < 0 || $('#compose').hidden) { ph.hidden = true; this.renderToolbar(); return; }
       ph.hidden = false;
       ph.style.left = `${(pos / STEP_TICKS) * this.pxStep}px`;
@@ -2391,8 +2396,9 @@ export class ComposeEditor {
     const t0 = ctx.currentTime + 0.1;
     for (let i = 0; i < 4; i++) this.synth.note(i ? 84 : 96, 110, t0 + i * beat, t0 + i * beat + 0.05, 'pluck', 'melody');
     const at = t0 + 4 * beat;
-    // seconds from the recorder start (midway through the call) to the first beat of the progression
-    const offset = (performance.now() + (at - ctx.currentTime) * 1000 - (tA + tB) / 2) / 1000;
+    // seconds from the recorder start (midway through the call) to the first beat of the progression, as heard
+    // (the player plays along with the speakers, the output latency after the beat is scheduled)
+    const offset = (performance.now() + (at - ctx.currentTime) * 1000 - (tA + tB) / 2) / 1000 + this.player.latency();
     this._rec = { offset, loop: this.ui.loop };
     this.transport.play({ events: this.rendered.events, bpm, from: 0, to: this.seq.bars * 16 * STEP_TICKS, loop: this.ui.loop, at,
       onEnd: () => this.stopRecording() });
