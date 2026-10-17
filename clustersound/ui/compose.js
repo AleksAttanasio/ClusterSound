@@ -513,8 +513,9 @@ export class ComposeEditor {
             ${btn(`${t('Send to')} ${svg('chevron-down', 11)}`, { id: 'cp-send' })}
           </div>
           <div class="cp-tbrow">
-            <wa-button class="cp-play" variant="brand" size="s" id="cp-play" title="${t('Play / stop (Space)')}"><wa-icon name="play" label="Play"></wa-icon></wa-button>
-            <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-loop" title="Loop"><wa-icon name="rotate-ccw" label="Loop"></wa-icon></wa-button>
+            <wa-button-group label="${t('Transport')}">
+              <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-stop" title="Stop"><wa-icon name="square" label="Stop"></wa-icon></wa-button><wa-button class="cp-play" variant="brand" size="s" id="cp-play" title="${t('Play / pause (Space)')}"><wa-icon name="play" label="Play"></wa-icon></wa-button><wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-loop" title="Loop"><wa-icon name="rotate-ccw" label="Loop"></wa-icon></wa-button>
+            </wa-button-group>
             <wa-button-group label="${t('History')}">
               <wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-undo" title="${t('Undo')} (${MOD}Z)"><wa-icon name="undo-2" label="${t('Undo')}"></wa-icon></wa-button><wa-button class="icon-btn" appearance="filled-outlined" size="s" id="cp-redo" title="${t('Redo')} (${SHIFT_MOD}Z)"><wa-icon name="redo-2" label="${t('Redo')}"></wa-icon></wa-button>
             </wa-button-group>
@@ -616,6 +617,7 @@ export class ComposeEditor {
       this.transport.update(this.playEvents);
     };
     $('#cp-play').onclick = () => this.togglePlay();
+    $('#cp-stop').onclick = () => { this._pausedAt = null; this.stop(); };
     $('#cp-withpat').onclick = () => {
       this.ui.withPattern = !this.ui.withPattern;
       this._persist();
@@ -1061,18 +1063,26 @@ export class ComposeEditor {
     this.transport.play({ events: res.events, bpm: this.project.bpm, from: 0, to: seq.bars * 16 * STEP_TICKS, loop: false, onEnd: () => this.renderToolbar() });
   }
 
-  togglePlay() { if (this.transport.playing) this.stop(); else this.play(); }
+  // play / pause: pausing keeps the position, play resumes from it (Stop goes back to the start)
+  togglePlay() {
+    if (this._rec) { this.stop(); return; }
+    if (this.transport.playing) { this._pausedAt = this.transport.position; this.stop(); return; }
+    this.play(0, this._pausedAt);
+  }
 
-  async play(from = 0) {
+  // resume (a tick past `from`): starts sounding there, the loop still goes back to `from`
+  async play(from = 0, resume = null) {
     const to = this.seq.bars * 16 * STEP_TICKS;
     from = Math.max(0, Math.min(from, to - 1));
+    const pos = resume != null && resume > from && resume < to ? resume : from;
+    this._pausedAt = null;
     this.stop();
     const pe = this.ui.withPattern ? await this._preparePattern() : null;
     const at = this.synth.ctx.currentTime + 0.08;
-    if (pe) this._startPattern(pe, at, from);
+    if (pe) this._startPattern(pe, at, pos);
     this.synth.setVolume(this.ui.chordVol);
     this._melVolumes();
-    this.transport.play({ events: this.playEvents, bpm: this.project.bpm, from, to, loop: this.ui.loop, at,
+    this.transport.play({ events: this.playEvents, bpm: this.project.bpm, from, to, loop: this.ui.loop, at: at - (pos - from) * (60 / this.project.bpm / PPQ),
       onEnd: () => { this._stopPattern(); this.renderToolbar(); } });
     this.renderToolbar();
     this._animate();
@@ -1233,8 +1243,8 @@ export class ComposeEditor {
     const state = this._rec ? 'rec' : this.transport.playing ? 'stop' : 'play';
     if (play.dataset.state !== state) {
       play.dataset.state = state;
-      play.innerHTML = `<wa-icon name="${{ rec: 'circle', stop: 'square', play: 'play' }[state]}" label="${state === 'play' ? 'Play' : 'Stop'}"></wa-icon>`;
-      play.variant = state === 'play' ? 'brand' : 'danger';
+      play.innerHTML = `<wa-icon name="${{ rec: 'circle', stop: 'pause', play: 'play' }[state]}" label="${{ rec: 'Stop', stop: 'Pause', play: 'Play' }[state]}"></wa-icon>`;
+      play.variant = state === 'rec' ? 'danger' : 'brand';
     }
     play.classList.toggle('rec', !!this._rec);
     $('#cp-view').value = this.ui.view;
